@@ -1,7 +1,7 @@
-// Tiny cars driving the street grid and pedestrians walking the sidewalks.
+// Tiny cars driving the street grid, plus parked cars. People live in people.js.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { HALF, LANE, RW, CURB } from './city.js';
+import { LANE, RW } from './city.js';
 import { rng } from './textures.js';
 
 const IN = RW / 2; // where lanes stop before an intersection centre
@@ -83,43 +83,6 @@ export class Traffic {
     this.parkedMesh.computeBoundingSphere();
     parent.add(this.parkedMesh);
 
-    // pedestrians
-    const nWalk = opts.people ?? 3200;
-    const blocks = city.walkBlocks.map(b => ({ ...b, w: b.x1 - b.x0, d: b.z1 - b.z0, P: 2 * (b.x1 - b.x0 + b.z1 - b.z0) }));
-    const totalP = blocks.reduce((a, b) => a + b.P, 0);
-    this.walkers = [];
-    for (let k = 0; k < nWalk; k++) {
-      let t = r() * totalP, bi = 0;
-      while (t > blocks[bi].P && bi < blocks.length - 1) { t -= blocks[bi].P; bi++; }
-      this.walkers.push({ b: blocks[bi], s: t, v: (0.9 + r() * 0.8) * (r() < 0.5 ? 1 : -1), lat: (r() - 0.5) * 2.2 });
-    }
-    const crowdPts = [];
-    for (const c of city.crowds) {
-      for (let k = 0; k < c.n; k++) {
-        const a = r() * Math.PI * 2, d = Math.sqrt(r()) * c.rad;
-        crowdPts.push([c.x + Math.cos(a) * d, c.y, c.z + Math.sin(a) * d]);
-      }
-    }
-    // small knots of people standing at corners
-    for (let k = 0; k < 320; k++) {
-      const b = pick(blocks); const n = 3 + Math.floor(r() * 10);
-      const cx = r() < 0.5 ? b.x0 : b.x1, cz = r() < 0.5 ? b.z0 : b.z1;
-      for (let m = 0; m < n; m++) crowdPts.push([cx + (r() - 0.5) * 3, CURB, cz + (r() - 0.5) * 3]);
-    }
-    this.nWalk = nWalk;
-    const pplGeo = personGeometry();
-    this.pplMesh = new THREE.InstancedMesh(pplGeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }), nWalk + crowdPts.length);
-    const arr = this.pplMesh.instanceMatrix.array;
-    for (let k = 0; k < nWalk + crowdPts.length; k++) {
-      m4.identity();
-      if (k >= nWalk) { const c = crowdPts[k - nWalk]; m4.setPosition(c[0], c[1], c[2]); }
-      m4.toArray(arr, k * 16);
-      this.pplMesh.setColorAt(k, col.set(pick(PPL_COLS)));
-    }
-    this.pplMesh.castShadow = true; this.pplMesh.receiveShadow = true;
-    this.pplMesh.frustumCulled = false;
-    parent.add(this.pplMesh);
-
     this._m4 = m4; this._q = q; this._e = e; this._p = p; this._one = one;
     this.update(0);
   }
@@ -179,18 +142,5 @@ export class Traffic {
     }
     this.carMesh.instanceMatrix.needsUpdate = true;
 
-    const arr = this.pplMesh.instanceMatrix.array;
-    for (let k = 0; k < this.nWalk; k++) {
-      const w = this.walkers[k], b = w.b;
-      w.s += w.v * dt;
-      let s = ((w.s % b.P) + b.P) % b.P, x, z;
-      if (s < b.w) { x = b.x0 + s; z = b.z0 - w.lat * 0.5; }
-      else if ((s -= b.w) < b.d) { x = b.x1 + w.lat * 0.5; z = b.z0 + s; }
-      else if ((s -= b.d) < b.w) { x = b.x1 - s; z = b.z1 + w.lat * 0.5; }
-      else { s -= b.w; x = b.x0 - w.lat * 0.5; z = b.z1 - s; }
-      const o = k * 16;
-      arr[o + 12] = x; arr[o + 13] = CURB; arr[o + 14] = z;
-    }
-    this.pplMesh.instanceMatrix.needsUpdate = true;
   }
 }

@@ -103,7 +103,7 @@ export function buildCity(tex, opts = {}) {
     fac: [new Bucket(), new Bucket(), new Bucket(), new Bucket()],
     shop: new Bucket(), roof: new Bucket(), walk: new Bucket(), grass: new Bucket(),
   };
-  const crowns = [], trunks = [], tanks = [], lamps = [], stripes = [], parked = [], crowds = [], walkBlocks = [];
+  const crowns = [], trunks = [], tanks = [], lamps = [], stripes = [], parked = [], crowds = [], walkBlocks = [], open = [];
 
   // downtown clusters
   const centers = [];
@@ -282,6 +282,7 @@ export function buildCity(tex, opts = {}) {
         top(B.grass, blk, CURB + 0.04, lin('#ffffff'), 6);
         const n = Math.floor((blk.x1 - blk.x0) * (blk.z1 - blk.z0) / 45);
         for (let k = 0; k < n; k++) addTree(blk.x0 + 2 + r() * (blk.x1 - blk.x0 - 4), blk.z0 + 2 + r() * (blk.z1 - blk.z0 - 4), CURB, 1.6 + r() * 1.4, 2 + r() * 2);
+        open.push(blk);
         crowds.push({ x: (blk.x0 + blk.x1) / 2, z: (blk.z0 + blk.z1) / 2, y: CURB + 0.04, n: 20 + Math.floor(r() * 30), rad: 8 });
         continue;
       }
@@ -295,13 +296,14 @@ export function buildCity(tex, opts = {}) {
           top(B.walk, lot, CURB + 0.03, lin('#f4ead8'), 4);
           const n = 1 + Math.floor(r() * 4);
           for (let t = 0; t < n; t++) addTree(lot.x0 + 2 + r() * (lot.x1 - lot.x0 - 4), lot.z0 + 2 + r() * (lot.z1 - lot.z0 - 4), CURB, 1.5 + r(), 2.5);
+          open.push(lot);
           crowds.push({ x: (lot.x0 + lot.x1) / 2, z: (lot.z0 + lot.z1) / 2, y: CURB + 0.03, n: 10 + Math.floor(r() * 30), rad: Math.min(lot.x1 - lot.x0, lot.z1 - lot.z0) * 0.35 });
         } else if (k < 0.08) {
           top(B.grass, lot, CURB + 0.04, lin('#ffffff'), 6);
           const n = 1 + Math.floor(area / 60);
           for (let t = 0; t < n; t++) addTree(lot.x0 + 1.5 + r() * (lot.x1 - lot.x0 - 3), lot.z0 + 1.5 + r() * (lot.z1 - lot.z0 - 3), CURB, 1.3 + r() * 1.2, 1.8 + r() * 2);
         } else if (k < 0.13 && area > 250 && !interior) {
-          parkingLot(lot);
+          parkingLot(lot); open.push(lot);
         } else {
           building(lot, interior);
         }
@@ -418,7 +420,7 @@ export function buildCity(tex, opts = {}) {
   }, false);
 
   return {
-    group, sx, sz, NB, parked, crowds, walkBlocks,
+    group, sx, sz, NB, parked, crowds, walkBlocks, open,
     bounds: { x0: sx[0], x1: sx[NB], z0: sz[0], z1: sz[NB] },
     stats: { crowns: crowns.length, tanks: tanks.length, parked: parked.length, verts: Object.values(B).flat().reduce((a, b) => a + b.v, 0) },
   };

@@ -30,8 +30,17 @@ READ THIS FIRST after a compaction. Current as of 2026-10-25.
 ## Screenshots
 - `shots/`: shot3/shot4 desktop, shot5-low phone quality (sent to Sean 2026-10-25).
 
+## Outbreak (v0.2, 2026-10-25)
+- src/people.js: typed-array agent sim for every person. States WALK (block loop), IDLE (crowd), FLEE, RETURN, GRABBED, TURNING, ZOMBIE, FALLING. inf flag + incubation timer.
+- Walk grid at 0.5 m (street corridors + open lots: plazas, parks, parking) with wall sliding. Spatial hash (6 m cells) of civilians, rebuilt every step.
+- Shambler (ZTYPES[0]): wander 0.55, chase 1.3, lunge 2.9 under 2.2 m, sight 12, notice 5.5 m at 30% per think, bite 1.1 s, incubation 10-18 s. Bites scream-panic civilians within 12 m.
+- panic() must re-check isCivilian: states change mid-tick (this caused bitten victims to be cured; fixed).
+- Spread with one Shambler, no defenders: first bite from seconds (crowded drop) to ~3 min (quiet street); ~800 zombies at 7 min; city overrun ~15 min.
+- src/game.js: tap a street to drop (3 Shamblers per run), HUD counters, outbreak clock, speed 1/2/4/8x (fixed 1/30 s substeps), Follow (zooms to 170 m and tracks a zombie, cancels on drag), Reset.
+- Markers: green ring = zombie, amber = infected; drawn through buildings; scale with zoom. Blood decals at bites.
+
 ## Next (not started)
-- Zombie drop and infection spread, police and army response.
+- Police and army response. More zombie types.
 
 ## Private preview link
 - https://claude.ai/artifact/Jemm5Sxje8y9XvJxcFNPwN (private, Sean only). Page source: artifact/zday-city.html.

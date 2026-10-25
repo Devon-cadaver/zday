@@ -5,6 +5,8 @@ import { makeTextures } from './textures.js';
 import { buildCity } from './city.js';
 import { Traffic } from './traffic.js';
 import { Post } from './post.js';
+import { People } from './people.js';
+import { Game } from './game.js';
 
 const P = new URLSearchParams(location.search);
 const coarse = matchMedia('(pointer: coarse)').matches;
@@ -65,7 +67,8 @@ const t0 = performance.now();
 const tex = makeTextures(renderer);
 const city = buildCity(tex, { seed: num('seed', 20261025), blocks: low ? 10 : 12 });
 scene.add(city.group);
-const traffic = new Traffic(city, scene, { cars: low ? 160 : 280, people: low ? 2600 : 5200 });
+const traffic = new Traffic(city, scene, { cars: low ? 160 : 280 });
+const people = new People(city, scene, { people: low ? 2600 : 5200 });
 const buildMs = Math.round(performance.now() - t0);
 
 const post = new Post(renderer, { samples: low ? 0 : 4 });
@@ -78,7 +81,6 @@ addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight); post.setSize();
 });
 
-const hud = document.getElementById('hud');
 const clock = new THREE.Clock();
 let frames = 0, fpsT = 0, fps = 0, time = 0;
 const B = city.bounds, M = 60;
@@ -93,16 +95,18 @@ function frame() {
   if (cx !== tg.x || cz !== tg.z) { camera.position.x += cx - tg.x; camera.position.z += cz - tg.z; tg.x = cx; tg.z = cz; }
   tg.y = 0;
 
-  traffic.update(dt);
+  game.update(dt, fps);
   sun.position.copy(tg).addScaledVector(sunDir, 700);
   sun.target.position.copy(tg);
   const focus = camera.position.distanceTo(tg);
   post.render(scene, camera, focus, time);
 
   frames++; fpsT += dt;
-  if (fpsT > 0.5) { fps = Math.round(frames / fpsT); frames = 0; fpsT = 0; hud.textContent = 'Z-DAY city test · ' + fps + ' fps · drag to pan, pinch or scroll to zoom, two-finger or right-drag to rotate'; }
+  if (fpsT > 0.5) { fps = Math.round(frames / fpsT); frames = 0; fpsT = 0; }
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 
-window.__z = { THREE, scene, camera, controls, renderer, post, city, traffic, sun, hemi, setView, buildMs, info: () => renderer.info.render };
+const game = new Game({ people, traffic, camera, controls, renderer });
+
+window.__z = { THREE, scene, camera, controls, renderer, post, city, traffic, people, game, sun, hemi, setView, buildMs, info: () => renderer.info.render };
