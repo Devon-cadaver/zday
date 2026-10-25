@@ -10,7 +10,10 @@ READ THIS FIRST after a compaction. Current as of 2026-10-25.
 ## Stack
 - Three.js 0.170 + Vite 6, plain JS, same as Dead City (010) and Valhalla's Tide (012). No Blender: everything is procedural.
 - Dev server: `.claude/launch.json` config "zday" on port 5191.
-- Not a git repo yet, not published.
+- Live: https://devon-cadaver.github.io/zday/ (GitHub Pages, deploys on every push to main via .github/workflows/deploy.yml, about 1 minute).
+- Repo: https://github.com/Devon-cadaver/zday (public, branch main). Sean approved publishing on 2026-10-25.
+- No gh CLI on this PC. The repo was created through the GitHub REST API with the token from git credential manager (git credential fill), never printed.
+- The claude.ai artifact link does NOT open on Sean's older iPhone (viewer says browser unsupported). Use the GitHub Pages link for phone testing.
 
 ## Files
 - `src/main.js`: renderer, MapControls camera (fov 18, distance ~470, pitch 48, yaw 45), sun + hemisphere light, shadow camera follows the view target, render loop. Debug hook `window.__z`.
