@@ -1,0 +1,7 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "zday", "runtimeExecutable": "npx", "runtimeArgs": ["vite", "--port", "5191", "--strictPort"], "port": 5191 },
+    { "name": "zday-built", "runtimeExecutable": "npx", "runtimeArgs": ["vite", "preview", "--port", "4191", "--strictPort"], "port": 4191 }
+  ]
+}

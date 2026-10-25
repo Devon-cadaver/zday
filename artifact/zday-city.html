@@ -1,0 +1,16 @@
+<title>Z-Day City</title>
+<style>
+/* Full-bleed game canvas, single dark look so the scene frames the same on any host theme */
+:root { --ground: #2a1d12; --hud: #f6e7cc; --hud-shadow: #000000; color-scheme: dark; }
+html, body { height: 100%; margin: 0; background: var(--ground); overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; }
+canvas { position: fixed; inset: 0; display: block; width: 100%; height: 100%; }
+#hud {
+  position: fixed; left: 0; top: 0; z-index: 2; pointer-events: none; opacity: .85;
+  padding-top: calc(8px + env(safe-area-inset-top, 0px));
+  padding-left: max(12px, env(safe-area-inset-left, 0px));
+  padding-right: max(12px, env(safe-area-inset-right, 0px));
+  color: var(--hud); font: 12px/1.35 system-ui, -apple-system, "Segoe UI", sans-serif; text-shadow: 0 1px 2px var(--hud-shadow);
+}
+</style>
+<div id="hud">Building the city…</div>
+<script type="module" src="assets/index-P22UZ3nu.js"></script>
