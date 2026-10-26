@@ -10,10 +10,10 @@
 import * as THREE from 'three';
 import { HALF, RW, CURB } from './city.js';
 import { rng } from './textures.js';
-import { figureGeometry, figureMaterial, figureAttributes, rollArchetype, OFFICER_LOOK, FIREFIGHTER_LOOK, ZTYPES, rollZombieType, ZSKIN, FLAG } from './figures.js';
+import { figureGeometry, figureMaterial, figureAttributes, rollArchetype, OFFICER_LOOK, FIREFIGHTER_LOOK, SOLDIER_LOOK, ZTYPES, rollZombieType, ZSKIN, FLAG } from './figures.js';
 
 export const ST = { WALK: 0, IDLE: 1, FLEE: 2, RETURN: 3, GRABBED: 4, TURNING: 5, ZOMBIE: 6, FALLING: 7, DEAD: 8, SEEK: 9, INSIDE: 10, ROOF: 11, PILE: 12, CLIMB: 13, JUMP: 14, COP: 15, FIREMAN: 16, EVAC: 17 };
-export const KIND = { CIVILIAN: 0, OFFICER: 1, FIREFIGHTER: 2 };
+export const KIND = { CIVILIAN: 0, OFFICER: 1, FIREFIGHTER: 2, SOLDIER: 3 };
 export { ZTYPES };
 
 const INCUBATE = [10, 18];
@@ -124,7 +124,7 @@ export class People {
     this.flashes = new THREE.InstancedMesh(new THREE.SphereGeometry(0.35, 6, 4), new THREE.MeshBasicMaterial({ color: '#fff2a0' }), this.flashMax);
     this.flashes.count = 0; this.flashes.frustumCulled = false;
     parent.add(this.flashes);
-    this.flashList = [];
+    this.flashList = []; this.grenades = []; this.grenadeCd = 0;
     this.dust = [];
     for (let k = 0; k < 6; k++) {
       const m = new THREE.Mesh(new THREE.RingGeometry(0.6, 1.0, 28).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#efe0c0', transparent: true, opacity: 0, depthWrite: false }));
@@ -269,9 +269,9 @@ export class People {
     this.drops = 0;
     this.bloodN = 0; this.blood.count = 0;
     this.time = 0; this.bldT = 0; this.firstRoof = false;
-    this.stats = { humans: this.nHuman, infected: 0, zombies: 0, dead: 0, roof: 0, bites: 0, runover: 0, shot: 0, officers: 0, rescued: 0 };
+    this.stats = { humans: this.nHuman, infected: 0, zombies: 0, dead: 0, roof: 0, bites: 0, runover: 0, shot: 0, officers: 0, rescued: 0, bombed: 0, bombedCiv: 0 };
     this.events = [];
-    this.flashList.length = 0;
+    this.flashList.length = 0; this.grenades.length = 0; this.grenadeCd = 0;
     for (const d of this.dust) { d.m.visible = false; d.t = 1; }
     this.sync(300);
   }
@@ -479,8 +479,8 @@ export class People {
     return done;
   }
 
-  // commander: officers get out of a cruiser at (x,z)
-  spawnOfficers(x, z, n) {
+  // commander: officers get out of a cruiser at (x,z); kind OFFICER or SOLDIER
+  spawnOfficers(x, z, n, kind = KIND.OFFICER) {
     const out = [];
     for (let k = 0; k < n && this.active < this.N; k++) {
       const a = this.r() * Math.PI * 2;
@@ -492,12 +492,12 @@ export class People {
       if (!p) p = this.snapWalkable(x + Math.cos(a) * 2.5, z + Math.sin(a) * 2.5, 12);
       if (!p) continue;
       const i = this.active++;
-      this.st[i] = S.COP; this.kind[i] = KIND.OFFICER; this.lvl[i] = -1; this.inf[i] = 0; this.fx[i] = 0;
+      this.st[i] = S.COP; this.kind[i] = kind; this.lvl[i] = -1; this.inf[i] = 0; this.fx[i] = 0;
       this.x[i] = p[0]; this.z[i] = p[1]; this.y[i] = this.groundY(p[0], p[1]);
-      this.s[i] = p[0]; this.lat[i] = p[1]; // post
+      this.s[i] = kind === KIND.SOLDIER ? x : p[0]; this.lat[i] = kind === KIND.SOLDIER ? z : p[1]; // post (soldiers hold the vehicle)
       this.target[i] = -1; this.think[i] = 0; this.wt[i] = 0.5 + this.r() * 0.5; this.bt[i] = -1; this.inc[i] = 0;
       this.hx[i] = Math.cos(a); this.hz[i] = Math.sin(a);
-      this.base[i] = OFFICER_LOOK(this.r); this.setLook(i, this.base[i]); this.dirty[i] = 0;
+      this.base[i] = kind === KIND.SOLDIER ? SOLDIER_LOOK(this.r) : OFFICER_LOOK(this.r); this.setLook(i, this.base[i]); this.dirty[i] = 0;
       this.stats.officers++;
       out.push(i);
     }
@@ -651,6 +651,11 @@ export class People {
       if (d.t >= 1) d.m.visible = false;
     }
     for (let k = this.flashList.length - 1; k >= 0; k--) { if ((this.flashList[k].t -= h) <= 0) this.flashList.splice(k, 1); }
+    this.grenadeCd -= h;
+    for (let k = this.grenades.length - 1; k >= 0; k--) {
+      const gr = this.grenades[k];
+      if ((gr.t -= h) <= 0) { this.grenades.splice(k, 1); this.blast(gr.x, gr.z, 5, false); this.puff(gr.x, gr.z); if (this.fire) this.fire.spray(gr.x, gr.z, 0.5, 6, 2.5, 0.9); }
+    }
   }
 
   fleeStep(i, h) {
@@ -746,12 +751,14 @@ export class People {
     const x = this.x[i], z = this.z[i];
     if ((this.think[i] -= h) <= 0) {
       this.think[i] = 0.25;
-      const mop = this.stats.zombies <= 12, R = mop ? 160 : 60; // few left: officers roam and hunt them down
-      let best = R * R, bi = -1, near = 0;
-      this.around(x, z, R, (j, d2) => { if (this.st[j] !== S.ZOMBIE) return; if (d2 < 36) near++; if (d2 < best) { best = d2; bi = j; } });
-      if (!mop && bi >= 0 && Math.hypot(this.x[bi] - this.s[i], this.z[bi] - this.lat[i]) > 100) bi = -1; // too far from the post
+      const sol = this.kind[i] === KIND.SOLDIER;
+      const mop = this.stats.zombies <= 12, R = mop ? 160 : sol ? 70 : 60; // few left: officers roam and hunt them down
+      let best = R * R, bi = -1, near = 0, clump = 0, cx = 0, cz = 0;
+      this.around(x, z, R, (j, d2) => { if (this.st[j] !== S.ZOMBIE) return; if (d2 < 36) near++; if (d2 < best) { best = d2; bi = j; } if (sol && d2 > 100 && d2 < 900) { clump++; cx += this.x[j]; cz += this.z[j]; } });
+      if (!mop && bi >= 0 && Math.hypot(this.x[bi] - this.s[i], this.z[bi] - this.lat[i]) > (sol ? 45 : 100)) bi = -1; // too far from the post
       this.target[i] = bi;
-      if (near >= 8) { // overrun: fall back
+      if (sol && clump >= 6 && this.grenadeCd <= 0) { this.grenadeCd = 4; this.grenade(i, cx / clump, cz / clump); }
+      if (near >= (sol ? 14 : 8)) { // overrun: fall back
         this.st[i] = S.FLEE; this.tx[i] = 3.0; this.t1[i] = 4; this.target[i] = bi;
         const dx = x - this.x[bi], dz = z - this.z[bi], d = Math.hypot(dx, dz) || 1; this.hx[i] = dx / d; this.hz[i] = dz / d;
         this.events.push({ type: 'fallback', i });
@@ -762,14 +769,15 @@ export class People {
     if (tg >= 0 && this.st[tg] === S.ZOMBIE) {
       const dx = this.x[tg] - x, dz = this.z[tg] - z, d = Math.hypot(dx, dz) || 0.001;
       this.hx[i] = dx / d; this.hz[i] = dz / d;
+      const sol = this.kind[i] === KIND.SOLDIER, engage = sol ? 18 : 12, range = sol ? 32 : 22;
       if (this.inc[i] > 0) { // detouring round a corner
         this.inc[i] -= h; this.fx[i] = 1;
         if (!this.move(i, this.hx[i], this.hz[i], 2.4 * h)) this.inc[i] = 0;
-      } else if (d > 12) { if (!this.move(i, dx / d, dz / d, 2.8 * h) && this.randomCardinal(i, 1.5)) this.inc[i] = 1.2; this.fx[i] = 1; }
+      } else if (d > engage) { if (!this.move(i, dx / d, dz / d, 2.8 * h) && this.randomCardinal(i, 1.5)) this.inc[i] = 1.2; this.fx[i] = 1; }
       else if (d < 3.5) { this.move(i, -dx / d, -dz / d, 1.8 * h); this.fx[i] = 1; }
       else this.fx[i] = 2;
-      this.wt[i] -= h;
-      if (this.wt[i] <= 0 && d < 22) { this.wt[i] = 0.6; this.shoot(i, tg, d); }
+      this.wt[i] -= h; if (sol) this.inc0[i] -= h;
+      if (this.wt[i] <= 0 && d < range) { this.wt[i] = sol ? 0.35 : 0.6; this.shoot(i, tg, sol ? d * 0.6 : d); }
       return;
     }
     // no target: drift back toward the post
@@ -823,14 +831,46 @@ export class People {
     if (this.wt[i] <= 0) { this.wt[i] = 0.35; F.spray(b.wall[0] - b.n[0] * 0.6 + (this.r() - 0.5) * 2, b.wall[1] - b.n[1] * 0.6 + (this.r() - 0.5) * 2, 1.5 + this.r() * 4); }
   }
 
+  // a soldier lobs a grenade at a clump: 5 m kill radius after a 1.5 s fuse
+  grenade(i, gx, gz) {
+    this.events.push({ type: 'grenade', x: gx, z: gz, from: i });
+    this.grenades.push({ x: gx, z: gz, t: 1.5 });
+  }
+
+  // airstrike / grenade: everything within R dies; civilians count against the commander
+  blast(x, z, R, civilians = true) {
+    let zk = 0, ck = 0;
+    const R2 = R * R;
+    for (let j = 0; j < this.active; j++) {
+      const s = this.st[j];
+      if (s === S.DEAD || s === S.INSIDE || s === S.EVAC) continue;
+      if (this.lvl[j] >= 0 && R < 15) continue; // grenades do not reach rooftops
+      const dx = this.x[j] - x, dz = this.z[j] - z, d2 = dx * dx + dz * dz;
+      if (d2 > R2) continue;
+      const wasZ = s === S.ZOMBIE || s === S.PILE || s === S.CLIMB || s === S.TURNING || s === S.FALLING;
+      if (!wasZ && !civilians) continue;
+      if (s === S.PILE || s === S.CLIMB) { const k = this.bt[j]; if (k >= 0) { this.bPile[k] = Math.max(0, this.bPile[k] - 1); } }
+      const d = Math.sqrt(d2) || 1, k = (1 - d / R) * 12 + 3;
+      this.st[j] = S.DEAD; this.inf[j] = 0; this.lvl[j] = -1; this.x[j] += dx / d * 0.5; this.z[j] += dz / d * 0.5;
+      this.hx[j] = dx / d; this.hz[j] = dz / d; this.y[j] = this.groundY(this.x[j], this.z[j]);
+      this.deadLook(j);
+      if (wasZ) zk++; else { ck++; if (this.kind[j] === KIND.CIVILIAN) this.stats.bombedCiv++; }
+    }
+    this.stats.bombed += zk;
+    if (R >= 15) { this.addBlood(x, z, R * 0.5); this.scare(x, z, R * 2.5, 0.95); }
+    else this.addBlood(x, z, 1.5);
+    this.events.push({ type: 'blastkill', x, z, zk, ck });
+    return { zk, ck };
+  }
+
   shoot(i, j, d = 10) {
     const x = this.x[i], z = this.z[i];
     this.events.push({ type: 'shot', x, z, tx: this.x[j], tz: this.z[j] });
     if (this.flashList.length < this.flashMax) this.flashList.push({ x: x + this.hx[i] * 0.6, y: this.y[i] + 1.3, z: z + this.hz[i] * 0.6, t: 0.08 });
     const hit = Math.min(0.95, 1.05 - 0.025 * d) + (this.ztype(j).hitMod || 0);
     if (this.r() < hit) this.kill(j, (this.x[j] - x) * 0.5, (this.z[j] - z) * 0.5, 'shot');
-    // the noise draws idle zombies toward the shooter
-    this.around(x, z, 25, (k) => {
+    // the noise draws idle zombies toward the shooter (rifles carry further)
+    this.around(x, z, this.kind[i] === KIND.SOLDIER ? 45 : 25, (k) => {
       if (this.st[k] !== S.ZOMBIE || this.target[k] >= 0 || this.bt[k] >= 0 || this.r() > 0.5) return;
       const dx = x - this.x[k], dz = z - this.z[k], dd = Math.hypot(dx, dz) || 1;
       this.hx[k] = dx / dd; this.hz[k] = dz / dd; this.wt[k] = 4; this.fx[k] = 3;

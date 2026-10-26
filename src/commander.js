@@ -9,6 +9,8 @@ export const UNITS = [
   { id: 'fire', name: 'Fire truck', cost: 80, cd: 30, alert: 2 },
   { id: 'water', name: 'Water heli', cost: 150, cd: 60, alert: 2 },
   { id: 'rescue', name: 'Rescue heli', cost: 120, cd: 45, alert: 2 },
+  { id: 'apc', name: 'Army APC', cost: 250, cd: 60, alert: 3 },
+  { id: 'strike', name: 'Airstrike', cost: 300, cd: 45, alert: 4 },
 ];
 const ALERTS = ['Quiet', 'Outbreak', 'Spreading', 'Major incident', 'City emergency'];
 const ROUND = 600;
@@ -30,6 +32,8 @@ const MSGS = {
   fireout: 'The fire crew knocked down a blaze',
   waterdrop: 'Water drop! Everything under it is out and soaked',
   rescued: 'Survivors are being lifted off a rooftop',
+  grenade: 'The squad is throwing grenades into the horde',
+  blast: 'Airstrike on target. Fires are starting in the blast zone',
 };
 
 export class Commander {
@@ -77,7 +81,7 @@ export class Commander {
     this.sel = null; this.cool = {}; for (const u of UNITS) this.cool[u.id] = 0;
     if (g.helis) g.helis.reset();
     this.kills0 = 0; this.sent = 0; this.lost = 0; this.heatT = 0; this.spawned = 0; this.callT = 30;
-    this.out0 = 0; this.rescued0 = 0; this.trucks = 0; this.helisSent = 0;
+    this.out0 = 0; this.rescued0 = 0; this.trucks = 0; this.helisSent = 0; this.apcs = 0; this.strikes = 0; this.bombedCiv0 = 0; this.bombed0 = 0;
     this.lastCall = null; this.call.hidden = true; for (const p of this.pins) { p.life = 0; p.m.visible = false; }
     for (const c of Object.values(this.cards)) c.btn.classList.remove('sel');
     // three outbreak sites, well apart, away from the edge
@@ -95,9 +99,9 @@ export class Commander {
   }
 
   // a 911 call: toast, call strip, and a search zone on the map (jittered, so it is a hunt)
-  report(x, z, text, radius) {
+  report(x, z, text, radius, exact = false) {
     const p = this.g.people;
-    const a = p.r() * Math.PI * 2, jit = p.r() * radius * 0.45;
+    const a = p.r() * Math.PI * 2, jit = exact ? 0 : p.r() * radius * 0.45;
     const cx = x + Math.cos(a) * jit, cz = z + Math.sin(a) * jit;
     this.lastCall = { x: cx, z: cz };
     this.g.toast(text, 4200);
@@ -134,6 +138,8 @@ export class Commander {
     else if (id === 'fire') this.sendFire(x, z);
     else if (id === 'water') this.sendWater(x, z);
     else if (id === 'rescue') this.sendRescue(x, z);
+    else if (id === 'apc') this.sendApc(x, z);
+    else if (id === 'strike') this.sendStrike(x, z);
   }
 
   sendPolice(x, z) {
@@ -191,6 +197,27 @@ export class Commander {
     g.toast('Rescue helicopter inbound to a roof with ' + p.bRoof[bk] + ' people, ' + Math.ceil(hl.eta) + ' s out');
   }
 
+  sendApc(x, z) {
+    const g = this.g, p = g.people;
+    const car = g.traffic.dispatchTo(x, z, {
+      kind: 'apc',
+      onArrive: (ax, az) => { p.spawnOfficers(ax, az, 8, 3); g.toast('Squad deployed. They are holding the crossing in the ' + this.district(ax, az)); },
+      onLost: () => { this.lost++; g.toast('The APC was lost on the way'); },
+    });
+    if (!car) { g.toast('No APC available'); return; }
+    this.spend('apc'); this.apcs++;
+    g.toast('APC rolling, about ' + Math.ceil(car.eta) + ' s out');
+  }
+
+  sendStrike(x, z) {
+    const g = this.g;
+    const jet = g.helis.strike(x, z, { radius: 25, onBlast: (bx, bz) => { if (g.camera.position.distanceTo(g.controls.target) < 500) this.shake = 1; } });
+    this.spend('strike'); this.strikes++;
+    // mark the target for the player
+    this.report(x, z, 'Airstrike inbound. Impact in ' + Math.ceil(jet.eta) + ' s. Clear the area!', 25, true);
+    this.lastCall = { x, z };
+  }
+
   onEvent(e) {
     if (e.type === 'bite' && e.officer && !this.g.seen.copbit) { this.g.seen.copbit = true; this.g.toast(MSGS.copbit, 3200); }
   }
@@ -238,6 +265,9 @@ export class Commander {
     const k = p.stats.shot; if (k > this.kills0) { this.rp += k - this.kills0; this.earned += k - this.kills0; this.kills0 = k; }
     const fo = g.fire.stats.out; if (fo > this.out0) { this.rp += 30 * (fo - this.out0); this.earned += 30 * (fo - this.out0); this.out0 = fo; }
     const rs = p.stats.rescued; if (rs > this.rescued0) { this.rp += 3 * (rs - this.rescued0); this.earned += 3 * (rs - this.rescued0); this.rescued0 = rs; }
+    const bz = p.stats.bombed; if (bz > this.bombed0) { this.rp += bz - this.bombed0; this.earned += bz - this.bombed0; this.bombed0 = bz; }
+    const bc = p.stats.bombedCiv; if (bc > this.bombedCiv0) { this.rp -= 5 * (bc - this.bombedCiv0); this.earned -= 5 * (bc - this.bombedCiv0); this.bombedCiv0 = bc; g.toast('Your airstrike killed ' + bc + ' civilians so far', 3500); }
+    if (this.shake > 0) { this.shake -= sdt * 1.2; const k = Math.max(0, this.shake) * 2.5; g.camera.position.x += (Math.random() - 0.5) * k; g.camera.position.z += (Math.random() - 0.5) * k; }
     for (const id in this.cool) if (this.cool[id] > 0) this.cool[id] = Math.max(0, this.cool[id] - sdt);
     for (const q of this.pins) {
       if (q.life <= 0) continue;
@@ -296,6 +326,8 @@ export class Commander {
       ['Zombies shot by police', s.shot.toLocaleString()],
       ['Cruisers and trucks sent / wrecked', (this.sent + this.trucks) + ' / ' + this.lost],
       ['Helicopters sent', this.helisSent],
+      ['APCs / airstrikes', this.apcs + ' / ' + this.strikes],
+      ['Killed by bombs: zombies / civilians', s.bombed + ' / ' + s.bombedCiv],
       ['Rescued by helicopter', s.rescued.toLocaleString()],
       ['Fires put out', g.fire.stats.out],
       ['Buildings burned', (g.fire.bFire.length - intact).toLocaleString()],

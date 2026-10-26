@@ -78,8 +78,15 @@ READ THIS FIRST after a compaction. Current as of 2026-10-25.
 - Points: +30 per fire put out, +3 per rescued. End screen: helicopters sent, rescued, fires put out.
 - Headless check: at a 325-zombie outbreak at 163 s, truck + crew arrive but the crew dies within a minute (fine, sent late); water drop put out 3 buildings; rescue heli lifted 12. Calm test: crew hoses a building out in ~10 s with two on the line.
 
+## Commander phase 3: army and airstrike (v0.7, 2026-10-25)
+- Cards: Army APC 250 pts / 60 s at alert 3, Airstrike 300 pts / 45 s at alert 4.
+- APC: traffic MISSION_KINDS.apc = VEHICLES.stryker, cap 6, cruise 12, tough: never crashes (the other car wrecks), ignores pedestrians, parks in the intersection it was sent to (stopAt = len - 1). On arrival people.spawnOfficers(x, z, 8, KIND.SOLDIER): state COP with kind SOLDIER, SOLDIER_LOOK (olive, helmet, vest, pack), post = the APC. Soldiers: search 70 m, leash 45 m from the post, engage from 18 m, fire every 0.35 s within 32 m with accuracy as if the target were at 0.6x the distance, fall back at 14 zombies within 6 m (police: 8). Their gunfire draws idle zombies within 45 m (police 25 m), so a squad is a horde magnet. Grenades: when 6+ zombies sit 10-30 m away, one soldier lobs at their centroid; squad-wide cooldown people.grenadeCd 4 s; 1.5 s fuse, people.blast(x, z, 5, civilians=false) kills zombies only, puff + mist.
+- Airstrike: Commander.sendStrike -> helis.strike(x, z, {radius 25}): an A-10 (buildVehicle('a10'), scale 2.2) spawns 900 m out on a random heading through the target at 120 m/s, 60 m up; releases a bomb (cylinder mesh) at lead = 120*sqrt(2*60/9.8) m before the target, ballistic fall; on impact fire.blast (fireball + smoke + dust, char every building within 25 m, 35% ignite) and people.blast (everything within 25 m dies incl. rooftop people; civilians count stats.bombedCiv, -5 pts each, +1 per zombie). Camera shake if within 500 m. The strike is marked with an exact red ring (report(..., exact=true)) and 'Impact in N s' in the call strip.
+- Headless: an APC squad against a 10-20 zombie clump kills everything approaching within 30 m (34 kills / 90 s with few arrivals, 8 alive). Airstrike on a 24-zombie clump in a busy street: 24 zombies and ~40 civilians dead, 2-8 fires. Expensive on purpose.
+- Screenshot trick: g.speed = 0 freezes the sim while the render loop keeps drawing; to frame a jet at height H with pitch 35 shift the camera target toward the camera by H*cos(35)/... (about 86 m for H=60, azimuth 45: target = jet + (-0.707, -0.707) * 86).
+
 ## Next
-- Commander phases 3-5 per DESIGN.md: fire truck, water and rescue helicopters, army APC, airstrike, nuke, evacuation bus, XP and levels, menu.
+- Commander phases 4-5 per DESIGN.md: nuke, evacuation bus, XP and levels, menu.: fire truck, water and rescue helicopters, army APC, airstrike, nuke, evacuation bus, XP and levels, menu.
 
 ## Earlier plan note
 - Sean decided on 2026-10-25 to make the player the hero (emergency commander) instead of dropping zombies. The full plan is DESIGN.md (round, alert levels, units, points, levelling, 5 implementation phases). Sandbox stays at ?mode=sandbox.

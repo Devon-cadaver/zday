@@ -14,7 +14,7 @@ const LEN = 4.3, HALF_L = 2.2, HALF_W = 0.95;
 const CELL = 10;
 const DRIVE = 0, WRECK = 1, REST = 2, PARKED = 3;
 const MISSION_CAP = 24;
-const MISSION_KINDS = { police: { geo: () => cruiserGeometry(), cap: 12, cruise: 14 }, fire: { geo: () => VEHICLES.fire_truck.build(), cap: 8, cruise: 11 } };
+const MISSION_KINDS = { police: { geo: () => cruiserGeometry(), cap: 12, cruise: 14 }, fire: { geo: () => VEHICLES.fire_truck.build(), cap: 8, cruise: 11 }, apc: { geo: () => VEHICLES.stryker.build(), cap: 6, cruise: 12, tough: true } };
 const STOPLINE = 3.4; // car centre stops this far before the lane end
 
 const CAR_COLS = ['#f2efe8', '#f2efe8', '#f2efe8', '#e8e6e0', '#b8b8b4', '#9a9a98', '#2a2a2c', '#8c2a22', '#2f4566', '#d8c9a8', '#e0b030', '#5b6b4a'];
@@ -216,6 +216,7 @@ export class Traffic {
         else if (car.panic <= 0 && !car.mission) { car.s = Math.max(before, car.len - STOPLINE); car.v = 0; return; }
       }
       if (car.mission && car.ri + 2 >= car.route.length && car.s >= this.stopAt(car)) { car.s = this.stopAt(car); this.park(car); return; }
+      if (car.mission && car.kind === 'apc' && car.ri + 2 >= car.route.length && car.s >= car.len - 1) { car.s = car.len - 1; this.park(car); return; }
       if (car.s >= car.len) {
         const over = car.s - car.len; this.startTurn(car); car.t = over / car.tlen;
       }
@@ -289,7 +290,7 @@ export class Traffic {
         car.pedGap = 99;
         if (car.panic <= 0) {
           P.around(car.x + car.hx * 5, car.z + car.hz * 5, 6, (j) => {
-            if (!P.hittable(j) || (car.mission && P.st[j] === 6)) return;
+            if (!P.hittable(j) || (car.mission && P.st[j] === 6) || car.kind === 'apc') return;
             const dx = P.x[j] - car.x, dz = P.z[j] - car.z;
             const lx = dx * car.hx + dz * car.hz, lz = -dx * car.hz + dz * car.hx;
             if (lx > 1 && lx < 11 && Math.abs(lz) < 1.5) car.pedGap = Math.min(car.pedGap, lx - HALF_L);
@@ -401,7 +402,10 @@ export class Traffic {
         if (!this.overlap(car, o)) return;
         const rvx = car.hx * car.v - o.hx * o.v, rvz = car.hz * car.v - o.hz * o.v;
         const rel = Math.hypot(rvx, rvz);
-        if (rel > 5 && (car.mode === DRIVE || o.mode === DRIVE)) this.crash(car, (o.mode === REST || o.mode === PARKED) ? null : o, rel);
+        if (rel > 5 && (car.mode === DRIVE || o.mode === DRIVE)) {
+          if (car.kind === 'apc' || o.kind === 'apc') { const soft = car.kind === 'apc' ? o : car; if (soft.mode === DRIVE && soft.kind !== 'apc') this.crash(soft, null, rel); }
+          else this.crash(car, (o.mode === REST || o.mode === PARKED) ? null : o, rel);
+        }
         else this.separate(car, o);
       });
     }
@@ -478,6 +482,7 @@ export class Traffic {
 
   // where on its final segment a mission car pulls over: beside the tap point
   stopAt(car) {
+    if (car.kind === 'apc') return car.len - 1; // right at the crossing
     if (!car.to) return car.len - 7;
     const s = (car.to[0] - car.p0x) * car.dx + (car.to[1] - car.p0z) * car.dz;
     return Math.min(car.len - 7, Math.max(3, s));

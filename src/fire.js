@@ -143,6 +143,27 @@ export class Fire {
 
   later(dt, fn) { this.timers.push({ at: this.simT + dt, fn }); }
 
+  // airstrike: a fireball, a dust ring, scorched ground, fires on buildings inside
+  blast(x, z, R = 25) {
+    const t = this.uniforms.uTime.value;
+    const fb = this.flames.alloc(60, x, 1, z, R * 0.45, R * 0.45, 5.5, t);
+    const sm = this.smoke.alloc(40, x, 4, z, R * 0.6, R * 0.6, 3.5, t);
+    this.later(1.2, () => this.flames.end(fb, this.uniforms.uTime.value));
+    this.later(6, () => this.flames.release(fb));
+    this.later(14, () => this.smoke.end(sm, this.uniforms.uTime.value));
+    this.later(26, () => this.smoke.release(sm));
+    this.spray(x, z, 0.5, 50, R * 0.9, 1.4);
+    let lit = 0;
+    this.city.buildings.forEach((b, k) => {
+      const cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2, d = Math.hypot(cx - x, cz - z);
+      if (d > R) return;
+      this.city.char(k, 0.6);
+      if (Math.random() < 0.35 && this.igniteBuilding(k)) lit++;
+    });
+    this.events.push({ type: 'blast', x, z, lit });
+    return lit;
+  }
+
   // a fire on a car wreck at rest: burns a minute or so, smoulders, goes out
   carFire(x, z) {
     const t = this.uniforms.uTime.value;

@@ -3,12 +3,26 @@
 import * as THREE from 'three';
 import { buildVehicle } from './vehicles.js';
 
-const SPEED = 30, ALT = 48;
+const SPEED = 30, ALT = 48, JET_SPEED = 120, JET_ALT = 60;
 
 export class Helicopters {
   constructor(scene, city, fire, people) {
     Object.assign(this, { scene, city, fire, people });
-    this.list = []; this.events = [];
+    this.list = []; this.events = []; this.jets = [];
+    this.bombGeo = new THREE.CylinderGeometry(0.5, 0.3, 3.2, 8); this.bombGeo.rotateZ(Math.PI / 2);
+    this.bombMat = new THREE.MeshStandardMaterial({ color: '#3a3f3a', roughness: 0.6 });
+  }
+
+  // an A-10 run: straight line through (tx,tz), bomb released to land there, blast on impact
+  strike(tx, tz, opts = {}) {
+    const obj = buildVehicle('a10'); obj.scale.setScalar(2.2);
+    const a = Math.random() * Math.PI * 2, R = 900;
+    const hx = Math.cos(a), hz = Math.sin(a);
+    const jet = { obj, x: tx - hx * R, y: JET_ALT, z: tz - hz * R, hx, hz, tx, tz, state: 'in', t: 0, bomb: null, onBlast: opts.onBlast, radius: opts.radius ?? 25 };
+    obj.position.set(jet.x, jet.y, jet.z);
+    this.scene.add(obj); this.jets.push(jet);
+    jet.eta = R / JET_SPEED;
+    return jet;
   }
 
   // kind 'water' | 'rescue'; opts.k = building index for a rescue
@@ -58,6 +72,31 @@ export class Helicopters {
       }
     }
     if (this.list.some(hl => hl.dead)) this.list = this.list.filter(hl => !hl.dead);
+    for (const j of this.jets) {
+      j.x += j.hx * JET_SPEED * h; j.z += j.hz * JET_SPEED * h; j.t += h;
+      const along = (j.tx - j.x) * j.hx + (j.tz - j.z) * j.hz; // distance still to go to the target
+      // a bomb dropped from 60 m at 120 m/s travels about 3.5 s: release that far out
+      const lead = JET_SPEED * Math.sqrt(2 * JET_ALT / 9.8);
+      if (j.state === 'in' && along <= lead) {
+        j.state = 'dropped';
+        const m = new THREE.Mesh(this.bombGeo, this.bombMat); m.castShadow = true;
+        this.scene.add(m);
+        j.bomb = { m, x: j.x, y: j.y - 2, z: j.z, vx: j.hx * JET_SPEED, vz: j.hz * JET_SPEED, vy: 0 };
+      }
+      if (j.bomb) {
+        const b = j.bomb;
+        b.vy -= 9.8 * h; b.x += b.vx * h; b.z += b.vz * h; b.y += b.vy * h;
+        b.m.position.set(b.x, b.y, b.z); b.m.rotation.y = Math.atan2(-b.vz, b.vx); b.m.rotation.z = Math.atan2(b.vy, Math.hypot(b.vx, b.vz));
+        if (b.y <= 0.5) {
+          this.scene.remove(b.m); j.bomb = null;
+          this.fire.blast(b.x, b.z, j.radius);
+          this.people.blast(b.x, b.z, j.radius);
+          if (j.onBlast) j.onBlast(b.x, b.z);
+        }
+      }
+      if (along < -1200) { this.scene.remove(j.obj); j.dead = true; }
+    }
+    if (this.jets.some(j => j.dead)) this.jets = this.jets.filter(j => !j.dead);
   }
 
   sync(dt) {
@@ -69,7 +108,8 @@ export class Helicopters {
       o.rotation.z = -(hl.v / SPEED) * 0.25;
       if (o.userData.rotor) o.userData.rotor.rotation.y += dt * 22;
     }
+    for (const j of this.jets) { j.obj.position.set(j.x, j.y, j.z); j.obj.rotation.y = Math.atan2(-j.hz, j.hx); j.obj.rotation.z = Math.sin(j.t * 1.5) * 0.04; }
   }
 
-  reset() { for (const hl of this.list) this.scene.remove(hl.obj); this.list = []; this.events.length = 0; }
+  reset() { for (const hl of this.list) this.scene.remove(hl.obj); this.list = []; for (const j of this.jets) { this.scene.remove(j.obj); if (j.bomb) this.scene.remove(j.bomb.m); } this.jets = []; this.events.length = 0; }
 }

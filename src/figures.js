@@ -166,6 +166,7 @@ export function rollArchetype(r) {
   let t = r(); for (const a of ARCHETYPES) { if ((t -= a.w) <= 0) return a; }
   return ARCHETYPES[0];
 }
+export const SOLDIER_LOOK = (r) => ({ shirt: C('#4a5a3a'), pants: C('#3e4a30'), skin: pick(r, SKINS), hat: HAT.HARD, accent: C('#3a4a30'), flags: FLAG.VEST | FLAG.PACK, accent2: C('#2f3a26') });
 export const FIREFIGHTER_LOOK = (r) => ({ shirt: C('#c9a24a'), pants: C('#b8903c'), skin: pick(r, SKINS), hat: HAT.HARD, accent: C('#f2c300'), flags: FLAG.VEST, accent2: C('#e8e23a') });
 export const OFFICER_LOOK = (r) => ({ shirt: C('#22305e'), pants: C('#1b2240'), skin: pick(r, SKINS), hat: HAT.CAP, accent: C('#1b2240'), flags: FLAG.VEST, accent2: C('#1b2240') });
 
