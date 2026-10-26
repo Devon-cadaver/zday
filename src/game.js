@@ -1,12 +1,12 @@
 // Shared game layer: HUD scaffolding, toasts, tap input, time speed, fixed-step
-// simulation, follow camera. Modes plug in: Sandbox (drop zombies) and Commander
-// (send help to the city).
+// simulation, follow camera. Modes plug in: Commander (send help to the city),
+// Be The Disaster (drive one yourself) and Sandbox (drop zombies and disasters).
 import * as THREE from 'three';
 import { ST } from './people.js';
 import { Commander } from './commander.js';
-import { Profile, UNLOCK, UPGRADES, LEVELS, MAX_LEVEL, HAZARD_LEVEL } from './profile.js';
-import { HAZARDS, WEATHER } from './disasters.js';
-import { Storm } from './storm.js';
+import { Profile, UNLOCK, UPGRADES, LEVELS, MAX_LEVEL, HAZARD_LEVEL, BE_LEVEL } from './profile.js';
+import { HAZARDS, WEATHER, threatName } from './disasters.js';
+import { BeTheDisaster, BE } from './be.js';
 
 const CSS = `
 #zd-top{position:fixed;left:0;right:0;top:0;display:flex;gap:6px;align-items:center;flex-wrap:wrap;
@@ -62,7 +62,7 @@ const CSS = `
   padding:max(16px, env(safe-area-inset-left));font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;color:#f6ead2}
 #zd-menu[hidden]{display:none}
 #zd-menu .box{width:100%;max-width:380px;background:rgba(32,24,14,.92);border:1px solid rgba(255,236,200,.18);border-radius:16px;padding:22px 20px 18px;text-align:center;max-height:calc(100vh - 32px);overflow:auto}
-#zd-menu h1{margin:0;font-size:34px;letter-spacing:.18em;color:#fff4e0}
+#zd-menu h1{margin:0;font-size:30px;line-height:1.05;letter-spacing:.12em;color:#fff4e0}
 #zd-menu .tag{font-size:12px;letter-spacing:.12em;text-transform:uppercase;opacity:.7;margin:2px 0 14px}
 #zd-menu .rank{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;margin:0 0 6px}
 #zd-menu .rank b{font-size:16px;color:#a6ff4d}
@@ -80,6 +80,7 @@ const CSS = `
 #zd-menu .row .d{font-size:11px;opacity:.75}
 #zd-menu .row .s{font-size:11px;white-space:nowrap;color:#ffc233;font-variant-numeric:tabular-nums}
 #zd-menu .row .zd-btn{padding:8px 10px;font-size:11px;min-width:0}
+#zd-menu .row .zd-btn.own-go{background:rgba(70,98,34,.9);border-color:rgba(166,255,77,.5)}
 #zd-menu .row .zd-btn.own{background:rgba(70,98,34,.9);border-color:rgba(166,255,77,.5);pointer-events:none}
 #zd-menu .back{margin-top:12px}
 #zd-menu .foot{font-size:11px;opacity:.55;margin:12px 0 0}
@@ -123,14 +124,17 @@ export class Game {
     document.body.appendChild(this.menu);
     if (mode === 'sandbox') this.mode = new Sandbox(this);
     else if (mode === 'commander') this.mode = new Commander(this);
-    else if (mode === 'storm') this.mode = new Storm(this);
-    else { this.mode = new Idle(); this.showMenu(); }
+    else if (mode === 'be' || mode === 'storm') { // ?mode=be&kind=lava starts that disaster, ?mode=be alone opens the picker
+      const d = new URLSearchParams(location.search).get('kind') || (mode === 'storm' ? 'tornado' : '');
+      if (BE[d] && this.profile.level >= BE_LEVEL[d]) this.mode = new BeTheDisaster(this, d);
+      else { this.mode = new Idle(); this.showMenu('be'); }
+    } else { this.mode = new Idle(); this.showMenu(); }
   }
 
-  startMode(which) {
+  startMode(which, kind) {
     this.menu.hidden = true;
     this.top.innerHTML = ''; this.bar.innerHTML = '';
-    this.mode = which === 'sandbox' ? new Sandbox(this) : which === 'storm' ? new Storm(this) : new Commander(this);
+    this.mode = which === 'sandbox' ? new Sandbox(this) : which === 'be' ? new BeTheDisaster(this, kind) : new Commander(this);
   }
 
   // ---------- main menu and unlocks
@@ -141,13 +145,23 @@ export class Game {
       '<div class="next">' + (next ? (next - pr.xp).toLocaleString() + ' XP to level ' + (lvl + 1) + this.nextUnlockText(lvl + 1) : 'Maximum level') + '</div>';
     let body;
     if (panel === 'main') {
-      body = '<h1>Z-DAY</h1><div class="tag">Emergency commander</div>' + rank +
+      const beOpen = Object.keys(BE).filter(k => lvl >= BE_LEVEL[k]).length;
+      body = '<h1>MY TINY<br>DISASTER</h1><div class="tag">Save the city, or be the disaster</div>' + rank +
         '<div class="btns"><button class="zd-btn main" type="button" data-go="commander">Play · Commander</button>' +
         '<button class="zd-btn" type="button" data-go="unlocks">Units and upgrades' + (pr.bank >= 3000 && UPGRADES.some(u => pr.canBuy(u.id)) ? ' · upgrade available' : '') + '</button>' +
-        '<button class="zd-btn" type="button" data-go="storm">Storm · be the tornado' + (pr.data.stormBest ? ' · best ' + pr.data.stormBest.toLocaleString() : '') + '</button>' +
+        '<button class="zd-btn" type="button" data-go="be">Be The Disaster · ' + beOpen + ' of ' + Object.keys(BE).length + ' unlocked</button>' +
         '<button class="zd-btn dim" type="button" data-go="sandbox">Sandbox · drop zombies and disasters</button>' +
         '<a class="zd-btn dim" href="showcase.html" style="text-decoration:none;display:block">Roster · every model</a></div>' +
         '<div class="foot">' + pr.data.rounds + ' rounds played · best score ' + pr.data.best.toLocaleString() + ' · ' + pr.data.stars + ' stars' + (pr.ok ? '' : ' · progress is not being saved on this device') + '</div>';
+    } else if (panel === 'be') {
+      const bests = pr.data.beBest || {};
+      body = '<h1>BE THE<br>DISASTER</h1><div class="tag">One finger drives it, two fingers move the camera</div>' + rank +
+        '<div class="list">' + Object.keys(BE).map(k => {
+          const ok = lvl >= BE_LEVEL[k];
+          return '<div class="row' + (ok ? '' : ' locked') + '"><div><div class="n">' + BE[k].name + '</div><div class="d">' + (ok ? BE[k].hint + (bests[k] ? ' · best ' + bests[k].toLocaleString() : '') : 'Unlocks at commander level ' + BE_LEVEL[k]) + '</div></div>' +
+            (ok ? '<button class="zd-btn own-go" type="button" data-be="' + k + '">Play</button>' : '<span class="s">L' + BE_LEVEL[k] + '</span>') + '</div>';
+        }).join('') + '</div>' +
+        '<div class="btns back"><button class="zd-btn" type="button" data-go="main">Back</button></div>';
     } else {
       const units = Object.keys(UNIT_NAMES).map(id => {
         const need = UNLOCK[id], ok = lvl >= need;
@@ -160,20 +174,22 @@ export class Game {
       }).join('');
       body = '<h1>UNLOCKS</h1><div class="tag">' + pr.bank.toLocaleString() + ' XP to spend</div>' + rank +
         '<div class="list">' + units + '</div><div class="tag" style="margin-top:16px">Upgrades</div><div class="list">' + ups + '</div>' +
-        '<div class="tag" style="margin-top:16px">Threats</div><div class="list">' + Object.keys(HAZARD_LEVEL).map(h => '<div class="row' + (lvl >= HAZARD_LEVEL[h] ? '' : ' locked') + '"><div><div class="n">' + HAZARDS[h].name + '</div><div class="d">' + (lvl >= HAZARD_LEVEL[h] ? 'Can strike during a round' : 'Starts at level ' + HAZARD_LEVEL[h]) + '</div></div><span class="s">L' + HAZARD_LEVEL[h] + '</span></div>').join('') + '</div>' +
+        '<div class="tag" style="margin-top:16px">Threats</div><div class="list">' + Object.keys(HAZARD_LEVEL).map(h => '<div class="row' + (lvl >= HAZARD_LEVEL[h] ? '' : ' locked') + '"><div><div class="n">' + threatName(h) + '</div><div class="d">' + (lvl >= HAZARD_LEVEL[h] ? 'Can strike during a round' : 'Starts at level ' + HAZARD_LEVEL[h]) + '</div></div><span class="s">L' + HAZARD_LEVEL[h] + '</span></div>').join('') + '</div>' +
         '<div class="btns back"><button class="zd-btn" type="button" data-go="main">Back</button></div>';
     }
     this.menu.innerHTML = '<div class="box">' + body + '</div>';
     this.menu.hidden = false;
-    this.menu.querySelectorAll('[data-go]').forEach(b => { b.onclick = () => { const go = b.dataset.go; if (go === 'commander' || go === 'sandbox' || go === 'storm') this.startMode(go); else this.showMenu(go); }; });
+    this.menu.querySelectorAll('[data-go]').forEach(b => { b.onclick = () => { const go = b.dataset.go; if (go === 'commander' || go === 'sandbox') this.startMode(go); else this.showMenu(go); }; });
+    this.menu.querySelectorAll('[data-be]').forEach(b => { b.onclick = () => this.startMode('be', b.dataset.be); });
     this.menu.querySelectorAll('[data-buy]').forEach(b => { b.onclick = () => { if (pr.buy(b.dataset.buy)) { this.toast('Upgrade bought'); this.showMenu('unlocks'); } }; });
   }
 
   nextUnlockText(level) {
     const units = Object.keys(UNLOCK).filter(id => UNLOCK[id] === level).map(id => UNIT_NAMES[id]);
     const ups = UPGRADES.filter(u => u.level === level).map(u => u.name);
-    const all = units.concat(ups), hz = Object.keys(HAZARD_LEVEL).filter(h => HAZARD_LEVEL[h] === level).map(h => HAZARDS[h].name);
-    return (all.length ? ' · unlocks ' + all.join(', ') : '') + (hz.length ? ' · new threat: ' + hz.join(', ') : '');
+    const all = units.concat(ups), hz = Object.keys(HAZARD_LEVEL).filter(h => HAZARD_LEVEL[h] === level).map(threatName);
+    const be = Object.keys(BE_LEVEL).filter(k => BE_LEVEL[k] === level && level > 1).map(k => BE[k].name);
+    return (all.length ? ' · unlocks ' + all.join(', ') : '') + (hz.length ? ' · new threat: ' + hz.join(', ') : '') + (be.length ? ' · be the ' + be.join(', ').toLowerCase() : '');
   }
 
   buildUI() {

@@ -6,8 +6,8 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 - The game is **My Tiny Disaster** (renamed from Z-Day on 2026-10-26; the repo and URL stay devon-cadaver/zday, the save key stays zday_profile so progress is kept).
 - A warm sepia tilt-shift miniature city (procedural Three.js) that disasters hit. Sean plays on an older iPhone through GitHub Pages and wants finished, pushed work with screenshots sent via SendUserFile.
 - Modes (menu = default page):
-  - **Commander** (main game): random disasters each round that the player reacts to with rescue units (police, evacuation bus, fire truck, water and rescue helicopters, army APC, airstrike, nuke). XP, levels (12), unlocks, upgrades, stars. Zombie outbreaks are one of the possible disasters.
-  - **Be The Disaster** (was Storm mode): pick a disaster unlocked by your level and control it by dragging a finger (tornado, alien saucer, tsunami, lava, earthquake cracks, sinkhole, meteor). Score, ranks, best per disaster.
+  - **Commander** (main game): each 10 minute round is a run of 2 to 5 random incidents (zombie outbreak, quake, riot, flood... up to meltdown as you level) that the player answers with rescue units (police, evacuation bus, fire truck, water and rescue helicopters, army APC, airstrike, nuke). The next incident comes early once the city is quiet; clearing them all secures the city. XP, levels (12), unlocks, upgrades, stars.
+  - **Be The Disaster** (src/be.js, was Storm mode): pick a disaster unlocked by your level and drive it with one finger for 3 minutes (tornado, sinkhole, earthquake, meteor shower, lava, tsunami, alien saucer); two fingers pan and zoom. Score, ranks, best per disaster.
   - **Sandbox**: drop zombies, Disasters panel triggers any of the 14 disasters and 9 weathers.
   - showcase.html: roster of every model.
 - Disasters (src/disasters.js registry HAZARDS + start()): tornado, quake, flood, tsunami, riot, aliens, meteor, sinkhole, volcano, haboob (dust storm), coldwave, solar, nuclear, meltdown, plus zombie outbreaks. Weather: clear, rain, storm, fog, snow, heat, ash, dust, sand.
@@ -20,7 +20,7 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 - main.js: renderer, camera, lights, render loop, camera shake per frame, window.__z.
 - game.js: shared layer (HUD, toasts, tap input, speed, fixed 1/30 s step, menu, unlock screen) and the Sandbox mode with the Disasters panel.
 - commander.js: the main game round. profile.js: XP, levels, UNLOCK, UPGRADES, HAZARD_LEVEL, WEATHER_LEVEL, difficulty().
-- storm.js: Be The Disaster mode.
+- be.js: Be The Disaster mode (BE table, one controller class per disaster, BeTheDisaster mode).
 - city.js: layout (grid, superblocks, roundabouts, diagonal avenue), buildings (records with door, roof, hut/hatch, vertex ranges), street furniture, destruction API (hideBuilding, extractBuilding, addRubble, takeStreetNear, restoreAll, char).
 - outskirts.js: terrain biomes, sea, highways, trees, the nuclear power plant (plant.group, towers, reactor, lightMat, steam()).
 - traffic.js: cars on the node graph (insets, roundabout polylines, don't-block-the-box, closed roads), mission vehicles, parked cars, flinging.
@@ -49,6 +49,7 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 - `src/textures.js`: canvas textures (facades, shopfronts, roof, asphalt, sidewalk, grass).
 
 ## URL params
+- `mode=commander|be|sandbox` (no mode = menu); `mode=be&kind=lava` starts that disaster straight away (tornado, sinkhole, quake, meteor, lava, tsunami, saucer); `mode=storm` still opens the tornado.
 - `q=low|high` (low is auto on touch devices: 10x10 blocks, fewer people/cars, no MSAA, 2048 shadows).
 - `x`, `z`, `d`, `p`, `a`, `fov`: camera target, distance, pitch, yaw, field of view.
 - `dof=0`, `grade=0`, `blur=0.022`, `sun`, `hemi`, `fog`, `seed`.
@@ -163,8 +164,16 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 - outskirts.js: 3800 m terrain mesh around the city (asphalt plane trimmed to city + 36 m): biome weights by angle from the centre (east desert dunes + far mesas, south beach sloping into the sea, north ridged mountains with snow above ~180 m, west forest hills), flat apron near the city, highways out of the middle of the west, east and north edges (terrain flattened under them), the plant site flattened on the coast. Sea shader plane (surf lines rolling in). Instanced pines (4200 / 2000 low, thicker near town), cacti, rocks, palms, no shadow casting. Nuclear power plant: two lathe cooling towers with steam (outskirts.steam(fire) after every reset), reactor dome, turbine hall, striped stack, warning lights. Tsunamis mostly come from the ocean (south).
 - Tested: every new piece headless; six disasters stacked in an L12 round with no errors; 60 fps in q=low at 390x844 on the dev PC.
 
+## Commander incidents and Be The Disaster (v1.3, 2026-10-26)
+- Sean: rename the game My Tiny Disaster; the Commander game should be random disasters that the player reacts to with rescue teams; the tornado Storm mode becomes Be The Disaster, where you pick a disaster and move it with your finger (saucers, wave, tornado, lava, quake cracks, sinkhole).
+- Commander (commander.js): a round is profile.difficulty().incidents incidents (L1 2, L2-3 3, L4-6 4, L7+ 5) drawn without repeats from HAZARD_LEVEL (zombies, quake, riot L1; flood, sinkhole L2; tornado, coldwave L3; tsunami, haboob L4; aliens L5; solar L6; volcano L7; meteor L8; nuclear L9; meltdown L10), zombies weighted x3. The first comes at 4 s; each later one is due by a spread-out time (4 + k x 420/(n-1) +-15%) or sooner once the city has been quiet (no disaster in the list, no zombies or bitten, no burning buildings) for 12 s and 40 s have passed since the last. A zombie incident breaks out at diff.sites sites (1/2/3) 0, 11 and 23 s apart, each with a jittered 911 ring. Contained ('City secured') = every incident in, 30 s since the last, quiet for 3 s. HUD has an Incidents n/N pill. The round plan (weather, incidents, outbreak sites) uses Math.random: the people RNG is reseeded on every reset, so p.r() gave the same round every time.
+- Be The Disaster (be.js): controllers get down/move/up from one pointer (MapControls touches.ONE and mouse LEFT are null; two fingers or right mouse pan, pinch or wheel zoom). Tornado = player Twister, camera follows. Sinkhole = a Hole that grows 4.5 m/s while held (max 38 m) swallowing and collapsing what it reaches, then blocks the walk grid and closes roads. Quake = the crack tip tears toward the finger at up to 35 m/s, a jagged decal every 7 m; buildings within 9 m collapse by height odds or catch fire (gas mains), people fall in, cars crash. Meteor = tap to call one (5 s cooldown, quiet, every other one throws a mushroom cloud). Lava = a city-wide LavaField (n 150, cell = city span / n) poured at the finger at 150 m3/s with an additive lava fountain; lava now sets buildings alight (also in the volcano). Tsunami = waves always off the ocean, speed 16; SweepFront.pull boosts sections within 220 m of the finger up to 2.5x (0.5 elsewhere, 1.6 for stragglers once 60% of the city is under); the next wave lands 16 s after one recedes (the old one drains 4x faster). Saucer = player saucer flies to the finger; hold still to beam people (3 per 0.3 s) and cars up, fly to blast buildings, cars and people below every 0.35 s.
+- Scoring: stat deltas every 0.5 s (150 per building, 12 per death, 30 per abduction, 40 per wrecked car, 60 per building fire) x a per-disaster k (tornado 0.9, sinkhole 0.6, quake 1, meteor 0.45, lava 1.6, tsunami 0.35, saucer 3.5) tuned so a busy simulated run of each lands near rank A (65k). Ranks D 8k, C 20k, B 40k, A 65k, S 95k. profile.addBe(kind, score): XP score/10, data.beBest[kind]. BE_LEVEL tornado/sinkhole 1, quake 2, meteor 3, lava 4, tsunami 5, saucer 6.
+- Gotcha: the URL param `d` is the camera distance, so the disaster kind is `kind` (d=lava made the camera NaN).
+- Tested headless at 390x844: all seven controllers for 3 simulated minutes without errors, real mouse and CDP multi-touch input (one finger drives, the second finger stops it and pans), 60 fps pouring lava in q=low, Commander rounds at L1 and L8, the City secured path, the menu, unlocks and Sandbox.
+
 ## Next
-- All five phases and the disasters are in. Sean is testing on his phone; tune from his notes. Candidates: card bar height on the phone, unit costs and cooldowns, airstrike and nuke civilian penalties, outbreak timing, more zombie types in play.: fire truck, water and rescue helicopters, army APC, airstrike, nuke, evacuation bus, XP and levels, menu.
+- Sean tests v1.3 on his phone; tune from his notes. Candidates: Be The Disaster score scales and ranks once real scores come in, the saucer size at close zoom, how often zombie outbreaks turn up in Commander, incident pacing, card bar height on the phone.
 
 ## Earlier plan note
 - Sean decided on 2026-10-25 to make the player the hero (emergency commander) instead of dropping zombies. The full plan is DESIGN.md (round, alert levels, units, points, levelling, 5 implementation phases). Sandbox stays at ?mode=sandbox.

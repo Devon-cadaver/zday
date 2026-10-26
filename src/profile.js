@@ -8,9 +8,12 @@ export const MAX_LEVEL = LEVELS.length;
 // level at which each unit becomes available
 export const UNLOCK = { police: 1, bus: 1, fire: 2, water: 3, rescue: 3, apc: 4, strike: 5, nuke: 6 };
 
-// level from which each disaster and kind of weather can turn up in a Commander round
-export const HAZARD_LEVEL = { quake: 2, riot: 2, flood: 3, sinkhole: 3, tornado: 4, tsunami: 5, coldwave: 5, aliens: 6, haboob: 6, solar: 7, volcano: 8, meteor: 9, nuclear: 10, meltdown: 11 };
+// level from which each kind of incident and weather can turn up in a Commander round
+export const HAZARD_LEVEL = { zombies: 1, quake: 1, riot: 1, flood: 2, sinkhole: 2, tornado: 3, coldwave: 3, tsunami: 4, haboob: 4, aliens: 5, solar: 6, volcano: 7, meteor: 8, nuclear: 9, meltdown: 10 };
 export const WEATHER_LEVEL = { clear: 1, rain: 2, fog: 2, storm: 4, snow: 4, heat: 5, sand: 5 };
+
+// Be The Disaster: the level at which each disaster can be played
+export const BE_LEVEL = { tornado: 1, sinkhole: 1, quake: 2, meteor: 3, lava: 4, tsunami: 5, saucer: 6 };
 
 export const UPGRADES = [
   { id: 'squad4', name: 'Four-officer cruisers', cost: 3000, level: 7, desc: 'Every cruiser carries four officers instead of two.' },
@@ -56,13 +59,13 @@ export class Profile {
     return { xp, levelUp: level > before, level, before };
   }
 
-  // a Storm run: XP for the damage done, best score kept
-  addStorm(score) {
+  // a Be The Disaster run: XP for the damage done, best score kept per disaster
+  addBe(kind, score) {
     const before = this.level;
-    const xp = Math.max(100, Math.round(score / 20));
+    const xp = Math.max(100, Math.round(score / 10));
     this.data.xp += xp; this.data.stormRuns = (this.data.stormRuns || 0) + 1;
-    const best = score > (this.data.stormBest || 0);
-    if (best) this.data.stormBest = score;
+    const bests = this.data.beBest || (this.data.beBest = {}), best = score > (bests[kind] || 0);
+    if (best) bests[kind] = score;
     this.save();
     return { xp, best, levelUp: this.level > before, level: this.level };
   }
@@ -71,14 +74,13 @@ export class Profile {
   difficulty() {
     const l = this.level;
     return {
-      outbreaks: l <= 1 ? 1 : l === 2 ? 2 : 3,
+      incidents: l <= 1 ? 2 : l <= 3 ? 3 : l <= 6 ? 4 : 5, // incidents per round
+      sites: l <= 1 ? 1 : l <= 3 ? 2 : 3,                 // outbreak sites in a zombie incident
       incubate: l <= 1 ? [20, 30] : l === 2 ? [15, 24] : [10, 18],
       seeds: l >= 8 ? 4 : 3,
       runners: l >= 10,
       policeCd: (l >= 5 ? 15 : 20) * (this.has('fastcops') ? 0.5 : 1),
       fireCd: 30 * (this.has('fastcops') ? 0.5 : 1),
-      hazards: l >= 7 ? 2 : l >= 2 ? 1 : 0, // disasters per round
-      hazardChance: l >= 4 ? 0.85 : 0.65,     // odds the first one happens at all
     };
   }
 }

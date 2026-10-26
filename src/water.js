@@ -245,6 +245,7 @@ export class SweepFront {
     this.halfW = this.width / 2; this.segW = this.width / (FRONT_N - 1);
     this.coast = ['South', 'North', 'East', 'West'][side];
     this.speed = o.speed ?? 15; this.slow = o.slow ?? 0.45; this.fast = o.fast ?? 1.08; this.pileK = o.pile ?? 1.4; this.t = 0;
+    this.pull = o.pull || null; // optional (tangent coordinate, front) -> speed factor: lets a player drag the front
     this.F = new Float32Array(FRONT_N); this.P = new Float32Array(FRONT_N).fill(1); this.T = new Float32Array(FRONT_N);
     this.pace = new Float32Array(FRONT_N); this.ph = new Float32Array(FRONT_N);
     const a = Math.random() * 6, b = Math.random() * 6, s0 = o.start ?? -40;
@@ -263,7 +264,7 @@ export class SweepFront {
       const [x, z] = this.at(k);
       let blocked = false;
       if (this.slow < 1 && this.inCity(x, z)) city.buildingsNear(x, z, 3, (kb, d) => { if (d === 0 && !city.dead[kb]) blocked = true; });
-      F[k] += this.speed * this.pace[k] * (0.9 + 0.2 * Math.sin(this.t * 0.35 + this.ph[k])) * (blocked ? this.slow : this.fast) * h;
+      F[k] += this.speed * this.pace[k] * (0.9 + 0.2 * Math.sin(this.t * 0.35 + this.ph[k])) * (blocked ? this.slow : this.fast) * (this.pull ? this.pull(-this.halfW + k * this.segW, F[k]) : 1) * h;
       P[k] += ((blocked ? this.pileK : 1) - P[k]) * Math.min(1, h * 2.5);
     }
     // keep it one body: a little smoothing, and no section may trail its neighbour by more than a steep slope
@@ -281,14 +282,14 @@ export class Tsunami {
   constructor(D, opts = {}) {
     this.type = 'tsunami'; this.D = D; this.t = 0; this.alive = true; this.phase = 'warn';
     const side = opts.side ?? (Math.random() < 0.75 ? 0 : Math.floor(Math.random() * 4)); // 0 south (the ocean), 1 north, 2 east, 3 west
-    const sw = this.sw = new SweepFront(D, side, { speed: 15, slow: 0.45, fast: 1.08, pile: 1.4 });
+    const sw = this.sw = new SweepFront(D, side, { speed: opts.speed ?? 15, slow: 0.45, fast: 1.08, pile: 1.4, pull: opts.pull, start: opts.start });
     Object.assign(this, { dir: sw.dir, origin: sw.origin, tan: sw.tan, extent: sw.extent, width: sw.width, halfW: sw.halfW, segW: sw.segW, coast: sw.coast, front: sw.F, pile: sw.P });
     this.Hw = opts.height ?? 12; this.floodH = 4.2; this.warnT = opts.warn ?? 18; this.damaged = new Set(); this.stepN = 0;
     this.recedeT = 0;
     const { people, traffic } = D.ctx;
-    people.alarm(40);
+    if (!opts.quiet) people.alarm(40);
     for (const car of traffic.cars) if (car.mode === 0 && !car.mission) { car.panic = 30; car.zx = this.origin.x; car.zz = this.origin.y; }
-    D.emit({ type: 'warn', hazard: 'tsunami', x: this.origin.x + this.dir.x * 60, z: this.origin.y + this.dir.y * 60, r: 120, exact: true, text: 'Tsunami warning! A wave is coming in from the ' + this.coast + ' coast. Get everyone onto the rooftops' });
+    if (!opts.quiet) D.emit({ type: 'warn', hazard: 'tsunami', x: this.origin.x + this.dir.x * 60, z: this.origin.y + this.dir.y * 60, r: 120, exact: true, text: 'Tsunami warning! A wave is coming in from the ' + this.coast + ' coast. Get everyone onto the rooftops' });
     // the wave: x runs along the coast, z is distance behind the front; the vertex shader bends it to the front line
     const geo = new THREE.PlaneGeometry(this.width, 70, 220, 28); geo.rotateX(-Math.PI / 2); geo.translate(0, 0, 35);
     this.mat = new THREE.ShaderMaterial({

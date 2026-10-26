@@ -15,6 +15,8 @@ import { Haboob, ColdWave } from './fronts.js';
 import { SolarStorm } from './solar.js';
 import { Mushroom, NuclearStrike, Meltdown } from './nuke.js';
 
+export const threatName = (h) => (h === 'zombies' ? 'Zombie outbreak' : HAZARDS[h].name);
+
 export const HAZARDS = {
   tornado: { name: 'Tornado', tap: true },
   quake: { name: 'Earthquake', tap: true },

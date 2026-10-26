@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { NOISE, Splash } from './water.js';
 import { Hole } from './impact.js';
 
-const N = 80, CELL = 3.5;
+const N0 = 80, CELL0 = 3.5;
 const LAVA_VS = /* glsl */`
 uniform sampler2D uMap;
 varying vec2 vUv; varying vec3 vW;
@@ -33,7 +33,8 @@ void main() {
 
 // the lava itself; stays in D.leftovers, cooling, until the world is reset
 export class LavaField {
-  constructor(D, x, z) {
+  constructor(D, x, z, o = {}) {
+    const N = this.N = o.n ?? N0, CELL = this.CELL = o.cell ?? CELL0; // a bigger field can cover the whole city
     this.D = D; this.x0 = x - N * CELL / 2; this.z0 = z - N * CELL / 2;
     this.H = new Float32Array(N * N); this.T = new Float32Array(N * N); this.F = new Float32Array(N * N); this.HT = new Float32Array(N * N);
     this.covered = new Uint8Array(N * N); this.bcell = new Int32Array(N * N).fill(-1); this.melt = new Map(); this.newCells = []; this.roadCells = [];
@@ -49,18 +50,19 @@ export class LavaField {
     this.texT = 0; this.fxT = 0; this.closeT = 0;
     D.leftovers.push(this);
   }
-  cellAt(x, z) { const i = Math.floor((x - this.x0) / CELL), j = Math.floor((z - this.z0) / CELL); return i < 0 || j < 0 || i >= N || j >= N ? -1 : j * N + i; }
+  cellAt(x, z) { const N = this.N, i = Math.floor((x - this.x0) / this.CELL), j = Math.floor((z - this.z0) / this.CELL); return i < 0 || j < 0 || i >= N || j >= N ? -1 : j * N + i; }
   pour(x, z, vol) { // cubic metres of fresh lava at (x, z)
     const c = this.cellAt(x, z); if (c < 0) return;
-    const add = vol / (CELL * CELL); this.T[c] = (this.T[c] * this.H[c] + add) / (this.H[c] + add); this.H[c] += add;
+    const add = vol / (this.CELL * this.CELL); this.T[c] = (this.T[c] * this.H[c] + add) / (this.H[c] + add); this.H[c] += add;
   }
   update(h) {
-    const { H, T, F, HT, bcell } = this, city = this.D.ctx.city;
+    const { H, T, F, HT, bcell, N } = this, city = this.D.ctx.city;
     F.fill(0); HT.fill(0);
     for (let j = 1; j < N - 1; j++) for (let i = 1; i < N - 1; i++) {
       const c = j * N + i, hc = H[c]; if (hc < 0.02) continue;
       const visc = 0.1 + (1 - T[c]) * 0.7; // cooling lava stiffens and stops
-      for (const nb of [c - 1, c + 1, c - N, c + N]) {
+      for (let q = 0; q < 4; q++) {
+        const nb = q === 0 ? c - 1 : q === 1 ? c + 1 : q === 2 ? c - N : c + N;
         const wall = bcell[nb] >= 0 && !city.dead[bcell[nb]] ? 1.4 : 0; // a standing building holds the flow back
         const dh = hc - (H[nb] + wall) - visc; if (dh <= 0) continue;
         const f = Math.min(dh * 0.18, hc * 0.2) * Math.min(1, h * 8);
@@ -83,7 +85,7 @@ export class LavaField {
     if ((this.fxT -= h) <= 0) { this.fxT = 0.5; this.effects(); }
   }
   effects() {
-    const D = this.D, { people, traffic, city, fire } = D.ctx, { H, T } = this;
+    const D = this.D, { people, traffic, city, fire } = D.ctx, { H, T, N, CELL } = this;
     const hot = (x, z) => { const c = this.cellAt(x, z); return c >= 0 && H[c] > 0.15 && T[c] > 0.15; };
     for (let i = 0; i < people.active; i++) {
       const s = people.st[i];
@@ -97,6 +99,7 @@ export class LavaField {
       const cx = this.x0 + (c % N + 0.5) * CELL, cz = this.z0 + (Math.floor(c / N) + 0.5) * CELL;
       for (const it of city.takeStreetNear(cx, cz, CELL * 0.8)) fire.burst(it.x, it.y, it.z, 8, 1.6);
       people.block(cx, cz, CELL * 0.75);
+      city.buildingsNear(cx, cz, CELL, (k) => { if (!fire.bFire[k] && Math.random() < 0.3) fire.igniteBuilding(k); }); // lava against a wall sets the building alight
       this.roadCells.push(cx, cz);
     }
     this.newCells.length = 0;
@@ -109,7 +112,7 @@ export class LavaField {
   sync(dt, realT) {
     if ((this.texT -= dt) <= 0) {
       this.texT = 0.1;
-      const d = this.data;
+      const d = this.data, N = this.N;
       for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
         const c = j * N + i, o = ((N - 1 - j) * N + i) * 4; // texture rows run the other way to z
         d[o] = Math.min(255, this.H[c] / 2.55 * 255); d[o + 1] = this.T[c] * 255; d[o + 2] = 0; d[o + 3] = 255;

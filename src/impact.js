@@ -73,7 +73,7 @@ export class Hole {
 }
 
 // everything within R of (x, z) goes down the hole
-function swallow(D, x, z, R, moversOnly = false) {
+export function swallow(D, x, z, R, moversOnly = false) {
   const { people, traffic, city } = D.ctx;
   people.around(x, z, R, (j) => people.fallIn(j));
   for (let i = 0; i < people.active; i++) if ((people.st[i] === 19 || people.st[i] === 20) && Math.hypot(people.x[i] - x, people.z[i] - z) < R && people.y[i] < 3) people.fallIn(i);
@@ -88,7 +88,8 @@ export class Meteor {
     this.type = 'meteor'; this.D = D; this.x = x; this.z = z; this.t = 0; this.alive = true; this.phase = 'warn';
     this.R = o.size ?? 20; this.warnT = o.warn ?? 18; this.small = !!o.small;
     const a = Math.random() * Math.PI * 2; this.from = new THREE.Vector3(x + Math.cos(a) * 1500, 950, z + Math.sin(a) * 1500); this.to = new THREE.Vector3(x, 0, z);
-    if (!this.small) D.emit({ type: 'warn', hazard: 'meteor', x, z, r: this.R * 3.5, exact: true, text: 'Incoming! An asteroid fragment will hit the ' + D.district(x, z) + ' district in ' + Math.round(this.warnT) + ' seconds. Clear the area' });
+    this.quiet = !!o.quiet; this.cloud = o.mushroom ?? true;
+    if (!this.small && !this.quiet) D.emit({ type: 'warn', hazard: 'meteor', x, z, r: this.R * 3.5, exact: true, text: 'Incoming! An asteroid fragment will hit the ' + D.district(x, z) + ' district in ' + Math.round(this.warnT) + ' seconds. Clear the area' });
   }
   update(h) {
     const D = this.D, fire = D.ctx.fire;
@@ -148,14 +149,14 @@ export class Meteor {
     const t = fire.uniforms.uTime.value, fb = fire.flames.alloc(this.small ? 20 : 70, x, 2, z, R * 0.6, R * 0.6, this.small ? 4 : 9, t);
     fire.later(1.6, () => fire.flames.end(fb, fire.uniforms.uTime.value)); fire.later(8, () => fire.flames.release(fb));
     fire.dustCloud(x, z, R * 1.8, this.small ? 20 : 70);
-    if (!this.small) new Mushroom(D, x, z, R * 2.6, { life: 100, lit: '#cdb79a', shade: '#4e4036' }); // it goes up like a nuke
+    if (!this.small && this.cloud) new Mushroom(D, x, z, R * 2.6, { life: 100, lit: '#cdb79a', shade: '#4e4036' }); // it goes up like a nuke
     const ring = new THREE.Mesh(new THREE.RingGeometry(0.82, 1, 64).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#d8c4a0', transparent: true, opacity: 0.55, depthWrite: false }));
     ring.position.set(x, 1.2, z); ring.renderOrder = 4; D.ctx.scene.add(ring); this.ring = ring;
     people.block(x, z, R * 0.9);
     traffic.closeNear(x, z, R * 0.9 + 4);
     // a few smaller fragments come down nearby
-    if (!this.small) for (let n = 0; n < 3; n++) { const a = Math.random() * Math.PI * 2, d = 70 + Math.random() * 120; D.later(0.4 + Math.random() * 1.8, () => D.start('meteor', x + Math.cos(a) * d, z + Math.sin(a) * d, { size: 5 + Math.random() * 3, warn: 3, small: true })); }
-    D.emit(this.small ? { type: 'fragment', x, z } : { type: 'impact', x, z, text: 'Impact! The asteroid hit the ' + D.district(x, z) + ' district' });
+    if (!this.small && !this.quiet) for (let n = 0; n < 3; n++) { const a = Math.random() * Math.PI * 2, d = 70 + Math.random() * 120; D.later(0.4 + Math.random() * 1.8, () => D.start('meteor', x + Math.cos(a) * d, z + Math.sin(a) * d, { size: 5 + Math.random() * 3, warn: 3, small: true })); }
+    D.emit(this.small || this.quiet ? { type: 'fragment', x, z } : { type: 'impact', x, z, text: 'Impact! The asteroid hit the ' + D.district(x, z) + ' district' });
   }
   sync() {}
   dispose() { if (this.ball) this.D.ctx.scene.remove(this.ball); if (this.ring) this.D.ctx.scene.remove(this.ring); }

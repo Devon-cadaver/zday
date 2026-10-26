@@ -1,10 +1,10 @@
-// Commander mode: three hidden outbreaks, alert level, Response Points, a
-// 10 minute round, and units the player dispatches by tapping the map.
-// Phase 1: police cruisers only.
+// Commander mode: a 10 minute round of incidents (zombie outbreaks, quakes,
+// riots, and worse disasters as you level up), an alert level, Response Points,
+// and rescue units the player dispatches by tapping the map.
 import * as THREE from 'three';
 import { ST } from './people.js';
 import { HAZARD_LEVEL, WEATHER_LEVEL } from './profile.js';
-import { HAZARDS, WEATHER } from './disasters.js';
+import { WEATHER, threatName } from './disasters.js';
 
 export const UNITS = [
   { id: 'police', name: 'Police', cost: 50, cd: 20, alert: 0 },
@@ -16,10 +16,10 @@ export const UNITS = [
   { id: 'strike', name: 'Airstrike', cost: 300, cd: 45, alert: 4 },
   { id: 'nuke', name: 'Nuke', cost: 1000, cd: 9999, alert: 4, once: true },
 ];
-const ALERTS = ['Quiet', 'Outbreak', 'Spreading', 'Major incident', 'City emergency'];
+const ALERTS = ['Quiet', 'Incident', 'Spreading', 'Major incident', 'City emergency'];
 const ROUND = 600;
 const START_RP = 100;
-const OUTBREAK_AT = [3, 14, 26];
+const SITE_AT = [0, 11, 23]; // the sites of one zombie outbreak break out this far apart
 
 const CALLS = ['there is a man eating someone on the sidewalk!', 'they are attacking people outside my window', 'something is wrong with the people on my street', 'send help, they are everywhere', 'my neighbour just bit the mailman'];
 
@@ -49,7 +49,7 @@ export class Commander {
     this.g = g; this.msgs = MSGS;
     this.el = {
       h: g.addPill('zd-h', 'Humans'), z: g.addPill('zd-z', 'Zombies'), d: g.addPill('zd-d', 'Dead'),
-      rp: g.addPill('zd-rp', 'Points'), alert: g.addPill('zd-al', '', 'zd-alert'), clock: g.addPill('', '', 'zd-clock'),
+      rp: g.addPill('zd-rp', 'Points'), inc: g.addPill('', 'Incidents'), alert: g.addPill('zd-al', '', 'zd-alert'), clock: g.addPill('', '', 'zd-clock'),
     };
     this.el.alertPill = this.el.alert.parentElement;
     this.pr = g.profile; this.diff = this.pr.difficulty();
@@ -95,37 +95,52 @@ export class Commander {
     this.sel = null; this.cool = {}; for (const u of UNITS) this.cool[u.id] = 0;
     this.cdOf = (id) => id === 'police' ? this.diff.policeCd : id === 'fire' ? this.diff.fireCd : this.cards[id].u.cd;
     if (g.helis) g.helis.reset();
-    this.kills0 = 0; this.sent = 0; this.lost = 0; this.heatT = 0; this.spawned = 0; this.callT = 30;
+    this.kills0 = 0; this.sent = 0; this.lost = 0; this.heatT = 0; this.callT = 30;
     this.out0 = 0; this.rescued0 = 0; this.trucks = 0; this.helisSent = 0; this.apcs = 0; this.strikes = 0; this.bombedCiv0 = 0; this.bombed0 = 0;
     this.buses = 0; this.bused0 = 0; this.nuked = false; this.nukeAt = null; this.nukedCiv0 = 0;
     this.lastCall = null; this.call.hidden = true; for (const p of this.pins) { p.life = 0; p.m.visible = false; }
     for (const c of Object.values(this.cards)) c.btn.classList.remove('sel');
-    // three outbreak sites, well apart, away from the edge
-    const B = g.city.bounds, pts = [];
-    const nOut = this.diff.outbreaks;
-    for (let tries = 0; tries < 200 && pts.length < nOut; tries++) {
-      const x = B.x0 + 50 + p.r() * (B.x1 - B.x0 - 100), z = B.z0 + 50 + p.r() * (B.z1 - B.z0 - 100);
+    // the weather this round (the people RNG restarts with every reset, so the round plan rolls its own dice)
+    const R = Math.random;
+    const lvl = this.pr.level, wPool = Object.keys(WEATHER_LEVEL).filter(w => lvl >= WEATHER_LEVEL[w]);
+    this.weather = lvl < 2 || R() < 0.4 ? 'clear' : wPool[Math.floor(R() * wPool.length)];
+    g.disasters.weather.set(this.weather, true);
+    this.wxShift = wPool.length > 1 && R() < 0.35 ? 220 + R() * 140 : -1;
+    // the incidents this round brings, drawn from what your level allows (zombie outbreaks turn up most)
+    const bag = Object.keys(HAZARD_LEVEL).filter(h => lvl >= HAZARD_LEVEL[h]).concat(['zombies', 'zombies']), n = this.diff.incidents;
+    this.incidents = [];
+    for (let k = 0; k < n && bag.length; k++) {
+      const type = bag[Math.floor(R() * bag.length)];
+      for (let j = bag.length - 1; j >= 0; j--) if (bag[j] === type) bag.splice(j, 1);
+      // each comes in by this time at the latest, or sooner once the city has gone quiet again
+      this.incidents.push({ type, at: k === 0 ? 4 : 4 + k * 420 / Math.max(1, n - 1) * (0.85 + R() * 0.3), fired: false });
+    }
+    this.sites = []; this.quietT = 0; this.lastInc = 0;
+    this.alertFloor = 0; this.saucers = 0; this.arrests0 = 0; this.alienK0 = 0; this.riotsBroken = 0; this.hit = [];
+    g.lookAt(0, 0);
+    this.hud();
+    g.toast('Dispatch is open. ' + (n === 1 ? 'One incident' : n + ' incidents') + ' expected this round: answer each call with your rescue units' + (this.weather !== 'clear' ? '. Weather: ' + WEATHER[this.weather].name.toLowerCase() : ''), 5000);
+  }
+
+  // an incident comes in: a zombie outbreak (one to three sites, seconds apart) or a disaster
+  incident(inc) {
+    const g = this.g, p = g.people;
+    inc.fired = true; this.hit.push(inc.type); this.lastInc = this.t; this.quietT = 0;
+    if (inc.type !== 'zombies') { g.disasters.start(inc.type); return; }
+    const B = g.city.bounds, pts = [], R = Math.random; // well apart, away from the edge
+    for (let tries = 0; tries < 200 && pts.length < this.diff.sites; tries++) {
+      const x = B.x0 + 50 + R() * (B.x1 - B.x0 - 100), z = B.z0 + 50 + R() * (B.z1 - B.z0 - 100);
       const w = p.snapWalkable(x, z, 20);
       if (!w || pts.some(q => Math.hypot(q[0] - w[0], q[1] - w[1]) < 140)) continue;
       pts.push(w);
     }
-    this.outbreaks = pts.map((w, k) => ({ x: w[0], z: w[1], at: OUTBREAK_AT[k] ?? 30 + k * 10, fired: false }));
-    // the weather and the disasters this round brings (more kinds as you level up)
-    const lvl = this.pr.level, wPool = Object.keys(WEATHER_LEVEL).filter(w => lvl >= WEATHER_LEVEL[w]);
-    this.weather = lvl < 2 || p.r() < 0.4 ? 'clear' : wPool[Math.floor(p.r() * wPool.length)];
-    g.disasters.weather.set(this.weather, true);
-    this.wxShift = wPool.length > 1 && p.r() < 0.35 ? 220 + p.r() * 140 : -1;
-    const hPool = Object.keys(HAZARD_LEVEL).filter(h => lvl >= HAZARD_LEVEL[h]);
-    this.hazards = [];
-    for (let k = 0; k < this.diff.hazards && hPool.length; k++) {
-      if (k === 0 && p.r() > this.diff.hazardChance) break;
-      this.hazards.push({ type: hPool.splice(Math.floor(p.r() * hPool.length), 1)[0], at: 150 + p.r() * 330, fired: false });
-    }
-    if (this.hazards.length === 2 && Math.abs(this.hazards[0].at - this.hazards[1].at) < 90) this.hazards[1].at = Math.min(560, this.hazards[0].at + 90 + p.r() * 60);
-    this.alertFloor = 0; this.saucers = 0; this.arrests0 = 0; this.alienK0 = 0; this.riotsBroken = 0; this.hit = [];
-    g.lookAt(0, 0);
-    this.hud();
-    g.toast((nOut === 1 ? 'A 911 call is coming in' : nOut === 2 ? 'Two 911 calls are coming in' : 'Three 911 calls are coming in') + '. Watch for panic, crashes and smoke, then send help' + (this.weather !== 'clear' ? '. Weather: ' + WEATHER[this.weather].name.toLowerCase() : ''), 5000);
+    pts.forEach((w, k) => this.sites.push({ x: w[0], z: w[1], at: this.t + SITE_AT[k], fired: false }));
+  }
+
+  // nothing left to deal with: no disaster under way, no zombies or bitten, no buildings burning
+  quiet() {
+    const p = this.g.people;
+    return !this.g.disasters.list.length && p.stats.zombies === 0 && p.stats.infected === 0 && this.fires === 0 && this.sites.every(s => s.fired);
   }
 
   // a 911 call: toast, call strip, and a search zone on the map (jittered, so it is a hunt)
@@ -335,17 +350,16 @@ export class Commander {
     if (this.ended) return;
     const g = this.g, p = g.people;
     this.t += sdt;
-    for (const o of this.outbreaks) {
+    for (const o of this.sites) {
       if (o.fired || this.t < o.at) continue;
-      o.fired = true; this.spawned++;
+      o.fired = true;
       p.infectAt(o.x, o.z, this.diff.seeds);
       this.report(o.x, o.z, '911 · ' + this.district(o.x, o.z) + ': "someone is biting people!"', 70);
     }
-    for (const hz of this.hazards) {
-      if (hz.fired || this.t < hz.at) continue;
-      hz.fired = true; this.hit.push(hz.type);
-      g.disasters.start(hz.type);
-    }
+    // the next incident: on schedule, or early once the city has been quiet for a while
+    this.quietT = this.quiet() ? this.quietT + sdt : 0;
+    const next = this.incidents.find(i => !i.fired);
+    if (next && (this.t >= next.at || (this.quietT > 12 && this.t > this.lastInc + 40))) this.incident(next);
     if (this.wxShift > 0 && this.t >= this.wxShift) {
       this.wxShift = -1;
       const pool = Object.keys(WEATHER_LEVEL).filter(w => this.pr.level >= WEATHER_LEVEL[w] && w !== this.weather);
@@ -377,14 +391,14 @@ export class Commander {
     if (this.heatT >= 1) { this.heatT = 0; this.heat(); }
     // the switchboard: every so often a caller reports where they saw one
     this.callT -= sdt;
-    if (this.callT <= 0 && p.stats.zombies > 0 && this.spawned === this.outbreaks.length) {
+    if (this.callT <= 0 && p.stats.zombies > 0 && this.sites.length && this.sites.every(s => s.fired)) {
       this.callT = 15 + p.r() * 10;
       const zs = []; for (let i = 0; i < p.active; i++) if (p.st[i] === ST.ZOMBIE && p.lvl[i] === -1) zs.push(i);
       if (zs.length) { const i = zs[Math.floor(p.r() * zs.length)]; this.report(p.x[i], p.z[i], '911 · ' + this.district(p.x[i], p.z[i]) + ': "' + CALLS[Math.floor(p.r() * CALLS.length)] + '"', 55); }
     }
     // end of round
     const hum = p.stats.humans, tot = p.nHuman;
-    if (this.spawned === this.outbreaks.length && this.t > 40 && p.stats.zombies === 0 && p.stats.infected === 0 && !g.disasters.list.length) this.finish('contained');
+    if (!next && this.t > this.lastInc + 30 && this.quietT > 3) this.finish('contained');
     else if (hum < tot * 0.2) this.finish('lost');
     else if (this.t >= ROUND) this.finish('holdout');
     this.hud();
@@ -394,6 +408,7 @@ export class Commander {
     const p = this.g.people, s = p.stats, e = this.el;
     e.h.textContent = s.humans; e.z.textContent = s.zombies; e.d.textContent = s.dead;
     e.rp.textContent = Math.floor(this.rp);
+    e.inc.textContent = this.incidents.filter(i => i.fired).length + '/' + this.incidents.length;
     e.alert.textContent = this.alert ? 'Alert ' + this.alert + ' · ' + ALERTS[this.alert] : ALERTS[0];
     e.alertPill.className = 'zd-pill zd-al a' + this.alert;
     const left = Math.max(0, ROUND - this.t), m = Math.floor(left / 60), sec = Math.floor(left % 60);
@@ -416,8 +431,8 @@ export class Commander {
     if (reason === 'contained') stars = frac >= 0.9 ? 3 : 2;
     else if (reason === 'holdout') stars = frac >= 0.7 ? 2 : 1;
     if (this.nuked) stars = Math.min(stars, 1);
-    const title = reason === 'contained' ? 'Outbreak contained' : reason === 'holdout' ? 'The city held out' : 'The city is lost';
-    const sub = reason === 'contained' ? 'Every zombie is down. The city owes you a drink.' : reason === 'holdout' ? 'Ten minutes survived. The army arrives at dawn.' : 'The infection took the streets.';
+    const title = reason === 'contained' ? 'City secured' : reason === 'holdout' ? 'The city held out' : 'The city is lost';
+    const sub = reason === 'contained' ? 'Every incident is under control. The city owes you a drink.' : reason === 'holdout' ? 'Ten minutes survived. The army arrives at dawn.' : 'Too many lives were lost.';
     const t = Math.floor(this.t);
     const lines = [
       ['Survivors', s.humans.toLocaleString() + ' of ' + tot.toLocaleString()],
@@ -433,7 +448,8 @@ export class Commander {
       ['Fires put out', g.fire.stats.out],
       ['Buildings burned or destroyed', (g.fire.bFire.length - intact).toLocaleString()],
       ...(this.weather !== 'clear' ? [['Weather', WEATHER[this.weather].name]] : []),
-      ...(this.hit.length ? [['Disasters', this.hit.map(h => HAZARDS[h].name).join(', ')], ['Killed by disasters', (s.disasterCiv + s.drowned).toLocaleString()]] : []),
+      ['Incidents', this.hit.map(threatName).join(', ') || 'none'],
+      ...(this.hit.some(h => h !== 'zombies') ? [['Killed by disasters', (s.disasterCiv + s.drowned).toLocaleString()]] : []),
       ...(s.arrests ? [['Rioters arrested', s.arrests]] : []),
       ...(this.hit.includes('aliens') ? [['Saucers downed / aliens killed', this.saucers + ' / ' + s.aliensKilled], ['Abducted', s.abducted]] : []),
       ['Time', Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0')],

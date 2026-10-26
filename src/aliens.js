@@ -42,7 +42,7 @@ function parts() {
   return shared;
 }
 
-function saucerMesh(dark = false) {
+export function saucerMesh(dark = false) {
   const P = parts(), g = new THREE.Group();
   const spin = new THREE.Group();
   const body = new THREE.Mesh(P.body, dark ? P.hullDark : P.hull); body.castShadow = true;
@@ -52,7 +52,7 @@ function saucerMesh(dark = false) {
   return g;
 }
 
-function beamMesh() {
+export function beamMesh() {
   const mat = new THREE.ShaderMaterial({ vertexShader: BEAM_VS, fragmentShader: BEAM_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
     uniforms: { uTime: { value: 0 }, uOn: { value: 0 }, uColor: { value: new THREE.Color(0.6, 1.6, 1.0) } } });
   const m = new THREE.Mesh(parts().beam, mat); m.visible = false; m.frustumCulled = false; m.renderOrder = 7;

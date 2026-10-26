@@ -1,4 +1,4 @@
-// Z-Day city prototype: miniature tilt-shift city with traffic and crowds.
+// My Tiny Disaster: a miniature tilt-shift city with traffic and crowds, hit by disasters.
 import * as THREE from 'three';
 import { MapControls } from 'three/addons/controls/MapControls.js';
 import { makeTextures } from './textures.js';
@@ -17,7 +17,7 @@ const P = new URLSearchParams(location.search);
 const coarse = matchMedia('(pointer: coarse)').matches;
 const low = P.get('q') === 'low' || (coarse && P.get('q') !== 'high');
 const num = (k, d) => (P.has(k) ? parseFloat(P.get(k)) : d);
-const mode = P.get('mode') || 'menu'; // menu | commander | sandbox
+const mode = P.get('mode') || 'menu'; // menu | commander | be | sandbox
 
 const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', preserveDrawingBuffer: P.has('shot') });
 renderer.setPixelRatio(Math.min(devicePixelRatio, low ? 1.5 : 2));

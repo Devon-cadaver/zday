@@ -1,4 +1,4 @@
-# Z-Day: Commander mode design
+# My Tiny Disaster (was Z-Day): Commander mode design
 
 Written 2026-10-25 from Sean's brief. The player stops dropping zombies and becomes the hero: the city's emergency commander,
 dispatching police, fire crews, helicopters, the army and, as a last resort, a nuke. Everything built in the sandbox (infection,
@@ -6,6 +6,7 @@ panic, rooftop refuges, zombie piles, car crashes, fires) becomes the threat the
 
 ## The round
 
+- Since v1.3 (2026-10-26) a round is a run of random incidents (2 to 5 by level) and a zombie outbreak is just one kind; see PROJECT-NOTES v1.3. The outbreak-only round below is the original design.
 - A round is one city, one outbreak, about 10 minutes.
 - Three 911 calls come in at random street locations a few seconds apart. Each is a small outbreak (1 to 3 Shamblers plus a
   couple of bitten civilians). Pins pulse on the map and a "Go" button on each alert pans the camera there.
@@ -128,7 +129,9 @@ level, outbreak count by level, airstrike fire chance, nuke radius, score weight
 - Weather changes the rules a little: rain and storms slow fires, heat spreads them, snow and sand slow cars and make them skid,
   fog hides the city, storms throw lightning.
 
-## Storm mode
+## Be The Disaster (was Storm mode)
 
-- You are the tornado for three minutes. Drag to steer. It grows from EF1 (only sheds and kiosks) to EF5 (towers) as it eats.
-  Score = what it swallows x its EF rating; zombies are worth more than people. Earns Commander XP; best score on the menu.
+- Pick a disaster your level has unlocked and be it for three minutes: steer a tornado, open sinkholes, tear fault lines,
+  call down meteors, pour lava, pull a tsunami through the streets, or fly an alien saucer. One finger drives it, two fingers
+  move the camera. Everything wrecked scores (scaled per disaster so ranks mean the same for each); earns Commander XP; best
+  score per disaster on the picker.
