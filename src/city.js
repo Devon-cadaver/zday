@@ -407,6 +407,33 @@ export function buildCity(tex, opts = {}) {
     }
   }
   const mast = (cx, cz, y, hgt, s = 0.5) => { box(B.roof, sq(cx, cz, s), y, y + hgt, lin('#c9c4ba')); box(B.roof, sq(cx, cz, s * 2.2), y + hgt * 0.35, y + hgt * 0.35 + 0.6, lin('#9a958c')); return y + hgt; };
+  // the stadium: a ring of stands round a pitch, a roof canopy, floodlight towers; its 'roof' is the pitch, where crowds gather
+  function stadium(cx, cz, R, blk) {
+    curB = buildings.length;
+    const vStart = { roof: B.roof.v, grass: B.grass.v }, y0 = CURB, H = 16, segs = 40, r0 = R * 0.55, wall = lin('#cfc7b8'), seat = lin('#8c3a32'), seat2 = lin('#a8a29a');
+    const P = (a, r, y) => [cx + Math.cos(a) * r, y, cz + Math.sin(a) * r];
+    for (let j = 0; j < segs; j++) {
+      const a0 = j / segs * Math.PI * 2, a1 = (j + 1) / segs * Math.PI * 2, am = (a0 + a1) / 2, ox = Math.cos(am), oz = Math.sin(am);
+      B.roof.quad(P(a1, R, y0), P(a0, R, y0), P(a0, R, y0 + H), P(a1, R, y0 + H), [ox, 0, oz], [0, 0], [1, 0], [1, 1], [0, 1], shade(wall, 0.78), wall); // the outer wall
+      if (j % 2 === 0) B.roof.quad(P(a1, R + 0.05, y0 + 3), P(a0, R + 0.05, y0 + 3), P(a0, R + 0.05, y0 + H - 2), P(a1, R + 0.05, y0 + H - 2), [ox, 0, oz], [0, 0], [1, 0], [1, 1], [0, 1], lin('#9a9286'), lin('#b3ab9e')); // pillars between the arches
+      for (let t = 0; t < 4; t++) { // the stands, rising from the pitch to the rim in four tiers
+        const ra = r0 + (R - r0) * t / 4, rb = r0 + (R - r0) * (t + 1) / 4, ya = y0 + 1 + (H - 2) * t / 4, yb = y0 + 1 + (H - 2) * (t + 1) / 4, c = j % 5 === 0 ? seat2 : seat; // aisles
+        B.roof.quad(P(a0, ra, ya), P(a1, ra, ya), P(a1, rb, yb), P(a0, rb, yb), [-ox * 0.6, 0.8, -oz * 0.6], [0, 0], [1, 0], [1, 1], [0, 1], shade(c, 0.85), c);
+      }
+      B.roof.quad(P(a1, R - 0.3, y0 + H + 1.2), P(a0, R - 0.3, y0 + H + 1.2), P(a0, R - (R - r0) * 0.55, y0 + H + 2.2), P(a1, R - (R - r0) * 0.55, y0 + H + 2.2), [0, 1, 0], [0, 0], [1, 0], [1, 1], [0, 1], lin('#e8e4dc'), lin('#f2efe8')); // the canopy
+    }
+    const field = { x0: cx - r0 * 0.7, x1: cx + r0 * 0.7, z0: cz - r0 * 0.7, z1: cz + r0 * 0.7 };
+    top(B.grass, sq(cx, cz, r0 * 0.98), y0 + 0.9, lin('#7f9a52'), 6); // the pitch
+    for (let k = -2; k <= 2; k++) top(B.grass, sq(cx + k * r0 * 0.3, cz, r0 * 0.06, r0 * 0.6), y0 + 0.93, lin('#a8c070'), 6); // mowing stripes (in the stadium's own ranges, so they go with it)
+    for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) { const x = cx + sx * R * 0.78, z = cz + sz * R * 0.78; box(B.roof, sq(x, z, 0.6), y0, y0 + H + 14, lin('#8a8a86')); box(B.roof, sq(x, z, 2.2, 1.2), y0 + H + 14, y0 + H + 16.5, lin('#e8e6dc')); } // floodlights
+    const rec = { x0: cx - R, x1: cx + R, z0: cz - R, z1: cz + R, roofY: y0 + 0.9, baseY: y0, fl: 5, door: null, landmark: 'Stadium',
+      ranges: [{ key: 'roof', v0: vStart.roof, v1: B.roof.v }, { key: 'grass', v0: vStart.grass, v1: B.grass.v }], roof: field };
+    rec.wall = [cx, cz - R]; rec.door = [cx, blk.z0 - 0.9]; rec.n = [0, -1];
+    rec.wallCol = wall; rec.top = y0 + H + 2.2; rec.hut = null; rec.hatch = null;
+    buildings.push(rec); curB = -1;
+    crowds.push({ x: cx, z: blk.z0 + 2, y: CURB + 0.03, n: 20, rad: 5 });
+  }
+
   function landmark(kind, blk) {
     const cx = (blk.x0 + blk.x1) / 2, cz = (blk.z0 + blk.z1) / 2, W = (blk.x1 - blk.x0) / 2, D = (blk.z1 - blk.z0) / 2;
     top(B.walk, blk, CURB + 0.03, lin('#ece2cf'), 4); // a paved forecourt all round
@@ -417,10 +444,8 @@ export function buildCity(tex, opts = {}) {
     else if (kind === 'deco') // a stepped limestone Art Deco tower
       tiered([{ b: sq(cx, cz, W * 0.66, D * 0.66), fl: 10 }, { b: sq(cx, cz, W * 0.54, D * 0.54), fl: 8 }, { b: sq(cx, cz, W * 0.42, D * 0.42), fl: 7 }, { b: sq(cx, cz, W * 0.3, D * 0.3), fl: 5 }], 0, lin('#e2d6bc'), blk,
         { name: 'Art Deco tower', trim: 0.4, crown: (x, z, y, t) => { const s = (t.x1 - t.x0) / 2; box(B.roof, sq(x, z, s * 0.7), y, y + 5, lin('#e8dcc2')); box(B.roof, sq(x, z, s * 0.45), y + 5, y + 9, lin('#d9c9a4')); box(B.roof, sq(x, z, s * 0.25), y + 9, y + 13, lin('#cdb98c')); return mast(x, z, y + 13, 16, 0.35); } });
-    else if (kind === 'twins') { // two slim glass towers
-      for (const sd of [-1, 1]) tiered([{ b: sq(cx + sd * W * 0.38, cz, W * 0.3, D * 0.42), fl: 32 }], 1, lin(sd < 0 ? '#8aa1aa' : '#93a7a5'), blk,
-        { name: 'Twin towers', roof: '#6c7c86', trim: 0.1, crown: (x, z, y) => { box(B.roof, sq(x, z, W * 0.2, D * 0.3), y, y + 3, lin('#7a8a94')); return mast(x, z, y + 3, 14, 0.4); } });
-    } else if (kind === 'dome') { // city hall: white stone, a columned portico and a green copper dome
+    else if (kind === 'stadium') stadium(cx, cz, Math.min(W, D) * 0.92, blk);
+    else if (kind === 'dome') { // city hall: white stone, a columned portico and a green copper dome
       const hw = W * 0.8, hd = D * 0.55, h = CURB + GF + 4 * FH, R = Math.min(hw, hd) * 0.42;
       tiered([{ b: sq(cx, cz, hw, hd), fl: 4 }], 3, lin('#efe9dc'), blk, { name: 'City hall', noHut: true, trim: 0.45, roof: '#cfc6b4',
         crown: (x, z, y) => { drum(x, z, y, y + 7, R, lin('#ebe4d5')); box(B.roof, sq(x, z, R * 1.05, R * 1.05), y + 6.6, y + 7.2, lin('#dcd3c0')); dome(x, z, y + 7, R, lin('#86a596')); drum(x, z, y + 7 + R, y + 10 + R, R * 0.18, lin('#e8e1d2'), 8); dome(x, z, y + 10 + R, R * 0.2, lin('#86a596'), 8, 3); return y + 10 + R * 1.2; } });
@@ -571,7 +596,7 @@ export function buildCity(tex, opts = {}) {
       cand.push({ key, x, z, s: heightAt(x, z) + r() * 0.35 });
     }
     cand.sort((a, b) => b.s - a.s);
-    const kinds = ['spire', 'deco', 'dome', 'twins'];
+    const kinds = ['spire', 'deco', 'dome', 'stadium'];
     for (const c of cand) {
       if (landmarks.size >= kinds.length) break;
       if ([...landmarks.values()].some(o => Math.hypot(o.x - c.x, o.z - c.z) < 140)) continue;
