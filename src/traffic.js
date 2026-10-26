@@ -11,7 +11,8 @@ const IN = RW / 2;        // lanes stop this far before an intersection centre
 const ACC = 3.5, BRAKE = 8, BRAKE_PANIC = 4.5;
 const LEN = 4.3, HALF_L = 2.2, HALF_W = 0.95;
 const CELL = 10;
-const DRIVE = 0, WRECK = 1, REST = 2;
+const DRIVE = 0, WRECK = 1, REST = 2, PARKED = 3;
+const MISSION_CAP = 24;
 const STOPLINE = 3.4; // car centre stops this far before the lane end
 
 function colorize(g, hex) {
@@ -34,6 +35,19 @@ export function personGeometry() {
   return mergeGeometries([
     colorize(new THREE.CylinderGeometry(0.2, 0.24, 1.2, 6).translate(0, 0.78, 0), '#ffffff'),
     colorize(new THREE.SphereGeometry(0.17, 6, 4).translate(0, 1.55, 0), '#ffffff'),
+  ]);
+}
+
+// police cruiser: white body, dark hood stripe, red and blue light bar
+export function cruiserGeometry() {
+  return mergeGeometries([
+    colorize(new THREE.BoxGeometry(3.7, 0.42, 1.62).translate(0, 0.33, 0), '#1c1c1c'),
+    colorize(new THREE.BoxGeometry(4.3, 0.56, 1.8).translate(0, 0.78, 0), '#f4f4f0'),
+    colorize(new THREE.BoxGeometry(1.2, 0.58, 1.82).translate(1.5, 0.78, 0), '#1d2440'),
+    colorize(new THREE.BoxGeometry(2.3, 0.5, 1.62).translate(-0.25, 1.3, 0), '#262b31'),
+    colorize(new THREE.BoxGeometry(2.0, 0.08, 1.5).translate(-0.3, 1.58, 0), '#f4f4f0'),
+    colorize(new THREE.BoxGeometry(0.4, 0.16, 0.55).translate(0.1, 1.68, -0.32), '#ff2a1a'),
+    colorize(new THREE.BoxGeometry(0.4, 0.16, 0.55).translate(0.1, 1.68, 0.32), '#2a5cff'),
   ]);
 }
 
@@ -62,11 +76,16 @@ export class Traffic {
     const carGeo = carGeometry();
     const carMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.1 });
     this.nCars = opts.cars ?? 260;
-    this.next = new Int32Array(this.nCars);
+    this.next = new Int32Array(this.nCars + MISSION_CAP);
     this.carMesh = new THREE.InstancedMesh(carGeo, carMat, this.nCars);
     this.carMesh.castShadow = this.carMesh.receiveShadow = true;
     this.carMesh.frustumCulled = false;
     parent.add(this.carMesh);
+    // mission vehicles (police cruisers) on their own mesh
+    this.cruiserMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4, metalness: 0.1, emissive: '#000000' });
+    this.cruiserMesh = new THREE.InstancedMesh(cruiserGeometry(), this.cruiserMat, MISSION_CAP);
+    this.cruiserMesh.count = 0; this.cruiserMesh.castShadow = this.cruiserMesh.receiveShadow = true; this.cruiserMesh.frustumCulled = false;
+    parent.add(this.cruiserMesh);
 
     // parked cars (static)
     const r = rng(1234);
@@ -111,9 +130,10 @@ export class Traffic {
       this.carMesh.setColorAt(k, this._c.set(car.colHex));
     }
     this.carMesh.instanceColor.needsUpdate = true;
+    this.missions = []; this.cruiserMesh.count = 0;
     this.events = [];
     this.stats = { crashes: 0, wrecks: 0 };
-    this.sync();
+    this.sync(0);
   }
 
   // ---------- paths
@@ -129,7 +149,8 @@ export class Traffic {
     const Bn = this.nodes[car.b];
     const opts = Bn.nb.filter(n => n !== car.a);
     let c;
-    if (!opts.length) c = car.a;
+    if (car.mission) c = car.route[car.ri + 2];
+    else if (!opts.length) c = car.a;
     else if (car.panic > 0) {
       // drive away from the zombies
       let best = -1e9;
@@ -203,8 +224,9 @@ export class Traffic {
       if (car.s >= car.len - STOPLINE && !car.held) {
         if (node.occ < 0) { node.occ = car.id; car.held = true; }
         else if (node.occ === car.id) car.held = true;
-        else if (car.panic <= 0) { car.s = Math.max(before, car.len - STOPLINE); car.v = 0; return; }
+        else if (car.panic <= 0 && !car.mission) { car.s = Math.max(before, car.len - STOPLINE); car.v = 0; return; }
       }
+      if (car.mission && car.ri + 2 >= car.route.length && car.s >= this.stopAt(car)) { car.s = this.stopAt(car); this.park(car); return; }
       if (car.s >= car.len) {
         const over = car.s - car.len; this.startTurn(car); car.t = over / car.tlen;
       }
@@ -215,6 +237,7 @@ export class Traffic {
         if (car.resume >= 0) { car.turn = false; car.s = car.resume + over; car.resume = -1; }
         else {
           const node = this.nodes[car.b]; if (node.occ === car.id) node.occ = -1;
+          if (car.mission) car.ri++;
           this.startSeg(car, car.b, car.next); car.s = over;
         }
       }
@@ -267,11 +290,11 @@ export class Traffic {
       if (P) {
         let zd = 1e9, zn = 0;
         P.around(car.x, car.z, 22, (j, d2) => { if (P.st[j] === 6) { zn++; if (d2 < zd) { zd = d2; car.zx = P.x[j]; car.zz = P.z[j]; } } });
-        if (zn >= 2) car.panic = 25;
+        if (zn >= 2 && !car.mission) car.panic = 25;
         car.pedGap = 99;
         if (car.panic <= 0) {
           P.around(car.x + car.hx * 5, car.z + car.hz * 5, 6, (j) => {
-            if (!P.hittable(j)) return;
+            if (!P.hittable(j) || (car.mission && P.st[j] === 6)) return;
             const dx = P.x[j] - car.x, dz = P.z[j] - car.z;
             const lx = dx * car.hx + dz * car.hz, lz = -dx * car.hz + dz * car.hx;
             if (lx > 1 && lx < 11 && Math.abs(lz) < 1.5) car.pedGap = Math.min(car.pedGap, lx - HALF_L);
@@ -288,7 +311,7 @@ export class Traffic {
       const stop = panic ? 0.6 : 2.5;
       if (gap < 99) vDes = Math.min(vDes, Math.sqrt(Math.max(0, 2 * brake * (gap - stop))));
       if (!panic && car.pedGap < 99) vDes = Math.min(vDes, Math.sqrt(Math.max(0, 2 * BRAKE * (car.pedGap - 1.5))));
-      if (!panic && !car.turn) {
+      if (!panic && !car.turn && !car.mission) {
         const node = this.nodes[car.b], toEnd = car.len - car.s;
         if (node.occ >= 0 && node.occ !== car.id && !car.held && toEnd < 18) vDes = Math.min(vDes, Math.sqrt(Math.max(0, 2 * BRAKE * (toEnd - STOPLINE))));
       }
@@ -298,7 +321,12 @@ export class Traffic {
     this.advance(car, car.v * h);
     this.pose(car);
     if (car.v < 0.3) car.blocked += h; else car.blocked = 0;
-    if (car.blocked > 6 && !car.turn && car.s > 8 && car.s < car.len - 9 && this.oppositeClear(car)) this.uturn(car);
+    if (car.mission && car.blocked > 4) {
+      const last = car.ri + 2 >= car.route.length;
+      const dToStop = last && !car.turn ? Math.abs(this.stopAt(car) - car.s) : 99;
+      if (dToStop < 30 || car.blocked > 15) { this.park(car); return; } // stuck in traffic: officers walk from here
+    }
+    if (car.blocked > 6 && !car.turn && !car.mission && car.s > 8 && car.s < car.len - 9 && this.oppositeClear(car)) this.uturn(car);
   }
 
   wreckStep(car, h, P) {
@@ -313,7 +341,7 @@ export class Traffic {
       car.mode = REST; car.v = 0; car.vx = car.vz = car.w = 0;
       if (car.ignite && this.fire) {
         this.fire.carFire(car.x, car.z); car.burning = true;
-        this.carMesh.setColorAt(car.id, this._c.set('#1a1714')); this.carMesh.instanceColor.needsUpdate = true;
+        if (!car.mission) { this.carMesh.setColorAt(car.id, this._c.set('#1a1714')); this.carMesh.instanceColor.needsUpdate = true; }
         this.events.push({ type: 'carfire', x: car.x, z: car.z });
       }
     }
@@ -327,8 +355,8 @@ export class Traffic {
       c.mode = WRECK;
       { const node = this.nodes[c.b]; if (node.occ === c.id) node.occ = -1; }
       c.ignite = this.r() < 0.28 + Math.min(0.35, impact / 40);
-      this._c.set(c.colHex).multiplyScalar(0.6);
-      this.carMesh.setColorAt(c.id, this._c); this.carMesh.instanceColor.needsUpdate = true;
+      if (c.mission) { if (c.onLost) c.onLost(c); }
+      else { this._c.set(c.colHex).multiplyScalar(0.6); this.carMesh.setColorAt(c.id, this._c); this.carMesh.instanceColor.needsUpdate = true; }
       this.stats.wrecks++;
     }
     if (other) {
@@ -348,7 +376,7 @@ export class Traffic {
 
   collisions(P) {
     for (const car of this.cars) {
-      if (car.mode === REST) continue;
+      if (car.mode === REST || car.mode === PARKED) continue;
       // run over anyone in the footprint
       if (P && car.v > 2) {
         P.around(car.x, car.z, 2.7, (j) => {
@@ -368,11 +396,11 @@ export class Traffic {
       // car against car (circle pairs along each body)
       this.near(car.x, car.z, 6, (o) => {
         if (o === car) return;
-        if (o.id < car.id && o.mode !== REST) return; // pair handled from the other side
+        if (o.id < car.id && o.mode !== REST && o.mode !== PARKED) return; // pair handled from the other side
         if (!this.overlap(car, o)) return;
         const rvx = car.hx * car.v - o.hx * o.v, rvz = car.hz * car.v - o.hz * o.v;
         const rel = Math.hypot(rvx, rvz);
-        if (rel > 5 && (car.mode === DRIVE || o.mode === DRIVE)) this.crash(car, o.mode === REST ? null : o, rel);
+        if (rel > 5 && (car.mode === DRIVE || o.mode === DRIVE)) this.crash(car, (o.mode === REST || o.mode === PARKED) ? null : o, rel);
         else this.separate(car, o);
       });
     }
@@ -390,16 +418,82 @@ export class Traffic {
   separate(a, b) {
     if (a.mode === DRIVE && (b.mode !== DRIVE || a.v >= b.v)) a.v = Math.min(a.v, 0.5);
     else if (b.mode === DRIVE) b.v = Math.min(b.v, 0.5);
-    if (a.mode === WRECK && b.mode === REST) { a.vx *= -0.3; a.vz *= -0.3; }
+    if (a.mode === WRECK && (b.mode === REST || b.mode === PARKED)) { a.vx *= -0.3; a.vz *= -0.3; }
   }
 
-  sync() {
+  sync(realT = 0) {
     const { _m4: m4, _q: q, _e: e, _p: p, _one: one } = this;
     for (const car of this.cars) {
       e.set(0, car.yaw, 0); q.setFromEuler(e);
       m4.compose(p.set(car.x, 0, car.z), q, one);
-      this.carMesh.setMatrixAt(car.id, m4);
+      if (car.mission) this.cruiserMesh.setMatrixAt(car.slot, m4); else this.carMesh.setMatrixAt(car.id, m4);
     }
     this.carMesh.instanceMatrix.needsUpdate = true;
+    if (this.missions.length) {
+      this.cruiserMesh.instanceMatrix.needsUpdate = true;
+      const lit = this.missions.some(c => c.mode === DRIVE);
+      this.cruiserMat.emissive.setHex(!lit ? 0x000000 : Math.floor(realT * 5) % 2 ? 0x3a0404 : 0x04083a);
+    }
+  }
+
+  // ---------- mission vehicles
+  nearestNode(x, z) {
+    let best = 1e18, bi = 0;
+    this.nodes.forEach((n, i) => { const d = (n.x - x) ** 2 + (n.z - z) ** 2; if (d < best) { best = d; bi = i; } });
+    return bi;
+  }
+
+  // shortest road route from the city edge to the intersection nearest (x,z)
+  routeTo(x, z) {
+    const target = this.nearestNode(x, z), N = this.nodes.length;
+    const dist = new Int32Array(N).fill(-1), par = new Int32Array(N).fill(-1);
+    const qn = [target]; dist[target] = 0;
+    for (let qi = 0; qi < qn.length; qi++) {
+      const u = qn[qi];
+      for (const v of this.nodes[u].nb) if (dist[v] < 0) { dist[v] = dist[u] + 1; par[v] = u; qn.push(v); }
+    }
+    const NZ = this.city.sz.length, NX = this.city.sx.length;
+    let best = 1e9, start = -1;
+    for (let i = 0; i < N; i++) {
+      const gx = Math.floor(i / NZ), gz = i % NZ;
+      const edge = gx === 0 || gz === 0 || gx === NX - 1 || gz === NZ - 1;
+      if (!edge || i === target || dist[i] < 0) continue;
+      const sc = dist[i] + this.r() * 0.5;
+      if (sc < best) { best = sc; start = i; }
+    }
+    if (start < 0) return null;
+    const route = [start];
+    for (let u = start; u !== target; u = par[u]) route.push(par[u]);
+    return route;
+  }
+
+  // pull over where it is and deploy
+  park(car) {
+    car.mode = PARKED; car.v = 0; car.turn = false; this.pose(car);
+    const node = this.nodes[car.b]; if (node.occ === car.id) node.occ = -1;
+    if (car.onArrive) car.onArrive(car.x, car.z, car);
+  }
+
+  // where on its final segment a mission car pulls over: beside the tap point
+  stopAt(car) {
+    if (!car.to) return car.len - 7;
+    const s = (car.to[0] - car.p0x) * car.dx + (car.to[1] - car.p0z) * car.dz;
+    return Math.min(car.len - 7, Math.max(3, s));
+  }
+
+  dispatch(route, opts = {}) {
+    if (!route || route.length < 2 || this.missions.length >= MISSION_CAP) return null;
+    const id = this.cars.length;
+    const car = { id, mission: true, slot: this.missions.length, route, ri: 0, mode: DRIVE, cruise: opts.cruise ?? 14, v: 0, panic: 0, think: 0,
+      pedGap: 99, blocked: 0, resume: -1, x: 0, z: 0, hx: 1, hz: 0, yaw: 0, vx: 0, vz: 0, w: 0, ignite: false, burning: false, hits: 0, zx: 0, zz: 0,
+      colHex: '#f4f4f0', held: false, to: opts.to || null, onArrive: opts.onArrive, onLost: opts.onLost };
+    this.startSeg(car, route[0], route[1]);
+    car.s = 0; this.pose(car);
+    this.cars.push(car); this.missions.push(car);
+    this.cruiserMesh.count = this.missions.length;
+    let len = 0;
+    for (let k = 1; k < route.length; k++) len += Math.hypot(this.nodes[route[k]].x - this.nodes[route[k - 1]].x, this.nodes[route[k]].z - this.nodes[route[k - 1]].z);
+    car.eta = len / car.cruise;
+    return car;
   }
 }

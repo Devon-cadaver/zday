@@ -13,6 +13,7 @@ const P = new URLSearchParams(location.search);
 const coarse = matchMedia('(pointer: coarse)').matches;
 const low = P.get('q') === 'low' || (coarse && P.get('q') !== 'high');
 const num = (k, d) => (P.has(k) ? parseFloat(P.get(k)) : d);
+const mode = P.get('mode') === 'sandbox' ? 'sandbox' : 'commander';
 
 const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', preserveDrawingBuffer: P.has('shot') });
 renderer.setPixelRatio(Math.min(devicePixelRatio, low ? 1.5 : 2));
@@ -109,6 +110,6 @@ function frame() {
 }
 requestAnimationFrame(frame);
 
-const game = new Game({ people, traffic, fire, city, camera, controls, renderer });
+const game = new Game({ people, traffic, fire, city, camera, controls, renderer, mode });
 
 window.__z = { THREE, scene, camera, controls, renderer, post, city, traffic, people, fire, game, sun, hemi, setView, buildMs, info: () => renderer.info.render };

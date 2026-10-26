@@ -47,7 +47,22 @@ READ THIS FIRST after a compaction. Current as of 2026-10-25.
 - Corpses (DEAD) lie flat, darkened. HUD has a Dead counter. Camera min distance 200 (Follow zooms to 230). Camera edge clamp margin 10 m.
 - Test harness note: when stepping the sim by hand call people.sync() every simulated second; roof counts (bRoof) come from sync and piles collapse without it.
 
-## Next: Commander mode
+## Commander mode phase 1 (v0.4, 2026-10-25) - DEFAULT MODE
+- Default page is Commander; ?mode=sandbox keeps the zombie-drop sandbox. src/game.js is the shared layer (HUD scaffolding, toasts, tap input, speed, fixed-step loop, follow camera) with a Sandbox class; src/commander.js is the round.
+- Round: 3 outbreak sites (random walkable, 140 m apart, 50 m from the edge) fire at 3/14/26 s via people.infectAt(x, z, 3) (nearest civilians bitten, incubate 3-8 s). No markers, no pins: Sean wants finding the outbreaks to be the fun. Hints: a 911 toast naming the district (3x3 grid, North/South x West/East/Central) at each start, then every 25-40 s a caller from a random zombie's district.
+- Alert: once a second count zombies per street block; a block with 5+ is overrun. Alert 1 any zombies, 2 at 2+ blocks or any fire, 3 at 5+, 4 at 10+. Never drops. Shown in a HUD pill.
+- Points (RP): start 100; income 1 + humans/2000 per second (about 6/s); +1 per zombie shot. Police card costs 50, cooldown 20 s.
+- Police cruiser (traffic.dispatch): BFS route on the intersection graph from the nearest city-edge node to the node nearest the tap, parks beside the tap (stopAt), or wherever it is after 4 s stuck within 30 m of the stop / 15 s stuck anywhere. Mission cars never panic, skip intersection reservations, brake for civilians but not zombies, drive at 14. Separate cruiserMesh (white, navy hood stripe, red/blue bar) with emissive flashing while any cruiser is driving. Wrecked cruiser = onLost toast.
+- Officers (people.js state COP, kind OFFICER): spawn on the sidewalk by the car, post = car. Hunt zombies within 60 m (160 m with no leash once zombies <= 12), advance to 12 m at 2.8 m/s, shoot within 22 m every 0.6 s, hit chance 1.05 - 0.025*d (capped 0.95). Fall back (FLEE 4 s) when 8+ zombies within 6 m. Gunfire draws idle zombies within 25 m toward the shooter (fx 3 = alerted, chase speed). Officers can be bitten (keep shooting while infected, then turn) and run over.
+- Balance from headless runs (3 cruisers per outbreak, resent twice): sent at 20 s the police grind 3 outbreaks down to stragglers; sent at 45 s they hold ~2 min then lose; sent at 75 s they are swallowed. That is the intended timing pressure.
+- End: contained (all 3 started, t > 40, zombies 0, infected 0), lost (humans < 20%), holdout (600 s). Score = RP earned + 10/human + 20/intact building. Stars: contained 3 (>= 90% alive) or 2; holdout 2 (>= 70%) or 1; lost 0. Overlay #zd-end (needs the [hidden]{display:none} rule because it is display:flex).
+- Figures (src/figures.js): merged low-poly person (92 tris: icosahedron head, hair cap, torso, 2 arms, 2 legs), one instanced mesh, per-instance aShirt/aPants/aSkin/aAnim attributes, MeshStandardMaterial patched in onBeforeCompile: legs/arms swing by aAnim (1 walk, 2 run, 3 shamble, 5 arms out, 6 aim, 7 aim+walk) using gl_InstanceID as phase; zombies have arms forward and head tilted. people.sync writes rotation matrices by hand (Ry(yaw)*Rz(tilt)). Zombie look = green skin, dulled clothes; infected skin lerps to green; dead = darkened. Rings/markers removed.
+- Perf: 61 fps at 390x844 on the dev PC in low mode. Not measured on Sean's phone yet.
+
+## Next
+- Commander phases 2-5 per DESIGN.md: fire truck, water and rescue helicopters, army APC, airstrike, nuke, evacuation bus, XP and levels, menu.
+
+## Earlier plan note
 - Sean decided on 2026-10-25 to make the player the hero (emergency commander) instead of dropping zombies. The full plan is DESIGN.md (round, alert levels, units, points, levelling, 5 implementation phases). Sandbox stays at ?mode=sandbox.
 
 ## Private preview link

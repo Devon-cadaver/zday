@@ -20,6 +20,9 @@ panic, rooftop refuges, zombie piles, car crashes, fires) becomes the threat the
 
 ## Reading the threat
 
+Decided 2026-10-25 after the plan: NO zombie or infected markers and no outbreak pins. Finding the outbreaks is half the fun. The clues are screaming crowds, fleeing and crashing cars, smoke and fire, plus vague 911 calls that name a district. The block heat map below drives the alert level but is not drawn.
+
+
 - Block heat map: once a second count zombies per street block. A block with 3 or more zombies is "infected". Infected blocks get
   a translucent red tint on the ground and a red edge glow. Connected infected blocks form an outbreak zone.
 - Alert level (shown as a banner) rises with the number of infected blocks and unlocks heavier units:
