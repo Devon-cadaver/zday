@@ -305,7 +305,7 @@ export class BeTheDisaster {
   // what has been wrecked so far
   measure() {
     const { people, traffic, fire } = this.g, D = this.g.disasters;
-    let cars = 0; for (const c of traffic.cars) if (!c.mission && (c.gone || c.mode !== 0)) cars++;
+    let cars = 0; for (const c of traffic.cars) if (!c.mission && (c.gone || c.mode !== 0 || c.frozen)) cars++; // frozen solid counts too
     for (const pc of traffic.parkedList) if (!pc.alive || pc.burnt) cars++;
     let fires = 0; const dead = this.g.city.dead; for (let k = 0; k < fire.bFire.length; k++) if (fire.bFire[k] && !dead[k]) fires++;
     return { b: D.stats.buildings, dead: people.stats.dead, abd: people.stats.abducted, cars, fires, zom: people.stats.zombies };

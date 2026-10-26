@@ -704,7 +704,7 @@ export class People {
 
   // hurt or kill. Cars: slow hits knock walkers down, fast hits kill, armour shrugs. Shots: 1 hp.
   kill(j, vx = 0, vz = 0, cause = 'car') {
-    const wasZ = this.st[j] === S.ZOMBIE;
+    const wasZ = this.st[j] === S.ZOMBIE, counted = this.st[j] === S.FROZEN && this.fx[j] >= 8; // already counted when the ice (or the flash) took them
     if (wasZ) {
       const Z = this.ztype(j);
       let dmg = 99;
@@ -743,7 +743,7 @@ export class People {
     if (this.kind[j] === KIND.ALIEN) { this.stats.aliensKilled++; this.events.push({ type: 'alienkill', j, cause }); return; }
     if (cause === 'zap') { const A = this.fa.arrays, o = j * 3; for (let c = 0; c < 3; c++) { A.shirt[o + c] *= 0.35; A.pants[o + c] *= 0.35; A.skin[o + c] *= 0.3; } }
     if (cause === 'burn') { const A = this.fa.arrays, o = j * 3; for (let c = 0; c < 3; c++) { A.shirt[o + c] *= 0.25; A.pants[o + c] *= 0.25; A.skin[o + c] *= 0.2; } }
-    if (DISASTER_CAUSE.has(cause)) { if (wasZ || this.wz[j]) this.stats.disasterZ++; else if (this.kind[j] === KIND.CIVILIAN) this.stats.disasterCiv++; }
+    if (DISASTER_CAUSE.has(cause) && !counted) { if (wasZ || this.wz[j]) this.stats.disasterZ++; else if (this.kind[j] === KIND.CIVILIAN) this.stats.disasterCiv++; }
     if (cause === 'car') { this.stats.runover++; this.events.push({ type: 'runover', j, zombie: wasZ }); }
     else if (cause === 'shot') { if (wasZ) this.stats.shot++; this.events.push({ type: 'shotdead', j, zombie: wasZ }); }
   }
@@ -753,7 +753,7 @@ export class People {
     const s = this.st[j];
     this.wz[j] = s === S.ZOMBIE || ZSTATE[s] || ((s === S.EXT || s === S.AIR || s === S.FROZEN) && this.wz[j]) ? 1 : 0;
     if ((s === S.PILE || s === S.CLIMB) && this.bt[j] >= 0) this.bPile[this.bt[j]] = Math.max(0, this.bPile[this.bt[j]] - 1);
-    this.st[j] = S.FROZEN; this.t1[j] = 0; this.target[j] = -1; this.inf[j] = 0;
+    this.st[j] = S.FROZEN; this.t1[j] = 0; this.target[j] = -1; this.inf[j] = 0; this.fx[j] = 8;
     const A = this.fa.arrays, o = j * 3, g = 0.4 + this.r() * 0.14;
     for (const key of ['shirt', 'pants', 'skin', 'accent', 'accent2']) { A[key][o] = g * 1.03; A[key][o + 1] = g; A[key][o + 2] = g * 0.93; }
     A.kit[j * 4 + 1] = (A.kit[j * 4 + 1] | 0) & ~FLAG.GLOW; A.zed[j * 4 + 1] = 0; A.zed[j * 4 + 3] = 0;
@@ -1221,8 +1221,9 @@ export class People {
     return true;
   }
   frozenStep(i, h) {
+    if (this.fx[i] >= 8) return; // dead in the ice (or an ash statue): nothing happens until the thaw
     this.t1[i] += h;
-    if (!this.wz[i] && this.t1[i] > 18) { this.st[i] = S.IDLE; this.kill(i, 0, 0, 'freeze'); }
+    if (!this.wz[i] && this.t1[i] > 18) { this.fx[i] = 9; if (this.kind[i] === KIND.CIVILIAN) this.stats.disasterCiv++; this.events.push({ type: 'frozedead', i }); } // frozen to death, still standing
   }
   frozenLook(i) {
     const A = this.fa.arrays, o = i * 3, ice = [0.62, 0.74, 0.86];
@@ -1230,7 +1231,13 @@ export class People {
     A.kit[i * 4 + 1] = (A.kit[i * 4 + 1] | 0) & ~FLAG.GLOW;
     this.lookDirty = true; this.dirty[i] = 4;
   }
-  thawAll() { for (let i = 0; i < this.active; i++) if (this.st[i] === S.FROZEN) { if (this.wz[i]) { this.st[i] = S.ZOMBIE; this.t1[i] = 0; } else { this.st[i] = S.IDLE; this.setLook(i, this.base[i]); this.dirty[i] = 0; } } }
+  thawAll() {
+    for (let i = 0; i < this.active; i++) {
+      if (this.st[i] !== S.FROZEN || this.fx[i] === 8) continue;
+      if (this.fx[i] === 9) { this.setLook(i, this.base[i]); this.st[i] = S.IDLE; this.fx[i] = 0; this.kill(i, 0, 0, 'thaw'); continue; } // the ice lets go and the body falls
+      if (this.wz[i]) { this.st[i] = S.ZOMBIE; this.t1[i] = 0; } else { this.st[i] = S.IDLE; this.setLook(i, this.base[i]); this.dirty[i] = 0; }
+    }
+  }
   // swallowed by the ground (a sinkhole, a crater): gone for good
   fallIn(j) {
     const s = this.st[j];
@@ -1592,7 +1599,7 @@ export class People {
       if (s === S.ALIEN) continue;
       if ((s === S.EXT || s === S.AIR) && this.wz[i]) { zombies++; continue; }
       if (s === S.RIOT) rioters++;
-      if (s === S.FROZEN) { if (this.wz[i]) zombies++; else if (this.kind[i] === KIND.CIVILIAN) humans++; if (this.dirty[i] !== 4) { this.frozenLook(i); colDirty = true; } continue; }
+      if (s === S.FROZEN) { if (this.fx[i] >= 8) dead++; else if (this.wz[i]) zombies++; else if (this.kind[i] === KIND.CIVILIAN) humans++; if (this.dirty[i] !== 4) { this.frozenLook(i); colDirty = true; } continue; }
       if (s === S.ZOMBIE || s === S.FALLING || s === S.TURNING || s === S.PILE || s === S.CLIMB) {
         zombies++;
         if (s !== S.TURNING && this.dirty[i] !== 2) { this.zombieLook(i); colDirty = true; }

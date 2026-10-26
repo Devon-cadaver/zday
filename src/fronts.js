@@ -255,7 +255,7 @@ export class ColdWave {
     if (this.phase === 'after') {
       this.fade = Math.max(0, this.fade - h / 10);
       if (this.t > this.endT) {
-        this.alive = false; people.thawAll(); traffic.gripK = 1;
+        this.alive = false; people.thawAll(); traffic.thawAll(); traffic.gripK = 1;
         D.weather.set(this.prevWeather === 'snow' ? 'clear' : this.prevWeather);
         D.emit({ type: 'coldend', text: 'The cold has broken. The frozen are thawing' });
       }
@@ -266,7 +266,20 @@ export class ColdWave {
     }
     // the cold gets into everyone outdoors behind the front
     if (++this.stepN % 3 !== 0 || this.phase === 'after' && this.fade < 0.5) return;
-    const hh = h * 3;
+    const hh = h * 3, behind = (x, z) => this.phase === 'after' || sw.behind(x, z) > 0;
+    // fires go out under the frost, and nothing behind the front will catch again until it thaws
+    if (this.stepN % 9 === 0) {
+      const { fire, city } = D.ctx;
+      fire.quench((x, z) => behind(x, z) ? 2 : 0);
+      for (let k = 0; k < city.buildings.length; k++) { const b = city.buildings[k]; if (behind((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2)) fire.soak(k, 30); }
+    }
+    // cars ice up where they stand, a few seconds after the cold reaches them
+    for (const car of traffic.cars) {
+      if (car.frozen || car.mode !== 0 || car.mission || !behind(car.x, car.z)) continue;
+      car.cold = (car.cold || 0) + hh;
+      if (car.cold > 3 + (car.id % 7) * 0.5) traffic.freezeCar(car);
+    }
+    if (this.stepN % 9 === 0) for (const pc of traffic.parkedList) if (!pc.frost && behind(pc.x, pc.z)) traffic.frostParked(pc);
     for (let i = 0; i < people.active; i++) {
       const s = people.st[i];
       if (s === 8 || s === 10 || s === 11 || s === 17 || s === 19 || s === 20 || s === 23 || people.lvl[i] !== -1 || people.kind[i] === 4) continue;
@@ -280,5 +293,5 @@ export class ColdWave {
     for (const w of this.walls) syncCurtain(this.D, w, realT, this.phase === 'after' ? Math.max(0, this.fade * 2 - 1) : 1);
     this.frostMat.uniforms.uLight.value = this.D.lightK; this.frostMat.uniforms.uFade.value = this.fade;
   }
-  dispose() { for (const w of this.walls) drop(this.D, w); this.D.ctx.scene.remove(this.frost); this.frost.geometry.dispose(); this.frostMat.dispose(); if (this.alive) this.D.ctx.people.thawAll(); }
+  dispose() { for (const w of this.walls) drop(this.D, w); this.D.ctx.scene.remove(this.frost); this.frost.geometry.dispose(); this.frostMat.dispose(); if (this.alive) { this.D.ctx.people.thawAll(); this.D.ctx.traffic.thawAll(); } }
 }

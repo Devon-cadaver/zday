@@ -129,6 +129,19 @@ export class Traffic {
     if (!this.grab(car)) return;
     car.mode = AIR; car.vx = hx * v; car.vz = hz * v; car.vy = 0.4; car.w = (this.r() - 0.5) * 0.3; car.rw = (this.r() - 0.5) * 0.5; car.pw = -0.9 - this.r() * 0.5;
   }
+  // a cold front: the car freezes where it stands under a coat of frost (the people inside wait it out)
+  freezeCar(car) {
+    if (car.frozen || car.gone || car.mode !== DRIVE || car.mission) return false;
+    car.frozen = true; car.v = 0;
+    if (!car.burning) { this._c.set(car.colHex).lerp(this._ice || (this._ice = new THREE.Color('#eef4f9')), 0.85); this.tint(car, '#' + this._c.getHexString()); }
+    return true;
+  }
+  frostParked(pc) { if (!pc.alive || pc.burnt || pc.frost) return; pc.frost = true; pc.im.setColorAt(pc.k, this._c.set(pc.hex).lerp(this._ice || (this._ice = new THREE.Color('#eef4f9')), 0.85)); pc.im.instanceColor.needsUpdate = true; }
+  // the thaw: frost melts off and everyone drives on
+  thawAll() {
+    for (const car of this.cars) if (car.frozen) { car.frozen = false; car.blocked = 0; if (!car.burning && car.mode === DRIVE) this.tint(car, car.colHex); }
+    for (const pc of this.parkedList) if (pc.frost) { pc.frost = false; if (pc.alive && !pc.burnt) { pc.im.setColorAt(pc.k, this._c.set(pc.hex)); pc.im.instanceColor.needsUpdate = true; } }
+  }
   burn(car) { // molotov or laser on a moving car
     if (car.mode === DRIVE) this.crash(car, null, 9);
     car.ignite = true;
@@ -173,7 +186,7 @@ export class Traffic {
       this.typeMeshes[car.type].setColorAt(car.slot, this._c.set(car.colHex));
     }
     this.speedK = 1; this.gripK = 1; this.waterAt = null; this.closed = new Set();
-    for (const pc of this.parkedList || []) { pc.alive = true; pc.burnt = false; }
+    for (const pc of this.parkedList || []) { pc.alive = true; pc.burnt = false; pc.frost = false; }
     for (const im of this.parkedMeshes || []) { im.instanceMatrix.array.set(im.userData.orig); im.instanceMatrix.needsUpdate = true; if (im.userData.origCol) { im.instanceColor.array.set(im.userData.origCol); im.instanceColor.needsUpdate = true; } }
     for (const t of TRAFFIC_MIX) { const im = this.typeMeshes[t.id]; im.count = counts[t.id]; if (im.instanceColor) im.instanceColor.needsUpdate = true; }
     this.missions = []; for (const im of Object.values(this.missionMeshes)) im.count = 0;
@@ -395,6 +408,7 @@ export class Traffic {
     if (car.grace > 0) car.grace -= h;
     if (this.waterAt && !(car.kind === 'apc') && this.waterAt(car.x, car.z) > 0.55) { car.v = 0; car.stalled = true; return; } // stalled in flood water
     car.stalled = false;
+    if (car.frozen) { car.v = 0; return; } // iced in until the thaw
     // zombies nearby? panic. Pedestrians ahead? (calm drivers only)
     if ((car.think -= h) <= 0) {
       car.think = 0.25 + this.r() * 0.15;

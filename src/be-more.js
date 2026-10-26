@@ -112,8 +112,10 @@ export class BlizzardCtl {
     if ((this.tick -= h) > 0) return;
     this.tick = 0.25;
     people.around(this.x, this.z, this.R, (j) => { const s = people.st[j]; if ((people.hittable(j) || s === ST.ROOF) && s !== ST.FROZEN && people.kind[j] !== KIND.ALIEN && Math.random() < 0.3 * (1 - Math.hypot(people.x[j] - this.x, people.z[j] - this.z) / this.R) + 0.05 && people.freeze(j)) this.frozen++; });
-    traffic.near(this.x, this.z, this.R, (car) => { if (car.mode === 0 && !car.mission && Math.random() < 0.07) traffic.crash(car, null, 7); }); // skidding on the ice
-    city.buildingsNear(this.x, this.z, this.R * 0.6, (k) => { if (fire.bFire[k] === 1) fire.extinguish(k); });
+    traffic.near(this.x, this.z, this.R, (car) => { if (car.mode === 0 && !car.mission && Math.random() < 0.25) { if (Math.random() < 0.15) traffic.crash(car, null, 7); else traffic.freezeCar(car); } }); // skidding on the ice, or frozen where they stand
+    for (const pc of traffic.parkedNear(this.x, this.z, this.R)) traffic.frostParked(pc);
+    fire.quench((x, z) => Math.hypot(x - this.x, z - this.z) < this.R ? 2 : 0); // fires go out under the snow
+    city.buildingsNear(this.x, this.z, this.R, (k) => fire.soak(k, 20));
     if (Math.random() < 0.5) D.decals.add('scour', this.x + (Math.random() - 0.5) * this.R, this.z + (Math.random() - 0.5) * this.R, 6, 6);
   }
   sync() { this.snow.sync(this.be.D.lightK, this.be.D.ctx.fire.uniforms.uScale.value); }

@@ -217,6 +217,12 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 ## Twin towers removed (2026-10-26)
 - Sean asked to remove the two side-by-side towers (insensitive to 9/11 survivors). Do not add twin towers or anything that echoes them again. The fourth landmark is now a stadium (city.js stadium()): a 40-segment outer wall with arches, four tiers of red stands with radial aisles, a white roof canopy, a striped pitch and four floodlight towers; one building record whose 'roof' is the pitch (roofY at pitch height, no hut), top 18 m; it burns, collapses and resets like any building.
 
+## Cold front: fires out, frozen cars, ice until the thaw (2026-10-26)
+- Sean: the cold front should put out fires and freeze cars where they stand and people, with frost on them until it thaws; people die but people in cars survive until the thaw.
+- ColdWave (fronts.js): behind the front, every ~0.9 s fire.quench() puts out burning buildings and car fires and fire.soak(k, 30) stops anything catching; moving cars freeze 3-6.5 s after the cold reaches them (traffic.freezeCar: stopped, tinted 85% toward frost white; driveStep returns while car.frozen) and parked cars frost over (frostParked). At the end traffic.thawAll() restores colours and they drive on (their occupants survived).
+- People: freeze() as before; after 18 s a frozen civilian dies but stays standing in the ice (FROZEN with fx 9: counted dead in the census and in disasterCiv once; kill() skips re-counting fx >= 8). thawAll(): fx 9 fall as bodies (kill cause 'thaw'), the living walk again, frozen zombies wake. Nuke ash statues are fx 8 and the thaw leaves them alone.
+- Be blizzard: freezes and frosts cars in its cell (some still skid and crash), puts fires out and soaks buildings; frozen cars count as wrecked cars for the score.
+
 ## Next
 - Sean tests v1.3 on his phone; tune from his notes. Candidates: Be The Disaster score scales and ranks once real scores come in, the saucer size at close zoom, how often zombie outbreaks turn up in Commander, incident pacing, card bar height on the phone.
 
