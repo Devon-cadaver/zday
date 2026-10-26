@@ -128,7 +128,8 @@ export class LavaField {
 export class Volcano {
   constructor(D, x, z, o = {}) {
     this.type = 'volcano'; this.D = D; this.x = x; this.z = z; this.t = 0; this.alive = true; this.phase = 'rumble';
-    this.warnT = o.warn ?? 14; this.eruptT = o.erupt ?? 60; this.waneT = 25; this.bombT = 1; this.ashT = 0; this.bombs = [];
+    this.warnT = o.warn ?? 14; this.eruptT = o.erupt ?? 60 * Math.sqrt(o.size ?? 1); this.waneT = 25; this.bombT = 1; this.ashT = 0; this.bombs = [];
+    this.k = o.size ?? 1; // 0.5 a vent ... 3 a supervolcano
     this.prevWeather = D.weather.type;
     if (!o.quiet) D.emit({ type: 'warn', hazard: 'volcano', x, z, r: 130, exact: true, text: 'Magma is rising under the ' + D.district(x, z) + ' district! An eruption is coming. Get everyone out' });
     this.bombMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(4, 1.4, 0.3) }); this.bombGeo = new THREE.SphereGeometry(1.1, 8, 6);
@@ -147,8 +148,8 @@ export class Volcano {
     const te = this.t - this.warnT, waning = te > this.eruptT, k = waning ? Math.max(0, 1 - (te - this.eruptT) / this.waneT) : 1;
     D.shake(0.1 * k + 0.03);
     // the fountain and the flow
-    this.lava.pour(this.x, this.z, 115 * k * h);
-    if (k > 0) this.splash.emit(this.x, 1, this.z, Math.round(10 * k + 1), { up: [12 * k + 4, 30 * k + 6], spread: 9, life: 2.4, size: 2.4 });
+    this.lava.pour(this.x, this.z, 115 * this.k * this.k * k * h);
+    if (k > 0) this.splash.emit(this.x, 1, this.z, Math.round((10 * k + 1) * Math.min(2.5, this.k)), { up: [(12 * k + 4) * Math.sqrt(this.k), (30 * k + 6) * Math.sqrt(this.k)], spread: 9 * this.k, life: 2.4, size: 2.4 * Math.sqrt(this.k) });
     if (Math.random() < 0.5 * k) fire.burst(this.x + (Math.random() - 0.5) * 6, 1, this.z + (Math.random() - 0.5) * 6, 8, 3);
     // the ash column
     if ((this.ashT -= h) <= 0 && k > 0.2) {
@@ -156,7 +157,7 @@ export class Volcano {
       fire.later(9, () => fire.smoke.end(r, fire.uniforms.uTime.value)); fire.later(22, () => fire.smoke.release(r));
     }
     // lava bombs
-    if ((this.bombT -= h) <= 0 && k > 0.15) { this.bombT = this.aim ? 0.16 : (0.5 + Math.random() * 0.6) / k; this.launch(); } // aimed (Be The Disaster): a barrage at the finger
+    if ((this.bombT -= h) <= 0 && k > 0.15) { this.bombT = this.aim ? 0.16 : (0.5 + Math.random() * 0.6) / (k * this.k); this.launch(); } // aimed (Be The Disaster): a barrage at the finger
     for (let i = this.bombs.length - 1; i >= 0; i--) {
       const b = this.bombs[i]; b.vy -= 9.8 * h; b.m.position.x += b.vx * h; b.m.position.y += b.vy * h; b.m.position.z += b.vz * h; b.m.rotation.x += h * 4;
       if ((b.trail -= h) <= 0) { b.trail = 0.12; fire.burst(b.m.position.x, b.m.position.y, b.m.position.z, 2, 1.4); }
@@ -172,19 +173,20 @@ export class Volcano {
   erupt() {
     const D = this.D, { people, city, fire } = D.ctx;
     this.phase = 'erupt';
-    this.vent = new Hole(D, this.x, this.z, { R: 7, depth: 5, rim: 1.7, glow: 2, wall: '#3a2e28', floor: '#2a1c14', rimCol: '#3e3028' });
-    this.lava = new LavaField(D, this.x, this.z);
+    const K = this.k;
+    this.vent = new Hole(D, this.x, this.z, { R: 7 * K, depth: 5 * K, rim: 1.7, glow: 2, wall: '#3a2e28', floor: '#2a1c14', rimCol: '#3e3028' });
+    this.lava = new LavaField(D, this.x, this.z, K > 1 ? { n: Math.round(80 * Math.min(1.9, K)), cell: 3.5 * Math.max(1, K / 1.9) } : {}); // a bigger field for a bigger mountain
     this.splash = new Splash(D.ctx.scene, 1600); this.splash.mat.blending = THREE.AdditiveBlending; this.splash.mat.uniforms.uColor.value.setRGB(3, 0.9, 0.18);
     this.splash.points.renderOrder = 7;
-    city.buildingsNear(this.x, this.z, 12, (k, d, b) => D.destroyBuilding(k, 'collapse', { dir: Math.atan2((b.z0 + b.z1) / 2 - this.z, (b.x0 + b.x1) / 2 - this.x) }));
-    people.around(this.x, this.z, 8, (j) => people.fallIn(j));
+    city.buildingsNear(this.x, this.z, 12 * K, (k, d, b) => D.destroyBuilding(k, 'collapse', { dir: Math.atan2((b.z0 + b.z1) / 2 - this.z, (b.x0 + b.x1) / 2 - this.x) }));
+    people.around(this.x, this.z, 8 * K, (j) => people.fallIn(j));
     people.scare(this.x, this.z, 160, 0.95);
     D.flash(0.5); D.shake(1.6);
     D.weather.set('ash');
     D.emit({ type: 'eruption', x: this.x, z: this.z, text: 'Eruption! Lava is pouring into the streets' });
   }
   launch() {
-    let a = Math.random() * Math.PI * 2, d = 35 + Math.pow(Math.random(), 0.7) * 200;
+    let a = Math.random() * Math.PI * 2, d = (35 + Math.pow(Math.random(), 0.7) * 200) * Math.sqrt(this.k);
     if (this.aim) { const tx = this.aim[0] + (Math.random() - 0.5) * 18, tz = this.aim[1] + (Math.random() - 0.5) * 18; a = Math.atan2(tz - this.z, tx - this.x); d = Math.max(12, Math.hypot(tx - this.x, tz - this.z)); }
     const T = 2.4 + d / 110;
     const m = new THREE.Mesh(this.bombGeo, this.bombMat); m.position.set(this.x, 4, this.z); this.D.ctx.scene.add(m);

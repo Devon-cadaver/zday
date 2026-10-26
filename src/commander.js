@@ -10,6 +10,8 @@ export const UNITS = [
   { id: 'police', name: 'Police', cost: 50, cd: 20, alert: 0 },
   { id: 'bus', name: 'Evac bus', cost: 60, cd: 30, alert: 0 },
   { id: 'boat', name: 'Rescue boat', cost: 80, cd: 20, alert: 0 }, // only once the streets flood
+  { id: 'chaser', name: 'Storm chaser', cost: 60, cd: 25, alert: 0 }, // spots tornadoes and aliens: calls in seeders, jets and tanks
+  { id: 'seeder', name: 'Cloud seeder', cost: 100, cd: 30, alert: 0 }, // weakens tornadoes, breaks up storms
   { id: 'fire', name: 'Fire truck', cost: 80, cd: 30, alert: 2 },
   { id: 'water', name: 'Water heli', cost: 150, cd: 60, alert: 2 },
   { id: 'rescue', name: 'Rescue heli', cost: 120, cd: 45, alert: 2 },
@@ -98,7 +100,8 @@ export class Commander {
     if (g.helis) g.helis.reset();
     this.kills0 = 0; this.sent = 0; this.lost = 0; this.heatT = 0; this.callT = 30;
     this.out0 = 0; this.rescued0 = 0; this.trucks = 0; this.helisSent = 0; this.apcs = 0; this.strikes = 0; this.bombedCiv0 = 0; this.bombed0 = 0;
-    this.buses = 0; this.bused0 = 0; this.boatsSent = 0; g.disasters.boats.auto = false; this.nuked = false; this.nukeAt = null; this.nukedCiv0 = 0;
+    this.buses = 0; this.bused0 = 0; this.boatsSent = 0; this.chasersSent = 0; this.seeds = 0; this.calledJets = 0; this.calledTanks = 0; this.jetAt = 0; this.tankAt = 0; this.chaseT = 0;
+    if (this.tracers) { for (const tr of this.tracers) this.g.disasters.ctx.scene.remove(tr.m); this.tracers.length = 0; } g.disasters.boats.auto = false; this.nuked = false; this.nukeAt = null; this.nukedCiv0 = 0;
     this.lastCall = null; this.call.hidden = true; for (const p of this.pins) { p.life = 0; p.m.visible = false; }
     for (const c of Object.values(this.cards)) c.btn.classList.remove('sel');
     // the weather this round (the people RNG restarts with every reset, so the round plan rolls its own dice)
@@ -193,6 +196,8 @@ export class Commander {
     else if (id === 'bus') this.sendBus(x, z);
     else if (id === 'nuke') this.sendNuke(x, z);
     else if (id === 'boat') this.sendBoat(x, z);
+    else if (id === 'chaser') this.sendChaser(x, z);
+    else if (id === 'seeder') this.sendSeeder(x, z, true);
   }
 
   sendPolice(x, z) {
@@ -204,6 +209,79 @@ export class Commander {
     if (!car) { g.toast(g.traffic.missions.length >= 24 ? 'All cruisers are out' : 'No road to that spot'); return; }
     this.spend('police'); this.sent++;
     g.toast('Cruiser dispatched, about ' + Math.ceil(car.eta) + ' s out');
+  }
+
+  sendChaser(x, z) {
+    const g = this.g;
+    const car = g.traffic.dispatchTo(x, z, { kind: 'chaser', onArrive: (ax, az) => g.toast('Storm chasers on station in the ' + this.district(ax, az) + '. They will call in what they spot'), onLost: () => { this.lost++; g.toast('A storm chaser truck was wrecked'); } });
+    if (!car) { g.toast('No road to that spot'); return; }
+    this.spend('chaser'); this.chasersSent++;
+    g.toast('Storm chasers rolling, about ' + Math.ceil(car.eta) + ' s out');
+  }
+  // a seeding run over (x, z): tornadoes nearby lose strength (a weak one ropes out), a thunderstorm breaks up into rain, rain into clear skies
+  sendSeeder(x, z, paid) {
+    const g = this.g;
+    if (paid) { this.spend('seeder'); this.seeds++; g.toast('Cloud seeder inbound, about ' + Math.ceil(800 / 55) + ' s out'); }
+    g.helis.seed(x, z, { onSeed: (sx, sz) => this.seeded(sx, sz) });
+  }
+  seeded(x, z) {
+    const g = this.g, D = g.disasters; let hit = 0;
+    for (const e of D.list) {
+      if (e.type !== 'tornado' || !e.tw) continue;
+      const tw = e.tw; if (Math.hypot(tw.x - x, tw.z - z) > 220) continue;
+      hit++; tw.size = Math.max(0.6, tw.size - 0.55); tw.applySize(); tw.life = Math.min(tw.life, tw.t + 25);
+      if (tw.size < 1.05 && tw.phase === 'ground') { tw.phase = 'rope'; tw.ropeT = 0; }
+    }
+    const w = D.weather.type;
+    if (w === 'storm') D.weather.set('rain'); else if (w === 'rain' && !D.active('flood')) D.weather.set('clear');
+    g.toast(hit ? 'Seeding run complete: the tornado is losing strength' : w === 'storm' ? 'Seeding run complete: the storm is breaking up into rain' : 'Seeding run complete', 3500);
+  }
+  // storm chasers on station: what they see, they call in
+  chaserTick() {
+    const g = this.g, D = g.disasters, now = this.t;
+    const chasers = g.traffic.missions.filter(c => c.kind === 'chaser' && !c.gone && (c.mode === 3 || c.mode === 0));
+    if (!chasers.length && !g.traffic.missions.some(c => c.kind === 'tank')) return;
+    const near = (x, z, R) => chasers.find(c => Math.hypot(c.x - x, c.z - z) < R);
+    for (const e of D.list) if (e.type === 'tornado' && e.tw && e.tw.onGround) {
+      const c = near(e.tw.x, e.tw.z, 280);
+      if (c && now > (e.seedAt || 0)) { e.seedAt = now + 18; this.sendSeeder(e.tw.x, e.tw.z, false); this.report(e.tw.x, e.tw.z, 'Storm chasers: "Tornado on the ground! Calling in a seeding run"', 40, true); }
+    }
+    const inv = D.list.find(e => e.type === 'aliens');
+    const targets = [];
+    if (inv) {
+      for (const t of inv.tripods) if (t.state === 'walk') targets.push({ x: t.x, z: t.z, t });
+      for (const s of inv.saucers) if ((s.state === 'cruise' || s.state === 'act') && s.y < 80) targets.push({ x: s.x, z: s.z, s });
+    }
+    for (const tg of targets) {
+      const c = near(tg.x, tg.z, 300); if (!c) continue;
+      const o = tg.t || tg.s;
+      if (!o.spotted) { o.spotted = true; this.report(tg.x, tg.z, 'Storm chasers: "' + (tg.t ? 'A tripod' : 'A saucer') + ' in the ' + this.district(tg.x, tg.z) + '! Calling it in to the army"', 45, true); }
+      if (now > (this.jetAt || 0)) { this.jetAt = now + 12; g.helis.strike(tg.x, tg.z, { radius: 25 }); this.calledJets++; } // an A-10 on the spot
+      if (tg.t && now > (this.tankAt || 0) && g.traffic.missions.filter(m => m.kind === 'tank' && !m.gone).length < 3) {
+        const car = g.traffic.dispatchTo(tg.x, tg.z, { kind: 'tank', onArrive: () => g.toast('A tank is in position and engaging') });
+        if (car) { this.tankAt = now + 30; this.calledTanks++; g.toast('The army is sending a tank, about ' + Math.ceil(car.eta) + ' s out', 3000); }
+      }
+    }
+    // tanks shell whatever alien is in range
+    for (const tk of g.traffic.missions) {
+      if (tk.kind !== 'tank' || tk.gone || (tk.fireT = (tk.fireT || 0) - 1) > 0) continue;
+      let best = null, bd = 160;
+      for (const tg of targets) { const d = Math.hypot(tg.x - tk.x, tg.z - tk.z); if (d < bd) { bd = d; best = tg; } }
+      if (!best) continue;
+      tk.fireT = 3;
+      const o = best.t || best.s, y = best.t ? o.y : o.y;
+      this.tracer(tk.x, 3, tk.z, best.x, y, best.z);
+      g.fire.burst(best.x, y, best.z, 12, 2.2);
+      if (best.t) o.damage(14); else { o.hp -= 20; if (o.hp <= 0) inv.shootDown(o); }
+    }
+  }
+  tracer(x0, y0, z0, x1, y1, z1) {
+    const s = this.g.disasters.ctx.scene;
+    if (!this.trGeo) { this.trGeo = new THREE.CylinderGeometry(0.25, 0.25, 1, 5, 1, true).translate(0, 0.5, 0); this.trMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(4, 3, 1.2), fog: false }); this.tracers = []; }
+    const m = new THREE.Mesh(this.trGeo, this.trMat), d = new THREE.Vector3(x1 - x0, y1 - y0, z1 - z0);
+    m.position.set(x0, y0, z0); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.clone().normalize()); m.scale.set(1, d.length(), 1);
+    s.add(m); this.tracers.push({ m, t: 0.15 });
+    this.g.fire.burst(x0, y0, z0, 6, 1.4);
   }
 
   sendBoat(x, z) {
@@ -388,6 +466,8 @@ export class Commander {
     const bz = p.stats.bombed; if (bz > this.bombed0) { this.rp += bz - this.bombed0; this.earned += bz - this.bombed0; this.bombed0 = bz; }
     const bc = p.stats.bombedCiv; if (bc > this.bombedCiv0) { this.rp -= 5 * (bc - this.bombedCiv0); this.earned -= 5 * (bc - this.bombedCiv0); this.bombedCiv0 = bc; g.toast('Your airstrike killed ' + bc + ' civilians so far', 3500); }
     this.busTick(sdt);
+    if ((this.chaseT -= sdt) <= 0) { this.chaseT = 1; this.chaserTick(); }
+    if (this.tracers) for (let i = this.tracers.length - 1; i >= 0; i--) { const tr = this.tracers[i]; if ((tr.t -= sdt) <= 0) { this.g.disasters.ctx.scene.remove(tr.m); this.tracers.splice(i, 1); } }
     const bu = p.stats.bused; if (bu > this.bused0) { this.rp += 3 * (bu - this.bused0); this.earned += 3 * (bu - this.bused0); this.bused0 = bu; }
     const nc = p.stats.nukedCiv; if (nc > this.nukedCiv0) { this.rp -= 5 * (nc - this.nukedCiv0); this.earned -= 5 * (nc - this.nukedCiv0); this.nukedCiv0 = nc; g.toast('The nuke killed ' + nc + ' civilians', 5000); }
     if (this.rp < 0) this.rp = 0; // penalties cost score, never lock the cards
@@ -453,6 +533,7 @@ export class Commander {
       ['Cruisers and trucks sent / wrecked', (this.sent + this.trucks) + ' / ' + this.lost],
       ['Helicopters sent', this.helisSent],
       ['APCs / airstrikes', this.apcs + ' / ' + this.strikes],
+      ...(this.chasersSent || this.seeds ? [['Storm chasers / seeding runs', this.chasersSent + ' / ' + this.seeds], ['Jets / tanks called in', this.calledJets + ' / ' + this.calledTanks]] : []),
       ['Killed by bombs: zombies / civilians', s.bombed + ' / ' + s.bombedCiv],
       ['Rescued by helicopter or boat', s.rescued.toLocaleString()],
       ['Evacuated by bus', s.bused.toLocaleString()],

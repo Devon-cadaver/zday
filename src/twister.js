@@ -146,7 +146,7 @@ export class Twister {
   }
 
   get reach() { return 8 + 6 * this.size; }
-  get maxH() { return 10 + (this.size - 1) * 22; }
+  get maxH() { return 10 + (this.size - 1) * 22; } // an EF5+ monster (size above 3) tears down towers
   applySize() {
     this.H = 110 + 18 * this.size; this.r0 = this.reach * 0.4; this.r1 = 20 + 10 * this.size;
     this.vort.H = this.H; this.vort.scale = 0.8 + this.size * 0.25;

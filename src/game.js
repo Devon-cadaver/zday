@@ -7,6 +7,7 @@ import { Commander } from './commander.js';
 import { Profile, UNLOCK, UPGRADES, LEVELS, MAX_LEVEL, HAZARD_LEVEL, BE_LEVEL } from './profile.js';
 import { HAZARDS, WEATHER, threatName } from './disasters.js';
 import { BeTheDisaster, BE } from './be.js';
+import { Gauge, SIZED } from './gauge.js';
 
 const CSS = `
 #zd-top{position:fixed;left:0;right:0;top:0;display:flex;gap:6px;align-items:center;flex-wrap:wrap;
@@ -101,7 +102,7 @@ const CSS = `
 @media (prefers-reduced-motion: reduce){#zd-toast{transition:none}}
 `;
 
-const UNIT_NAMES = { police: 'Police cruiser', bus: 'Evacuation bus', boat: 'Rescue boat', fire: 'Fire truck', water: 'Water helicopter', rescue: 'Rescue helicopter', apc: 'Army APC', strike: 'Airstrike', nuke: 'Nuke' };
+const UNIT_NAMES = { police: 'Police cruiser', bus: 'Evacuation bus', chaser: 'Storm chaser', seeder: 'Cloud seeder', boat: 'Rescue boat', fire: 'Fire truck', water: 'Water helicopter', rescue: 'Rescue helicopter', apc: 'Army APC', strike: 'Airstrike', nuke: 'Nuke' };
 
 // the city runs on its own behind the menu
 class Idle {
@@ -369,7 +370,7 @@ class Sandbox {
     g.followBtn = g.addButton('zd-find', 'Follow', () => g.cycleFollow());
     g.addSpeedButton();
     this.disBtn = g.addButton('zd-disb', 'Disasters', () => {
-      if (this.pending) { this.pending = null; this.close(); g.toast('Cancelled'); return; } // the button cancels a disaster waiting to be placed
+      if (this.pending) { this.pending = null; this.gauge.cancel(); this.close(); g.toast('Cancelled'); return; } // the button cancels a disaster waiting to be placed
       this.panel.style.bottom = (g.bar.offsetHeight + 8) + 'px'; this.panel.hidden = !this.panel.hidden; this.disBtn.classList.toggle('on', !this.panel.hidden); });
     g.addButton('zd-reset', 'Reset', () => this.reset());
     g.addButton('zd-menu-btn', 'Menu', () => { location.href = location.pathname; });
@@ -387,7 +388,7 @@ class Sandbox {
       if (HAZARDS[h].tap) { // out of the way so you can see where it goes
         this.pending = h; d.querySelectorAll('[data-hz]').forEach(o => o.classList.toggle('sel', o.dataset.hz === h));
         this.panel.hidden = true; this.disBtn.textContent = 'Cancel ' + HAZARDS[h].name.toLowerCase();
-        if (HAZARDS[h].hold) { g.controls.enabled = false; g.toast('Press and hold on the map. The longer you hold, the bigger the ' + HAZARDS[h].name.toLowerCase(), 4500); } // the finger grows it instead of moving the camera
+        if (SIZED[h]) { g.controls.enabled = false; g.toast('Press and hold where it goes: the longer you hold, the bigger it gets. Let go to drop it', 4500); } // the finger sizes it instead of moving the camera
         else g.toast('Tap the map where the ' + HAZARDS[h].name.toLowerCase() + ' should strike', 4000);
         return;
       }
@@ -395,28 +396,30 @@ class Sandbox {
     }; });
     d.querySelectorAll('[data-wx]').forEach(b => { b.onclick = () => { g.disasters.weather.set(b.dataset.wx); g.toast('Weather: ' + WEATHER[b.dataset.wx].name); this.close(); }; });
   }
-  close() { this.panel.hidden = true; this.disBtn.classList.remove('on'); this.disBtn.textContent = 'Disasters'; if (!this.growing) this.g.controls.enabled = true; }
-  // sinkholes and black holes: press to place, they grow until the finger lifts
+  close() { this.panel.hidden = true; this.disBtn.classList.remove('on'); this.disBtn.textContent = 'Disasters'; if (!this.gauge.active) this.g.controls.enabled = true; }
+  // meteors, tornadoes, black holes, volcanoes, sinkholes and warheads: press, hold to size it (drag to aim), let go and it lands
   bindHold() {
     const g = this.g, dom = g.renderer.domElement;
+    this.gauge = new Gauge(g.disasters.ctx.scene);
     dom.addEventListener('pointerdown', (e) => {
-      if (!this.pending || !HAZARDS[this.pending].hold || e.button > 0 || this.growing) return;
+      if (!this.pending || !SIZED[this.pending] || e.button > 0 || this.gauge.active) return;
       const p = g.worldPoint(e.clientX, e.clientY); if (!p) return;
-      const h = this.pending; this.pending = null; this.panel.querySelectorAll('[data-hz]').forEach(o => o.classList.remove('sel'));
-      this.growing = g.disasters.start(h, p.x, p.z, { grow: true }); this.growId = e.pointerId; this.noTapUntil = Infinity;
-      if (this.clock < 0) this.clock = 0;
+      this.gauge.start(this.pending, p.x, p.z); this.growId = e.pointerId; this.noTapUntil = Infinity;
     });
+    dom.addEventListener('pointermove', (e) => { if (this.gauge.active && e.pointerId === this.growId) { const p = g.worldPoint(e.clientX, e.clientY); if (p) this.gauge.move(p.x, p.z); } });
     const up = (e) => {
-      if (!this.growing || e.pointerId !== this.growId) return;
-      const ev = this.growing; this.growing = null; if (ev.release) ev.release();
+      if (!this.gauge.active || e.pointerId !== this.growId) return;
+      const r = this.gauge.release();
+      this.pending = null; this.panel.querySelectorAll('[data-hz]').forEach(o => o.classList.remove('sel'));
+      g.disasters.start(r.kind, r.x, r.z, r.opts);
+      if (this.clock < 0) this.clock = 0;
       this.noTapUntil = performance.now() + 400; this.close();
-      g.toast(HAZARDS[ev.type].name + ': ' + Math.round(ev.size * 2) + ' m across', 2500);
     };
     dom.addEventListener('pointerup', up); dom.addEventListener('pointercancel', up);
   }
   tap(x, z) {
     const g = this.g;
-    if (this.growing || performance.now() < (this.noTapUntil || 0)) return; // that press was growing a hole
+    if (this.gauge.active || performance.now() < (this.noTapUntil || 0)) return; // that press was sizing a disaster
     if (this.pending) {
       const h = this.pending; this.pending = null; this.panel.querySelectorAll('[data-hz]').forEach(o => o.classList.remove('sel'));
       g.disasters.start(h, x, z); this.close(); if (this.clock < 0) this.clock = 0;
@@ -437,10 +440,11 @@ class Sandbox {
     this.g.toast('City reset. Tap a street to drop a Shambler');
   }
   phase() { return (Math.max(0, this.clock) / 600) % 1; }
-  update(sdt) {
+  update(sdt, dt) {
+    this.gauge.update(dt || 0);
+    if (this.gauge.active) { const g = this.g, R = SIZED[this.gauge.kind].ring(this.gauge.v), d = g.camera.position.distanceTo(g.controls.target), want = Math.min(g.controls.maxDistance || 1200, R * 3); if (want > d + 5) g.zoomTo = want; } // pull back to keep the ring in view
     const s = this.g.people.stats;
     if (this.clock >= 0) this.clock += sdt;
-    if (this.growing) { if (!this.growing.alive) { this.growing = null; this.close(); } else this.disBtn.textContent = 'Growing · ' + Math.round(this.growing.size * 2) + ' m'; }
     for (const m of [10, 50, 100, 250, 500, 1000, 2000]) if (s.zombies >= m && this.milestone < m) { this.milestone = m; this.g.toast(m + ' zombies roam the city'); }
     this.el.h.textContent = s.humans; this.el.i.textContent = s.infected; this.el.z.textContent = s.zombies; this.el.d.textContent = s.dead;
     if (this.clock >= 0) { const t = Math.floor(this.clock); this.el.clock.textContent = 'T+' + String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0'); }

@@ -26,6 +26,16 @@ export class Helicopters {
     return jet;
   }
 
+  // a cloud seeding run: a light plane crosses (tx, tz) trailing silver iodide; onSeed when it is over the target
+  seed(tx, tz, opts = {}) {
+    const obj = buildVehicle('seeder_plane'); obj.scale.setScalar(2.4);
+    const a = Math.random() * Math.PI * 2, R = 800, hx = Math.cos(a), hz = Math.sin(a);
+    const jet = { obj, x: tx - hx * R, y: 95, z: tz - hz * R, hx, hz, tx, tz, state: 'in', t: 0, seed: true, speed: 55, alt: 95, onSeed: opts.onSeed, trailT: 0 };
+    obj.position.set(jet.x, jet.y, jet.z); this.scene.add(obj); this.jets.push(jet);
+    jet.eta = R / 55;
+    return jet;
+  }
+
   strike(tx, tz, opts = {}) {
     const obj = buildVehicle('a10'); obj.scale.setScalar(2.2);
     const a = Math.random() * Math.PI * 2, R = 900;
@@ -94,6 +104,12 @@ export class Helicopters {
       const along = (j.tx - j.x) * j.hx + (j.tz - j.z) * j.hz; // distance still to go to the target
       // release the bomb so its ballistic fall lands it on the target
       const lead = sp * Math.sqrt(2 * alt / 9.8);
+      if (j.seed) { // no bomb: a long white trail of seeding flares over the target, and the clouds answer
+        if (Math.abs(along) < 260 && (j.trailT -= h) <= 0) { j.trailT = 0.12; this.fire.spray(j.x - j.hx * 6, j.z - j.hz * 6, j.y - 2, 5, 4, 3.2); }
+        if (j.state === 'in' && along <= 0) { j.state = 'done'; if (j.onSeed) j.onSeed(j.tx, j.tz); }
+        if (along < -1300) { this.scene.remove(j.obj); j.dead = true; }
+        continue;
+      }
       if (j.state === 'in' && along <= lead) {
         j.state = 'dropped';
         const m = new THREE.Mesh(this.bombGeo, this.bombMat); m.castShadow = true;

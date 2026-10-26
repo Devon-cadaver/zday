@@ -125,6 +125,20 @@ V.patrol_boat = { name: 'Patrol boat', section: 'Police', build: () => {
   for (const x of [-3.8, -2.2, 1.6, 2.6]) for (const z of [-1.55, 1.55]) p.push(cyl(0.03, 0.03, 0.5, x, 1.78, z, '#c8c8c8', 'y', 4));
   return merge(p); } };
 
+// the storm chaser: a white pickup with an orange stripe, a weather mast and a radar dish on the bed
+V.storm_chaser = { name: 'Storm chaser', section: 'Fire and rescue', build: () => {
+  const p = [box(4.6, 0.45, 1.9, 0, 0.5, 0, DARK), box(2.2, 0.75, 2.0, 1.1, 1.05, 0, '#f4f4f0'), box(1.6, 0.6, 1.86, 0.9, 1.7, 0, GLASS), box(1.5, 0.08, 1.82, 0.85, 2.02, 0, '#f4f4f0'),
+    box(2.2, 0.55, 2.0, -1.2, 0.95, 0, '#f4f4f0'), box(4.62, 0.16, 2.02, 0, 1.0, 0, '#e0571a'), box(1.4, 0.12, 1.2, 0.8, 2.12, 0, '#2a2a2a'),
+    cyl(0.05, 0.05, 2.4, -1.6, 2.4, 0.6, '#c8c8c8'), box(0.6, 0.05, 0.05, -1.6, 3.5, 0.6, '#c8c8c8'), cyl(0.12, 0.12, 0.2, -1.3, 3.55, 0.6, '#e0571a', 'y', 6),
+    cyl(0.08, 0.08, 0.7, -1.0, 1.55, -0.4, '#8a8a8a'), cyl(0.7, 0.4, 0.25, -1.0, 2.0, -0.4, '#e8e8e4', 'x', 12), ...lightbar(0.9, 2.2)];
+  wheels(p, [1.5, -1.5], 0.98, 0.42, 0.36); lights(p, 2.3, -2.3, 0.75, 0.7); return merge(p); } };
+// the cloud seeder: a small twin-prop plane with flare racks under the wings
+V.seeder_plane = { name: 'Cloud seeder', section: 'Aircraft', build: () => jetGroup([
+  box(5.4, 0.8, 0.8, 0, 1.3, 0, '#f4f4f0'), cyl(0.4, 0.1, 1.2, 3.2, 1.3, 0, '#f4f4f0', 'x', 8), box(1.2, 0.45, 0.66, 1.6, 1.75, 0, GLASS), box(5.5, 0.12, 0.84, 0, 1.0, 0, '#e0b030'),
+  box(1.3, 0.1, 8.4, 0.4, 1.55, 0, '#f4f4f0'), cyl(0.3, 0.3, 1.3, 0.7, 1.35, -1.8, '#d8d8d4', 'x', 8), cyl(0.3, 0.3, 1.3, 0.7, 1.35, 1.8, '#d8d8d4', 'x', 8),
+  box(0.08, 1.2, 0.12, 1.42, 1.35, -1.8, '#2a2a2a'), box(0.08, 1.2, 0.12, 1.42, 1.35, 1.8, '#2a2a2a'), box(0.7, 0.1, 2.4, -2.5, 1.45, 0, '#f4f4f0'), box(0.8, 1.0, 0.1, -2.6, 1.95, 0, '#e0b030'),
+  box(0.6, 0.2, 0.3, 0.2, 1.38, -3.2, '#e0571a'), box(0.6, 0.2, 0.3, 0.2, 1.38, 3.2, '#e0571a')]) };
+
 function heli(body, stripe, size = 1, blades = 2, bucket = false) {
   const g = new THREE.Group();
   const p = [cyl(0.7, 0.75, 1.2, 1.8, 1.6, 0, body, 'x', 10), cyl(0.75, 0.2, 1.1, 2.9, 1.6, 0, GLASS, 'x', 10), box(3.2, 1.45, 1.5, 0, 1.6, 0, body), box(3.3, 0.35, 1.52, 0.2, 1.25, 0, stripe),

@@ -7,7 +7,7 @@
 // then the street gives way and swallows people, cars and whole buildings.
 import * as THREE from 'three';
 import { NOISE } from './water.js';
-import { Mushroom } from './nuke.js';
+import { Mushroom, nuclearDamage } from './nuke.js';
 import { addHole, setHole, removeHole } from './holes.js';
 
 const PIT_VS = /* glsl */`
@@ -158,18 +158,33 @@ export class Meteor {
     if (this.phase === 'warn') {
       if (this.t > this.warnT - 3) {
         this.phase = 'fall'; this.ft = 0;
-        const m = new THREE.Mesh(new THREE.SphereGeometry(this.small ? 2.5 : 6, 14, 10), new THREE.MeshBasicMaterial({ color: new THREE.Color(6, 3.2, 1.2), fog: false }));
+        if (!this.small) { // in from the top edge of the view, so you watch it come all the way down
+          const cam = D.ctx.camera, v = new THREE.Vector3((Math.random() - 0.5) * 1.2, 0.97, 0.5).unproject(cam).sub(cam.position).normalize();
+          const hit = v.y < -0.05 ? cam.position.y / -v.y : 2000;
+          this.from.copy(cam.position).addScaledVector(v, hit * 0.5);
+        }
+        const m = new THREE.Mesh(new THREE.SphereGeometry(this.small ? 2.5 : Math.max(6, this.R * 0.32), 20, 14), new THREE.MeshBasicMaterial({ color: new THREE.Color(6, 3.2, 1.2), fog: false })); // the bigger the crater, the bigger the rock
         this.ball = m; D.ctx.scene.add(m);
+        if (!this.small) { // a dark, lumpy rock inside the glowing shell of its own fire
+          const r = Math.max(6, this.R * 0.32), rg = new THREE.IcosahedronGeometry(r * 0.78, 2), pa = rg.attributes.position;
+          for (let i = 0; i < pa.count; i++) { const k = 0.82 + 0.3 * Math.abs(Math.sin(pa.getX(i) * 0.7 / r * 6 + pa.getY(i) * 1.3 / r * 6) * Math.cos(pa.getZ(i) / r * 5)); pa.setXYZ(i, pa.getX(i) * k, pa.getY(i) * k, pa.getZ(i) * k); }
+          rg.computeVertexNormals();
+          m.add(new THREE.Mesh(rg, new THREE.MeshBasicMaterial({ color: new THREE.Color(0.5, 0.2, 0.08), fog: false })));
+          m.material.color.setRGB(1.5, 0.62, 0.2); m.material.transparent = true; m.material.opacity = 0.32; m.material.depthWrite = false; m.material.blending = THREE.AdditiveBlending; m.renderOrder = 7;
+        }
       }
       return;
     }
     if (this.phase === 'fall') {
-      this.ft += h; const k = Math.min(1, this.ft / 3), p = this.from.clone().lerp(this.to, k);
+      const fallT = 3 + Math.max(0, this.R - 20) / 50; // a giant takes longer to come down, and you see it all the way
+      this.ft += h; const k = Math.min(1, this.ft / fallT), p = this.from.clone().lerp(this.to, k);
       this.ball.position.copy(p);
-      if (Math.random() < 0.8) fire.burst(p.x, p.y, p.z, 5, this.small ? 3 : 7);
+      const back = this.small ? 0 : Math.max(6, this.R * 0.32) * 1.3, dv = this.to.clone().sub(this.from).normalize(); // the fire streams off behind it
+      if (Math.random() < 0.8) fire.burst(p.x - dv.x * back, p.y - dv.y * back, p.z - dv.z * back, 5 + Math.round(this.R / 15), this.small ? 3 : Math.max(7, this.R * 0.3));
+      if (this.R > 40) D.shake(k * k * 0.8);
       if (Math.random() < 0.5) { const r = fire.smoke.alloc(3, p.x, p.y, p.z, 4, 4, this.small ? 1.5 : 3, fire.uniforms.uTime.value); fire.later(3, () => fire.smoke.end(r, fire.uniforms.uTime.value)); fire.later(14, () => fire.smoke.release(r)); }
       D.flash(k * k * (this.small ? 0.1 : 0.35));
-      if (k >= 1) { D.ctx.scene.remove(this.ball); this.ball.geometry.dispose(); this.impact(); this.phase = 'after'; this.at = 0; }
+      if (k >= 1) { D.ctx.scene.remove(this.ball); this.ball.traverse(o => { if (o.geometry) { o.geometry.dispose(); o.material.dispose(); } }); this.impact(); this.phase = 'after'; this.at = 0; }
       return;
     }
     this.at += h;
@@ -182,6 +197,17 @@ export class Meteor {
   poi() { return this.phase === 'fall' && this.ball ? { x: this.ball.position.x, z: this.ball.position.z, danger: 0, range: 3000 } : null; }
   impact() {
     const D = this.D, { people, traffic, city, fire } = D.ctx, x = this.x, z = this.z, R = this.R;
+    if (R >= 40) { // a city killer and up: a crater blasted out of the ground and a blast like two nukes going off at once
+      const cr = Math.min(D.maxHoleR, R * 0.9);
+      new Hole(D, x, z, { R: cr, depth: Math.min(90, R * 0.6), rim: 1.4, glow: 1.6, cool: 0.012, wall: '#4e3e32', floor: '#2c221a', rimCol: '#5c4838' });
+      city.buildingsNear(x, z, cr, (k, d, b) => { if (Math.hypot((b.x0 + b.x1) / 2 - x, (b.z0 + b.z1) / 2 - z) < cr) D.destroyBuilding(k, 'collapse', { vanish: true }); }); // vaporised
+      swallow(D, x, z, cr);
+      nuclearDamage(D, x, z, R * 3.2, { bigFlash: true });
+      D.later(0.35, () => { D.flash(2); D.shake(3.5); }); // the second shock
+      for (let n = 0; n < 160; n++) { const a = Math.random() * Math.PI * 2, sp = 20 + Math.random() * 50, s = 1 + Math.random() * 3.5; D.debris.add(x + Math.cos(a) * cr * 0.6, 2 + Math.random() * 6, z + Math.sin(a) * cr * 0.6, s, s * 0.7, s, Math.random() < 0.5 ? 0x4e3e32 : 0x6a5a48, 'fly', { v: [Math.cos(a) * sp, 15 + Math.random() * 35, Math.sin(a) * sp] }); }
+      D.emit(this.quiet ? { type: 'fragment', x, z } : { type: 'impact', x, z, text: (R >= 112 ? 'Planet killer!' : R >= 80 ? 'Extinction event!' : 'City killer!') + ' The asteroid hit the ' + D.district(x, z) + ' district' });
+      return;
+    }
     D.flash(this.small ? 0.3 : 1.5); D.shake(this.small ? 0.8 : 2.6);
     new Hole(D, x, z, { R: R * 0.9, depth: R * 0.6, rim: 1.6, glow: this.small ? 0.6 : 1.3, cool: 0.02, wall: '#4e3e32', floor: '#2c221a', rimCol: '#5c4838' });
     // the blast: buildings near the crater come down, further out they burn
@@ -226,7 +252,7 @@ export class Meteor {
 export class Sinkhole {
   constructor(D, x, z, o = {}) {
     this.type = 'sinkhole'; this.D = D; this.x = x; this.z = z; this.t = 0; this.alive = true;
-    this.Rmax = o.size ?? 11 + Math.random() * 13; this.rumble = 3.5; this.grow = 7; this.hole = null; this.cracked = false;
+    this.Rmax = o.size ?? 11 + Math.random() * 13; this.rumble = 3.5; this.grow = 7 * Math.sqrt(Math.max(1, this.Rmax / 17)); this.hole = null; this.cracked = false; // a bigger one takes longer to give way
     this.hold = !!o.grow; this.holding = this.hold; this.R = 0; // held: it widens for as long as the finger is down
     if (this.hold) { this.Rmax = D.maxHoleR; this.rumble = 0.8; }
     if (!this.hold || !o.quiet) D.emit({ type: 'warn', hazard: 'sinkhole', x, z, r: this.Rmax * 2, exact: true, text: 'Sinkhole! The ground is giving way in the ' + D.district(x, z) + ' district' });
@@ -249,7 +275,7 @@ export class Sinkhole {
       R = this.R; k = this.holding && this.R < this.Rmax ? 0.5 : 1;
       if (k >= 1) this.doneT = (this.doneT || 0) + h;
     } else { k = Math.min(1, (this.t - this.rumble) / this.grow); R = this.R = this.Rmax * (1 - Math.pow(1 - k, 2.2)); }
-    if (!this.hole) this.hole = new Hole(D, this.x, this.z, { R: 0.5, depth: this.hold ? 90 : this.Rmax * 1.4, rim: 1.3, shape: 'shaft', wall: '#6e5a46', floor: '#4a3c2a', rimCol: '#7a6650' });
+    if (!this.hole) this.hole = new Hole(D, this.x, this.z, { R: 0.5, depth: this.hold ? 90 : Math.min(90, Math.max(20, this.Rmax * 1.4)), rim: 1.3, shape: 'shaft', wall: '#6e5a46', floor: '#4a3c2a', rimCol: '#7a6650' });
     this.hole.setR(R);
     D.shake(0.3 * (1 - k) + 0.05);
     swallow(this.D, this.x, this.z, R);

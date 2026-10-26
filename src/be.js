@@ -10,18 +10,19 @@ import { Hole, swallow } from './impact.js';
 import { saucerMesh, beamMesh } from './aliens.js';
 import { ST, KIND } from './people.js';
 import { roofTop } from './tripod.js';
+import { Gauge, SIZED } from './gauge.js';
 import { ZombiesCtl, RiotCtl, FloodCtl, VolcanoCtl, DustCtl, BlizzardCtl, SolarCtl, NukeCtl, ReactorCtl, RoamingHoleCtl, TripodCtl } from './be-more.js';
 
 const RUN = 180;
 const RANKS = [[0, 'F'], [8000, 'D'], [20000, 'C'], [40000, 'B'], [65000, 'A'], [95000, 'S']];
 export const BE = {
   tornado: { name: 'Tornado', k: 0.9, hint: 'Drag to steer the tornado. It grows as it feeds' },
-  sinkhole: { name: 'Sinkhole', k: 0.6, hint: 'Press and hold to open a sinkhole. The longer you hold, the bigger it gets, up to ten blocks wide' },
+  sinkhole: { name: 'Sinkhole', k: 0.6, hint: 'Hold to size a sinkhole (up to ten blocks wide), let go and the ground gives way' },
   zombies: { name: 'Zombie outbreak', k: 2.2, zom: true, hint: 'Tap to bite someone. Hold and drag and the horde follows your finger' },
   riot: { name: 'Riot', k: 7, hint: 'Drag to lead the mob. It smashes and burns wherever you take it, and grows' },
   quake: { name: 'Earthquake', k: 1, hint: 'Drag across the city to tear a fault line through it' },
   flood: { name: 'Flood', k: 0.8, hint: 'Hold to make it pour: the water rises while you hold and drains when you let go' },
-  meteor: { name: 'Meteor shower', k: 0.45, hint: 'Tap where the next meteor should land' },
+  meteor: { name: 'Meteor shower', k: 0.45, hint: 'Hold to size the rock, from a fireball to a planet killer. Let go and it comes down there' },
   lava: { name: 'Lava', k: 1.6, hint: 'Drag to pour lava. It runs down the streets and swallows what it touches' },
   haboob: { name: 'Dust storm', k: 0.62, hint: 'Drag to pull the wall of dust through the streets. It lifts cars and people' },
   coldwave: { name: 'Blizzard', k: 4, hint: 'Drag to steer a freezing blizzard. Everyone it catches freezes solid' },
@@ -29,7 +30,7 @@ export const BE = {
   saucer: { name: 'Alien saucer', k: 3.5, hint: 'Drag to fly and blast the streets. Hold still over a crowd to beam them up' },
   solar: { name: 'Solar flare', k: 1, hint: 'Hold to charge a flare, let go to strike. The longer you hold, the wider it hits' },
   tripod: { name: 'Alien tripod', k: 3.5, hint: 'Drag to walk it. Hold under it to beam people up. Tap to sweep the heat ray' },
-  volcano: { name: 'Volcano', k: 2.5, hint: 'Tap where the volcano bursts out, then hold anywhere to rain lava bombs there' },
+  volcano: { name: 'Volcano', k: 2.5, hint: 'Hold to size the volcano and let go where it bursts out. Then hold anywhere to rain lava bombs there' },
   blackhole: { name: 'Black hole', k: 1.4, hint: 'Drag to move the black hole. It grows with everything it swallows' },
   nuclear: { name: 'Nuclear strike', k: 0.2, hint: 'Hold to set the yield, let go to launch. Three warheads, another every minute' },
   meltdown: { name: 'Meltdown', k: 1.4, zom: true, hint: 'Hold to overload the reactor until it blows, then drag to steer the fallout over the city' },
@@ -51,18 +52,21 @@ class TornadoCtl {
 
 class SinkholeCtl {
   constructor(be) { this.be = be; this.cur = null; this.n = 0; be.D.list.push(wrap(this)); }
-  down(x, z) { const D = this.be.D; this.n++; this.cur = { x, z, R: 2, hole: new Hole(D, x, z, { R: 2, depth: 90, rim: 1.3, shape: 'shaft', wall: '#6e5a46', floor: '#4a3c2a', rimCol: '#7a6650' }) }; D.shake(0.4); D.ctx.people.scare(x, z, 40, 0.6); }
-  move() {} // a sinkhole opens where you pressed
-  up() { const c = this.cur; if (!c) return; this.cur = null; this.be.D.ctx.people.block(c.x, c.z, c.R + 0.3); this.be.D.ctx.traffic.closeNear(c.x, c.z, c.R + 3); }
+  down(x, z) { this.be.gauge.start('sinkhole', x, z); }
+  dig(x, z, Rmax) { const D = this.be.D; this.n++; this.cur = { x, z, R: 2, Rmax, hole: new Hole(D, x, z, { R: 2, depth: 90, rim: 1.3, shape: 'shaft', wall: '#6e5a46', floor: '#4a3c2a', rimCol: '#7a6650' }) }; D.shake(0.4); D.ctx.people.scare(x, z, 40, 0.6); }
+  move(x, z) { this.be.gauge.move(x, z); }
+  up() { const r = this.be.gauge.release(); if (r && !this.cur) this.dig(r.x, r.z, r.v); } // the hole opens where you let go and widens to the size you set
+  settle() { const c = this.cur; if (!c) return; this.cur = null; this.be.D.ctx.people.block(c.x, c.z, c.R + 0.3); this.be.D.ctx.traffic.closeNear(c.x, c.z, c.R + 3); }
   update(h) {
     const c = this.cur; if (!c) return;
     const D = this.be.D, { city, fire } = D.ctx;
-    c.R = Math.min(D.maxHoleR, c.R + h * (3 + c.R * 0.09)); c.hole.setR(c.R); D.shake(0.15); // faster the wider it gets, up to ten blocks
+    c.R = Math.min(c.Rmax, c.R + h * (4 + c.R * 0.12)); c.hole.setR(c.R); D.shake(0.15); // faster the wider it gets
+    if (c.R >= c.Rmax) { this.settle(); return; }
     swallow(D, c.x, c.z, c.R);
     city.buildingsNear(c.x, c.z, c.R, (k, d, b) => { const bx = (b.x0 + b.x1) / 2, bz = (b.z0 + b.z1) / 2; if (Math.hypot(bx - c.x, bz - c.z) < c.R + 2) D.destroyBuilding(k, 'collapse', { dir: Math.atan2(c.z - bz, c.x - bx), noRubble: true, noCrush: true }); });
     if (Math.random() < h * 4) { const a = Math.random() * 6.28; fire.dustCloud(c.x + Math.cos(a) * c.R, c.z + Math.sin(a) * c.R, 4, 8); }
   }
-  label() { return this.cur ? Math.round(this.cur.R * 2) + ' m wide' : 'Press to open'; }
+  label() { return this.cur ? Math.round(this.cur.R * 2) + ' m wide' : 'Hold to size it'; }
   poi() { const c = this.cur; return c ? { x: c.x, z: c.z, danger: c.R + 10, range: 160 } : null; }
 }
 
@@ -106,10 +110,14 @@ class MeteorCtl {
   constructor(be) { this.be = be; this.cd = 0; this.n = 0; be.D.list.push(wrap(this)); }
   down(x, z) {
     if (this.cd > 0) { this.be.g.toast('The next meteor is ' + Math.ceil(this.cd) + ' s away'); return; }
-    this.cd = 5; this.n++;
-    this.be.D.start('meteor', x, z, { size: 11 + Math.random() * 9, warn: 3, quiet: true, mushroom: this.n % 2 === 1 });
+    this.be.gauge.start('meteor', x, z);
   }
-  move() {} up() {}
+  move(x, z) { this.be.gauge.move(x, z); }
+  up() {
+    const r = this.be.gauge.release(); if (!r) return;
+    this.n++; this.cd = 3 + r.v / 10; // a planet killer takes a while to come round again
+    this.be.D.start('meteor', r.x, r.z, { ...r.opts, warn: 3, quiet: true, mushroom: r.v < 40 && this.n % 2 === 1 });
+  }
   update(h) { this.cd = Math.max(0, this.cd - h); }
   label() { return this.cd > 0 ? 'Next in ' + Math.ceil(this.cd) + ' s' : 'Ready'; }
 }
@@ -249,6 +257,7 @@ export class BeTheDisaster {
     this.end = document.getElementById('zd-end') || document.createElement('div'); this.end.id = 'zd-end'; this.end.hidden = true;
     if (!this.end.parentNode) document.body.appendChild(this.end);
     // one finger drives the disaster; two fingers (or the right mouse button) pan, pinch or wheel to zoom
+    this.gauge = new Gauge(g.disasters.ctx.scene); // hold-to-size
     g.controls.touches = { ONE: null, TWO: THREE.TOUCH.DOLLY_PAN };
     g.controls.mouseButtons = { LEFT: null, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
     this.bindDrag();
@@ -274,6 +283,7 @@ export class BeTheDisaster {
   start() {
     const g = this.g, D = g.disasters, B = g.city.bounds, p = g.people, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2;
     this.end.hidden = true; this.ended = false;
+    if (this.gauge) this.gauge.cancel();
     g.resetWorld(); g.setSpeed(1); D.boats.auto = false; // nobody comes to the rescue
     this.t = 0; this.score = 0; this.tick = 0;
     D.weather.set(this.kind === 'tornado' ? 'storm' : 'clear', true);
@@ -317,6 +327,8 @@ export class BeTheDisaster {
   update(sdt, dt) {
     if (this.ended) return;
     const g = this.g;
+    this.gauge.update(dt);
+    if (this.gauge.active) { const R = SIZED[this.gauge.kind].ring(this.gauge.v), d = g.camera.position.distanceTo(g.controls.target), want = Math.min(g.controls.maxDistance || 1100, R * 3); if (want > d + 5) g.zoomTo = want; }
     this.t += sdt;
     const f = this.ctl && this.ctl.follow && this.ctl.follow();
     if (f) { // the camera rides along with a moving disaster
@@ -344,6 +356,7 @@ export class BeTheDisaster {
   finish() {
     this.ended = true;
     const g = this.g, G = this.got || { b: 0, dead: 0, abd: 0, cars: 0, fires: 0 };
+    this.gauge.cancel();
     if (this.ctl && this.ctl.up) this.ctl.up();
     if (this.ctl && this.ctl.finish) this.ctl.finish();
     let rank = 'F'; for (const [s, r] of RANKS) if (this.score >= s) rank = r;

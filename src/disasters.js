@@ -27,21 +27,21 @@ export const HAZARDS = {
   riot: { name: 'Riot', tap: true },
   aliens: { name: 'Alien invasion', tap: false },
   meteor: { name: 'Meteor', tap: true },
-  sinkhole: { name: 'Sinkhole', tap: true, hold: true }, // hold: grows for as long as you press
+  sinkhole: { name: 'Sinkhole', tap: true },
   volcano: { name: 'Volcano', tap: true },
   haboob: { name: 'Dust storm', tap: false },
   coldwave: { name: 'Cold wave', tap: false },
   solar: { name: 'Solar flare', tap: false },
   nuclear: { name: 'Nuclear attack', tap: true },
   meltdown: { name: 'Plant meltdown', tap: false },
-  blackhole: { name: 'Black hole', tap: true, hold: true },
+  blackhole: { name: 'Black hole', tap: true },
 };
 export { WEATHER };
 
 class TornadoEvent {
   constructor(D, x, z, opts) {
     this.type = 'tornado'; this.D = D;
-    this.tw = new Twister(D, x, z, { size: opts.size ?? 1.4 + Math.random() * 0.8, life: opts.life });
+    this.tw = new Twister(D, x, z, { size: opts.size ?? 1.4 + Math.random() * 0.8, life: opts.life ?? (opts.size ? 50 + opts.size * 10 : undefined) });
     const w = D.weather.type;
     if (w === 'clear' || w === 'heat' || w === 'fog' || w === 'sand') { this.prevWeather = w; D.weather.set('storm'); }
     D.emit({ type: 'warn', hazard: 'tornado', x, z, r: 70, text: 'Tornado warning! A twister is touching down in the ' + D.district(x, z) + ' district' });
@@ -170,6 +170,7 @@ export class Disasters {
     const hgt = b.top - b.baseY, wc = b.wallCol, hex = new THREE.Color(wc[0], wc[1], wc[2]).getHex();
     people.clearBuilding(k, how === 'tear' ? 'tear' : 'crush');
     fire.gone(k);
+    if (opts.vanish) { people.clearBuilding(k, 'crush'); fire.gone(k); city.hideBuilding(k); this.stats.buildings++; this.emit({ type: 'collapse', k, how, x: cx, z: cz }); return true; } // vaporised: no shell, no debris
     const shell = city.extractBuilding(k); city.hideBuilding(k);
     const dbr = this.debris;
     if (how === 'tear') {

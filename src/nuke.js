@@ -147,7 +147,7 @@ export class NukeBlast {
     this.type = 'nukeblast'; this.D = D; this.x = x; this.z = z; this.R = R; this.t = 0; this.f = 0; this.alive = true;
     this.speed = R / 3.4; this.byPlayer = !!o.byPlayer; this.ash = []; this.heat = 1;
     const { fire, scene } = D.ctx;
-    D.flash(1.3); D.shake(3); // a blink of white, then the orange heat wash (post.js uHeat) carries it
+    D.flash(o.bigFlash ? 1.8 : 1.3); D.shake(3); // a blink of white, then the orange heat wash (post.js uHeat) carries it
     fire.nuke(x, z, R * 0.9, { cloud: false });
     new Mushroom(D, x, z, R * 0.7);
     this.mat = new THREE.ShaderMaterial({ vertexShader: WALL_VS, fragmentShader: WALL_FS, transparent: true, depthWrite: false, side: THREE.DoubleSide, uniforms: { uTime: { value: 0 }, uK: { value: 1 } } });

@@ -68,13 +68,16 @@ export class FloodCtl {
 export class VolcanoCtl {
   constructor(be) { this.be = be; be.D.list.push(wrap(this)); }
   down(x, z) {
-    if (!this.v) { this.v = this.be.D.start('volcano', x, z, { warn: 3, erupt: 99999, quiet: true }); this.be.g.lookAt(x, z, 520); return; }
+    if (!this.v) { this.be.gauge.start('volcano', x, z); return; } // first: size it
     this.v.aim = [x, z];
   }
-  move(x, z) { if (this.v && this.v.aim) this.v.aim = [x, z]; }
-  up() { if (this.v) this.v.aim = null; }
+  move(x, z) { if (!this.v) this.be.gauge.move(x, z); else if (this.v.aim) this.v.aim = [x, z]; }
+  up() {
+    if (!this.v) { const r = this.be.gauge.release(); if (r) { this.v = this.be.D.start('volcano', r.x, r.z, { ...r.opts, warn: 3, erupt: 99999, quiet: true }); this.be.g.lookAt(r.x, r.z, 520); } return; }
+    this.v.aim = null;
+  }
   update() {}
-  label() { return !this.v ? 'Tap where it rises' : this.v.phase === 'rumble' ? 'Rumbling' : this.v.aim ? 'Bombarding' : 'Erupting'; }
+  label() { return !this.v ? 'Hold to size it' : this.v.phase === 'rumble' ? 'Rumbling' : this.v.aim ? 'Bombarding' : 'Erupting'; }
 }
 
 // The dust storm: the wall surges towards your finger; a new one rolls in out of the desert when it has passed
@@ -98,7 +101,7 @@ export class DustCtl {
 export class BlizzardCtl {
   constructor(be, x, z) {
     const D = be.D; this.be = be; this.x = x; this.z = z; this.tx = x; this.tz = z; this.R = 26; this.t = 0; this.tick = 0; this.frozen = 0;
-    this.snow = new Splash(D.ctx.scene, 3600); this.fogT = 0; // and a dense white whirl of cloud at its core this.snow.mat.uniforms.uColor.value.setRGB(0.95, 0.97, 1.0);
+    this.snow = new Splash(D.ctx.scene, 3600); this.fogT = 0; this.snow.mat.uniforms.uColor.value.setRGB(0.95, 0.97, 1.0); // and a dense white whirl of cloud at its core
     D.weather.set('snow'); D.list.push(wrap(this));
   }
   down(x, z) { this.tx = x; this.tz = z; } move(x, z) { this.tx = x; this.tz = z; } up() {}
@@ -166,18 +169,15 @@ export class SolarCtl {
 
 // The arsenal: three warheads (another every minute); hold to dial the yield up, let go to launch
 export class NukeCtl {
-  constructor(be) { this.be = be; this.heads = 3; this.regen = 0; this.charge = 0; this.ring = ringMesh(be.D.ctx.scene, new THREE.Color(3, 0.6, 0.3)); be.D.list.push(wrap(this)); }
-  get R() { return 120 + 180 * this.charge; }
+  constructor(be) { this.be = be; this.heads = 3; this.regen = 0; be.D.list.push(wrap(this)); }
   down(x, z) {
     if (this.heads <= 0) { this.be.g.toast('No warheads left: the next one is ' + Math.ceil(60 - this.regen) + ' s away'); return; }
-    this.held = true; this.charge = 0; this.at = [x, z];
+    this.be.gauge.start('nuclear', x, z);
   }
-  move(x, z) { if (this.held) this.at = [x, z]; }
-  up() { if (!this.held) return; this.held = false; this.heads--; this.be.D.start('nuclear', this.at[0], this.at[1], { warn: 5.2, size: this.R, quiet: true }); }
-  update(h) { if (this.held) this.charge = Math.min(1, this.charge + h / 2.5); if (this.heads < 3 && (this.regen += h) >= 60) { this.regen = 0; this.heads++; } }
-  sync(dt, realT) { this.ring.visible = !!this.held; if (this.held) { this.ring.position.set(this.at[0], 0.4, this.at[1]); this.ring.scale.setScalar(this.R); this.ring.material.opacity = 0.5 + 0.4 * Math.sin(realT * 10); } }
-  dispose() { this.be.D.ctx.scene.remove(this.ring); }
-  label() { return this.heads + ' warheads' + (this.held ? ' · ' + Math.round(this.R) + ' m blast' : ''); }
+  move(x, z) { this.be.gauge.move(x, z); }
+  up() { const r = this.be.gauge.release(); if (!r) return; this.heads--; this.be.D.start('nuclear', r.x, r.z, { ...r.opts, warn: 5.2, quiet: true }); }
+  update(h) { if (this.heads < 3 && (this.regen += h) >= 60) { this.regen = 0; this.heads++; } }
+  label() { return this.heads + ' warheads'; }
 }
 
 // The reactor: hold to push the core (let go and it cools a little); at 100% it blows. Then steer the fallout over the city

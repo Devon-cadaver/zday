@@ -39,7 +39,7 @@ void main() {
 export class BlackHole {
   constructor(D, x, z, o = {}) {
     this.type = 'blackhole'; this.D = D; this.x = x; this.z = z; this.y = 15; this.t = 0; this.alive = true; this.phase = 'form';
-    this.Rmax = o.size ?? 3.2 + Math.random() * 1.3; this.life = o.life ?? 26; this.Rh = 0.05; this.tick = 0;
+    this.Rmax = o.size ?? 3.2 + Math.random() * 1.3; this.life = o.life ?? 26 + Math.max(0, this.Rmax - 4) * 1.2; this.sized = o.size != null; this.Rh = 0.05; this.tick = 0; // sized: it reaches its full size in a few seconds
     this.lift = []; this.cars = []; this.eaten = 0;
     this.hold = !!o.grow; this.holding = this.hold; this.holdT = 0; this.voidR = 3;
     this.steer = !!o.steer; this.tx = x; this.tz = z; this.torn = 0; // steered (Be The Disaster): it roams after your finger and leaves its void where it dies // held: it swells for as long as the finger is down
@@ -60,8 +60,8 @@ export class BlackHole {
     if (!o.quiet) D.emit({ type: 'warn', hazard: 'blackhole', x, z, r: 70, exact: true, text: 'Gravitational anomaly in the ' + D.district(x, z) + ' district! Something is tearing a hole in space. Get away from it' });
     D.flash(0.25); D.shake(0.6);
   }
-  get pullR() { return Math.max(18 + this.Rh * 15, this.voidR + 45); }
-  get tearR() { return Math.max(5 + this.Rh * 6, this.voidR + 10); }
+  get pullR() { return Math.min(Math.max(18 + this.Rh * 15, this.voidR + 45), this.hole.R + 90); }
+  get tearR() { return Math.max(5 + this.Rh * 6, this.voidR + 10, this.hole.R + 8); }
   get size() { return this.hole.R; }
   release() { if (this.holding) { this.holding = false; this.ft = 0; } }
   collapse() { if (this.phase === 'form' || this.phase === 'feed') { this.phase = 'collapse'; this.ct = 0; this.R0 = this.Rh; } }
@@ -92,7 +92,7 @@ export class BlackHole {
       if (this.t >= 3) { this.phase = 'feed'; this.ft = 0; }
     } else if (this.phase === 'feed') {
       this.ft += h;
-      this.Rh = 1 + (this.Rmax - 1) * Math.min(1, this.ft / (this.life * 0.7));
+      this.Rh = 1 + (this.Rmax - 1) * Math.min(1, this.ft / (this.sized ? 6 + this.Rmax * 0.3 : this.life * 0.7));
       D.shake(0.12 + this.Rh * 0.03);
       if (this.ft >= this.life) { this.phase = 'collapse'; this.ct = 0; this.R0 = this.Rh; }
     } else if (this.phase === 'collapse') {
@@ -132,7 +132,7 @@ export class BlackHole {
     // buildings in reach are torn apart and drawn in, the nearest first
     let k0 = -1, dk = 1e9, inside = 0;
     city.buildingsNear(x, z, T, (k, d, b) => {
-      if (this.hold && inside < 3 && Math.hypot((b.x0 + b.x1) / 2 - x, (b.z0 + b.z1) / 2 - z) < this.hole.R + 4 && D.destroyBuilding(k, 'tear', { vort: this.vi, noRubble: true })) { inside++; for (const j of people.lifted) this.lift.push(j); people.lifted.length = 0; return; }
+      if ((this.hold || this.sized) && inside < 3 && Math.hypot((b.x0 + b.x1) / 2 - x, (b.z0 + b.z1) / 2 - z) < this.hole.R + 4 && D.destroyBuilding(k, 'tear', { vort: this.vi, noRubble: true })) { inside++; for (const j of people.lifted) this.lift.push(j); people.lifted.length = 0; return; }
       if (d < dk) { dk = d; k0 = k; }
     });
     if (k0 >= 0 && Math.random() < 0.5 && D.destroyBuilding(k0, 'tear', { vort: this.vi, noRubble: true }) && ++this.torn) { for (const j of people.lifted) this.lift.push(j); people.lifted.length = 0; } // the people inside go with it
@@ -142,7 +142,7 @@ export class BlackHole {
       const a = Math.random() * 6.28, r = this.hole.R + Math.random() * T * 0.5, s = 0.4 + Math.random() * 1.3;
       D.debris.add(x + Math.cos(a) * r, 0.3, z + Math.sin(a) * r, s, s * 0.35, s * (0.6 + Math.random() * 0.6), Math.random() < 0.6 ? 0x6a655c : 0x8a8274, 'orbit', { vort: this.vi, hold: 99 });
     }
-    if (!this.steer) this.hole.setR(Math.max(this.hole.R, this.hold ? this.voidR : Math.min(T * 0.85, 3 + this.Rh * 4.6)));
+    if (!this.steer) this.hole.setR(Math.max(this.hole.R, this.hold ? this.voidR : Math.min(D.maxHoleR, T * 0.85, 3 + this.Rh * 4.6)));
   }
 
   // everything caught spirals in: tighter and faster as it falls, gone at the horizon
