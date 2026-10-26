@@ -96,14 +96,11 @@ export class Commander {
 
   sendPolice(x, z) {
     const g = this.g, c = this.cards.police;
-    const route = g.traffic.routeTo(x, z);
-    if (!route) { g.toast('No road to that spot'); return; }
-    const car = g.traffic.dispatch(route, {
-      to: [x, z],
+    const car = g.traffic.dispatchTo(x, z, {
       onArrive: (ax, az) => { g.people.spawnOfficers(ax, az, 2); g.toast('Officers on scene in the ' + this.district(ax, az)); },
       onLost: () => { this.lost++; g.toast('A cruiser was wrecked on the way'); },
     });
-    if (!car) { g.toast('All cruisers are out'); return; }
+    if (!car) { g.toast(g.traffic.missions.length >= 24 ? 'All cruisers are out' : 'No road to that spot'); return; }
     this.rp -= c.u.cost; this.cool.police = c.u.cd; this.sent++;
     this.sel = null; c.btn.classList.remove('sel');
     g.toast('Cruiser dispatched, about ' + Math.ceil(car.eta) + ' s out');

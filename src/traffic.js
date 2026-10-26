@@ -222,6 +222,7 @@ export class Traffic {
       const node = this.nodes[car.b];
       if (node.occ >= 0) { const o = this.cars[node.occ]; if (!o || o.mode !== DRIVE || o.b !== car.b || !(o.held || o.turn)) node.occ = -1; }
       if (car.s >= car.len - STOPLINE && !car.held) {
+        if (!car.mission && car.panic <= 0 && this.sirenNear(node)) { car.s = Math.max(before, car.len - STOPLINE); car.v = 0; return; }
         if (node.occ < 0) { node.occ = car.id; car.held = true; }
         else if (node.occ === car.id) car.held = true;
         else if (car.panic <= 0 && !car.mission) { car.s = Math.max(before, car.len - STOPLINE); car.v = 0; return; }
@@ -242,6 +243,11 @@ export class Traffic {
         }
       }
     }
+  }
+
+  sirenNear(node) {
+    for (const m of this.missions) if (m.mode === DRIVE && Math.hypot(m.x - node.x, m.z - node.z) < 22) return true;
+    return false;
   }
 
   // ---------- spatial hash of cars
@@ -284,6 +290,7 @@ export class Traffic {
   }
 
   driveStep(car, h, P) {
+    if (car.grace > 0) car.grace -= h;
     // zombies nearby? panic. Pedestrians ahead? (calm drivers only)
     if ((car.think -= h) <= 0) {
       car.think = 0.25 + this.r() * 0.15;
@@ -313,7 +320,12 @@ export class Traffic {
       if (!panic && car.pedGap < 99) vDes = Math.min(vDes, Math.sqrt(Math.max(0, 2 * BRAKE * (car.pedGap - 1.5))));
       if (!panic && !car.turn && !car.mission) {
         const node = this.nodes[car.b], toEnd = car.len - car.s;
-        if (node.occ >= 0 && node.occ !== car.id && !car.held && toEnd < 18) vDes = Math.min(vDes, Math.sqrt(Math.max(0, 2 * BRAKE * (toEnd - STOPLINE))));
+        if (((node.occ >= 0 && node.occ !== car.id) || this.sirenNear(node)) && !car.held && toEnd < 18) vDes = Math.min(vDes, Math.sqrt(Math.max(0, 2 * BRAKE * (toEnd - STOPLINE))));
+      }
+      if (car.mission && !car.turn) {
+        // ease through a busy crossing
+        const node = this.nodes[car.b], toEnd = car.len - car.s;
+        if (toEnd < 14) { let busy = false; this.near(node.x, node.z, 16, (o) => { if (o !== car && o.mode === DRIVE && o.v > 1 && Math.hypot(o.x - node.x, o.z - node.z) < 16) busy = true; }); if (busy) vDes = Math.min(vDes, 6); }
       }
     } else vDes = 3;
     if (car.v < vDes) car.v = Math.min(vDes, car.v + ACC * (panic ? 1.6 : 1) * h);
@@ -395,7 +407,7 @@ export class Traffic {
       }
       // car against car (circle pairs along each body)
       this.near(car.x, car.z, 6, (o) => {
-        if (o === car) return;
+        if (o === car || car.grace > 0 || o.grace > 0) return; // fresh mission car: let traffic flow round it
         if (o.id < car.id && o.mode !== REST && o.mode !== PARKED) return; // pair handled from the other side
         if (!this.overlap(car, o)) return;
         const rvx = car.hx * car.v - o.hx * o.v, rvz = car.hz * car.v - o.hz * o.v;
@@ -444,7 +456,7 @@ export class Traffic {
   }
 
   // shortest road route from the city edge to the intersection nearest (x,z)
-  routeTo(x, z) {
+  routeTo(x, z, exclude = null) {
     const target = this.nearestNode(x, z), N = this.nodes.length;
     const dist = new Int32Array(N).fill(-1), par = new Int32Array(N).fill(-1);
     const qn = [target]; dist[target] = 0;
@@ -457,7 +469,7 @@ export class Traffic {
     for (let i = 0; i < N; i++) {
       const gx = Math.floor(i / NZ), gz = i % NZ;
       const edge = gx === 0 || gz === 0 || gx === NX - 1 || gz === NZ - 1;
-      if (!edge || i === target || dist[i] < 0) continue;
+      if (!edge || i === target || dist[i] < 0 || (exclude && exclude.has(i))) continue;
       const sc = dist[i] + this.r() * 0.5;
       if (sc < best) { best = sc; start = i; }
     }
@@ -481,12 +493,31 @@ export class Traffic {
     return Math.min(car.len - 7, Math.max(3, s));
   }
 
+  // route from a clear stretch of the city edge to (x,z) and send a cruiser
+  dispatchTo(x, z, opts = {}) {
+    const tried = new Set();
+    let route = null;
+    for (let k = 0; k < 6; k++) {
+      const r = this.routeTo(x, z, tried);
+      if (!r) break;
+      route = route || r;
+      tried.add(r[0]);
+      const A = this.nodes[r[0]], B = this.nodes[r[1]];
+      const L = Math.hypot(B.x - A.x, B.z - A.z), dx = (B.x - A.x) / L, dz = (B.z - A.z) / L;
+      const sx = A.x + dx * IN - dz * LANE, sz = A.z + dz * IN + dx * LANE;
+      let clear = true;
+      this.near(sx, sz, 14, (o) => { if (Math.hypot(o.x - sx, o.z - sz) < 14) clear = false; });
+      if (clear) { route = r; break; }
+    }
+    return this.dispatch(route, { ...opts, to: [x, z] });
+  }
+
   dispatch(route, opts = {}) {
     if (!route || route.length < 2 || this.missions.length >= MISSION_CAP) return null;
     const id = this.cars.length;
     const car = { id, mission: true, slot: this.missions.length, route, ri: 0, mode: DRIVE, cruise: opts.cruise ?? 14, v: 0, panic: 0, think: 0,
       pedGap: 99, blocked: 0, resume: -1, x: 0, z: 0, hx: 1, hz: 0, yaw: 0, vx: 0, vz: 0, w: 0, ignite: false, burning: false, hits: 0, zx: 0, zz: 0,
-      colHex: '#f4f4f0', held: false, to: opts.to || null, onArrive: opts.onArrive, onLost: opts.onLost };
+      colHex: '#f4f4f0', held: false, to: opts.to || null, onArrive: opts.onArrive, onLost: opts.onLost, grace: 2.5 };
     this.startSeg(car, route[0], route[1]);
     car.s = 0; this.pose(car);
     this.cars.push(car); this.missions.push(car);
