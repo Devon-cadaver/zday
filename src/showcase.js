@@ -1,0 +1,106 @@
+// Roster page: every figure and vehicle on its own plinth, rendered into one
+// fixed canvas with a scissor viewport per tile (so a phone needs one WebGL
+// context, not sixty).
+import * as THREE from 'three';
+import { figureGeometry, figureMaterial, figureAttributes, ARCHETYPES, OFFICER_LOOK, ZTYPES, FLAG } from './figures.js';
+import { VEHICLES, buildVehicle } from './vehicles.js';
+import { rng } from './textures.js';
+
+const r = rng(2026);
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('gl'), antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setClearColor(0x000000, 0);
+renderer.shadowMap.enabled = true;
+const fig = figureMaterial();
+const tiles = [];
+
+function plinth(size) {
+  const g = new THREE.CylinderGeometry(size, size * 1.08, size * 0.12, 6);
+  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: '#1b2838', roughness: 0.8 }));
+  m.position.y = -size * 0.06; m.receiveShadow = true; m.rotation.y = Math.PI / 6;
+  return m;
+}
+
+function figure(look, anim) {
+  const geo = figureGeometry();
+  const fa = figureAttributes(geo, 1);
+  fa.write(0, look); fa.arrays.anim[0] = anim; fa.dirty();
+  const m = new THREE.InstancedMesh(geo, fig.mat, 1);
+  m.setMatrixAt(0, new THREE.Matrix4()); m.castShadow = true;
+  const g = new THREE.Group(); g.add(m);
+  if (anim === 8) { m.rotation.z = -1.25; m.position.y = 0.05; }
+  else if (anim === 3) m.rotation.z = -0.3;
+  else if (anim === 9) m.rotation.z = -0.5;
+  return g;
+}
+
+function add(section, name, obj, fit) {
+  let grid = document.querySelector('[data-section="' + section + '"]');
+  if (!grid) {
+    const h = document.createElement('h2'); h.textContent = section;
+    grid = document.createElement('div'); grid.className = 'grid'; grid.dataset.section = section;
+    document.getElementById('sections').append(h, grid);
+  }
+  const el = document.createElement('div'); el.className = 'tile';
+  const lbl = document.createElement('div'); lbl.className = 'lbl'; lbl.textContent = name;
+  el.appendChild(lbl); grid.appendChild(el);
+  const scene = new THREE.Scene();
+  const hemi = new THREE.HemisphereLight('#dfe7f2', '#2a3340', 1.1);
+  const sun = new THREE.DirectionalLight('#fff0d8', 2.6); sun.position.set(4, 8, 5); sun.castShadow = true;
+  sun.shadow.mapSize.set(512, 512); sun.shadow.camera.left = -fit * 1.5; sun.shadow.camera.right = fit * 1.5; sun.shadow.camera.top = fit * 1.5; sun.shadow.camera.bottom = -fit * 1.5;
+  scene.add(hemi, sun, plinth(fit * 0.95));
+  const pivot = new THREE.Group(); pivot.add(obj); scene.add(pivot);
+  const cam = new THREE.PerspectiveCamera(28, 1, 0.1, 100);
+  const d = fit * 2.6;
+  cam.position.set(d * 0.75, d * 0.62, d * 0.75); cam.lookAt(0, fit * 0.4, 0);
+  tiles.push({ el, scene, cam, pivot, obj, rot: r() * 6.28 });
+}
+
+// ---------- figures
+for (const a of ARCHETYPES) add('Civilians', a.name, figure(a.roll(r), 1), 1.9);
+add('Civilians', 'Infected', figure({ ...ARCHETYPES[0].roll(r), skin: new THREE.Color('#8fae5a') }, 2), 1.9);
+add('Responders', 'Police officer', figure(OFFICER_LOOK(r), 6), 1.9);
+for (const [k, Z] of ZTYPES.entries()) {
+  const base = ARCHETYPES[k % 3 === 0 ? 0 : k % 3 === 1 ? 4 : 2].roll(r);
+  const L = Z.look(base); L.scale = Z.scale || 1; L.torso = Z.torso || 1; L.flags = (L.flags || 0) | FLAG.GLOW;
+  add('Zombies', Z.name, figure(L, Z.anim), 2.3 * (Z.scale || 1));
+}
+// ---------- vehicles
+const order = ['Police', 'Fire and rescue', 'Military', 'Aircraft', 'Civilian'];
+const tints = ['#f2efe8', '#b8b8b4', '#8c2a22', '#2f4566', '#e0b030', '#5b6b4a', '#d8c9a8'];
+for (const sec of order) {
+  for (const [id, v] of Object.entries(VEHICLES)) {
+    if (v.section !== sec) continue;
+    const obj = buildVehicle(id, v.tint ? (id === 'car_taxi' ? '#f2c300' : tints[Math.floor(r() * tints.length)]) : null);
+    const box = new THREE.Box3().setFromObject(obj);
+    const size = box.getSize(new THREE.Vector3());
+    const fit = Math.max(size.x, size.z) * 0.62 + size.y * 0.3;
+    if (obj.userData.rotor) obj.position.y = 0.4;
+    add(sec, v.name, obj, fit);
+  }
+}
+
+// ---------- render loop
+function resize() { renderer.setSize(innerWidth, innerHeight, false); }
+addEventListener('resize', resize); resize();
+const clock = new THREE.Clock();
+function frame() {
+  const dt = Math.min(0.05, clock.getDelta());
+  fig.uTime.value += dt;
+  renderer.setScissorTest(true);
+  const H = innerHeight;
+  for (const t of tiles) {
+    const rc = t.el.getBoundingClientRect();
+    if (rc.bottom < 0 || rc.top > H || rc.right < 0 || rc.left > innerWidth) continue;
+    t.rot += dt * 0.5;
+    t.pivot.rotation.y = t.rot;
+    if (t.obj.userData.rotor) { t.obj.userData.rotor.rotation.y += dt * 18; t.obj.position.y = 0.4 + Math.sin(t.rot * 2) * 0.08; }
+    const w = rc.width, h = rc.height, left = rc.left, bottom = H - rc.bottom;
+    t.cam.aspect = w / h; t.cam.updateProjectionMatrix();
+    renderer.setViewport(left, bottom, w, h); renderer.setScissor(left, bottom, w, h);
+    renderer.render(t.scene, t.cam);
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+window.__sc = { tiles, renderer };

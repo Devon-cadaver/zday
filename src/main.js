@@ -8,6 +8,7 @@ import { Post } from './post.js';
 import { People } from './people.js';
 import { Game } from './game.js';
 import { Fire } from './fire.js';
+import { Daylight } from './daylight.js';
 
 const P = new URLSearchParams(location.search);
 const coarse = matchMedia('(pointer: coarse)').matches;
@@ -75,6 +76,8 @@ const fire = new Fire(scene, city, { low });
 const buildMs = Math.round(performance.now() - t0);
 
 const post = new Post(renderer, { samples: low ? 0 : 4 });
+const daylight = new Daylight({ scene, sun, hemi, post, city, traffic, people });
+daylight.set(0);
 if (P.has('blur')) post.opts.blurFrac = num('blur', 0.018);
 if (P.get('dof') === '0') post.opts.dof = false;
 if (P.get('grade') === '0') post.opts.grade = false;
@@ -110,6 +113,6 @@ function frame() {
 }
 requestAnimationFrame(frame);
 
-const game = new Game({ people, traffic, fire, city, camera, controls, renderer, mode });
+const game = new Game({ people, traffic, fire, city, camera, controls, renderer, mode, daylight });
 
-window.__z = { THREE, scene, camera, controls, renderer, post, city, traffic, people, fire, game, sun, hemi, setView, buildMs, info: () => renderer.info.render };
+window.__z = { THREE, scene, camera, controls, renderer, post, city, traffic, people, fire, game, daylight, sun, hemi, setView, buildMs, info: () => renderer.info.render };

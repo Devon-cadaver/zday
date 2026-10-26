@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Z-Day roster</title>
+<style>
+html,body{margin:0;background:#0d141d;color:#dfe7f2;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+#gl{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+#page{position:relative;z-index:1;padding:calc(14px + env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) 40px max(14px, env(safe-area-inset-left))}
+h1{font-size:22px;letter-spacing:.08em;text-transform:uppercase;margin:0 0 4px}
+.sub{opacity:.6;font-size:13px;margin:0 0 18px}
+h2{font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:#9fb4cc;margin:26px 0 10px;display:flex;align-items:center;gap:12px}
+h2::after{content:"";flex:1;height:1px;background:rgba(159,180,204,.35)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.tile{aspect-ratio:1/1;position:relative;border-radius:10px;background:rgba(255,255,255,.02)}
+.tile .lbl{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);background:#1b2838;border:1px solid rgba(159,180,204,.3);color:#e6eef8;padding:4px 9px;border-radius:5px;font:700 10px/1 system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
+a{color:#9fd1ff}
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="page">
+  <h1>Z-Day roster</h1>
+  <p class="sub">Every model in the game, rotating. Tap and drag does nothing here; this is a review sheet. <a href="./">Back to the game</a></p>
+  <div id="sections"></div>
+</div>
+<script type="module" src="/src/showcase.js"></script>
+</body>
+</html>

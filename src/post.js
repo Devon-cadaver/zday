@@ -58,7 +58,7 @@ void main() {
 const FINAL_FRAG = /* glsl */`
 uniform sampler2D tColor, tBlur;
 uniform vec2 res;
-uniform float maxBlurFull, exposure, time, gradeOn, dofOn, glow, sepia;
+uniform float maxBlurFull, exposure, time, gradeOn, dofOn, glow, sepia, night;
 varying vec2 vUv;
 ${COMMON}
 vec3 RRTAndODTFit(vec3 v) {
@@ -87,23 +87,24 @@ void main() {
   // soft glow from the blurred mip chain
   vec3 g = textureLod(tBlur, vUv, 4.0).rgb * 0.5 + textureLod(tBlur, vUv, 6.0).rgb * 0.5;
   col += max(g - 0.55, 0.0) * glow + g * glow * 0.12;
-  col = aces(col * exposure);
+  col = aces(col * exposure * (1.0 + 0.9 * night));
   col = toSRGB(col);
   if (gradeOn > 0.5) {
     float l = dot(col, vec3(0.299, 0.587, 0.114));
     vec3 sep = vec3(l) * vec3(1.13, 0.97, 0.74);
-    col = mix(col, sep, sepia);
+    col = mix(col, sep, sepia * (1.0 - night));
+    col = mix(col, col * vec3(0.86, 0.9, 1.1), night);
     float l2 = dot(col, vec3(0.299, 0.587, 0.114));
     col = mix(vec3(l2), col, 1.18);
     // split tone: warm brown shadows, cream highlights
     col = mix(col, col * vec3(1.05, 0.96, 0.82), smoothstep(0.35, 1.0, l) * 0.5);
-    col += vec3(0.07, 0.035, 0.0) * (1.0 - l);
+    col += vec3(0.07, 0.035, 0.0) * (1.0 - l) * (1.0 - night);
     // gentle S-curve
     col = mix(col, col * col * (3.0 - 2.0 * col), 0.35);
     // vignette, warm
     vec2 q = (vUv - 0.5) * vec2(1.0, 1.15);
     float v = smoothstep(0.95, 0.3, length(q));
-    col *= mix(vec3(0.55, 0.40, 0.26), vec3(1.0), v);
+    col *= mix(mix(vec3(0.55, 0.40, 0.26), vec3(0.42, 0.44, 0.56), night), vec3(1.0), v);
   }
   col += (hash(vUv * res + fract(time) * 100.0) - 0.5) * 0.03;
   gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
@@ -134,7 +135,7 @@ export class Post {
       uniforms: {
         ...common, tColor: { value: this.sceneRT.texture }, tBlur: { value: this.blurRT.texture },
         res: { value: new THREE.Vector2() }, maxBlurFull: { value: 20 }, exposure: { value: 1 }, time: { value: 0 },
-        gradeOn: { value: 1 }, dofOn: { value: 1 }, glow: { value: 0.3 }, sepia: { value: 0.3 },
+        gradeOn: { value: 1 }, dofOn: { value: 1 }, glow: { value: 0.3 }, sepia: { value: 0.3 }, night: { value: 0 },
       },
     });
     // share the common uniform objects so one write updates both passes
@@ -163,7 +164,7 @@ export class Post {
     const maxFull = this.h * o.blurFrac;
     u.maxBlur.value = Math.max(1.5, maxFull / 2);
     f.maxBlurFull.value = maxFull;
-    f.exposure.value = o.exposure; f.time.value = time; f.glow.value = o.glow; f.sepia.value = o.sepia;
+    f.exposure.value = o.exposure; f.time.value = time; f.glow.value = o.glow; f.sepia.value = o.sepia; f.night.value = o.night || 0;
     f.gradeOn.value = o.grade ? 1 : 0; f.dofOn.value = o.dof ? 1 : 0;
 
     const r = this.renderer;

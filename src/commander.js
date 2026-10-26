@@ -1,6 +1,7 @@
 // Commander mode: three hidden outbreaks, alert level, Response Points, a
 // 10 minute round, and units the player dispatches by tapping the map.
 // Phase 1: police cruisers only.
+import * as THREE from 'three';
 import { ST } from './people.js';
 
 export const UNITS = [
@@ -42,6 +43,22 @@ export class Commander {
     g.addButton('zd-restart', 'Restart', () => this.start());
     this.end = document.createElement('div'); this.end.id = 'zd-end'; this.end.hidden = true;
     document.body.appendChild(this.end);
+    // latest 911 call, with a button that flies the camera to the search zone
+    this.call = document.createElement('div'); this.call.id = 'zd-call'; this.call.hidden = true;
+    this.call.innerHTML = '<span class="t"></span><button type="button" class="zd-btn" id="zd-go">Go</button>';
+    document.body.appendChild(this.call);
+    this.call.querySelector('#zd-go').onclick = () => { if (this.lastCall) g.lookAt(this.lastCall.x, this.lastCall.z, 330); };
+    // search zones drawn on the ground
+    this.pins = [];
+    const ring = new THREE.RingGeometry(0.94, 1, 64); ring.rotateX(-Math.PI / 2);
+    const ring2 = new THREE.RingGeometry(0.985, 1, 64); ring2.rotateX(-Math.PI / 2);
+    for (let k = 0; k < 6; k++) {
+      const m = new THREE.Group();
+      m.add(new THREE.Mesh(ring, new THREE.MeshBasicMaterial({ color: '#ff4a3a', transparent: true, opacity: 0, depthWrite: false, depthTest: false })));
+      m.add(new THREE.Mesh(ring2, new THREE.MeshBasicMaterial({ color: '#fff0e0', transparent: true, opacity: 0, depthWrite: false, depthTest: false })));
+      m.visible = false; m.renderOrder = 3; g.people.mesh.parent.add(m);
+      this.pins.push({ m, life: 0 });
+    }
     this.start();
   }
 
@@ -52,7 +69,8 @@ export class Commander {
     g.resetWorld(); g.setSpeed(1);
     this.t = 0; this.rp = START_RP; this.earned = 0; this.alert = 0; this.blocksInf = 0; this.fires = 0; this.ended = false;
     this.sel = null; this.cool = {}; for (const u of UNITS) this.cool[u.id] = 0;
-    this.kills0 = 0; this.sent = 0; this.lost = 0; this.heatT = 0; this.spawned = 0; this.callT = 40;
+    this.kills0 = 0; this.sent = 0; this.lost = 0; this.heatT = 0; this.spawned = 0; this.callT = 30;
+    this.lastCall = null; this.call.hidden = true; for (const p of this.pins) { p.life = 0; p.m.visible = false; }
     for (const c of Object.values(this.cards)) c.btn.classList.remove('sel');
     // three outbreak sites, well apart, away from the edge
     const B = g.city.bounds, pts = [];
@@ -66,6 +84,19 @@ export class Commander {
     g.lookAt(0, 0);
     this.hud();
     g.toast('Three 911 calls are coming in. Watch for panic, crashes and smoke, then send help', 5000);
+  }
+
+  // a 911 call: toast, call strip, and a search zone on the map (jittered, so it is a hunt)
+  report(x, z, text, radius) {
+    const p = this.g.people;
+    const a = p.r() * Math.PI * 2, jit = p.r() * radius * 0.45;
+    const cx = x + Math.cos(a) * jit, cz = z + Math.sin(a) * jit;
+    this.lastCall = { x: cx, z: cz };
+    this.g.toast(text, 4200);
+    this.call.querySelector('.t').textContent = text;
+    this.call.hidden = false;
+    const pin = this.pins.find(q => q.life <= 0) || this.pins.reduce((a, b) => (a.life < b.life ? a : b));
+    pin.life = 45; pin.m.visible = true; pin.m.position.set(cx, 0.1, cz); pin.m.scale.setScalar(radius);
   }
 
   district(x, z) {
@@ -136,6 +167,8 @@ export class Commander {
     }
   }
 
+  phase() { return (this.t / ROUND) % 1; }
+
   update(sdt) {
     if (this.ended) return;
     const g = this.g, p = g.people;
@@ -144,20 +177,27 @@ export class Commander {
       if (o.fired || this.t < o.at) continue;
       o.fired = true; this.spawned++;
       p.infectAt(o.x, o.z, 3);
-      g.toast('911 from the ' + this.district(o.x, o.z) + ' district: "someone is biting people!"', 4200);
+      this.report(o.x, o.z, '911 · ' + this.district(o.x, o.z) + ': "someone is biting people!"', 70);
     }
     const income = (1 + p.stats.humans / 2000) * sdt;
     this.rp += income; this.earned += income;
     const k = p.stats.shot; if (k > this.kills0) { this.rp += k - this.kills0; this.earned += k - this.kills0; this.kills0 = k; }
     for (const id in this.cool) if (this.cool[id] > 0) this.cool[id] = Math.max(0, this.cool[id] - sdt);
+    for (const q of this.pins) {
+      if (q.life <= 0) continue;
+      q.life -= sdt;
+      const k = Math.min(1, q.life / 10), pulse = 0.75 + 0.25 * Math.sin(this.g.realT * 3);
+      q.m.children[0].material.opacity = 0.7 * k * pulse; q.m.children[1].material.opacity = 0.5 * k;
+      if (q.life <= 0) q.m.visible = false;
+    }
     this.heatT += sdt;
     if (this.heatT >= 1) { this.heatT = 0; this.heat(); }
     // the switchboard: every so often a caller reports where they saw one
     this.callT -= sdt;
     if (this.callT <= 0 && p.stats.zombies > 0 && this.spawned === 3) {
-      this.callT = 25 + p.r() * 15;
+      this.callT = 15 + p.r() * 10;
       const zs = []; for (let i = 0; i < p.active; i++) if (p.st[i] === ST.ZOMBIE && p.lvl[i] === -1) zs.push(i);
-      if (zs.length) { const i = zs[Math.floor(p.r() * zs.length)]; g.toast('911 from the ' + this.district(p.x[i], p.z[i]) + ' district: "' + CALLS[Math.floor(p.r() * CALLS.length)] + '"', 4200); }
+      if (zs.length) { const i = zs[Math.floor(p.r() * zs.length)]; this.report(p.x[i], p.z[i], '911 · ' + this.district(p.x[i], p.z[i]) + ': "' + CALLS[Math.floor(p.r() * CALLS.length)] + '"', 55); }
     }
     // end of round
     const hum = p.stats.humans, tot = p.nHuman;

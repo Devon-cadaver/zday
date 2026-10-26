@@ -383,8 +383,8 @@ export function buildCity(tex, opts = {}) {
   const group = new THREE.Group();
   const std = (o) => new THREE.MeshStandardMaterial({ roughness: 0.9, metalness: 0, ...o });
   const mats = {
-    fac: tex.facades.map(m => std({ map: m, vertexColors: true, roughness: 0.85 })),
-    shop: std({ map: tex.shop, vertexColors: true }),
+    fac: tex.facades.map((m, k) => std({ map: m, vertexColors: true, roughness: 0.85, emissiveMap: tex.facadesLit[k], emissive: '#ffffff', emissiveIntensity: 0 })),
+    shop: std({ map: tex.shop, vertexColors: true, emissiveMap: tex.shopLit, emissive: '#ffffff', emissiveIntensity: 0 }),
     roof: std({ map: tex.roof, vertexColors: true }),
     walk: std({ map: tex.sidewalk, vertexColors: true }),
     grass: std({ map: tex.grass, vertexColors: true, roughness: 1 }),
@@ -456,7 +456,7 @@ export function buildCity(tex, opts = {}) {
   };
 
   return {
-    buildings, char, uncharAll,
+    buildings, char, uncharAll, lamps, mats,
     group, sx, sz, NB, parked, crowds, walkBlocks, open,
     bounds: { x0: sx[0], x1: sx[NB], z0: sz[0], z1: sz[NB] },
     stats: { crowns: crowns.length, tanks: tanks.length, parked: parked.length, verts: Object.values(B).flat().reduce((a, b) => a + b.v, 0) },

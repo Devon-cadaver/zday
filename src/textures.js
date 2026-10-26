@@ -62,7 +62,16 @@ function finish(c, renderer) {
 
 const pick = (r, a) => a[Math.floor(r() * a.length)];
 
+const LIT = ['#ffd58a', '#ffe9b8', '#ffc978', '#d8e4ff', '#fff3d0'];
+let GE = null; // emissive canvas context for the texture being drawn
+function lit(x, y, w, h, r, p = 0.55) {
+  if (!GE || r() > p) return;
+  GE.fillStyle = LIT[Math.floor(r() * LIT.length)]; GE.fillRect(x, y, w, h);
+  GE.fillStyle = 'rgba(0,0,0,0.25)'; GE.fillRect(x, y, w, h * 0.12);
+}
+
 function glass(g, x, y, w, h, r, mullion = true) {
+  lit(x, y, w, h, r);
   g.fillStyle = '#fbf6ec'; g.fillRect(x - 4, y - 4, w + 8, h + 8);
   const k = 26 + r() * 26;
   const gr = g.createLinearGradient(x, y, x + w * 0.6, y + h);
@@ -89,6 +98,7 @@ function shutter(g, x, y, w, h, col) {
 // 512x512 = 4 bays x 4 floors (each 3 m x 3 m), mapped at 12 m per repeat.
 function facade(style, r) {
   const S = 512, C = 128; const [c, g] = mk(S, S);
+  const [ce, ge] = mk(S, S); ge.fillStyle = '#000'; ge.fillRect(0, 0, S, S); GE = ge; c.lit = ce;
   g.fillStyle = '#f3ece1'; g.fillRect(0, 0, S, S);
   addNoise(g, S, S, 16, r);
   blotches(g, S, S, r, 30, '120,90,60', 0.12, 20, 90);
@@ -102,6 +112,7 @@ function facade(style, r) {
       g.fillStyle = gr; g.fillRect(0, gy, S, gh);
       g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(0, gy, S, 7);
       g.fillStyle = '#d9d2c4'; for (let x = 0; x < S; x += 32) g.fillRect(x, gy, 3, gh);
+      for (let x = 0; x < S; x += 32) lit(x + 3, gy + 2, 26, gh - 4, r, 0.5);
       g.fillStyle = '#fffaf0'; g.fillRect(0, gy + gh, S, 5);
       for (let bx = 0; bx < 16; bx++) if (r() < 0.15) { g.fillStyle = 'rgba(230,220,200,.75)'; g.fillRect(bx * 32 + 3, gy + 7, 29, gh * (0.3 + r() * 0.5)); }
     } else {
@@ -123,6 +134,7 @@ function facade(style, r) {
           g.fillStyle = '#fbf6ec';
           g.beginPath(); g.moveTo(wx - 6, wy + wh + 4); g.lineTo(wx - 6, wy + 10); g.arc(wx + ww / 2, wy + 10, ww / 2 + 6, Math.PI, 0); g.lineTo(wx + ww + 6, wy + wh + 4); g.fill();
           const k = 30 + r() * 25;
+          lit(wx, wy, ww, wh, r);
           g.fillStyle = r() < 0.2 ? pick(r, shut) : 'rgb(' + (k + 20) + ',' + (k + 20) + ',' + (k + 24) + ')';
           g.beginPath(); g.moveTo(wx, wy + wh); g.lineTo(wx, wy + 10); g.arc(wx + ww / 2, wy + 10, ww / 2, Math.PI, 0); g.lineTo(wx + ww, wy + wh); g.fill();
           g.fillStyle = 'rgba(0,0,0,.3)'; g.fillRect(wx, wy + 10, 4, wh - 10);
@@ -135,12 +147,14 @@ function facade(style, r) {
     g.fillStyle = 'rgba(255,255,255,0.38)'; g.fillRect(0, y + C - 6, S, 3);
   }
   streaks(g, S, S, r, 70, 0.22);
+  GE = null;
   return c;
 }
 
 // 1024x176 = 8 bays x ground floor (24 m x 4 m)
 function shop(r) {
   const W = 1024, H = 176, B = 128; const [c, g] = mk(W, H);
+  const [ce, ge] = mk(W, H); ge.fillStyle = '#000'; ge.fillRect(0, 0, W, H); GE = ge; c.lit = ce;
   g.fillStyle = '#ece3d3'; g.fillRect(0, 0, W, H);
   addNoise(g, W, H, 16, r);
   const awn = ['#a8402f', '#2f6b4f', '#3f5f8a', '#c07a2a', '#7a3b5c', '#d8cdb5', '#8a8f3a'];
@@ -152,6 +166,8 @@ function shop(r) {
       const gr = g.createLinearGradient(0, 60, 0, H);
       gr.addColorStop(0, '#4a4844'); gr.addColorStop(1, '#1d1c1b');
       g.fillStyle = gr; g.fillRect(x + 10, 62, w - 20, H - 74);
+      lit(x + 10, 62, w - 20, H - 74, r, 0.7);
+      if (GE && r() < 0.6) { GE.fillStyle = pick(r, ['#ff6a4a', '#4ad0ff', '#ffd54a', '#ff4ab0']); GE.fillRect(x + 24, 38, (w - 48) * 0.6, 9); }
       g.fillStyle = 'rgba(230,215,190,.35)'; for (let k = x + 10; k < x + w - 10; k += 40) g.fillRect(k + 18, 70, 6 + r() * 10, 40 + r() * 50);
       g.fillStyle = '#d9d0bf'; for (let k = x + 10; k < x + w - 10; k += 64) g.fillRect(k, 62, 3, H - 74);
       g.fillStyle = r() < 0.5 ? '#2c2a28' : pick(r, awn); g.fillRect(x + 8, 30, w - 16, 26);
@@ -176,6 +192,7 @@ function shop(r) {
   g.fillStyle = 'rgba(255,255,255,.4)'; g.fillRect(0, 0, W, 6);
   g.fillStyle = 'rgba(80,60,40,.35)'; g.fillRect(0, 6, W, 4);
   streaks(g, W, H, r, 40, 0.18);
+  GE = null;
   return c;
 }
 
@@ -230,9 +247,12 @@ function grass(r) {
 
 export function makeTextures(renderer, seed = 7) {
   const r = rng(seed);
+  const fac = [0, 1, 2, 3].map(s => facade(s, r)), sh = shop(r);
   return {
-    facades: [0, 1, 2, 3].map(s => finish(facade(s, r), renderer)),
-    shop: finish(shop(r), renderer),
+    facades: fac.map(c => finish(c, renderer)),
+    facadesLit: fac.map(c => finish(c.lit, renderer)),
+    shop: finish(sh, renderer),
+    shopLit: finish(sh.lit, renderer),
     roof: finish(roof(r), renderer),
     asphalt: finish(asphalt(r), renderer),
     sidewalk: finish(sidewalk(r), renderer),

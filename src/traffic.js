@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { LANE, RW } from './city.js';
 import { rng } from './textures.js';
+import { CAR_TYPES, TRAFFIC_MIX, cruiserGeometry } from './vehicles.js';
 
 const IN = RW / 2;        // lanes stop this far before an intersection centre
 const ACC = 3.5, BRAKE = 8, BRAKE_PANIC = 4.5;
@@ -14,42 +15,6 @@ const CELL = 10;
 const DRIVE = 0, WRECK = 1, REST = 2, PARKED = 3;
 const MISSION_CAP = 24;
 const STOPLINE = 3.4; // car centre stops this far before the lane end
-
-function colorize(g, hex) {
-  const c = new THREE.Color(hex); const n = g.attributes.position.count; const a = new Float32Array(n * 3);
-  for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; }
-  g.setAttribute('color', new THREE.BufferAttribute(a, 3));
-  return g;
-}
-
-export function carGeometry() {
-  return mergeGeometries([
-    colorize(new THREE.BoxGeometry(3.7, 0.42, 1.62).translate(0, 0.33, 0), '#1c1c1c'),
-    colorize(new THREE.BoxGeometry(4.3, 0.56, 1.8).translate(0, 0.78, 0), '#ffffff'),
-    colorize(new THREE.BoxGeometry(2.3, 0.5, 1.62).translate(-0.25, 1.3, 0), '#262b31'),
-    colorize(new THREE.BoxGeometry(2.0, 0.08, 1.5).translate(-0.3, 1.58, 0), '#ffffff'),
-  ]);
-}
-
-export function personGeometry() {
-  return mergeGeometries([
-    colorize(new THREE.CylinderGeometry(0.2, 0.24, 1.2, 6).translate(0, 0.78, 0), '#ffffff'),
-    colorize(new THREE.SphereGeometry(0.17, 6, 4).translate(0, 1.55, 0), '#ffffff'),
-  ]);
-}
-
-// police cruiser: white body, dark hood stripe, red and blue light bar
-export function cruiserGeometry() {
-  return mergeGeometries([
-    colorize(new THREE.BoxGeometry(3.7, 0.42, 1.62).translate(0, 0.33, 0), '#1c1c1c'),
-    colorize(new THREE.BoxGeometry(4.3, 0.56, 1.8).translate(0, 0.78, 0), '#f4f4f0'),
-    colorize(new THREE.BoxGeometry(1.2, 0.58, 1.82).translate(1.5, 0.78, 0), '#1d2440'),
-    colorize(new THREE.BoxGeometry(2.3, 0.5, 1.62).translate(-0.25, 1.3, 0), '#262b31'),
-    colorize(new THREE.BoxGeometry(2.0, 0.08, 1.5).translate(-0.3, 1.58, 0), '#f4f4f0'),
-    colorize(new THREE.BoxGeometry(0.4, 0.16, 0.55).translate(0.1, 1.68, -0.32), '#ff2a1a'),
-    colorize(new THREE.BoxGeometry(0.4, 0.16, 0.55).translate(0.1, 1.68, 0.32), '#2a5cff'),
-  ]);
-}
 
 const CAR_COLS = ['#f2efe8', '#f2efe8', '#f2efe8', '#e8e6e0', '#b8b8b4', '#9a9a98', '#2a2a2c', '#8c2a22', '#2f4566', '#d8c9a8', '#e0b030', '#5b6b4a'];
 
@@ -73,49 +38,68 @@ export class Traffic {
     this.gw = Math.ceil((B.x1 - B.x0 + 40) / CELL) + 1; this.gh = Math.ceil((B.z1 - B.z0 + 40) / CELL) + 1;
     this.head = new Int32Array(this.gw * this.gh);
 
-    const carGeo = carGeometry();
     const carMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.1 });
     this.nCars = opts.cars ?? 260;
     this.next = new Int32Array(this.nCars + MISSION_CAP);
-    this.carMesh = new THREE.InstancedMesh(carGeo, carMat, this.nCars);
-    this.carMesh.castShadow = this.carMesh.receiveShadow = true;
-    this.carMesh.frustumCulled = false;
-    parent.add(this.carMesh);
+    this.typeMeshes = {};
+    for (const t of TRAFFIC_MIX) {
+      const im = new THREE.InstancedMesh(CAR_TYPES[t.id].build(), carMat, this.nCars);
+      im.count = 0; im.castShadow = im.receiveShadow = true; im.frustumCulled = false;
+      this.typeMeshes[t.id] = im; parent.add(im);
+    }
     // mission vehicles (police cruisers) on their own mesh
     this.cruiserMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4, metalness: 0.1, emissive: '#000000' });
     this.cruiserMesh = new THREE.InstancedMesh(cruiserGeometry(), this.cruiserMat, MISSION_CAP);
     this.cruiserMesh.count = 0; this.cruiserMesh.castShadow = this.cruiserMesh.receiveShadow = true; this.cruiserMesh.frustumCulled = false;
     parent.add(this.cruiserMesh);
 
-    // parked cars (static)
+    // parked cars (static), a mix of types
     const r = rng(1234);
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), p = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1), col = new THREE.Color();
     const pk = city.parked;
-    this.parkedMesh = new THREE.InstancedMesh(carGeo, carMat, Math.max(1, pk.length));
-    pk.forEach((c, k) => {
-      e.set(0, c.rot, 0); q.setFromEuler(e);
-      m4.compose(p.set(c.x, c.y, c.z), q, one);
-      this.parkedMesh.setMatrixAt(k, m4);
-      this.parkedMesh.setColorAt(k, col.set(CAR_COLS[Math.floor(r() * CAR_COLS.length)]));
-    });
-    this.parkedMesh.castShadow = this.parkedMesh.receiveShadow = true;
-    this.parkedMesh.computeBoundingSphere();
-    parent.add(this.parkedMesh);
+    const byType = {}; for (const t of TRAFFIC_MIX) byType[t.id] = [];
+    for (const c of pk) byType[this.rollType(r)].push(c);
+    for (const t of TRAFFIC_MIX) {
+      const list = byType[t.id];
+      const im = new THREE.InstancedMesh(this.typeMeshes[t.id].geometry, carMat, Math.max(1, list.length));
+      list.forEach((c, k) => {
+        e.set(0, c.rot, 0); q.setFromEuler(e);
+        m4.compose(p.set(c.x, c.y, c.z), q, one);
+        im.setMatrixAt(k, m4);
+        im.setColorAt(k, col.set(t.id === 'taxi' ? '#f2c300' : CAR_COLS[Math.floor(r() * CAR_COLS.length)]));
+      });
+      im.count = list.length; im.castShadow = im.receiveShadow = true; im.computeBoundingSphere();
+      parent.add(im);
+    }
 
     this._m4 = m4; this._q = q; this._e = e; this._p = p; this._one = one; this._c = col;
     this.reset();
+  }
+
+  rollType(r) {
+    let t = r(); for (const m of TRAFFIC_MIX) { if ((t -= m.w) <= 0) return m.id; }
+    return 'sedan';
+  }
+
+  tint(car, hex) {
+    const im = car.mission ? null : this.typeMeshes[car.type];
+    if (!im) return;
+    im.setColorAt(car.slot, this._c.set(hex)); im.instanceColor.needsUpdate = true;
   }
 
   reset() {
     const r = this.r = rng(this.opts.seed ?? 99);
     for (const n of this.nodes) n.occ = -1;
     this.cars = [];
+    const counts = {}; for (const t of TRAFFIC_MIX) counts[t.id] = 0;
     for (let k = 0; k < this.nCars; k++) {
       const a = Math.floor(r() * this.nodes.length);
       const nb = this.nodes[a].nb, b = nb[Math.floor(r() * nb.length)];
       const car = { id: k, mode: DRIVE, cruise: 8 + r() * 2.5, v: 0, panic: 0, think: r() * 0.5, pedGap: 99, blocked: 0, resume: -1,
         x: 0, z: 0, hx: 1, hz: 0, yaw: 0, vx: 0, vz: 0, w: 0, ignite: false, burning: false, hits: 0, zx: 0, zz: 0,
         colHex: CAR_COLS[Math.floor(r() * CAR_COLS.length)] };
+      car.type = this.rollType(r); car.slot = counts[car.type]++;
+      if (car.type === 'taxi') car.colHex = '#f2c300';
       // spawn spaced out from every car already placed
       for (let tries = 0; tries < 30; tries++) {
         const a2 = tries === 0 ? a : Math.floor(r() * this.nodes.length);
@@ -127,9 +111,9 @@ export class Traffic {
       }
       car.v = car.cruise;
       this.cars.push(car);
-      this.carMesh.setColorAt(k, this._c.set(car.colHex));
+      this.typeMeshes[car.type].setColorAt(car.slot, this._c.set(car.colHex));
     }
-    this.carMesh.instanceColor.needsUpdate = true;
+    for (const t of TRAFFIC_MIX) { const im = this.typeMeshes[t.id]; im.count = counts[t.id]; if (im.instanceColor) im.instanceColor.needsUpdate = true; }
     this.missions = []; this.cruiserMesh.count = 0;
     this.events = [];
     this.stats = { crashes: 0, wrecks: 0 };
@@ -353,7 +337,7 @@ export class Traffic {
       car.mode = REST; car.v = 0; car.vx = car.vz = car.w = 0;
       if (car.ignite && this.fire) {
         this.fire.carFire(car.x, car.z); car.burning = true;
-        if (!car.mission) { this.carMesh.setColorAt(car.id, this._c.set('#1a1714')); this.carMesh.instanceColor.needsUpdate = true; }
+        if (!car.mission) this.tint(car, '#1a1714');
         this.events.push({ type: 'carfire', x: car.x, z: car.z });
       }
     }
@@ -368,7 +352,7 @@ export class Traffic {
       { const node = this.nodes[c.b]; if (node.occ === c.id) node.occ = -1; }
       c.ignite = this.r() < 0.28 + Math.min(0.35, impact / 40);
       if (c.mission) { if (c.onLost) c.onLost(c); }
-      else { this._c.set(c.colHex).multiplyScalar(0.6); this.carMesh.setColorAt(c.id, this._c); this.carMesh.instanceColor.needsUpdate = true; }
+      else { this._c.set(c.colHex).multiplyScalar(0.6); this.tint(c, '#' + this._c.getHexString()); }
       this.stats.wrecks++;
     }
     if (other) {
@@ -438,9 +422,9 @@ export class Traffic {
     for (const car of this.cars) {
       e.set(0, car.yaw, 0); q.setFromEuler(e);
       m4.compose(p.set(car.x, 0, car.z), q, one);
-      if (car.mission) this.cruiserMesh.setMatrixAt(car.slot, m4); else this.carMesh.setMatrixAt(car.id, m4);
+      if (car.mission) this.cruiserMesh.setMatrixAt(car.slot, m4); else this.typeMeshes[car.type].setMatrixAt(car.slot, m4);
     }
-    this.carMesh.instanceMatrix.needsUpdate = true;
+    for (const t of TRAFFIC_MIX) this.typeMeshes[t.id].instanceMatrix.needsUpdate = true;
     if (this.missions.length) {
       this.cruiserMesh.instanceMatrix.needsUpdate = true;
       const lit = this.missions.some(c => c.mode === DRIVE);

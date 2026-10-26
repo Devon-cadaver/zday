@@ -34,9 +34,14 @@ const CSS = `
 .zd-card .cd{position:absolute;left:0;right:0;bottom:0;height:0;background:rgba(255,236,200,.18);pointer-events:none}
 .zd-card.sel{border-color:#a6ff4d;box-shadow:0 0 0 2px rgba(166,255,77,.35) inset;background:rgba(60,88,30,.85)}
 .zd-card.off{opacity:.45}
-#zd-toast{position:fixed;left:50%;top:calc(96px + env(safe-area-inset-top));transform:translateX(-50%);max-width:min(88vw,420px);
+#zd-toast{position:fixed;left:50%;top:calc(150px + env(safe-area-inset-top));transform:translateX(-50%);max-width:min(88vw,420px);
   background:rgba(28,20,12,.8);color:#f6ead2;border:1px solid rgba(255,236,200,.16);border-radius:10px;padding:9px 12px;
   font:600 13px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif;text-align:center;pointer-events:none;transition:opacity .4s;opacity:0}
+#zd-call{position:fixed;left:50%;top:calc(96px + env(safe-area-inset-top));transform:translateX(-50%);display:flex;gap:8px;align-items:center;max-width:min(92vw,440px);
+  background:rgba(60,22,14,.82);color:#ffd9cc;border:1px solid rgba(255,120,90,.35);border-radius:10px;padding:7px 8px 7px 12px;font:600 12px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif;z-index:3}
+#zd-call[hidden]{display:none}
+#zd-call .t{flex:1;min-width:0}
+#zd-call .zd-btn{padding:8px 12px;background:rgba(200,60,40,.9);border-color:rgba(255,160,130,.5);min-width:0}
 #zd-fps{position:fixed;right:max(8px, env(safe-area-inset-right));bottom:calc(74px + env(safe-area-inset-bottom));font:10px system-ui,sans-serif;color:#f6ead2;opacity:.45;pointer-events:none}
 #zd-end{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(14,10,6,.78);z-index:5;
   padding:max(16px, env(safe-area-inset-left));font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;color:#f6ead2}
@@ -53,8 +58,8 @@ const CSS = `
 `;
 
 export class Game {
-  constructor({ people, traffic, fire, city, camera, controls, renderer, mode }) {
-    Object.assign(this, { people, traffic, fire, city, camera, controls, renderer });
+  constructor({ people, traffic, fire, city, camera, controls, renderer, mode, daylight }) {
+    Object.assign(this, { people, traffic, fire, city, camera, controls, renderer, daylight });
     this.pendingFires = []; this.simT = 0; this.realT = 0; this.acc = 0; this.speed = 1; this.follow = -1; this.seen = {};
     people.fire = fire; traffic.people = people; traffic.fire = fire;
     people.onOverrun = (k, why) => { if (Math.random() < (why === 'breach' ? 0.25 : 0.3)) this.pendingFires.push({ k, t: this.simT + 3 + Math.random() * 8 }); };
@@ -170,6 +175,7 @@ export class Game {
     this.realT += dt;
     p.uTime.value = this.realT;
     this.traffic.sync(this.realT);
+    if (this.daylight) { this.daylight.set(this.mode.phase ? this.mode.phase() : 0); this.daylight.update(); }
     this.fire.update(sdt, this.realT, this.camera, this.renderer);
     p.sync();
 
@@ -246,6 +252,7 @@ class Sandbox {
     this.clock = -1; this.milestone = 0;
     this.g.toast('City reset. Tap a street to drop a Shambler');
   }
+  phase() { return (Math.max(0, this.clock) / 600) % 1; }
   update(sdt) {
     const s = this.g.people.stats;
     if (this.clock >= 0) this.clock += sdt;
