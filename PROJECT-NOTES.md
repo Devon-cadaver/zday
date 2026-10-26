@@ -207,6 +207,13 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 - Picker rows: buttons no longer shrink (flex: none).
 - Tested: all 18 Be modes and all 15 Sandbox disasters without errors, a Commander alien round; screenshots city-colors, cityhall, tripod-1/2, be-blizzard, be-blackhole, be-picker.
 
+## Alien collision and the tripod glass dome (v1.8, 2026-10-26)
+- Sean: collision for the alien ships and walkers; a glass dome roof over the top of the walkers.
+- tripod.js roofTop(city, x, z, R): the tallest roof within R. Tripod: the head rides at standY() = clamp(roof under it within 11 m + 8, 40, 80), so it rises on its legs over tall blocks; towers taller than 72 m are walked round (the part of its heading into the wall is removed and it slides along it, picking the shorter way round once per building, side/sideK) and the head is pushed out if it ever ends up within 9 m of one. Feet: footSpot() moves a landing point out of any tower above the foot's reach (head y - 12); footing() stands a foot on the roof of a building at least 26 m tall that it can reach (L.gy, L.bk), lower ones are crushed as before; steps arc up over the higher of the two heights; if the roof under a planted foot is destroyed the foot drops. A foot landing on a roof makes sparks instead of crushing the street.
+- aliens.js: clear(s) keeps every live saucer 7 m over the roofs here and 2.5 s ahead (and at least 3 m over the one under it); a falling saucer that meets a roof smashes buildings under 45 m down and falls on, or comes to rest burning on a taller roof (dropping to the street if that building later goes). spread() pushes saucers and walking tripods apart (saucers give way to tripods). The player saucer in Be mode keeps over the roofs too.
+- Glass dome: a fresnel glass hemisphere (r 5.3) on a dark collar on top of the head; inside, the grinder: a heaving, veined, wet meat mass (vertex lumps) that churns faster the more it has to grind (gut), with up to 12 bone chunks tumbling round it while it feeds.
+- Tested: a tripod sent straight at the 148 m skyscraper walks round it (closest 11.8 m, never inside, no foot above its reach); a saucer flown over it stays 3+ m above the roof; five saucers shot down over 20-40 m buildings all crashed through them; tripod wrecks clear on reset; Be saucer and tripod rounds run. Screenshots tripod-dome, tripod-game.
+
 ## Next
 - Sean tests v1.3 on his phone; tune from his notes. Candidates: Be The Disaster score scales and ranks once real scores come in, the saucer size at close zoom, how often zombie outbreaks turn up in Commander, incident pacing, card bar height on the phone.
 

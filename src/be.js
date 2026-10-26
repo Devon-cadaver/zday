@@ -9,6 +9,7 @@ import { LavaField } from './volcano.js';
 import { Hole, swallow } from './impact.js';
 import { saucerMesh, beamMesh } from './aliens.js';
 import { ST, KIND } from './people.js';
+import { roofTop } from './tripod.js';
 import { ZombiesCtl, RiotCtl, FloodCtl, VolcanoCtl, DustCtl, BlizzardCtl, SolarCtl, NukeCtl, ReactorCtl, RoamingHoleCtl, TripodCtl } from './be-more.js';
 
 const RUN = 180;
@@ -178,7 +179,7 @@ class SaucerCtl {
     const dx = this.tx - this.x, dz = this.tz - this.z, d = Math.hypot(dx, dz) || 0.001, v = Math.min(30, d * 1.5);
     this.vx = dx / d * v; this.vz = dz / d * v; this.x += this.vx * h; this.z += this.vz * h;
     const beaming = this.held && d < 8;
-    this.y += ((beaming ? 22 : 32) - this.y) * Math.min(1, h * 1.2);
+    this.y += (Math.max(beaming ? 22 : 32, roofTop(D.ctx.city, this.x, this.z, 8.5).top + 7) - this.y) * Math.min(1, h * 1.6); // over the roofs, never through them
     this.beam.visible = beaming;
     if (beaming && (this.n -= h) <= 0) {
       this.n = 0.3; let got = 0;

@@ -5,7 +5,7 @@
 // airstrike or a nuke brings them down too. The fleet leaves after a few
 // minutes, or once every saucer is down.
 import * as THREE from 'three';
-import { Tripod } from './tripod.js';
+import { Tripod, roofTop } from './tripod.js';
 import { ST, KIND } from './people.js';
 
 const PROFILE = [[0, 1.5], [1.9, 1.35], [3.4, 0.75], [6.6, 0.16], [7, 0], [6.6, -0.14], [4.6, -0.55], [2.4, -0.85], [0, -0.95]];
@@ -125,7 +125,8 @@ export class Invasion {
       const won = tripodsDown && this.saucers.every(s => s.state === 'down' || s.state === 'wreck');
       D.emit({ type: 'aliensend', won, text: won ? 'Every saucer is down. The mothership is retreating' : 'The aliens are leaving with their captives' });
     }
-    for (const s of this.saucers) this.saucerStep(s, h);
+    for (const s of this.saucers) { this.saucerStep(s, h); this.clear(s, h); }
+    this.spread(h);
     for (let i = this.lasers.length - 1; i >= 0; i--) { const l = this.lasers[i]; l.t -= h; if (l.t <= 0) { D.ctx.scene.remove(l.m); this.lasers.splice(i, 1); } }
     if (this.leaving && this.my > 860 && this.saucers.every(s => s.state === 'wreck' || s.state === 'gone') && this.tripods.every(t => t.gone || t.state === 'wreck')) this.alive = false;
   }
@@ -207,6 +208,36 @@ export class Invasion {
     }
   }
 
+  // a saucer never flies through a building: it lifts over the roofs, and a falling one crashes into them
+  clear(s, h) {
+    if (s.state === 'wreck' || s.state === 'gone' || s.state === 'home') return;
+    const city = this.D.ctx.city, r = roofTop(city, s.x, s.z, 8.5);
+    if (s.state === 'down') {
+      if (r.k >= 0 && s.y < r.top + 0.5 && s.y > r.top - 6) {
+        const b = city.buildings[r.k], fire = this.D.ctx.fire;
+        fire.burst(s.x, s.y, s.z, 24, 3); this.D.shake(0.6);
+        if (b.top - b.baseY < 45) this.D.destroyBuilding(r.k, 'collapse'); // smashes it down and falls on into the rubble
+        else { fire.igniteBuilding(r.k); s.y = r.top + 1.2; s.state = 'wreck'; for (const j of s.lift) this.drop(j); s.lift.length = 0; s.roofK = r.k; } // comes to rest burning on the roof
+      }
+      return;
+    }
+    const ahead = roofTop(city, s.x + (s.vx || 0) * 2.5, s.z + (s.vz || 0) * 2.5, 11), floor = Math.max(r.top, ahead.top) + 7; // look ahead and climb early
+    if (s.y < floor) s.y += (floor - s.y) * Math.min(1, h * 4);
+    if (r.k >= 0) s.y = Math.max(s.y, r.top + 3); // and never inside one
+  }
+  // saucers and tripods keep out of each other's way
+  spread(h) {
+    const U = [];
+    for (const s of this.saucers) if (s.state === 'cruise' || s.state === 'act') U.push({ o: s, r: 9, y: s.y });
+    for (const t of this.tripods) if (t.state === 'walk') U.push({ o: t, r: 13, y: t.y, t: true });
+    for (let i = 0; i < U.length; i++) for (let j = i + 1; j < U.length; j++) {
+      const a = U[i], b = U[j], dx = b.o.x - a.o.x, dz = b.o.z - a.o.z, d = Math.hypot(dx, dz) || 0.01, m = a.r + b.r;
+      if (d >= m || Math.abs(a.y - b.y) > 14) continue;
+      const p = (m - d) * Math.min(1, h * 3) * 0.5, px = dx / d * p, pz = dz / d * p;
+      if (!a.t || b.t) { a.o.x -= px; a.o.z -= pz; } if (!b.t || a.t) { b.o.x += px; b.o.z += pz; } // a saucer gives way to a tripod
+    }
+  }
+
   // police and soldiers below shoot at low saucers; the saucer fires back
   hits(s, h) {
     if ((s.hitT -= h) > 0) return;
@@ -283,7 +314,7 @@ export class Invasion {
       if (s.state === 'gone') continue;
       const o = s.obj, hover = s.state === 'wreck' ? 0 : Math.sin(realT * 2 + s.x) * 0.3;
       o.position.set(s.x, s.y + hover, s.z);
-      if (s.state === 'wreck') { o.rotation.set(0.35, 0, 0.2); continue; }
+      if (s.state === 'wreck') { if (s.roofK >= 0 && this.D.ctx.city.dead[s.roofK]) { s.roofK = -1; s.y = 1.0; } o.rotation.set(0.35, 0, 0.2); continue; } // the roof it lay on is gone
       o.userData.spin.rotation.y += dt * (s.state === 'down' ? 6 : 1.4);
       o.rotation.x = s.state === 'down' ? Math.sin(s.tilt) * 0.6 : -s.vz * 0.012; o.rotation.z = s.state === 'down' ? Math.cos(s.tilt) * 0.4 : s.vx * 0.012;
       if (s.beam.visible) { s.beam.position.set(s.x, s.y - 0.8, s.z); s.beam.scale.set(1, Math.max(1, s.y - 0.8), 1); s.beam.material.uniforms.uTime.value = realT; s.beam.material.uniforms.uOn.value = 1; }

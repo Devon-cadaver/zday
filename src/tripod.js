@@ -8,10 +8,50 @@
 // crashes into the street. The player can drive one in Be The Disaster.
 import * as THREE from 'three';
 import { beamMesh } from './aliens.js';
-import { Splash } from './water.js';
+import { Splash, NOISE } from './water.js';
 import { ST, KIND } from './people.js';
 
-const HEAD_Y = 40, HIP_R = 4, STANCE = 17, SEG = 18, TENT = 6;
+const HEAD_Y = 40, MAX_Y = 80, HIP_R = 4, STANCE = 17, SEG = 18, TENT = 6;
+const STURDY = 26;
+const k0 = (b) => b.x0 * 7 + b.z0; // a key for a building (for remembering which way round it we are going) // a foot crushes anything lower than this; taller roofs take its weight
+
+// the tallest roof within R of (x, z)
+export function roofTop(city, x, z, R) { let top = 0, k = -1; city.buildingsNear(x, z, R, (kb, d, b) => { if (b.top > top) { top = b.top; k = kb; } }); return { top, k }; }
+
+const GLASS_VS = /* glsl */`
+varying vec3 vN, vW;
+void main() { vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; vN = normalize(mat3(modelMatrix) * normal); gl_Position = projectionMatrix * viewMatrix * w; }`;
+const GLASS_FS = /* glsl */`
+uniform float uLight; uniform vec3 uSun;
+varying vec3 vN, vW;
+void main() {
+  vec3 V = normalize(cameraPosition - vW), N = normalize(vN); if (!gl_FrontFacing) N = -N;
+  float f = pow(1.0 - abs(dot(N, V)), 3.0), spec = pow(max(dot(reflect(-V, N), uSun), 0.0), 70.0);
+  vec3 col = mix(vec3(0.5, 0.72, 0.68), vec3(0.95, 1.0, 0.98), f) * uLight + vec3(1.2) * spec;
+  gl_FragColor = vec4(col, clamp(0.1 + 0.6 * f + spec, 0.0, 0.92));
+}`;
+const MEAT_VS = /* glsl */`
+uniform float uTime, uChurn;
+varying vec3 vP, vN, vW;
+void main() {
+  vec3 c = position - vec3(0.0, 3.7, 0.0), n = normalize(c);
+  float lump = sin(n.x * 5.0 + uTime * uChurn * 1.7) * sin(n.y * 6.0 - uTime * uChurn) * sin(n.z * 5.0 + uTime * uChurn * 1.3); // it heaves and writhes
+  vec3 p = vec3(0.0, 3.7, 0.0) + c * (1.0 + 0.16 * lump);
+  vP = p; vW = (modelMatrix * vec4(p, 1.0)).xyz; vN = normalize(mat3(modelMatrix) * n); gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+}`;
+const MEAT_FS = /* glsl */`
+uniform float uTime, uChurn, uLight;
+varying vec3 vP, vN, vW;
+${NOISE}
+void main() {
+  vec2 q = vec2(atan(vP.z, vP.x) * 2.0 + uTime * uChurn, vP.y * 1.6 - uTime * uChurn * 0.6);
+  float n = fbm(q * 1.3), v = fbm(q * 3.1 + 4.0);
+  vec3 col = mix(vec3(0.24, 0.03, 0.03), vec3(0.62, 0.14, 0.12), n);
+  col = mix(col, vec3(0.16, 0.02, 0.03), smoothstep(0.47, 0.5, v) * (1.0 - smoothstep(0.5, 0.53, v)) * 0.9); // veins
+  vec3 N = normalize(vN), L = normalize(vec3(0.3, 0.9, 0.2));
+  float l = 0.4 + 0.6 * max(dot(N, L), 0.0), wet = pow(max(dot(reflect(-L, N), normalize(cameraPosition - vW)), 0.0), 24.0); // a wet sheen
+  gl_FragColor = vec4(col * l * uLight + vec3(0.9, 0.6, 0.55) * wet * 0.5 * uLight, 1.0);
+}`;
 let shared = null;
 function parts() {
   if (shared) return shared;
@@ -19,7 +59,11 @@ function parts() {
   shared = {
     head: new THREE.LatheGeometry(prof, 40),
     band: new THREE.TorusGeometry(7.3, 0.35, 6, 48).rotateX(Math.PI / 2),
-    hood: new THREE.SphereGeometry(2.4, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2).translate(0, 2.8, 0),
+    collar: new THREE.TorusGeometry(5.3, 0.32, 6, 40).rotateX(Math.PI / 2).translate(0, 2.0, 0),
+    dome: new THREE.SphereGeometry(5.3, 32, 14, 0, Math.PI * 2, 0, Math.PI / 2).translate(0, 2.0, 0),
+    meat: new THREE.SphereGeometry(2.5, 22, 14).translate(0, 3.7, 0),
+    chunk: new THREE.BoxGeometry(0.5, 0.18, 0.18),
+    boneMat: new THREE.MeshStandardMaterial({ color: '#e8e0cc', roughness: 0.7 }),
     arm: new THREE.CylinderGeometry(0.45, 0.6, 3.6, 8).rotateZ(Math.PI / 2).translate(8.4, -0.6, 0),
     eye: new THREE.SphereGeometry(1.15, 14, 10).translate(10.4, -0.6, 0),
     vent: new THREE.CylinderGeometry(0.9, 1.3, 1.6, 10).translate(-5.6, -2.0, 0),
@@ -45,7 +89,13 @@ export class Tripod {
     const P = parts(), scene = D.ctx.scene;
     this.obj = new THREE.Group();
     const add = (g, m) => { const me = new THREE.Mesh(g, m); me.castShadow = true; this.obj.add(me); return me; };
-    add(P.head, P.hull); add(P.band, P.dark); add(P.hood, P.dark); add(P.arm, P.dark); add(P.vent, P.dark); add(P.eye, P.eyeMat);
+    add(P.head, P.hull); add(P.band, P.dark); add(P.collar, P.dark); add(P.arm, P.dark); add(P.vent, P.dark); add(P.eye, P.eyeMat);
+    // under a glass dome on top: the grinder, a churning mass of meat, with bones tumbling round it while it feeds
+    this.meatMat = new THREE.ShaderMaterial({ vertexShader: MEAT_VS, fragmentShader: MEAT_FS, uniforms: { uTime: { value: 0 }, uChurn: { value: 0.3 }, uLight: { value: 1 } } });
+    this.meat = add(P.meat, this.meatMat);
+    this.chunks = new THREE.InstancedMesh(P.chunk, P.boneMat, 12); this.chunks.count = 0; this.obj.add(this.chunks);
+    this.glassMat = new THREE.ShaderMaterial({ vertexShader: GLASS_VS, fragmentShader: GLASS_FS, transparent: true, depthWrite: false, side: THREE.DoubleSide, uniforms: { uLight: { value: 1 }, uSun: { value: new THREE.Vector3(0, 1, 0) } } });
+    this.glass = new THREE.Mesh(P.dome, this.glassMat); this.glass.renderOrder = 6; this.obj.add(this.glass);
     scene.add(this.obj);
     // legs and the little tentacles under the head: one instanced mesh of tapered segments
     this.segs = new THREE.InstancedMesh(P.seg, P.skin, 3 * SEG + TENT * 6); this.segs.castShadow = true; this.segs.frustumCulled = false; scene.add(this.segs);
@@ -53,7 +103,7 @@ export class Tripod {
     this.beam = beamMesh(); this.beam.material.uniforms.uColor.value.setRGB(1.2, 1.6, 0.6); scene.add(this.beam);
     this.rayMesh = new THREE.Mesh(P.ray, P.rayMat); this.rayMesh.visible = false; this.rayMesh.renderOrder = 8; scene.add(this.rayMesh);
     this.gore = new Splash(scene, 600); this.gore.mat.uniforms.uColor.value.setRGB(0.32, 0.03, 0.02); this.gore.mat.blending = THREE.NormalBlending;
-    this._m = new THREE.Matrix4(); this._q = new THREE.Quaternion(); this._v = new THREE.Vector3(); this._up = new THREE.Vector3(0, 1, 0); this._a = [0, 0, 0]; this._p = new THREE.Vector3(); this._s = new THREE.Vector3();
+    this._m = new THREE.Matrix4(); this._q = new THREE.Quaternion(); this._v = new THREE.Vector3(); this._up = new THREE.Vector3(0, 1, 0); this._a = [0, 0, 0]; this._p = new THREE.Vector3(); this._s = new THREE.Vector3(); this._e = new THREE.Euler();
   }
   get ground() { return [this.x, this.z]; }
   steer(x, z) { this.tx = x; this.tz = z; }
@@ -65,22 +115,56 @@ export class Tripod {
     if (this.state === 'fall') { this.fallStep(h); return; }
     if (this.state === 'rise') { this.y += h * (8 + (this.y - HEAD_Y) * 0.4); for (const L of this.legs) { L.fx += (this.x - L.fx) * h * 0.8; L.fz += (this.z - L.fz) * h * 0.8; L.fy = Math.max(0, this.y - HEAD_Y - 10); } if (this.y > 280) this.gone = true; return; } // winched back up into the mothership
     if (this.state === 'drop') { // lowered out of the mothership, legs dangling, then they plant
-      this.y += (HEAD_Y - this.y) * Math.min(1, h * 0.6);
+      this.y += (this.standY() + 1 - this.y) * Math.min(1, h * 0.6);
       for (const L of this.legs) { L.fx += (this.x + Math.cos(L.a + this.yaw) * STANCE - L.fx) * h * 2; L.fz += (this.z + Math.sin(L.a + this.yaw) * STANCE - L.fz) * h * 2; }
-      if (this.y < HEAD_Y + 1.5) { this.state = 'walk'; for (const L of this.legs) this.land(L); D.shake(0.6); }
+      if (this.y < this.standY() + 1.5) { this.state = 'walk'; for (const L of this.legs) this.land(L); D.shake(0.6); }
       return;
     }
-    // walk towards the target
+    // walk towards the target, steering round towers too tall to stand over
     const dx = this.tx - this.x, dz = this.tz - this.z, d = Math.hypot(dx, dz);
     const sp = d > 4 && !this.tb ? Math.min(5.2, d * 0.5) : 0;
-    this.vx += ((d > 0.1 ? dx / d : 0) * sp - this.vx) * Math.min(1, h * 1.5); this.vz += ((d > 0.1 ? dz / d : 0) * sp - this.vz) * Math.min(1, h * 1.5);
+    let ux = d > 0.1 ? dx / d : 0, uz = d > 0.1 ? dz / d : 0;
+    const city = D.ctx.city, tall = MAX_Y - 8;
+    if (sp > 0) city.buildingsNear(this.x, this.z, 24, (kb, e, b) => {
+      if (b.top < tall) return;
+      const cx = Math.max(b.x0, Math.min(b.x1, this.x)), cz = Math.max(b.z0, Math.min(b.z1, this.z)), al = Math.hypot(this.x - cx, this.z - cz) || 1, nx = (this.x - cx) / al, nz = (this.z - cz) / al;
+      const into = ux * nx + uz * nz; if (into >= 0) return; // not heading into it
+      const w = Math.min(1, (24 - e) / 12); ux -= nx * into * w; uz -= nz * into * w; // what is left runs along the wall
+      if (this.side == null || this.sideK !== k0(b)) { const tx = -nz, tz = nx; this.side = (tx * (this.tx - cx) + tz * (this.tz - cz)) >= 0 ? 1 : -1; this.sideK = k0(b); } // pick the shorter way round once
+      ux += -nz * this.side * w * 0.9; uz += nx * this.side * w * 0.9;
+    });
+    const ul = Math.hypot(ux, uz) || 1; ux /= ul; uz /= ul;
+    this.vx += (ux * sp - this.vx) * Math.min(1, h * 1.5); this.vz += (uz * sp - this.vz) * Math.min(1, h * 1.5);
     this.x += this.vx * h; this.z += this.vz * h;
+    city.buildingsNear(this.x, this.z, 9, (k, e, b) => { // never inside one
+      if (b.top < tall) return;
+      const cx = Math.max(b.x0, Math.min(b.x1, this.x)), cz = Math.max(b.z0, Math.min(b.z1, this.z)), ax = this.x - cx, az = this.z - cz, al = Math.hypot(ax, az);
+      if (al < 0.01) { this.x = (this.x - b.x0 < b.x1 - this.x ? b.x0 - 9 : b.x1 + 9); return; }
+      this.x = cx + ax / al * 9; this.z = cz + az / al * 9;
+    });
     if (sp > 0.5) { let dy = Math.atan2(dz, dx) - this.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); this.yaw += dy * Math.min(1, h * 0.8); }
-    this.y = HEAD_Y + Math.sin(this.t * 2.6) * 0.5;
+    this.ty = this.ty ?? HEAD_Y; this.ty += (this.standY() - this.ty) * Math.min(1, h * 0.9); // rises on its legs to clear the roofs below it
+    this.y = this.ty + Math.sin(this.t * 2.6) * 0.5;
     this.stepLegs(h);
     if (!this.player) this.think(h);
     this.rayStep(h); this.beamStep(h); this.gutStep(h);
     this.hits(h);
+  }
+
+  // the highest roof a foot can reach from where the head is
+  get reachY() { return this.y - 12; }
+  // how high the head rides here: high enough to clear every roof under it
+  standY() { return Math.min(MAX_Y, Math.max(HEAD_Y, roofTop(this.D.ctx.city, this.x, this.z, 11).top + 8)); }
+  // what a foot stands on at (x, z): the ground, or the roof of a building too strong to crush
+  footing(x, z) { let gy = 0, bk = -1; this.D.ctx.city.buildingsNear(x, z, 0.4, (k, d, b) => { if (d === 0 && b.top - b.baseY >= STURDY && b.top > gy && b.top <= this.reachY) { gy = b.top; bk = k; } }); return { gy, bk }; }
+  // a foot never comes down inside a tower it cannot stand on: it lands just outside the wall
+  footSpot(x, z) {
+    this.D.ctx.city.buildingsNear(x, z, 0.4, (k, d, b) => {
+      if (d !== 0 || b.top <= this.reachY) return;
+      const e = [x - b.x0, b.x1 - x, z - b.z0, b.z1 - z], m = Math.min(...e);
+      if (m === e[0]) x = b.x0 - 1.5; else if (m === e[1]) x = b.x1 + 1.5; else if (m === e[2]) z = b.z0 - 1.5; else z = b.z1 + 1.5;
+    });
+    return [x, z];
   }
 
   // a tripod gait: one leg at a time steps to where it should be, given the way the body is moving
@@ -92,15 +176,20 @@ export class Tripod {
         const s = L.step; s.t += h / 0.7;
         const k = Math.min(1, s.t), e = k * k * (3 - 2 * k);
         L.fx = s.x0 + (s.x1 - s.x0) * e; L.fz = s.z0 + (s.z1 - s.z0) * e; L.fy = Math.sin(k * Math.PI) * 7;
+        const top = Math.max(s.g0, s.g1) + 2, lift = (a, b, u) => a + (b - a) * u * u * (3 - 2 * u); // up over the higher of the two, then down
+        L.gy = k < 0.5 ? lift(s.g0, top, k * 2) : lift(top, s.g1, (k - 0.5) * 2);
         if (k >= 1) { L.step = null; L.fy = 0; this.land(L); }
       } else if (!busy && Math.hypot(L.fx - ix, L.fz - iz) > 8) {
-        L.step = { x0: L.fx, z0: L.fz, x1: ix + this.vx * 0.5, z1: iz + this.vz * 0.5, t: 0 }; busy = true;
-      }
+        const [x1, z1] = this.footSpot(ix + this.vx * 0.5, iz + this.vz * 0.5), f = this.footing(x1, z1);
+        L.step = { x0: L.fx, z0: L.fz, x1, z1, t: 0, g0: L.gy || 0, g1: f.gy }; busy = true;
+      } else if (L.bk >= 0 && this.D.ctx.city.dead[L.bk]) { L.gy = Math.max(0, (L.gy || 0) - h * 30); if (!L.gy) L.bk = -1; } // its roof gave way
     }
   }
   // a foot comes down: whatever is under it is crushed
   land(L) {
-    const D = this.D, { people, traffic, city, fire } = D.ctx, x = L.fx, z = L.fz;
+    const D = this.D, { people, traffic, city, fire } = D.ctx, x = L.fx, z = L.fz, f = this.footing(x, z);
+    L.gy = f.gy; L.bk = f.bk;
+    if (f.gy > 0) { fire.burst(x, f.gy + 0.5, z, 10, 1.6); const c = D.ctx.controls.target; if (Math.hypot(c.x - x, c.z - z) < 250) D.shake(0.2); return; } // planted on a roof
     people.crushNear(x, z, 2.6);
     traffic.near(x, z, 4, (car) => { if (!car.gone && car.mode !== 4 && car.mode !== 5 && Math.hypot(car.x - x, car.z - z) < 3.5) { traffic.fling(car, (Math.random() - 0.5) * 3, 1, (Math.random() - 0.5) * 3); car.ignite = Math.random() < 0.3; } });
     for (const pc of traffic.parkedNear(x, z, 3)) traffic.burnParked(pc);
@@ -252,7 +341,7 @@ export class Tripod {
     };
     for (let i = 0; i < 3; i++) {
       const L = this.legs[i], a = L.a + this.yaw, ox = Math.cos(a), oz = Math.sin(a);
-      const hip = [this.x + ox * HIP_R, this.y - 1.5, this.z + oz * HIP_R], foot = [L.fx, (L.fy || 0) + 0.3, L.fz];
+      const hip = [this.x + ox * HIP_R, this.y - 1.5, this.z + oz * HIP_R], foot = [L.fx, (L.gy || 0) + (L.fy || 0) + 0.3, L.fz];
       const reach = Math.hypot(foot[0] - hip[0], foot[2] - hip[2]), slack = wreck ? 0.2 : 1;
       const c1 = [hip[0] + ox * reach * 0.55, hip[1] + 6 * slack, hip[2] + oz * reach * 0.55], c2 = [foot[0] + ox * 4, foot[1] + (hip[1] - foot[1]) * 0.45 * slack, foot[2] + oz * 4];
       let prev = hip.slice();
@@ -290,12 +379,19 @@ export class Tripod {
       this.beam.material.uniforms.uTime.value = realT; this.beam.material.uniforms.uOn.value = Math.min(1, T.t * 2, (T.dur - T.t) * 2); this.beam.visible = true;
     } else this.beam.visible = false;
     this.gore.update(dt); this.gore.sync(this.D.lightK, this.D.ctx.fire.uniforms.uScale.value);
+    const sun = this.D.ctx.sun, mu = this.meatMat.uniforms, churn = 0.3 + Math.min(4, this.gut) * 0.7;
+    this.glassMat.uniforms.uLight.value = this.D.lightK; this.glassMat.uniforms.uSun.value.copy(sun.position).sub(sun.target.position).normalize();
+    mu.uTime.value = realT; mu.uChurn.value += (churn - mu.uChurn.value) * Math.min(1, dt * 2); mu.uLight.value = this.D.lightK;
+    this.meat.rotation.y += dt * mu.uChurn.value * 0.6; this.meat.scale.setScalar(1 + Math.sin(realT * (2 + churn * 2)) * 0.03 * churn);
+    const nc = Math.min(12, this.gut * 3 + (this.lift.length ? 2 : 0)); this.chunks.count = nc;
+    for (let i = 0; i < nc; i++) { const a = realT * (1.5 + churn) + i * 0.52, r = 2.9 + Math.sin(i * 1.7 + realT * 3) * 0.6; this._p.set(Math.cos(a) * r, 3.4 + Math.sin(a * 1.3 + i) * 1.2, Math.sin(a) * r); this._q.setFromEuler(this._e.set(a * 2 + i, a + i * 0.7, a * 1.4)); m.compose(this._p, this._q, this._s.set(1, 1, 1)); this.chunks.setMatrixAt(i, m); }
+    this.chunks.instanceMatrix.needsUpdate = true;
   }
 
   dispose() {
     const { scene, people } = this.D.ctx;
     for (const j of this.lift) if (people.st[j] === ST.EXT) people.fling(j, 0, 0, 0);
     scene.remove(this.obj, this.segs, this.beam, this.rayMesh, this.gore.points);
-    this.segs.dispose(); this.beam.material.dispose(); this.gore.points.geometry.dispose(); this.gore.mat.dispose();
+    this.segs.dispose(); this.beam.material.dispose(); this.glassMat.dispose(); this.meatMat.dispose(); this.chunks.dispose(); this.gore.points.geometry.dispose(); this.gore.mat.dispose();
   }
 }
