@@ -165,6 +165,7 @@ export class Volcano {
       D.emit({ type: 'volcanoend', text: 'The eruption is dying down. The lava is cooling' });
     }
   }
+  poi() { return { x: this.x, z: this.z, danger: this.phase === 'rumble' ? 25 : 75, range: 480 }; }
   erupt() {
     const D = this.D, { people, city, fire } = D.ctx;
     this.phase = 'erupt';

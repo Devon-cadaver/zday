@@ -280,7 +280,7 @@ export class SweepFront {
 export class Tsunami {
   constructor(D, opts = {}) {
     this.type = 'tsunami'; this.D = D; this.t = 0; this.alive = true; this.phase = 'warn';
-    const side = opts.side ?? Math.floor(Math.random() * 4); // 0 south, 1 north, 2 east, 3 west
+    const side = opts.side ?? (Math.random() < 0.75 ? 0 : Math.floor(Math.random() * 4)); // 0 south (the ocean), 1 north, 2 east, 3 west
     const sw = this.sw = new SweepFront(D, side, { speed: 15, slow: 0.45, fast: 1.08, pile: 1.4 });
     Object.assign(this, { dir: sw.dir, origin: sw.origin, tan: sw.tan, extent: sw.extent, width: sw.width, halfW: sw.halfW, segW: sw.segW, coast: sw.coast, front: sw.F, pile: sw.P });
     this.Hw = opts.height ?? 12; this.floodH = 4.2; this.warnT = opts.warn ?? 18; this.damaged = new Set(); this.stepN = 0;
@@ -368,6 +368,12 @@ export class Tsunami {
     if (this.recedeT > 50) { this.alive = false; W.level = -1; D.emit({ type: 'tsunamiend', text: 'The sea has drained out of the streets' }); }
   }
 
+  poi(x, z) {
+    if (this.phase === 'recede') return null;
+    const sw = this.sw;
+    if (this.phase === 'warn') { const dx = x - sw.origin.x, dz = z - sw.origin.y, t = dx * sw.tan.x + dz * sw.tan.y; return { x: sw.origin.x + sw.tan.x * t, z: sw.origin.y + sw.tan.y * t, danger: 0, range: 700 }; } // looking out to sea
+    return (() => { const dx = x - sw.origin.x, dz = z - sw.origin.y, t = dx * sw.tan.x + dz * sw.tan.y, s = sw.frontAt(t); return { x: sw.origin.x + sw.tan.x * t + sw.dir.x * s, z: sw.origin.y + sw.tan.y * t + sw.dir.y * s, danger: 30, range: 420 }; })();
+  }
   // the wave slams into a facade: a sheet of spray climbs it and falls back, mist hangs after
   burst(b, px, pz, k) {
     const D = this.D, d = this.dir, tn = this.tan, sp = D.water.splash;

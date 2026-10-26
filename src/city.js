@@ -180,7 +180,7 @@ export function buildCity(tex, opts = {}) {
     box(B.roof, { x0: b.x1 - t, x1: b.x1, z0: b.z0 + t, z1: b.z1 - t }, y, y + hgt, c);
   }
 
-  function roofStuff(t, y, wallCol) {
+  function roofStuff(t, y, wallCol, need = false) {
     const w = t.x1 - t.x0, d = t.z1 - t.z0, area = w * d;
     if (w < 3 || d < 3) return;
     const m = 1.0;
@@ -193,11 +193,18 @@ export function buildCity(tex, opts = {}) {
       const pw = w * (0.35 + r() * 0.55), pd = d * (0.35 + r() * 0.55);
       top(B.roof, rp(Math.min(pw, w - 2 * m), Math.min(pd, d - 2 * m)), y + 0.05, lin(pick(RUST)));
     }
-    if (r() < 0.7 && w > 7 && d > 7) { // stair / lift hut
-      const hb = rp(2.4 + r() * 1.4, 2.4 + r() * 1.8);
-      const hh = 2.5 + r() * 0.6;
+    let hut = null;
+    if ((need || r() < 0.7) && w > 4.5 && d > 4.5) { // stair / lift hut, with the door people come up through
+      const big = w > 7 && d > 7;
+      const hb = rp(big ? 2.4 + r() * 1.4 : 1.7 + r() * 0.5, big ? 2.4 + r() * 1.8 : 1.7 + r() * 0.5);
+      const hh = big ? 2.5 + r() * 0.6 : 2.3;
       box(B.roof, hb, y, y + hh, toWhite(wallCol, 0.15));
       parapet(hb, y + hh, toWhite(wallCol, 0.1), 0.35);
+      const hcx = (hb.x0 + hb.x1) / 2, hcz = (hb.z0 + hb.z1) / 2, ox = (t.x0 + t.x1) / 2 - hcx, oz = (t.z0 + t.z1) / 2 - hcz, dc = lin('#4a3c30');
+      let door; // on the side that faces the open roof
+      if (Math.abs(ox) > Math.abs(oz)) { const fx = ox > 0 ? hb.x1 : hb.x0, sg = ox > 0 ? 1 : -1; box(B.roof, { x0: Math.min(fx, fx + sg * 0.07), x1: Math.max(fx, fx + sg * 0.07), z0: hcz - 0.45, z1: hcz + 0.45 }, y, y + 2, dc); door = [fx + sg * 0.8, hcz]; }
+      else { const fz = oz > 0 ? hb.z1 : hb.z0, sg = oz > 0 ? 1 : -1; box(B.roof, { x0: hcx - 0.45, x1: hcx + 0.45, z0: Math.min(fz, fz + sg * 0.07), z1: Math.max(fz, fz + sg * 0.07) }, y, y + 2, dc); door = [hcx, fz + sg * 0.8]; }
+      hut = { x0: hb.x0, x1: hb.x1, z0: hb.z0, z1: hb.z1, door };
     }
     const nAC = Math.floor((0.3 + r() * 0.7) * Math.min(12, area / 22));
     for (let k = 0; k < nAC; k++) {
@@ -224,6 +231,7 @@ export function buildCity(tex, opts = {}) {
       const n = 1 + Math.floor(r() * 4);
       for (let k = 0; k < n; k++) { const s = 0.6 + r() * 1.6; box(B.roof, rp(s, s * (0.5 + r())), y, y + 0.4 + r() * 1.2, lin(pick(['#9b7f60', '#b8a385', '#8c8a80', '#c9b79a']))); }
     }
+    return hut;
   }
 
   function balconies(b, y0, fl, col, mask) {
@@ -294,7 +302,7 @@ export function buildCity(tex, opts = {}) {
         tr = t; th = h2;
       }
     }
-    roofStuff({ x0: tr.x0 + 0.35, x1: tr.x1 - 0.35, z0: tr.z0 + 0.35, z1: tr.z1 - 0.35 }, th, col);
+    const hut = roofStuff({ x0: tr.x0 + 0.35, x1: tr.x1 - 0.35, z0: tr.z0 + 0.35, z1: tr.z1 - 0.35 }, th, col, !interior);
     // gameplay record: street door, roof, vertex ranges (for charring)
     const ranges = [{ key: fk, v0: vStart[fk], v1: B.fac[style].v }, { key: 'shop', v0: vStart.shop, v1: B.shop.v }, { key: 'roof', v0: vStart.roof, v1: B.roof.v }];
     const rec = { x0: b.x0, x1: b.x1, z0: b.z0, z1: b.z1, roofY: th, baseY: y0, fl, ranges, door: null,
@@ -314,7 +322,7 @@ export function buildCity(tex, opts = {}) {
         else { rec.wall = [b.x1, az]; rec.door = [blk.x1 + 0.9, az]; rec.n = [1, 0]; }
       }
     }
-    rec.wallCol = col; rec.top = th;
+    rec.wallCol = col; rec.top = th; rec.hut = hut || null; rec.hatch = hut ? hut.door : null;
     buildings.push(rec);
     curB = -1;
   }
@@ -598,10 +606,11 @@ export function buildCity(tex, opts = {}) {
   }
 
   // ground (roads everywhere under the blocks)
-  const ground = new THREE.PlaneGeometry(4000, 4000);
+  const gw = sx[NB] - sx[0] + 72, gd = sz[NB] - sz[0] + 72; // just the city: the land around it is outskirts.js
+  const ground = new THREE.PlaneGeometry(gw, gd);
   ground.rotateX(-Math.PI / 2);
   const uv = ground.attributes.uv;
-  for (let k = 0; k < uv.count; k++) uv.setXY(k, uv.getX(k) * 500, uv.getY(k) * 500);
+  for (let k = 0; k < uv.count; k++) uv.setXY(k, uv.getX(k) * gw / 8, uv.getY(k) * gd / 8);
   const gm = new THREE.Mesh(ground, std({ map: tex.asphalt, color: '#ffffff' }));
   mats.ground = gm.material;
   gm.receiveShadow = true; group.add(gm);

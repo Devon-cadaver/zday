@@ -74,6 +74,11 @@ export class Invasion {
   }
   get x() { return this.mx; } get z() { return this.mz; }
 
+  poi(x, z) {
+    let best = null, bd = Infinity;
+    for (const s of this.saucers) { if (s.state === 'gone') continue; const d = Math.hypot(s.x - x, s.z - z); if (d < bd) { bd = d; best = s; } }
+    return best ? { x: best.x, z: best.z, danger: best.state === 'wreck' ? 10 : 22, range: best.state === 'wreck' ? 120 : 280 } : { x: this.mx, z: this.mz, danger: 0, range: 500 };
+  }
   pickTarget(s) {
     const B = this.D.ctx.city.bounds, { people } = this.D.ctx;
     // head for a crowd: sample a few people, take the busiest spot

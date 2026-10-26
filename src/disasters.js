@@ -13,6 +13,7 @@ import { Meteor, Sinkhole } from './impact.js';
 import { Volcano } from './volcano.js';
 import { Haboob, ColdWave } from './fronts.js';
 import { SolarStorm } from './solar.js';
+import { Mushroom, NuclearStrike, Meltdown } from './nuke.js';
 
 export const HAZARDS = {
   tornado: { name: 'Tornado', tap: true },
@@ -27,6 +28,8 @@ export const HAZARDS = {
   haboob: { name: 'Dust storm', tap: false },
   coldwave: { name: 'Cold wave', tap: false },
   solar: { name: 'Solar flare', tap: false },
+  nuclear: { name: 'Nuclear attack', tap: true },
+  meltdown: { name: 'Plant meltdown', tap: false },
 };
 export { WEATHER };
 
@@ -42,6 +45,7 @@ class TornadoEvent {
   get x() { return this.tw.x; } get z() { return this.tw.z; }
   update(h) { this.tw.update(h); if (!this.tw.alive && this.prevWeather && this.D.weather.type === 'storm' && !this.D.list.some(e => e !== this && e.type === 'tornado' && e.alive)) this.D.weather.set(this.prevWeather === 'heat' ? 'clear' : this.prevWeather); }
   sync(dt, t) { this.tw.sync(dt, t); }
+  poi() { const tw = this.tw; return tw.phase === 'gone' ? null : { x: tw.x, z: tw.z, danger: tw.reach * 2.8, range: 340 }; }
   dispose() { this.tw.dispose(); }
 }
 
@@ -54,6 +58,7 @@ export class Disasters {
     this.decals = new Decals(scene);
     this.weather = new Weather({ ...ctx, disasters: this });
     this.water = new WaterSurface(this);
+    people.poi = (x, z) => this.poiAt(x, z); // onlookers watch (and film) whatever is happening near them
     // things falling into flood water or the sea throw up a splash
     this.debris.onSplash = (x, y, z, s) => this.water.splash.emit(x, y, z, Math.round(4 + s * 3), { up: [3, 4 + s * 2], spread: 3, life: 1.1, size: 1.2 + s * 0.3 });
     this.list = []; this.events = []; this.bolts = []; this.timers = []; this.leftovers = []; // craters, pits and lava stay until the world is reset
@@ -79,6 +84,16 @@ export class Disasters {
   shake(a) { const g = this.ctx.game; if (g) g.shake = Math.max(g.shake || 0, a); }
   flash(a) { const g = this.ctx.game; if (g) g.flash = Math.max(g.flash || 0, a); }
   later(secs, fn) { this.timers.push({ t: secs, fn }); }
+  // the most striking thing an onlooker at (x, z) can see right now: { x, z, danger, range } or null
+  poiAt(x, z) {
+    let best = null, bs = 1;
+    const consider = (p) => { if (!p) return; const sc = Math.hypot(p.x - x, p.z - z) / p.range; if (sc < bs) { bs = sc; best = p; } };
+    for (const e of this.list) if (e.poi) consider(e.poi(x, z));
+    for (const l of this.leftovers) if (l.poi) consider(l.poi(x, z));
+    if (!best) { const f = this.ctx.fire.firesWithin(x, z, 70); if (f.length) { const b = this.ctx.city.buildings[f[0]]; consider({ x: (b.x0 + b.x1) / 2, z: (b.z0 + b.z1) / 2, danger: 10, range: 70 }); } }
+    return best;
+  }
+  mushroom(x, z, R) { return new Mushroom(this, x, z, R); }
   inHole(x, z) { for (const l of this.leftovers) if (l.R && Math.hypot(x - l.x, z - l.z) < l.R) return true; return false; }
   // after the day/night cycle and the weather have set the lights (a solar storm cuts the power)
   afterLight() { for (const e of this.list) if (e.afterLight) e.afterLight(); }
@@ -105,6 +120,8 @@ export class Disasters {
     else if (type === 'haboob') ev = new Haboob(this, opts);
     else if (type === 'coldwave') ev = new ColdWave(this, opts);
     else if (type === 'solar') ev = new SolarStorm(this, opts);
+    else if (type === 'nuclear') ev = new NuclearStrike(this, x, z, opts);
+    else if (type === 'meltdown') ev = new Meltdown(this, opts);
     if (!ev) return null;
     this.list.push(ev); this.stats.hazards++;
     return ev;
@@ -179,7 +196,7 @@ export class Disasters {
   update(h) {
     for (let i = this.timers.length - 1; i >= 0; i--) { const t = this.timers[i]; t.t -= h; if (t.t <= 0) { this.timers.splice(i, 1); t.fn(); } }
     for (const e of this.list) e.update(h);
-    for (const l of this.leftovers) if (l.update) l.update(h);
+    for (let i = this.leftovers.length - 1; i >= 0; i--) { const l = this.leftovers[i]; if (l.update) l.update(h); if (l.alive === false) { l.dispose(); this.leftovers.splice(i, 1); } }
     for (let i = this.list.length - 1; i >= 0; i--) if (!this.list[i].alive) { this.list[i].dispose(); this.list.splice(i, 1); }
     this.water.update(h);
     this.weather.update(h);
@@ -207,5 +224,6 @@ export class Disasters {
     this.debris.reset(); this.decals.reset(); this.water.reset();
     this.weather.set('clear', true);
     this.stats = { buildings: 0, hazards: 0 };
+    if (this.ctx.outskirts) { this.ctx.outskirts.reset(); this.later(0, () => this.ctx.outskirts.steam(this.ctx.fire)); } // after fire.reset has cleared the pools
   }
 }

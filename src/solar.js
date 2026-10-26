@@ -43,6 +43,23 @@ void main() {
   gl_FragColor = vec4(col * band * uK, band * uK);
 }`;
 
+// the wave of the storm sweeping in: a wall of shimmering light
+const WAVE_VS = /* glsl */`
+varying vec2 vUv;
+void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+const WAVE_FS = /* glsl */`
+uniform float uTime, uK;
+varying vec2 vUv;
+${NOISE}
+void main() {
+  float rays = fbm(vec2(vUv.x * 90.0, uTime * 1.5)) * 0.6 + fbm(vec2(vUv.x * 300.0 + uTime * 3.0, uTime)) * 0.4;
+  rays = pow(rays, 2.0) * 2.5;
+  float fy = smoothstep(0.0, 0.06, vUv.y) * (1.0 - smoothstep(0.25, 1.0, vUv.y));
+  vec3 col = mix(vec3(0.3, 2.2, 2.6), vec3(2.0, 0.4, 2.6), smoothstep(0.1, 0.7, vUv.y + (rays - 0.5) * 0.3));
+  float a = (rays * fy + smoothstep(0.08, 0.0, vUv.y) * 1.5) * uK;
+  gl_FragColor = vec4(col * a, a);
+}`;
+
 export class SolarStorm {
   constructor(D, opts = {}) {
     this.type = 'solar'; this.D = D; this.t = 0; this.alive = true; this.life = opts.life ?? 90; this.k = 0;
@@ -57,14 +74,31 @@ export class SolarStorm {
     this.glow = new THREE.Mesh(gg, new THREE.ShaderMaterial({ vertexShader: GLOW_VS, fragmentShader: GLOW_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, uniforms: { uTime: { value: 0 }, uK: { value: 0 } } }));
     this.glow.position.set(cx, 26, cz); this.glow.renderOrder = 8; this.glow.frustumCulled = false; D.ctx.scene.add(this.glow);
     this.sparks = new Splash(D.ctx.scene, 1500); this.sparks.mat.blending = THREE.AdditiveBlending; this.sparks.mat.uniforms.uColor.value.setRGB(2.2, 2.6, 3.4);
-    this.sparkT = 0.5; this.said = false; this.stalled = new Map();
-    for (const car of D.ctx.traffic.cars) if (car.mode === 0 && !car.mission && Math.random() < 0.22) { this.stalled.set(car, car.cruise); car.cruise = 0; }
+    this.sparkT = 0.5; this.said = false; this.stalled = new Map(); this.rolled = new Set();
+    // the wave: in from one side at 70 m/s; cars die and transformers blow as it passes, and just behind it
+    // everything glows like a black-light poster for a second or so
+    const side = Math.floor(Math.random() * 4), dirs = [[0, -1], [0, 1], [-1, 0], [1, 0]], edges = [[cx, B.z1 + 60], [cx, B.z0 - 60], [B.x1 + 60, cz], [B.x0 - 60, cz]];
+    this.dir = dirs[side]; this.origin = edges[side]; this.ws = 0; this.extent = (side < 2 ? B.z1 - B.z0 : B.x1 - B.x0) + 120;
+    const W = (side < 2 ? B.x1 - B.x0 : B.z1 - B.z0) + 500;
+    this.wave = new THREE.Mesh(new THREE.PlaneGeometry(W, 230, 1, 1), new THREE.ShaderMaterial({ vertexShader: WAVE_VS, fragmentShader: WAVE_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, uniforms: { uTime: { value: 0 }, uK: { value: 1 } } }));
+    this.wave.rotation.y = Math.atan2(this.dir[0], this.dir[1]); this.wave.renderOrder = 8; this.wave.frustumCulled = false; D.ctx.scene.add(this.wave);
+    this.blk = { amount: 0, origin: this.origin, dir: this.dir, front: 0, width: 120 }; D.ctx.post.opts.blacklight = this.blk;
     D.emit({ type: 'warn', hazard: 'solar', text: 'Solar flare! A geomagnetic storm is knocking out power and radio. Helicopters are grounded' });
   }
   update(h) {
     const D = this.D, { city, fire, controls } = D.ctx;
     this.t += h; this.sparks.update(h);
     this.k = Math.min(1, this.t / 6, Math.max(0, (this.life - this.t) / 10));
+    if (this.ws < this.extent + 200) {
+      this.ws += 70 * h;
+      const o = this.origin, d = this.dir, at = (x, z) => (x - o[0]) * d[0] + (z - o[1]) * d[1];
+      for (const car of D.ctx.traffic.cars) { // engines die as the wave rolls over them
+        if (car.mission || car.gone || this.rolled.has(car) || at(car.x, car.z) > this.ws) continue;
+        this.rolled.add(car); if (car.mode === 0 && Math.random() < 0.22) { this.stalled.set(car, car.cruise); car.cruise = 0; }
+      }
+      for (const l of city.lamps) { const s = at(l.x, l.z); if (s < this.ws && s > this.ws - 70 * h && Math.random() < 0.18) this.sparks.emit(l.x + l.arm[0] * 1.3, 6.5, l.z + l.arm[1] * 1.3, 18, { up: [2, 7], spread: 6, life: 0.9, size: 0.6 }); }
+      if (!this.waveSaid && this.ws > 60) { this.waveSaid = true; D.flash(0.25); }
+    }
     // transformers blowing near where you are looking
     if ((this.sparkT -= h) <= 0 && this.k > 0.3) {
       this.sparkT = 0.25 + Math.random() * 0.5;
@@ -87,7 +121,9 @@ export class SolarStorm {
   }
   // after the day/night cycle has set the lights: the grid is down
   afterLight() {
-    const { city, game, hemi, scene, post } = this.D.ctx, k = this.k, off = Math.random() < 0.04 ? 0.5 : 0;
+    const { city, game, hemi, scene, post, controls } = this.D.ctx, off = Math.random() < 0.04 ? 0.5 : 0;
+    // the grid goes down where the wave has passed (judged at the point you are looking at)
+    const tg = controls.target, passed = Math.min(1, Math.max(0, (this.ws - ((tg.x - this.origin[0]) * this.dir[0] + (tg.z - this.origin[1]) * this.dir[1])) / 40)), k = this.k * passed;
     for (const m of city.mats.fac) m.emissiveIntensity *= 1 - k + k * off;
     city.mats.shop.emissiveIntensity *= 1 - k + k * off;
     const dl = game && game.daylight; if (dl) { dl.lampMat.opacity *= 1 - k; }
@@ -101,9 +137,16 @@ export class SolarStorm {
     for (const m of this.curtains) { m.material.uniforms.uTime.value = realT; m.material.uniforms.uK.value = this.k * (0.1 + 0.25 * night); }
     this.glow.material.uniforms.uTime.value = realT; this.glow.material.uniforms.uK.value = this.k * (0.06 + 0.34 * night);
     this.sparks.sync(1, this.D.ctx.fire.uniforms.uScale.value);
+    const B = this.D.ctx.city.bounds, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2, d = this.dir, o = this.origin;
+    const tx = Math.abs(d[0]) > 0.5 ? 0 : 1; // the wall spans the city sideways to its direction
+    this.wave.position.set(tx ? cx : o[0] + d[0] * this.ws, 115, tx ? o[1] + d[1] * this.ws : cz);
+    this.wave.material.uniforms.uTime.value = realT; this.wave.material.uniforms.uK.value = this.ws < this.extent ? 1 : Math.max(0, 1 - (this.ws - this.extent) / 150);
+    this.wave.visible = this.ws < this.extent + 150;
+    this.blk.front = this.ws; this.blk.amount = this.ws < this.extent + 120 ? 1 : 0;
   }
   dispose() {
-    for (const m of [...this.curtains, this.glow]) { this.D.ctx.scene.remove(m); m.geometry.dispose(); m.material.dispose(); }
+    for (const m of [...this.curtains, this.glow, this.wave]) { this.D.ctx.scene.remove(m); m.geometry.dispose(); m.material.dispose(); }
+    if (this.D.ctx.post.opts.blacklight === this.blk) this.D.ctx.post.opts.blacklight = null;
     this.D.ctx.scene.remove(this.sparks.points); this.sparks.points.geometry.dispose(); this.sparks.mat.dispose();
     if (this.alive) for (const [car, cruise] of this.stalled) car.cruise = cruise;
   }

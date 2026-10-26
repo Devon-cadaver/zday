@@ -121,7 +121,10 @@ level, outbreak count by level, airstrike fire chance, nuke radius, score weight
   - Sinkhole (L3): a street swallows people, cars and buildings. Cold wave (L5): anyone outdoors freezes; zombies freeze too
     until it breaks. Dust storm (L6): a wall of sand lifts people and cars. Solar flare (L7): blackout, fires, helicopters
     grounded, garbled 911 calls. Volcano (L8): lava through the streets and burning roofs. Meteor (L9): a warning, then a
-    crater and a burning district.
+    crater and a burning district. Nuclear attack (L10): sirens, a missile, a mushroom cloud. Plant meltdown (L11): the
+    coastal reactor overheats, explodes and fallout drifts over the city.
+- People react like people: they climb out onto roofs through the stair huts, crowd the side of the roof facing a disaster
+  and run across as it passes, and anyone safe enough stops in the street to film it on their phone.
 - Weather changes the rules a little: rain and storms slow fires, heat spreads them, snow and sand slow cars and make them skid,
   fog hides the city, storms throw lightning.
 

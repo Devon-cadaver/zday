@@ -297,7 +297,7 @@ export class Commander {
     if (e.type === 'saucerdown') { this.saucers++; this.rp += 500; this.earned += 500; }
     if (e.type === 'riotend' && e.broken) { this.riotsBroken++; this.rp += 100; this.earned += 100; }
     if (e.type === 'warn') {
-      this.alertFloor = Math.max(this.alertFloor, e.hazard === 'aliens' || e.hazard === 'volcano' || e.hazard === 'meteor' ? 3 : e.hazard === 'riot' ? 1 : 2); // disasters open up the units you need
+      this.alertFloor = Math.max(this.alertFloor, e.hazard === 'aliens' || e.hazard === 'volcano' || e.hazard === 'meteor' || e.hazard === 'nuclear' || e.hazard === 'meltdown' ? 3 : e.hazard === 'riot' ? 1 : 2); // disasters open up the units you need
       if (e.x != null && !this.ended) { this.report(e.x, e.z, e.text, e.r || 60, e.exact); return true; }
     }
   }

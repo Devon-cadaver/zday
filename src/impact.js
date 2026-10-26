@@ -7,6 +7,7 @@
 // street gives way and swallows people, cars and whole buildings.
 import * as THREE from 'three';
 import { NOISE } from './water.js';
+import { Mushroom } from './nuke.js';
 
 const HOLE_VS = /* glsl */`
 varying vec3 vW;
@@ -56,8 +57,10 @@ export class Hole {
     D.ctx.scene.add(this.mesh);
     D.leftovers.push(this);
   }
+  poi() { return this.age < 90 ? { x: this.x, z: this.z, danger: this.R + 6, range: this.R * 7 + 60 } : null; } // people gather to stare at it for a while
   setR(R) { this.R = R; this.mesh.scale.setScalar(Math.max(0.01, R)); this.mat.uniforms.uR.value = R; }
   update(h) {
+    this.age = (this.age || 0) + h;
     if (this.cool && this.glow > 0.12) this.glow = Math.max(0.12, this.glow - h * this.cool);
     if ((this.swT = (this.swT ?? 0) - h) <= 0 && this.R > 2) { this.swT = 0.4; swallow(this.D, this.x, this.z, this.R * 0.92, true); } // anything that wanders in later falls too
   }
@@ -114,6 +117,7 @@ export class Meteor {
     }
     if (this.at > 4) this.alive = false;
   }
+  poi() { return this.phase === 'fall' && this.ball ? { x: this.ball.position.x, z: this.ball.position.z, danger: 0, range: 3000 } : null; }
   impact() {
     const D = this.D, { people, traffic, city, fire } = D.ctx, x = this.x, z = this.z, R = this.R;
     D.flash(this.small ? 0.3 : 1.5); D.shake(this.small ? 0.8 : 2.6);
@@ -144,7 +148,7 @@ export class Meteor {
     const t = fire.uniforms.uTime.value, fb = fire.flames.alloc(this.small ? 20 : 70, x, 2, z, R * 0.6, R * 0.6, this.small ? 4 : 9, t);
     fire.later(1.6, () => fire.flames.end(fb, fire.uniforms.uTime.value)); fire.later(8, () => fire.flames.release(fb));
     fire.dustCloud(x, z, R * 1.8, this.small ? 20 : 70);
-    if (!this.small) { const sm = fire.smoke.alloc(60, x, 10, z, R, R, 6, t); fire.later(40, () => fire.smoke.end(sm, fire.uniforms.uTime.value)); fire.later(55, () => fire.smoke.release(sm)); }
+    if (!this.small) new Mushroom(D, x, z, R * 2.6, { life: 100, lit: '#cdb79a', shade: '#4e4036' }); // it goes up like a nuke
     const ring = new THREE.Mesh(new THREE.RingGeometry(0.82, 1, 64).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#d8c4a0', transparent: true, opacity: 0.55, depthWrite: false }));
     ring.position.set(x, 1.2, z); ring.renderOrder = 4; D.ctx.scene.add(ring); this.ring = ring;
     people.block(x, z, R * 0.9);
@@ -163,6 +167,7 @@ export class Sinkhole {
     this.Rmax = o.size ?? 11 + Math.random() * 13; this.rumble = 3.5; this.grow = 7; this.hole = null; this.cracked = false;
     D.emit({ type: 'warn', hazard: 'sinkhole', x, z, r: this.Rmax * 2, exact: true, text: 'Sinkhole! The ground is giving way in the ' + D.district(x, z) + ' district' });
   }
+  poi() { return { x: this.x, z: this.z, danger: this.Rmax * 1.5, range: 160 }; }
   update(h) {
     const D = this.D, { people, fire, city } = D.ctx;
     this.t += h;

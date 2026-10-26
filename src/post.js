@@ -59,6 +59,7 @@ const FINAL_FRAG = /* glsl */`
 uniform sampler2D tColor, tBlur;
 uniform vec2 res;
 uniform float maxBlurFull, exposure, time, gradeOn, dofOn, glow, sepia, night, flash;
+uniform float uBL, uBLFront, uBLWidth; uniform vec2 uBLOrigin, uBLDir; uniform mat4 uInvProj, uCamWorld;
 varying vec2 vUv;
 ${COMMON}
 vec3 RRTAndODTFit(vec3 v) {
@@ -76,6 +77,19 @@ vec3 toSRGB(vec3 c) {
   return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c));
 }
 float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+// world position of the surface seen at uv (from the depth buffer)
+vec3 worldAt(vec2 uv) {
+  vec4 p = uInvProj * vec4(uv * 2.0 - 1.0, texture2D(tDepth, uv).x * 2.0 - 1.0, 1.0); p /= p.w;
+  return (uCamWorld * p).xyz;
+}
+// a black-light poster: deep violet darks, bands of fluorescent magenta, cyan and acid green, glowing edges
+vec3 blackLight(vec3 c) {
+  float l = dot(c, vec3(0.299, 0.587, 0.114)), t = l * 4.0;
+  vec3 p0 = vec3(0.16, 0.0, 0.42), p1 = vec3(1.0, 0.08, 0.85), p2 = vec3(0.05, 1.0, 1.0), p3 = vec3(0.85, 1.0, 0.15);
+  vec3 neon = l < 0.25 ? mix(vec3(0.02, 0.0, 0.07), p0, t) : l < 0.5 ? mix(p0, p1, t - 1.0) : l < 0.75 ? mix(p1, p2, t - 2.0) : mix(p2, p3, t - 3.0);
+  float e = length(vec2(dFdx(l), dFdy(l))) * 7.0;
+  return neon + vec3(0.7, 1.0, 0.95) * e;
+}
 void main() {
   vec3 sharp = texture2D(tColor, vUv).rgb;
   vec3 col = sharp;
@@ -105,6 +119,11 @@ void main() {
     vec2 q = (vUv - 0.5) * vec2(1.0, 1.15);
     float v = smoothstep(0.95, 0.3, length(q));
     col *= mix(mix(vec3(0.55, 0.40, 0.26), vec3(0.42, 0.44, 0.56), night), vec3(1.0), v);
+  }
+  if (uBL > 0.0) { // the solar wave passing: the strip just behind it glows like a black-light poster
+    vec3 w = worldAt(vUv); float behind = uBLFront - dot(w.xz - uBLOrigin, uBLDir);
+    float m = uBL * smoothstep(-6.0, 18.0, behind) * (1.0 - smoothstep(uBLWidth * 0.55, uBLWidth, behind));
+    if (m > 0.001) col = mix(col, blackLight(col), m);
   }
   col += (hash(vUv * res + fract(time) * 100.0) - 0.5) * 0.03;
   col = mix(col, vec3(1.0, 0.98, 0.9), flash);
@@ -137,6 +156,7 @@ export class Post {
         ...common, tColor: { value: this.sceneRT.texture }, tBlur: { value: this.blurRT.texture },
         res: { value: new THREE.Vector2() }, maxBlurFull: { value: 20 }, exposure: { value: 1 }, time: { value: 0 },
         gradeOn: { value: 1 }, dofOn: { value: 1 }, glow: { value: 0.3 }, sepia: { value: 0.3 }, night: { value: 0 }, flash: { value: 0 },
+        uBL: { value: 0 }, uBLFront: { value: 0 }, uBLWidth: { value: 120 }, uBLOrigin: { value: new THREE.Vector2() }, uBLDir: { value: new THREE.Vector2(1, 0) }, uInvProj: { value: new THREE.Matrix4() }, uCamWorld: { value: new THREE.Matrix4() },
       },
     });
     // share the common uniform objects so one write updates both passes
@@ -167,6 +187,8 @@ export class Post {
     f.maxBlurFull.value = maxFull;
     f.exposure.value = o.exposure; f.time.value = time; f.glow.value = o.glow; f.sepia.value = o.sepia; f.night.value = o.night || 0; f.flash.value = o.flash || 0;
     f.gradeOn.value = o.grade ? 1 : 0; f.dofOn.value = o.dof ? 1 : 0;
+    const bl = o.blacklight; f.uBL.value = bl ? bl.amount : 0;
+    if (bl && bl.amount > 0) { f.uBLFront.value = bl.front; f.uBLWidth.value = bl.width; f.uBLOrigin.value.set(bl.origin[0], bl.origin[1]); f.uBLDir.value.set(bl.dir[0], bl.dir[1]); f.uInvProj.value.copy(camera.projectionMatrixInverse); f.uCamWorld.value.copy(camera.matrixWorld); }
 
     const r = this.renderer;
     r.setRenderTarget(this.sceneRT); r.render(scene, camera);

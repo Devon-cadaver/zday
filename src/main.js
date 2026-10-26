@@ -11,6 +11,7 @@ import { Fire } from './fire.js';
 import { Daylight } from './daylight.js';
 import { Helicopters } from './aircraft.js';
 import { Disasters } from './disasters.js';
+import { buildOutskirts } from './outskirts.js';
 
 const P = new URLSearchParams(location.search);
 const coarse = matchMedia('(pointer: coarse)').matches;
@@ -72,6 +73,7 @@ const t0 = performance.now();
 const tex = makeTextures(renderer);
 const city = buildCity(tex, { seed: num('seed', 20261025), blocks: low ? 10 : 12 });
 scene.add(city.group);
+const outskirts = buildOutskirts(scene, city, { low });
 const traffic = new Traffic(city, scene, { cars: low ? 160 : 280 });
 const people = new People(city, scene, { people: low ? 2600 : 5200 });
 const fire = new Fire(scene, city, { low });
@@ -82,7 +84,8 @@ const buildMs = Math.round(performance.now() - t0);
 const post = new Post(renderer, { samples: low ? 0 : 4 });
 const daylight = new Daylight({ scene, sun, hemi, post, city, traffic, people });
 daylight.set(0);
-const disasters = new Disasters({ scene, city, people, traffic, fire, post, camera, controls, renderer, sun, hemi, low });
+const disasters = new Disasters({ scene, city, people, traffic, fire, post, camera, controls, renderer, sun, hemi, low, outskirts });
+outskirts.steam(fire);
 if (P.has('blur')) post.opts.blurFrac = num('blur', 0.018);
 if (P.get('dof') === '0') post.opts.dof = false;
 if (P.get('grade') === '0') post.opts.grade = false;
@@ -107,6 +110,7 @@ function frame() {
   tg.y = 0;
 
   game.update(dt, fps);
+  outskirts.update(time, scene, sun, disasters.lightK, disasters.sunK);
   sun.position.copy(tg).addScaledVector(sunDir, 700);
   sun.target.position.copy(tg);
   const focus = camera.position.distanceTo(tg);
@@ -126,6 +130,7 @@ function frame() {
 }
 requestAnimationFrame(frame);
 
+helis.mushroom = (x, z, R) => disasters.mushroom(x, z, R); // the commander's nuke gets the full mushroom cloud
 const game = new Game({ people, traffic, fire, city, camera, controls, renderer, mode, daylight, helis, post, disasters });
 
-window.__z = { THREE, scene, camera, controls, renderer, post, city, traffic, people, fire, game, daylight, helis, disasters, sun, hemi, setView, buildMs, info: () => renderer.info.render };
+window.__z = { THREE, scene, camera, controls, renderer, post, city, traffic, people, fire, game, daylight, helis, disasters, outskirts, sun, hemi, setView, buildMs, info: () => renderer.info.render };

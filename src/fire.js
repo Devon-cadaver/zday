@@ -148,15 +148,17 @@ export class Fire {
 
   // airstrike: a fireball, a dust ring, scorched ground, fires on buildings inside
   // nuke: scorch everything within R, ring of fire at the edge, mushroom of smoke
-  nuke(x, z, R = 150) {
+  nuke(x, z, R = 150, o = {}) {
     const t = this.uniforms.uTime.value;
-    const col = this.flames.alloc(80, x, 6, z, R * 0.12, R * 0.12, 14, t);
-    const cap = this.smoke.alloc(90, x, 40, z, R * 0.35, R * 0.35, 9, t);
-    const base = this.smoke.alloc(60, x, 3, z, R * 0.7, R * 0.7, 5, t);
-    this.later(6, () => this.flames.end(col, this.uniforms.uTime.value));
-    this.later(14, () => this.flames.release(col));
-    this.later(60, () => { this.smoke.end(cap, this.uniforms.uTime.value); this.smoke.end(base, this.uniforms.uTime.value); });
-    this.later(80, () => { this.smoke.release(cap); this.smoke.release(base); });
+    if (o.cloud !== false) { // the old column of fire and smoke (a Mushroom draws the cloud when one is made)
+      const col = this.flames.alloc(80, x, 6, z, R * 0.12, R * 0.12, 14, t);
+      const cap = this.smoke.alloc(90, x, 40, z, R * 0.35, R * 0.35, 9, t);
+      const base = this.smoke.alloc(60, x, 3, z, R * 0.7, R * 0.7, 5, t);
+      this.later(6, () => this.flames.end(col, this.uniforms.uTime.value));
+      this.later(14, () => this.flames.release(col));
+      this.later(60, () => { this.smoke.end(cap, this.uniforms.uTime.value); this.smoke.end(base, this.uniforms.uTime.value); });
+      this.later(80, () => { this.smoke.release(cap); this.smoke.release(base); });
+    }
     this.spray(x, z, 1, 60, R * 0.95, 4);
     let lit = 0;
     this.city.buildings.forEach((b, k) => {

@@ -12,6 +12,7 @@ export const WEATHER = {
   snow: { name: 'Snow', sun: 0.62, hemi: 1.1, fog: 1.9, sky: '#d6dae0', skyK: 0.7, sepia: 0.25, exp: 0.97, rain: 0, snow: 1, sand: 0, cover: 0.15 },
   heat: { name: 'Heat wave', sun: 1.25, hemi: 1.05, fog: 1.7, sky: '#e9b56f', skyK: 0.45, sepia: 1.5, exp: 1.07, rain: 0, snow: 0, sand: 0, cover: 0 },
   ash: { name: 'Ash fall', sun: 0.32, hemi: 0.8, fog: 2.4, sky: '#6a6460', skyK: 0.75, sepia: 0.5, exp: 0.9, rain: 0, snow: 0.9, sand: 0, cover: 0, ash: true },
+  dust: { name: 'Dust storm', sun: 0.28, hemi: 0.72, fog: 5.5, sky: '#9a5a28', skyK: 0.92, sepia: 1.7, exp: 0.86, rain: 0, snow: 0, sand: 1.7, cover: 0 },
   sand: { name: 'Sandstorm', sun: 0.5, hemi: 0.95, fog: 2.8, sky: '#c78a48', skyK: 0.85, sepia: 1.4, exp: 0.96, rain: 0, snow: 0, sand: 1, cover: 0 },
 };
 const KEYS = ['sun', 'hemi', 'fog', 'skyK', 'sepia', 'exp', 'rain', 'snow', 'sand', 'cover'];
@@ -86,7 +87,7 @@ export class Weather {
     const { fire, traffic, people } = this.ctx;
     fire.rainK = type === 'storm' ? 2.2 : type === 'rain' ? 1.4 : 0;
     fire.spreadK = type === 'heat' ? 3.5 : (type === 'rain' || type === 'storm') ? 0.15 : type === 'snow' ? 0.5 : 1;
-    traffic.speedK = type === 'snow' ? 0.65 : type === 'sand' || type === 'ash' ? 0.8 : type === 'fog' ? 0.85 : 1;
+    traffic.speedK = type === 'snow' ? 0.65 : type === 'dust' ? 0.6 : type === 'sand' || type === 'ash' ? 0.8 : type === 'fog' ? 0.85 : 1;
     traffic.gripK = type === 'snow' ? 0.45 : type === 'storm' ? 0.75 : type === 'sand' ? 0.7 : 1;
     people.speedK = type === 'snow' ? 0.8 : type === 'sand' ? 0.9 : 1;
   }

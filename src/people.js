@@ -12,7 +12,7 @@ import { HALF, RW, SW, CURB } from './city.js';
 import { rng } from './textures.js';
 import { figureGeometry, figureMaterial, figureAttributes, rollArchetype, OFFICER_LOOK, FIREFIGHTER_LOOK, SOLDIER_LOOK, ALIEN_LOOK, ZTYPES, rollZombieType, ZSKIN, FLAG, HAT } from './figures.js';
 
-export const ST = { WALK: 0, IDLE: 1, FLEE: 2, RETURN: 3, GRABBED: 4, TURNING: 5, ZOMBIE: 6, FALLING: 7, DEAD: 8, SEEK: 9, INSIDE: 10, ROOF: 11, PILE: 12, CLIMB: 13, JUMP: 14, COP: 15, FIREMAN: 16, EVAC: 17, BOARD: 18, EXT: 19, AIR: 20, RIOT: 21, ALIEN: 22, FROZEN: 23 };
+export const ST = { WALK: 0, IDLE: 1, FLEE: 2, RETURN: 3, GRABBED: 4, TURNING: 5, ZOMBIE: 6, FALLING: 7, DEAD: 8, SEEK: 9, INSIDE: 10, ROOF: 11, PILE: 12, CLIMB: 13, JUMP: 14, COP: 15, FIREMAN: 16, EVAC: 17, BOARD: 18, EXT: 19, AIR: 20, RIOT: 21, ALIEN: 22, FROZEN: 23, FILM: 24 };
 export const KIND = { CIVILIAN: 0, OFFICER: 1, FIREFIGHTER: 2, SOLDIER: 3, ALIEN: 4 };
 export { ZTYPES };
 
@@ -26,12 +26,12 @@ const pileH = (n) => 1.7 * Math.sqrt(n) + 0.5;
 const pileR = (n) => pileH(n) * 0.65 + 1.0;
 
 const S = ST;
-const CIV = new Uint8Array(32); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.ROOF, S.COP, S.FIREMAN, S.BOARD, S.RIOT].forEach(s => { CIV[s] = 1; });
-const INHASH = new Uint8Array(32); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.ROOF, S.COP, S.FIREMAN, S.BOARD, S.RIOT, S.GRABBED, S.TURNING, S.ZOMBIE, S.ALIEN, S.FROZEN].forEach(s => { INHASH[s] = 1; });
-const HITTABLE = new Uint8Array(32); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.COP, S.FIREMAN, S.BOARD, S.RIOT, S.GRABBED, S.TURNING, S.ZOMBIE, S.ALIEN, S.FROZEN].forEach(s => { HITTABLE[s] = 1; });
+const CIV = new Uint8Array(32); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.ROOF, S.COP, S.FIREMAN, S.BOARD, S.RIOT, S.FILM].forEach(s => { CIV[s] = 1; });
+const INHASH = new Uint8Array(32); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.ROOF, S.COP, S.FIREMAN, S.BOARD, S.RIOT, S.GRABBED, S.TURNING, S.ZOMBIE, S.ALIEN, S.FROZEN, S.FILM].forEach(s => { INHASH[s] = 1; });
+const HITTABLE = new Uint8Array(32); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.COP, S.FIREMAN, S.BOARD, S.RIOT, S.GRABBED, S.TURNING, S.ZOMBIE, S.ALIEN, S.FROZEN, S.FILM].forEach(s => { HITTABLE[s] = 1; });
 export const HOSTILE = new Uint8Array(32); HOSTILE[S.ZOMBIE] = 1; HOSTILE[S.ALIEN] = 1;
-const GRABBABLE = new Uint8Array(32); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.ROOF, S.COP, S.FIREMAN, S.BOARD, S.RIOT, S.GRABBED, S.TURNING, S.ZOMBIE, S.ALIEN, S.PILE, S.CLIMB, S.FALLING, S.JUMP, S.FROZEN].forEach(s => { GRABBABLE[s] = 1; });
-const DISASTER_CAUSE = new Set(['fling', 'crush', 'drown', 'zap', 'bolt', 'freeze', 'burn', 'impact']);
+const GRABBABLE = new Uint8Array(32); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.ROOF, S.COP, S.FIREMAN, S.BOARD, S.RIOT, S.GRABBED, S.TURNING, S.ZOMBIE, S.ALIEN, S.PILE, S.CLIMB, S.FALLING, S.JUMP, S.FROZEN, S.FILM].forEach(s => { GRABBABLE[s] = 1; });
+const DISASTER_CAUSE = new Set(['fling', 'crush', 'drown', 'zap', 'bolt', 'freeze', 'burn', 'impact', 'rad']);
 const ZSTATE = new Uint8Array(32); [S.ZOMBIE, S.TURNING, S.PILE, S.CLIMB, S.FALLING].forEach(s => { ZSTATE[s] = 1; });
 const ANIM = new Float32Array(32);
 ANIM[S.WALK] = 1; ANIM[S.FLEE] = 2; ANIM[S.RETURN] = 1; ANIM[S.TURNING] = 5; ANIM[S.ZOMBIE] = 3; ANIM[S.FALLING] = 5;
@@ -97,6 +97,7 @@ export class People {
     this.x = F(); this.z = F(); this.y = F(); this.t1 = F(); this.inc = F(); this.inc0 = F(); this.spd = F(); this.s = F(); this.lat = F();
     this.hx = F(); this.hz = F(); this.tx = F(); this.tz = F(); this.think = F(); this.wt = F(); this.hp = F();
     this.wz = new Uint8Array(N); this.wet = new Float32Array(N); this.cuff = new Float32Array(N); // seconds spent handcuffing a rioter
+    this.px = new Float32Array(N); this.pz = new Float32Array(N); this.watch = new Uint8Array(N); // what someone is watching (a disaster nearby)
     this.st = new Uint8Array(N); this.inf = new Uint8Array(N); this.dirty = new Uint8Array(N); this.fx = new Uint8Array(N); this.kind = new Uint8Array(N); this.zt = new Uint8Array(N);
     this.blk = new Int16Array(N); this.lvl = new Int16Array(N); this.bt = new Int16Array(N);
     this.target = new Int32Array(N);
@@ -136,6 +137,10 @@ export class People {
     this.flashes.count = 0; this.flashes.frustumCulled = false;
     parent.add(this.flashes);
     this.flashList = []; this.grenades = []; this.grenadeCd = 0; this.lifted = [];
+    // phones held up by people filming a disaster (their screens glow at night)
+    this.phones = new THREE.InstancedMesh(new THREE.BoxGeometry(0.22, 0.34, 0.03), new THREE.MeshBasicMaterial({ color: new THREE.Color(1.3, 1.5, 1.9) }), 900);
+    this.phones.count = 0; this.phones.frustumCulled = false; parent.add(this.phones);
+    this.poi = null; this.watchT = 0; this.watchSlice = 0;
     this.dust = [];
     for (let k = 0; k < 6; k++) {
       const m = new THREE.Mesh(new THREE.RingGeometry(0.6, 1.0, 28).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#efe0c0', transparent: true, opacity: 0, depthWrite: false }));
@@ -314,7 +319,7 @@ export class People {
     this.time = 0; this.bldT = 0; this.firstRoof = false;
     this.stats = { humans: this.nHuman, infected: 0, zombies: 0, dead: 0, roof: 0, bites: 0, runover: 0, shot: 0, officers: 0, rescued: 0, bombed: 0, bombedCiv: 0, bused: 0, nukedCiv: 0, nukedZ: 0,
       disasterCiv: 0, disasterZ: 0, drowned: 0, abducted: 0, aliens: 0, aliensKilled: 0, rioters: 0, arrests: 0 };
-    this.wz.fill(0); this.wet.fill(0); this.cuff.fill(0); this.waterAt = null; this.alarmT = 0; this.speedK = 1; this.mobs = [];
+    this.wz.fill(0); this.wet.fill(0); this.cuff.fill(0); this.watch.fill(0); this.waterAt = null; this.alarmT = 0; this.speedK = 1; this.mobs = [];
     this.events = [];
     this.flashList.length = 0; this.grenades.length = 0; this.grenadeCd = 0;
     for (const d of this.dust) { d.m.visible = false; d.t = 1; }
@@ -623,7 +628,7 @@ export class People {
   }
 
   // the nuke: everything within R dies, roofs included; the ground is scorched for the rest of the round
-  nuke(x, z, R) {
+  nuke(x, z, R, byPlayer = true) { // byPlayer: the commander's own nuke (its civilian toll counts against them)
     let zk = 0, ck = 0;
     const R2 = R * R;
     for (let j = 0; j < this.active; j++) {
@@ -639,9 +644,9 @@ export class People {
       this.hx[j] = dx / d; this.hz[j] = dz / d; this.y[j] = this.groundY(this.x[j], this.z[j]);
       this.deadLook(j);
       const A = this.fa.arrays, o = j * 3; for (let c = 0; c < 3; c++) { A.shirt[o + c] *= 0.3; A.pants[o + c] *= 0.3; A.skin[o + c] *= 0.3; }
-      if (wasZ) zk++; else { ck++; if (this.kind[j] === KIND.CIVILIAN) this.stats.nukedCiv++; }
+      if (wasZ) zk++; else { ck++; if (this.kind[j] === KIND.CIVILIAN) { if (byPlayer) this.stats.nukedCiv++; else this.stats.disasterCiv++; } }
     }
-    this.stats.nukedZ += zk;
+    if (byPlayer) this.stats.nukedZ += zk; else this.stats.disasterZ += zk;
     for (let k = 0; k < this.bld.length; k++) { const b = this.bld[k]; if (Math.hypot((b.x0 + b.x1) / 2 - x, (b.z0 + b.z1) / 2 - z) <= R) { this.bPile[k] = 0; this.bBreach[k] = 0; this.bBarr[k] = 0; this.bCap[k] = 0; } }
     this.scare(x, z, R * 2.2, 1);
     this.events.push({ type: 'nukekill', x, z, zk, ck });
@@ -720,6 +725,7 @@ export class People {
         case S.AIR: this.airStep(i, h); break;
         case S.RIOT: this.riotStep(i, h); break;
         case S.FROZEN: this.frozenStep(i, h); break;
+        case S.FILM: this.filmStep(i, h); break;
         case S.ALIEN: this.alienStep(i, h); break;
         case S.FLEE: this.fleeStep(i, h); break;
         case S.RETURN: {
@@ -778,6 +784,7 @@ export class People {
       }
     }
     if (this.alarmT > 0) this.alarmT -= h;
+    if ((this.watchT -= h) <= 0) { this.watchT = 0.25; this.watchScan(); }
     this.bldT += h;
     if (this.bldT >= 1) { this.buildingTick(this.bldT); this.bldT = 0; }
     for (const d of this.dust) {
@@ -841,8 +848,10 @@ export class People {
     const k = this.bt[i], rf = this.bld[k].roof;
     this.bIn[k] = Math.max(0, this.bIn[k] - 1);
     this.st[i] = S.ROOF; this.lvl[i] = k; this.bHad[k] = 1;
-    this.x[i] = rf.x0 + this.r() * (rf.x1 - rf.x0); this.z[i] = rf.z0 + this.r() * (rf.z1 - rf.z0); this.y[i] = this.bld[k].roofY;
-    this.tx[i] = this.x[i]; this.tz[i] = this.z[i]; this.t1[i] = 0;
+    const hd = this.bld[k].hatch; // up the stairs and out through the hut door
+    if (hd) { this.x[i] = hd[0] + (this.r() - 0.5) * 0.4; this.z[i] = hd[1] + (this.r() - 0.5) * 0.4; } else { this.x[i] = rf.x0 + this.r() * (rf.x1 - rf.x0); this.z[i] = rf.z0 + this.r() * (rf.z1 - rf.z0); }
+    this.y[i] = this.bld[k].roofY;
+    const sp = this.roofSpot(k); this.tx[i] = sp[0]; this.tz[i] = sp[1]; this.t1[i] = 0; this.think[i] = this.r(); this.watch[i] = 0;
     if (!this.firstRoof) { this.firstRoof = true; this.events.push({ type: 'roof', k }); }
   }
 
@@ -859,9 +868,67 @@ export class People {
       if (!this.moveRoof(i, this.hx[i], this.hz[i], 2.3 * h)) { const a = this.r() * 6.28; this.hx[i] = Math.cos(a); this.hz[i] = Math.sin(a); }
       return;
     }
+    // something to see? crowd the side of the roof that faces it (and run across when it moves past)
+    if ((this.think[i] -= h) <= 0) {
+      this.think[i] = 0.6 + this.r() * 0.6;
+      const p = this.poi && this.poi(this.x[i], this.z[i]);
+      if (p) { const e = this.watchSpot(k, i, p.x, p.z); this.tx[i] = e[0]; this.tz[i] = e[1]; this.px[i] = p.x; this.pz[i] = p.z; this.watch[i] = 1; }
+      else if (this.watch[i]) { this.watch[i] = 0; const q = this.roofSpot(k); this.tx[i] = q[0]; this.tz[i] = q[1]; }
+    }
     const dx = this.tx[i] - this.x[i], dz = this.tz[i] - this.z[i], d = Math.hypot(dx, dz);
-    if (d > 0.1) { this.hx[i] = dx / d; this.hz[i] = dz / d; this.moveRoof(i, dx / d, dz / d, Math.min(d, 0.5 * h)); this.fx[i] = 1; }
-    else { this.fx[i] = 0; if (this.r() < h * 0.4) { this.tx[i] = rf.x0 + this.r() * (rf.x1 - rf.x0); this.tz[i] = rf.z0 + this.r() * (rf.z1 - rf.z0); } }
+    if (d > 0.1) { const run = this.watch[i] && d > 2.5; this.hx[i] = dx / d; this.hz[i] = dz / d; this.moveRoof(i, dx / d, dz / d, Math.min(d, (run ? 2.4 : 0.5) * h)); this.fx[i] = run ? 2 : 1; }
+    else if (this.watch[i]) { this.face(i, this.px[i], this.pz[i]); this.fx[i] = this.films(i) ? 3 : 0; this.snap(i); }
+    else { this.fx[i] = 0; if (this.r() < h * 0.4) { const q = this.roofSpot(k); this.tx[i] = q[0]; this.tz[i] = q[1]; } }
+  }
+
+  // a free spot on roof k, clear of the stair hut
+  roofSpot(k) {
+    const b = this.bld[k], rf = b.roof, hu = b.hut;
+    let x = 0, z = 0;
+    for (let n = 0; n < 6; n++) {
+      x = rf.x0 + this.r() * (rf.x1 - rf.x0); z = rf.z0 + this.r() * (rf.z1 - rf.z0);
+      if (!hu || x < hu.x0 - 0.4 || x > hu.x1 + 0.4 || z < hu.z0 - 0.4 || z > hu.z1 + 0.4) break;
+    }
+    return [x, z];
+  }
+  // where on roof k to stand to watch (px, pz): along the parapet facing it, spread out, a second row behind
+  watchSpot(k, i, px, pz) {
+    const rf = this.bld[k].roof, cx = (rf.x0 + rf.x1) / 2, cz = (rf.z0 + rf.z1) / 2, m = 0.45;
+    let dx = px - cx, dz = pz - cz; const d = Math.hypot(dx, dz) || 1; dx /= d; dz /= d;
+    const hw = Math.max(0.1, (rf.x1 - rf.x0) / 2 - m), hd = Math.max(0.1, (rf.z1 - rf.z0) / 2 - m);
+    const s = Math.min(hw / Math.max(1e-3, Math.abs(dx)), hd / Math.max(1e-3, Math.abs(dz)));
+    const spread = ((i * 7919) % 101) / 100 - 0.5, row = (i % 3) * 0.75;
+    const ex = cx + dx * (s - row) - dz * spread * Math.max(hw, hd) * 1.8, ez = cz + dz * (s - row) + dx * spread * Math.max(hw, hd) * 1.8;
+    return [Math.min(rf.x1 - m, Math.max(rf.x0 + m, ex)), Math.min(rf.z1 - m, Math.max(rf.z0 + m, ez))];
+  }
+  face(i, px, pz) { const dx = px - this.x[i], dz = pz - this.z[i], d = Math.hypot(dx, dz) || 1; this.hx[i] = dx / d; this.hz[i] = dz / d; }
+  films(i) { return ((i * 2654435761) >>> 0) % 10 < 7; } // most hold a phone up, some just stare
+  snap(i) { if (this.films(i) && this.r() < 0.004 && this.flashList.length < this.flashMax) this.flashList.push({ x: this.x[i] + this.hx[i] * 0.5, y: this.y[i] + 1.5, z: this.z[i] + this.hz[i] * 0.5, t: 0.05 }); }
+
+  // people in the street who are not in danger stop to watch and film
+  watchScan() {
+    if (!this.poi || this.filmN > 600) return;
+    const sl = this.watchSlice = (this.watchSlice + 1) % 6;
+    for (let i = sl; i < this.active; i += 6) {
+      const s = this.st[i];
+      if ((s !== S.WALK && s !== S.IDLE && s !== S.RETURN) || this.inf[i] || this.kind[i] !== KIND.CIVILIAN || this.lvl[i] !== -1) continue;
+      const p = this.poi(this.x[i], this.z[i]);
+      if (!p || this.r() > 0.35) continue;
+      const d = Math.hypot(p.x - this.x[i], p.z - this.z[i]);
+      if (d < p.danger || d > Math.min(p.range * 0.5, 160)) continue; // from the street you only see what is fairly close
+      this.st[i] = S.FILM; this.t1[i] = 8 + this.r() * 14; this.think[i] = this.r(); this.px[i] = p.x; this.pz[i] = p.z;
+    }
+  }
+  filmStep(i, h) {
+    this.t1[i] -= h;
+    if ((this.think[i] -= h) <= 0) {
+      this.think[i] = 0.8 + this.r() * 0.5;
+      const p = this.poi && this.poi(this.x[i], this.z[i]);
+      if (!p || this.t1[i] <= 0) { this.startReturn(i); return; }
+      this.px[i] = p.x; this.pz[i] = p.z;
+      if (Math.hypot(p.x - this.x[i], p.z - this.z[i]) < p.danger) { this.panic(i, p.x, p.z, -1); return; } // too close now: run
+    }
+    this.face(i, this.px[i], this.pz[i]); this.snap(i);
   }
 
   fallStep(i, h) {
@@ -1416,7 +1483,7 @@ export class People {
   sync() {
     const arr = this.mesh.instanceMatrix.array, anim = this.anim;
     const m = this._m4, q = this._q, e = this._e, p = this._p;
-    let humans = 0, infected = 0, zombies = 0, dead = 0, roof = 0, officers = 0, aliens = 0, rioters = 0, colDirty = this.lookDirty;
+    let humans = 0, infected = 0, zombies = 0, dead = 0, roof = 0, officers = 0, aliens = 0, rioters = 0, colDirty = this.lookDirty, film = 0;
     this.bRoof.fill(0); this.bRoofAll.fill(0);
     const t = this.time;
     for (let i = 0; i < this.active; i++) {
@@ -1438,7 +1505,8 @@ export class People {
       else if (s === S.JUMP) tilt = Math.sin(t * 9 + i) * 1.2;
       else if (s === S.EXT || s === S.AIR) tilt = t * (5 + (i % 5)) + i;
       else if (s === S.DEAD) { tilt = Math.PI / 2; y += 0.17; }
-      else if (s === S.ROOF) an = this.t1[i] > 0 ? 2 : this.fx[i] === 1 ? 1 : 0;
+      else if (s === S.ROOF) an = this.t1[i] > 0 || this.fx[i] === 2 ? 2 : this.fx[i] === 1 ? 1 : this.fx[i] === 3 ? 6 : 0;
+      else if (s === S.FILM) { an = this.films(i) ? 6 : 0; film++; }
       else if (s === S.COP) an = this.fx[i] === 1 ? 7 : this.fx[i] === 2 ? 6 : 0;
       else if (s === S.FIREMAN) an = this.fx[i] === 1 ? 1 : this.fx[i] === 2 ? 6 : 0;
       // rotation Ry(yaw) * Rz(tilt), column major
@@ -1498,12 +1566,21 @@ export class People {
       this.marks.instanceMatrix.needsUpdate = true;
     }
     this.marks.count = mk;
+    // phones held up to film
+    let pc = 0; const pm = this._pm || (this._pm = new THREE.Matrix4()), pq = this._pq || (this._pq = new THREE.Quaternion()), pe = this._pe || (this._pe = new THREE.Euler()), pv = this._pv || (this._pv = new THREE.Vector3()), one = this._one || (this._one = new THREE.Vector3(1, 1, 1));
+    for (let i = 0; i < this.active && pc < 900; i++) {
+      const s = this.st[i];
+      if (!((s === S.FILM && this.films(i)) || (s === S.ROOF && this.fx[i] === 3))) continue;
+      pe.set(-0.2, Math.atan2(this.hx[i], this.hz[i]), 0); pq.setFromEuler(pe);
+      pm.compose(pv.set(this.x[i] + this.hx[i] * 0.5, this.y[i] + 1.45, this.z[i] + this.hz[i] * 0.5), pq, one); this.phones.setMatrixAt(pc++, pm);
+    }
+    this.phones.count = pc; this.phones.instanceMatrix.needsUpdate = true;
     // muzzle flashes
     let fc = 0;
     for (const f of this.flashList) { m.identity(); m.setPosition(f.x, f.y, f.z); this.flashes.setMatrixAt(fc++, m); }
     this.flashes.count = fc;
     this.flashes.instanceMatrix.needsUpdate = true;
-    Object.assign(this.stats, { humans, infected, zombies, dead, roof, officers, aliens, rioters });
+    Object.assign(this.stats, { humans, infected, zombies, dead, roof, officers, aliens, rioters }); this.filmN = film;
   }
 
   nearestZombie(x, z, skip = -1) {

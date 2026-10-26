@@ -25,6 +25,7 @@ export class Riot {
   }
   get x() { return this.mob.x; } get z() { return this.mob.z; }
 
+  poi() { return { x: this.mob.x, z: this.mob.z, danger: 18, range: 110 }; }
   member() {
     const { people } = this.D.ctx;
     for (let n = 0; n < 8 && this.members.length; n++) { const j = this.members[Math.floor(Math.random() * this.members.length)]; if (people.st[j] === ST.RIOT && people.bt[j] === this.mob.id) return j; }
