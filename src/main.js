@@ -115,6 +115,6 @@ function frame() {
 }
 requestAnimationFrame(frame);
 
-const game = new Game({ people, traffic, fire, city, camera, controls, renderer, mode, daylight, helis });
+const game = new Game({ people, traffic, fire, city, camera, controls, renderer, mode, daylight, helis, post });
 
 window.__z = { THREE, scene, camera, controls, renderer, post, city, traffic, people, fire, game, daylight, helis, sun, hemi, setView, buildMs, info: () => renderer.info.render };

@@ -6,11 +6,13 @@ import { ST } from './people.js';
 
 export const UNITS = [
   { id: 'police', name: 'Police', cost: 50, cd: 20, alert: 0 },
+  { id: 'bus', name: 'Evac bus', cost: 60, cd: 30, alert: 0 },
   { id: 'fire', name: 'Fire truck', cost: 80, cd: 30, alert: 2 },
   { id: 'water', name: 'Water heli', cost: 150, cd: 60, alert: 2 },
   { id: 'rescue', name: 'Rescue heli', cost: 120, cd: 45, alert: 2 },
   { id: 'apc', name: 'Army APC', cost: 250, cd: 60, alert: 3 },
   { id: 'strike', name: 'Airstrike', cost: 300, cd: 45, alert: 4 },
+  { id: 'nuke', name: 'Nuke', cost: 1000, cd: 9999, alert: 4, once: true },
 ];
 const ALERTS = ['Quiet', 'Outbreak', 'Spreading', 'Major incident', 'City emergency'];
 const ROUND = 600;
@@ -34,6 +36,8 @@ const MSGS = {
   rescued: 'Survivors are being lifted off a rooftop',
   grenade: 'The squad is throwing grenades into the horde',
   blast: 'Airstrike on target. Fires are starting in the blast zone',
+  boarded: 'Civilians are boarding the evacuation bus',
+  nuke: 'Nuclear detonation. The district is gone',
 };
 
 export class Commander {
@@ -46,7 +50,7 @@ export class Commander {
     this.el.alertPill = this.el.alert.parentElement;
     this.cards = {};
     for (const u of UNITS) {
-      const b = g.addButton('zd-card-' + u.id, '<span class="nm">' + u.name + '</span><span class="cost">' + u.cost + ' pts</span><span class="cd"></span>', () => this.select(u.id), 'zd-card');
+      const b = g.addButton('zd-card-' + u.id, '<span class="nm">' + u.name + '</span><span class="cost">' + u.cost + ' pts</span><span class="cd"></span>', () => this.select(u.id), 'zd-card' + (u.once ? ' zd-nuke' : ''));
       this.cards[u.id] = { btn: b, cd: b.querySelector('.cd'), u };
     }
     g.addSpeedButton();
@@ -82,6 +86,7 @@ export class Commander {
     if (g.helis) g.helis.reset();
     this.kills0 = 0; this.sent = 0; this.lost = 0; this.heatT = 0; this.spawned = 0; this.callT = 30;
     this.out0 = 0; this.rescued0 = 0; this.trucks = 0; this.helisSent = 0; this.apcs = 0; this.strikes = 0; this.bombedCiv0 = 0; this.bombed0 = 0;
+    this.buses = 0; this.bused0 = 0; this.nuked = false; this.nukeAt = null; this.nukedCiv0 = 0;
     this.lastCall = null; this.call.hidden = true; for (const p of this.pins) { p.life = 0; p.m.visible = false; }
     for (const c of Object.values(this.cards)) c.btn.classList.remove('sel');
     // three outbreak sites, well apart, away from the edge
@@ -122,6 +127,7 @@ export class Commander {
     const c = this.cards[id];
     if (this.ended) return;
     if (this.sel === id) { this.sel = null; c.btn.classList.remove('sel'); return; }
+    if (c.u.once && this.nuked) { this.g.toast('Only one nuke per round'); return; }
     if (this.cool[id] > 0) { this.g.toast(c.u.name + ' is busy for ' + Math.ceil(this.cool[id]) + ' s'); return; }
     if (this.rp < c.u.cost) { this.g.toast('Not enough points. ' + c.u.name + ' costs ' + c.u.cost); return; }
     if (this.alert < c.u.alert) { this.g.toast(c.u.name + ' needs alert level ' + c.u.alert); return; }
@@ -140,6 +146,8 @@ export class Commander {
     else if (id === 'rescue') this.sendRescue(x, z);
     else if (id === 'apc') this.sendApc(x, z);
     else if (id === 'strike') this.sendStrike(x, z);
+    else if (id === 'bus') this.sendBus(x, z);
+    else if (id === 'nuke') this.sendNuke(x, z);
   }
 
   sendPolice(x, z) {
@@ -218,8 +226,47 @@ export class Commander {
     this.lastCall = { x, z };
   }
 
+  sendBus(x, z) {
+    const g = this.g, p = g.people;
+    const car = g.traffic.dispatchTo(x, z, {
+      kind: 'bus',
+      onArrive: (ax, az, bus) => {
+        bus.loadT = 0; bus.loaded = 0; bus.called = p.callToBus(ax, az, 45, 30, bus.id);
+        g.toast(bus.called ? 'Bus loading in the ' + this.district(ax, az) + '. ' + bus.called + ' people running for it' : 'Bus arrived but nobody is around to board');
+        if (!bus.called) { bus.loadT = 20; }
+      },
+      onLost: (bus) => { this.lost++; p.releaseBus(bus.id); g.toast('The evacuation bus was wrecked'); },
+      onGone: (bus) => { g.toast('Bus clear of the city with ' + bus.loaded + ' aboard'); },
+    });
+    if (!car) { g.toast('No bus available'); return; }
+    this.spend('bus'); this.buses++;
+    g.toast('Evacuation bus rolling, about ' + Math.ceil(car.eta) + ' s out');
+  }
+
+  sendNuke(x, z) {
+    const g = this.g;
+    this.nuked = true; this.nukeAt = { x, z };
+    const jet = g.helis.nuke(x, z, { radius: 150, onBlast: (bx, bz) => { g.flash = 1.6; this.shake = 2.5; } });
+    this.spend('nuke');
+    this.report(x, z, 'NUCLEAR STRIKE AUTHORISED. Impact in ' + Math.ceil(jet.eta) + ' s. Get everyone out!', 150, true);
+    this.lastCall = { x, z };
+    g.toast('B-2 inbound. ' + Math.ceil(jet.eta) + ' seconds to detonation', 5000);
+  }
+
+  busTick(sdt) {
+    const g = this.g, p = g.people;
+    for (const bus of g.traffic.missions) {
+      if (bus.kind !== 'bus' || bus.mode !== 3 || bus.leaving) continue;
+      bus.loadT += sdt;
+      const zn = p.zombiesNear(bus.x, bus.z, 10);
+      if (zn >= 4 && bus.loadT > 3) { p.releaseBus(bus.id); g.toast('Bus swarmed! Leaving with ' + bus.loaded + ' aboard'); g.traffic.depart(bus); continue; }
+      if (bus.loaded >= 30 || bus.loadT >= 25) { p.releaseBus(bus.id); g.traffic.depart(bus); }
+    }
+  }
+
   onEvent(e) {
     if (e.type === 'bite' && e.officer && !this.g.seen.copbit) { this.g.seen.copbit = true; this.g.toast(MSGS.copbit, 3200); }
+    if (e.type === 'boarded') { const bus = this.g.traffic.cars[e.bus]; if (bus) bus.loaded = (bus.loaded || 0) + 1; }
   }
 
   // zombies per street block; a block with 3+ is infected
@@ -267,6 +314,10 @@ export class Commander {
     const rs = p.stats.rescued; if (rs > this.rescued0) { this.rp += 3 * (rs - this.rescued0); this.earned += 3 * (rs - this.rescued0); this.rescued0 = rs; }
     const bz = p.stats.bombed; if (bz > this.bombed0) { this.rp += bz - this.bombed0; this.earned += bz - this.bombed0; this.bombed0 = bz; }
     const bc = p.stats.bombedCiv; if (bc > this.bombedCiv0) { this.rp -= 5 * (bc - this.bombedCiv0); this.earned -= 5 * (bc - this.bombedCiv0); this.bombedCiv0 = bc; g.toast('Your airstrike killed ' + bc + ' civilians so far', 3500); }
+    this.busTick(sdt);
+    const bu = p.stats.bused; if (bu > this.bused0) { this.rp += 3 * (bu - this.bused0); this.earned += 3 * (bu - this.bused0); this.bused0 = bu; }
+    const nc = p.stats.nukedCiv; if (nc > this.nukedCiv0) { this.rp -= 5 * (nc - this.nukedCiv0); this.earned -= 5 * (nc - this.nukedCiv0); this.nukedCiv0 = nc; g.toast('The nuke killed ' + nc + ' civilians', 5000); }
+    if (this.rp < 0) this.rp = 0; // penalties cost score, never lock the cards
     if (this.shake > 0) { this.shake -= sdt * 1.2; const k = Math.max(0, this.shake) * 2.5; g.camera.position.x += (Math.random() - 0.5) * k; g.camera.position.z += (Math.random() - 0.5) * k; }
     for (const id in this.cool) if (this.cool[id] > 0) this.cool[id] = Math.max(0, this.cool[id] - sdt);
     for (const q of this.pins) {
@@ -304,7 +355,8 @@ export class Commander {
     for (const c of Object.values(this.cards)) {
       const cd = this.cool[c.u.id];
       c.cd.style.height = cd > 0 ? (100 * cd / c.u.cd) + '%' : '0';
-      c.btn.classList.toggle('off', cd > 0 || this.rp < c.u.cost || this.alert < c.u.alert);
+      c.btn.classList.toggle('off', (c.u.once && this.nuked) || cd > 0 || this.rp < c.u.cost || this.alert < c.u.alert);
+      if (c.u.once) c.cd.style.height = '0';
     }
   }
 
@@ -312,11 +364,12 @@ export class Commander {
     this.ended = true;
     const g = this.g, p = g.people, s = p.stats, tot = p.nHuman;
     let intact = 0; for (const v of g.fire.bFire) if (!v) intact++;
-    const score = Math.round(this.earned + 10 * s.humans + 20 * intact);
-    const frac = s.humans / tot;
+    const score = Math.round(this.earned + 10 * (s.humans + s.rescued + s.bused) + 20 * intact);
+    const frac = (s.humans + s.rescued + s.bused) / tot;
     let stars = 0;
     if (reason === 'contained') stars = frac >= 0.9 ? 3 : 2;
     else if (reason === 'holdout') stars = frac >= 0.7 ? 2 : 1;
+    if (this.nuked) stars = Math.min(stars, 1);
     const title = reason === 'contained' ? 'Outbreak contained' : reason === 'holdout' ? 'The city held out' : 'The city is lost';
     const sub = reason === 'contained' ? 'Every zombie is down. The city owes you a drink.' : reason === 'holdout' ? 'Ten minutes survived. The army arrives at dawn.' : 'The infection took the streets.';
     const t = Math.floor(this.t);
@@ -329,6 +382,8 @@ export class Commander {
       ['APCs / airstrikes', this.apcs + ' / ' + this.strikes],
       ['Killed by bombs: zombies / civilians', s.bombed + ' / ' + s.bombedCiv],
       ['Rescued by helicopter', s.rescued.toLocaleString()],
+      ['Evacuated by bus', s.bused.toLocaleString()],
+      ['Nuke: zombies / civilians', this.nuked ? s.nukedZ + ' / ' + s.nukedCiv : 'not used'],
       ['Fires put out', g.fire.stats.out],
       ['Buildings burned', (g.fire.bFire.length - intact).toLocaleString()],
       ['Time', Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0')],

@@ -14,6 +14,18 @@ export class Helicopters {
   }
 
   // an A-10 run: straight line through (tx,tz), bomb released to land there, blast on impact
+  // the B-2: high and slow, one bomb, the nuke on impact
+  nuke(tx, tz, opts = {}) {
+    const obj = buildVehicle('b2'); obj.scale.setScalar(4);
+    const a = Math.random() * Math.PI * 2, R = 1100;
+    const hx = Math.cos(a), hz = Math.sin(a);
+    const jet = { obj, x: tx - hx * R, y: 140, z: tz - hz * R, hx, hz, tx, tz, state: 'in', t: 0, bomb: null, nuke: true, speed: 70, alt: 140, onBlast: opts.onBlast, radius: opts.radius ?? 150 };
+    obj.position.set(jet.x, jet.y, jet.z);
+    this.scene.add(obj); this.jets.push(jet);
+    jet.eta = R / 70;
+    return jet;
+  }
+
   strike(tx, tz, opts = {}) {
     const obj = buildVehicle('a10'); obj.scale.setScalar(2.2);
     const a = Math.random() * Math.PI * 2, R = 900;
@@ -73,15 +85,17 @@ export class Helicopters {
     }
     if (this.list.some(hl => hl.dead)) this.list = this.list.filter(hl => !hl.dead);
     for (const j of this.jets) {
-      j.x += j.hx * JET_SPEED * h; j.z += j.hz * JET_SPEED * h; j.t += h;
+      const sp = j.speed || JET_SPEED, alt = j.alt || JET_ALT;
+      j.x += j.hx * sp * h; j.z += j.hz * sp * h; j.t += h;
       const along = (j.tx - j.x) * j.hx + (j.tz - j.z) * j.hz; // distance still to go to the target
-      // a bomb dropped from 60 m at 120 m/s travels about 3.5 s: release that far out
-      const lead = JET_SPEED * Math.sqrt(2 * JET_ALT / 9.8);
+      // release the bomb so its ballistic fall lands it on the target
+      const lead = sp * Math.sqrt(2 * alt / 9.8);
       if (j.state === 'in' && along <= lead) {
         j.state = 'dropped';
         const m = new THREE.Mesh(this.bombGeo, this.bombMat); m.castShadow = true;
         this.scene.add(m);
-        j.bomb = { m, x: j.x, y: j.y - 2, z: j.z, vx: j.hx * JET_SPEED, vz: j.hz * JET_SPEED, vy: 0 };
+        if (j.nuke) m.scale.setScalar(2.5);
+        j.bomb = { m, x: j.x, y: j.y - 2, z: j.z, vx: j.hx * sp, vz: j.hz * sp, vy: 0 };
       }
       if (j.bomb) {
         const b = j.bomb;
@@ -89,12 +103,12 @@ export class Helicopters {
         b.m.position.set(b.x, b.y, b.z); b.m.rotation.y = Math.atan2(-b.vz, b.vx); b.m.rotation.z = Math.atan2(b.vy, Math.hypot(b.vx, b.vz));
         if (b.y <= 0.5) {
           this.scene.remove(b.m); j.bomb = null;
-          this.fire.blast(b.x, b.z, j.radius);
-          this.people.blast(b.x, b.z, j.radius);
+          if (j.nuke) { this.fire.nuke(b.x, b.z, j.radius); this.people.nuke(b.x, b.z, j.radius); this.events.push({ type: 'nuke', x: b.x, z: b.z }); }
+          else { this.fire.blast(b.x, b.z, j.radius); this.people.blast(b.x, b.z, j.radius); }
           if (j.onBlast) j.onBlast(b.x, b.z);
         }
       }
-      if (along < -1200) { this.scene.remove(j.obj); j.dead = true; }
+      if (along < -1300) { this.scene.remove(j.obj); j.dead = true; }
     }
     if (this.jets.some(j => j.dead)) this.jets = this.jets.filter(j => !j.dead);
   }

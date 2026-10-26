@@ -14,7 +14,7 @@ const LEN = 4.3, HALF_L = 2.2, HALF_W = 0.95;
 const CELL = 10;
 const DRIVE = 0, WRECK = 1, REST = 2, PARKED = 3;
 const MISSION_CAP = 24;
-const MISSION_KINDS = { police: { geo: () => cruiserGeometry(), cap: 12, cruise: 14 }, fire: { geo: () => VEHICLES.fire_truck.build(), cap: 8, cruise: 11 }, apc: { geo: () => VEHICLES.stryker.build(), cap: 6, cruise: 12, tough: true } };
+const MISSION_KINDS = { police: { geo: () => cruiserGeometry(), cap: 12, cruise: 14 }, fire: { geo: () => VEHICLES.fire_truck.build(), cap: 8, cruise: 11 }, apc: { geo: () => VEHICLES.stryker.build(), cap: 6, cruise: 12, tough: true }, bus: { geo: () => VEHICLES.bus.build(), cap: 8, cruise: 10 } };
 const STOPLINE = 3.4; // car centre stops this far before the lane end
 
 const CAR_COLS = ['#f2efe8', '#f2efe8', '#f2efe8', '#e8e6e0', '#b8b8b4', '#9a9a98', '#2a2a2c', '#8c2a22', '#2f4566', '#d8c9a8', '#e0b030', '#5b6b4a'];
@@ -215,8 +215,9 @@ export class Traffic {
         else if (node.occ === car.id) car.held = true;
         else if (car.panic <= 0 && !car.mission) { car.s = Math.max(before, car.len - STOPLINE); car.v = 0; return; }
       }
-      if (car.mission && car.ri + 2 >= car.route.length && car.s >= this.stopAt(car)) { car.s = this.stopAt(car); this.park(car); return; }
-      if (car.mission && car.kind === 'apc' && car.ri + 2 >= car.route.length && car.s >= car.len - 1) { car.s = car.len - 1; this.park(car); return; }
+      if (car.mission && car.leaving && car.ri + 2 >= car.route.length && car.s >= car.len - 2) { this.remove(car); if (car.onGone) car.onGone(car); return; }
+      if (car.mission && !car.leaving && car.ri + 2 >= car.route.length && car.s >= this.stopAt(car)) { car.s = this.stopAt(car); this.park(car); return; }
+      if (car.mission && !car.leaving && car.kind === 'apc' && car.ri + 2 >= car.route.length && car.s >= car.len - 1) { car.s = car.len - 1; this.park(car); return; }
       if (car.s >= car.len) {
         const over = car.s - car.len; this.startTurn(car); car.t = over / car.tlen;
       }
@@ -322,7 +323,7 @@ export class Traffic {
     this.advance(car, car.v * h);
     this.pose(car);
     if (car.v < 0.3) car.blocked += h; else car.blocked = 0;
-    if (car.mission && car.blocked > 4) {
+    if (car.mission && car.blocked > 4 && !car.leaving) {
       const last = car.ri + 2 >= car.route.length;
       const dToStop = last && !car.turn ? Math.abs(this.stopAt(car) - car.s) : 99;
       if (dToStop < 30 || car.blocked > 15) { this.park(car); return; } // stuck in traffic: officers walk from here
@@ -473,6 +474,21 @@ export class Traffic {
     return route;
   }
 
+  // a parked bus leaves: new route back to the edge, then it vanishes
+  depart(car) {
+    const route = this.routeTo(car.x, car.z); // edge -> here
+    if (!route) { this.remove(car); return; }
+    route.reverse(); // here -> edge
+    car.route = route; car.ri = 0; car.leaving = true; car.mode = DRIVE; car.held = false; car.grace = 1.5;
+    this.startSeg(car, route[0], route[1]);
+    car.s = 0; this.pose(car);
+  }
+
+  remove(car) {
+    car.mode = REST; car.gone = true;
+    car.x = 1e5; car.z = 1e5; this.pose(car);
+  }
+
   // pull over where it is and deploy
   park(car) {
     car.mode = PARKED; car.v = 0; car.turn = false; this.pose(car);
@@ -514,7 +530,7 @@ export class Traffic {
     const id = this.cars.length;
     const car = { id, mission: true, kind, slot, route, ri: 0, mode: DRIVE, cruise: opts.cruise ?? def.cruise, v: 0, panic: 0, think: 0,
       pedGap: 99, blocked: 0, resume: -1, x: 0, z: 0, hx: 1, hz: 0, yaw: 0, vx: 0, vz: 0, w: 0, ignite: false, burning: false, hits: 0, zx: 0, zz: 0,
-      colHex: '#f4f4f0', held: false, to: opts.to || null, onArrive: opts.onArrive, onLost: opts.onLost, grace: 2.5 };
+      colHex: '#f4f4f0', held: false, to: opts.to || null, onArrive: opts.onArrive, onLost: opts.onLost, onGone: opts.onGone, grace: 2.5, leaving: false, gone: false };
     this.startSeg(car, route[0], route[1]);
     car.s = 0; this.pose(car);
     this.cars.push(car); this.missions.push(car);

@@ -144,6 +144,31 @@ export class Fire {
   later(dt, fn) { this.timers.push({ at: this.simT + dt, fn }); }
 
   // airstrike: a fireball, a dust ring, scorched ground, fires on buildings inside
+  // nuke: scorch everything within R, ring of fire at the edge, mushroom of smoke
+  nuke(x, z, R = 150) {
+    const t = this.uniforms.uTime.value;
+    const col = this.flames.alloc(80, x, 6, z, R * 0.12, R * 0.12, 14, t);
+    const cap = this.smoke.alloc(90, x, 40, z, R * 0.35, R * 0.35, 9, t);
+    const base = this.smoke.alloc(60, x, 3, z, R * 0.7, R * 0.7, 5, t);
+    this.later(6, () => this.flames.end(col, this.uniforms.uTime.value));
+    this.later(14, () => this.flames.release(col));
+    this.later(60, () => { this.smoke.end(cap, this.uniforms.uTime.value); this.smoke.end(base, this.uniforms.uTime.value); });
+    this.later(80, () => { this.smoke.release(cap); this.smoke.release(base); });
+    this.spray(x, z, 1, 60, R * 0.95, 4);
+    let lit = 0;
+    this.city.buildings.forEach((b, k) => {
+      const cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2, d = Math.hypot(cx - x, cz - z);
+      if (d > R * 1.15) return;
+      if (d <= R * 0.8) {
+        this.city.char(k, 0.18);
+        if (this.bFire[k] === 1) this.extinguish(k); // nothing left to burn
+        this.bFire[k] = 2; this.soaked[k] = this.simT + 1e9;
+      } else if (Math.random() < 0.6 && this.igniteBuilding(k)) lit++;
+    });
+    this.events.push({ type: 'nuked', x, z, lit });
+    return lit;
+  }
+
   blast(x, z, R = 25) {
     const t = this.uniforms.uTime.value;
     const fb = this.flames.alloc(60, x, 1, z, R * 0.45, R * 0.45, 5.5, t);

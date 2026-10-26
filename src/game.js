@@ -34,6 +34,7 @@ const CSS = `
 .zd-card .cd{position:absolute;left:0;right:0;bottom:0;height:0;background:rgba(255,236,200,.18);pointer-events:none}
 .zd-card.sel{border-color:#a6ff4d;box-shadow:0 0 0 2px rgba(166,255,77,.35) inset;background:rgba(60,88,30,.85)}
 .zd-card.off{opacity:.45}
+.zd-nuke{border-color:rgba(255,90,60,.5)}.zd-nuke .cost{color:#ff8a6a}
 #zd-toast{position:fixed;left:50%;top:calc(150px + env(safe-area-inset-top));transform:translateX(-50%);max-width:min(88vw,420px);
   background:rgba(28,20,12,.8);color:#f6ead2;border:1px solid rgba(255,236,200,.16);border-radius:10px;padding:9px 12px;
   font:600 13px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif;text-align:center;pointer-events:none;transition:opacity .4s;opacity:0}
@@ -58,8 +59,9 @@ const CSS = `
 `;
 
 export class Game {
-  constructor({ people, traffic, fire, city, camera, controls, renderer, mode, daylight, helis }) {
-    Object.assign(this, { people, traffic, fire, city, camera, controls, renderer, daylight, helis });
+  constructor({ people, traffic, fire, city, camera, controls, renderer, mode, daylight, helis, post }) {
+    Object.assign(this, { people, traffic, fire, city, camera, controls, renderer, daylight, helis, post });
+    this.flash = 0;
     this.pendingFires = []; this.simT = 0; this.realT = 0; this.acc = 0; this.speed = 1; this.follow = -1; this.seen = {};
     people.fire = fire; traffic.people = people; traffic.fire = fire;
     people.onOverrun = (k, why) => { if (Math.random() < (why === 'breach' ? 0.25 : 0.3)) this.pendingFires.push({ k, t: this.simT + 3 + Math.random() * 8 }); };
@@ -205,6 +207,7 @@ export class Game {
       list.length = 0;
     }
     this.mode.update(sdt, dt);
+    if (this.flash > 0) { this.flash = Math.max(0, this.flash - dt * 0.6); this.post.opts.flash = Math.min(1, this.flash * this.flash); } else this.post.opts.flash = 0;
     if (fps) this.el.fps.textContent = fps + ' fps';
   }
 }

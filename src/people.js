@@ -12,7 +12,7 @@ import { HALF, RW, CURB } from './city.js';
 import { rng } from './textures.js';
 import { figureGeometry, figureMaterial, figureAttributes, rollArchetype, OFFICER_LOOK, FIREFIGHTER_LOOK, SOLDIER_LOOK, ZTYPES, rollZombieType, ZSKIN, FLAG } from './figures.js';
 
-export const ST = { WALK: 0, IDLE: 1, FLEE: 2, RETURN: 3, GRABBED: 4, TURNING: 5, ZOMBIE: 6, FALLING: 7, DEAD: 8, SEEK: 9, INSIDE: 10, ROOF: 11, PILE: 12, CLIMB: 13, JUMP: 14, COP: 15, FIREMAN: 16, EVAC: 17 };
+export const ST = { WALK: 0, IDLE: 1, FLEE: 2, RETURN: 3, GRABBED: 4, TURNING: 5, ZOMBIE: 6, FALLING: 7, DEAD: 8, SEEK: 9, INSIDE: 10, ROOF: 11, PILE: 12, CLIMB: 13, JUMP: 14, COP: 15, FIREMAN: 16, EVAC: 17, BOARD: 18 };
 export const KIND = { CIVILIAN: 0, OFFICER: 1, FIREFIGHTER: 2, SOLDIER: 3 };
 export { ZTYPES };
 
@@ -26,12 +26,12 @@ const pileH = (n) => 1.7 * Math.sqrt(n) + 0.5;
 const pileR = (n) => pileH(n) * 0.65 + 1.0;
 
 const S = ST;
-const CIV = new Uint8Array(20); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.ROOF, S.COP, S.FIREMAN].forEach(s => { CIV[s] = 1; });
-const INHASH = new Uint8Array(20); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.ROOF, S.COP, S.FIREMAN, S.GRABBED, S.TURNING, S.ZOMBIE].forEach(s => { INHASH[s] = 1; });
-const HITTABLE = new Uint8Array(20); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.COP, S.FIREMAN, S.GRABBED, S.TURNING, S.ZOMBIE].forEach(s => { HITTABLE[s] = 1; });
+const CIV = new Uint8Array(20); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.ROOF, S.COP, S.FIREMAN, S.BOARD].forEach(s => { CIV[s] = 1; });
+const INHASH = new Uint8Array(20); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.ROOF, S.COP, S.FIREMAN, S.BOARD, S.GRABBED, S.TURNING, S.ZOMBIE].forEach(s => { INHASH[s] = 1; });
+const HITTABLE = new Uint8Array(20); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.COP, S.FIREMAN, S.BOARD, S.GRABBED, S.TURNING, S.ZOMBIE].forEach(s => { HITTABLE[s] = 1; });
 const ANIM = new Float32Array(20);
 ANIM[S.WALK] = 1; ANIM[S.FLEE] = 2; ANIM[S.RETURN] = 1; ANIM[S.TURNING] = 5; ANIM[S.ZOMBIE] = 3; ANIM[S.FALLING] = 5;
-ANIM[S.DEAD] = 4; ANIM[S.SEEK] = 2; ANIM[S.PILE] = 5; ANIM[S.CLIMB] = 5; ANIM[S.JUMP] = 2;
+ANIM[S.DEAD] = 4; ANIM[S.SEEK] = 2; ANIM[S.PILE] = 5; ANIM[S.CLIMB] = 5; ANIM[S.JUMP] = 2; ANIM[S.BOARD] = 2;
 
 // a tangle of bodies: limbs and torsos in zombie greens, rags and shadow
 function bodiesTexture() {
@@ -269,7 +269,7 @@ export class People {
     this.drops = 0;
     this.bloodN = 0; this.blood.count = 0;
     this.time = 0; this.bldT = 0; this.firstRoof = false;
-    this.stats = { humans: this.nHuman, infected: 0, zombies: 0, dead: 0, roof: 0, bites: 0, runover: 0, shot: 0, officers: 0, rescued: 0, bombed: 0, bombedCiv: 0 };
+    this.stats = { humans: this.nHuman, infected: 0, zombies: 0, dead: 0, roof: 0, bites: 0, runover: 0, shot: 0, officers: 0, rescued: 0, bombed: 0, bombedCiv: 0, bused: 0, nukedCiv: 0, nukedZ: 0 };
     this.events = [];
     this.flashList.length = 0; this.grenades.length = 0; this.grenadeCd = 0;
     for (const d of this.dust) { d.m.visible = false; d.t = 1; }
@@ -357,7 +357,7 @@ export class People {
   panic(j, fromX, fromZ, threat) {
     if (!this.isCivilian(j)) return;
     const s = this.st[j];
-    if (s === S.SEEK || s === S.COP) return;
+    if (s === S.SEEK || s === S.COP || s === S.BOARD) return;
     if (s === S.FIREMAN) { this.st[j] = S.FLEE; this.tx[j] = 2.8; this.t1[j] = 3 + this.r() * 2; this.target[j] = threat; this.bt[j] = -1; const d0 = Math.hypot(this.x[j] - fromX, this.z[j] - fromZ) || 1; this.hx[j] = (this.x[j] - fromX) / d0; this.hz[j] = (this.z[j] - fromZ) / d0; return; }
     let dx = this.x[j] - fromX, dz = this.z[j] - fromZ;
     const d = Math.hypot(dx, dz) || 1;
@@ -528,6 +528,61 @@ export class People {
     return out;
   }
 
+  // evacuation bus parked at (x,z): up to n street civilians within R run for its door
+  callToBus(x, z, R, n, busId) {
+    const c = [];
+    this.around(x, z, R, (j, d2) => { if (this.kind[j] === 0 && !this.inf[j] && (this.st[j] === S.WALK || this.st[j] === S.IDLE || this.st[j] === S.FLEE || this.st[j] === S.RETURN)) c.push([d2, j]); });
+    c.sort((a, b) => a[0] - b[0]);
+    let k = 0;
+    for (const [, j] of c) {
+      if (k >= n) break;
+      this.st[j] = S.BOARD; this.tx[j] = x; this.tz[j] = z; this.bt[j] = busId; this.t1[j] = 25; this.inc[j] = 0;
+      this.wt[j] = RUN[0] + this.r() * (RUN[1] - RUN[0]); k++;
+    }
+    return k;
+  }
+
+  // everyone still running for bus busId gives up
+  releaseBus(busId) {
+    for (let i = 0; i < this.active; i++) if (this.st[i] === S.BOARD && this.bt[i] === busId) { this.st[i] = S.IDLE; this.bt[i] = -1; this.panic(i, this.tx[i], this.tz[i], -1); }
+  }
+
+  boardStep(i, h) {
+    const dx = this.tx[i] - this.x[i], dz = this.tz[i] - this.z[i], d = Math.hypot(dx, dz);
+    this.t1[i] -= h;
+    if (d < 2.2) { this.st[i] = S.EVAC; this.lvl[i] = -1; this.stats.bused++; this.events.push({ type: 'boarded', i, bus: this.bt[i] }); return; }
+    if (this.t1[i] <= 0) { this.st[i] = S.IDLE; this.bt[i] = -1; return; }
+    if (this.inc[i] > 0) { this.inc[i] -= h; if (!this.move(i, this.hx[i], this.hz[i], this.wt[i] * h)) this.inc[i] = 0; return; }
+    this.hx[i] = dx / d; this.hz[i] = dz / d;
+    if (!this.move(i, dx / d, dz / d, this.wt[i] * h) && this.randomCardinal(i, 1.5)) this.inc[i] = 1.2;
+  }
+
+  // the nuke: everything within R dies, roofs included; the ground is scorched for the rest of the round
+  nuke(x, z, R) {
+    let zk = 0, ck = 0;
+    const R2 = R * R;
+    for (let j = 0; j < this.active; j++) {
+      const s = this.st[j];
+      if (s === S.DEAD || s === S.EVAC) continue;
+      const dx = this.x[j] - x, dz = this.z[j] - z, d2 = dx * dx + dz * dz;
+      if (d2 > R2) continue;
+      const wasZ = s === S.ZOMBIE || s === S.PILE || s === S.CLIMB || s === S.TURNING || s === S.FALLING;
+      if (s === S.PILE || s === S.CLIMB) { const k = this.bt[j]; if (k >= 0) this.bPile[k] = 0; }
+      if (s === S.INSIDE) { const k = this.bt[j]; if (k >= 0) this.bIn[k] = Math.max(0, this.bIn[k] - 1); }
+      const d = Math.sqrt(d2) || 1;
+      this.st[j] = S.DEAD; this.inf[j] = 0; this.lvl[j] = -1;
+      this.hx[j] = dx / d; this.hz[j] = dz / d; this.y[j] = this.groundY(this.x[j], this.z[j]);
+      this.deadLook(j);
+      const A = this.fa.arrays, o = j * 3; for (let c = 0; c < 3; c++) { A.shirt[o + c] *= 0.3; A.pants[o + c] *= 0.3; A.skin[o + c] *= 0.3; }
+      if (wasZ) zk++; else { ck++; if (this.kind[j] === KIND.CIVILIAN) this.stats.nukedCiv++; }
+    }
+    this.stats.nukedZ += zk;
+    for (let k = 0; k < this.bld.length; k++) { const b = this.bld[k]; if (Math.hypot((b.x0 + b.x1) / 2 - x, (b.z0 + b.z1) / 2 - z) <= R) { this.bPile[k] = 0; this.bBreach[k] = 0; this.bBarr[k] = 0; this.bCap[k] = 0; } }
+    this.scare(x, z, R * 2.2, 1);
+    this.events.push({ type: 'nukekill', x, z, zk, ck });
+    return { zk, ck };
+  }
+
   // rescue helicopter: lift one uninfected survivor off the roof of building k
   evacuateFrom(k) {
     for (let i = 0; i < this.active; i++) {
@@ -606,6 +661,7 @@ export class People {
         case S.ROOF: this.roofStep(i, h); break;
         case S.COP: this.copStep(i, h); break;
         case S.FIREMAN: this.firemanStep(i, h); break;
+        case S.BOARD: this.boardStep(i, h); break;
         case S.GRABBED:
           if ((this.t1[i] -= h) <= 0) {
             this.inf[i] = 1;

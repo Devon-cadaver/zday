@@ -58,7 +58,7 @@ void main() {
 const FINAL_FRAG = /* glsl */`
 uniform sampler2D tColor, tBlur;
 uniform vec2 res;
-uniform float maxBlurFull, exposure, time, gradeOn, dofOn, glow, sepia, night;
+uniform float maxBlurFull, exposure, time, gradeOn, dofOn, glow, sepia, night, flash;
 varying vec2 vUv;
 ${COMMON}
 vec3 RRTAndODTFit(vec3 v) {
@@ -107,6 +107,7 @@ void main() {
     col *= mix(mix(vec3(0.55, 0.40, 0.26), vec3(0.42, 0.44, 0.56), night), vec3(1.0), v);
   }
   col += (hash(vUv * res + fract(time) * 100.0) - 0.5) * 0.03;
+  col = mix(col, vec3(1.0, 0.98, 0.9), flash);
   gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
 }
 `;
@@ -135,7 +136,7 @@ export class Post {
       uniforms: {
         ...common, tColor: { value: this.sceneRT.texture }, tBlur: { value: this.blurRT.texture },
         res: { value: new THREE.Vector2() }, maxBlurFull: { value: 20 }, exposure: { value: 1 }, time: { value: 0 },
-        gradeOn: { value: 1 }, dofOn: { value: 1 }, glow: { value: 0.3 }, sepia: { value: 0.3 }, night: { value: 0 },
+        gradeOn: { value: 1 }, dofOn: { value: 1 }, glow: { value: 0.3 }, sepia: { value: 0.3 }, night: { value: 0 }, flash: { value: 0 },
       },
     });
     // share the common uniform objects so one write updates both passes
@@ -164,7 +165,7 @@ export class Post {
     const maxFull = this.h * o.blurFrac;
     u.maxBlur.value = Math.max(1.5, maxFull / 2);
     f.maxBlurFull.value = maxFull;
-    f.exposure.value = o.exposure; f.time.value = time; f.glow.value = o.glow; f.sepia.value = o.sepia; f.night.value = o.night || 0;
+    f.exposure.value = o.exposure; f.time.value = time; f.glow.value = o.glow; f.sepia.value = o.sepia; f.night.value = o.night || 0; f.flash.value = o.flash || 0;
     f.gradeOn.value = o.grade ? 1 : 0; f.dofOn.value = o.dof ? 1 : 0;
 
     const r = this.renderer;
