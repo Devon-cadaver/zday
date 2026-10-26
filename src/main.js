@@ -15,7 +15,7 @@ const P = new URLSearchParams(location.search);
 const coarse = matchMedia('(pointer: coarse)').matches;
 const low = P.get('q') === 'low' || (coarse && P.get('q') !== 'high');
 const num = (k, d) => (P.has(k) ? parseFloat(P.get(k)) : d);
-const mode = P.get('mode') === 'sandbox' ? 'sandbox' : 'commander';
+const mode = P.get('mode') || 'menu'; // menu | commander | sandbox
 
 const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', preserveDrawingBuffer: P.has('shot') });
 renderer.setPixelRatio(Math.min(devicePixelRatio, low ? 1.5 : 2));

@@ -48,13 +48,16 @@ export class Commander {
       rp: g.addPill('zd-rp', 'Points'), alert: g.addPill('zd-al', '', 'zd-alert'), clock: g.addPill('', '', 'zd-clock'),
     };
     this.el.alertPill = this.el.alert.parentElement;
+    this.pr = g.profile; this.diff = this.pr.difficulty();
     this.cards = {};
     for (const u of UNITS) {
+      if (!this.pr.unlocked(u.id)) continue;
       const b = g.addButton('zd-card-' + u.id, '<span class="nm">' + u.name + '</span><span class="cost">' + u.cost + ' pts</span><span class="cd"></span>', () => this.select(u.id), 'zd-card' + (u.once ? ' zd-nuke' : ''));
       this.cards[u.id] = { btn: b, cd: b.querySelector('.cd'), u };
     }
     g.addSpeedButton();
     g.addButton('zd-restart', 'Restart', () => this.start());
+    g.addButton('zd-menu-btn', 'Menu', () => { location.href = location.pathname; });
     this.end = document.createElement('div'); this.end.id = 'zd-end'; this.end.hidden = true;
     document.body.appendChild(this.end);
     // latest 911 call, with a button that flies the camera to the search zone
@@ -80,9 +83,13 @@ export class Commander {
   start() {
     const g = this.g, p = g.people;
     this.end.hidden = true;
+    this.diff = this.pr.difficulty();
+    p.incubate = this.diff.incubate.slice(); p.runnerBoost = this.diff.runners; p.markInfected = this.pr.has('drone');
+    if (g.helis) g.helis.doubleDrop = this.pr.has('doubledrop');
     g.resetWorld(); g.setSpeed(1);
     this.t = 0; this.rp = START_RP; this.earned = 0; this.alert = 0; this.blocksInf = 0; this.fires = 0; this.ended = false;
     this.sel = null; this.cool = {}; for (const u of UNITS) this.cool[u.id] = 0;
+    this.cdOf = (id) => id === 'police' ? this.diff.policeCd : id === 'fire' ? this.diff.fireCd : this.cards[id].u.cd;
     if (g.helis) g.helis.reset();
     this.kills0 = 0; this.sent = 0; this.lost = 0; this.heatT = 0; this.spawned = 0; this.callT = 30;
     this.out0 = 0; this.rescued0 = 0; this.trucks = 0; this.helisSent = 0; this.apcs = 0; this.strikes = 0; this.bombedCiv0 = 0; this.bombed0 = 0;
@@ -91,7 +98,8 @@ export class Commander {
     for (const c of Object.values(this.cards)) c.btn.classList.remove('sel');
     // three outbreak sites, well apart, away from the edge
     const B = g.city.bounds, pts = [];
-    for (let tries = 0; tries < 200 && pts.length < 3; tries++) {
+    const nOut = this.diff.outbreaks;
+    for (let tries = 0; tries < 200 && pts.length < nOut; tries++) {
       const x = B.x0 + 50 + p.r() * (B.x1 - B.x0 - 100), z = B.z0 + 50 + p.r() * (B.z1 - B.z0 - 100);
       const w = p.snapWalkable(x, z, 20);
       if (!w || pts.some(q => Math.hypot(q[0] - w[0], q[1] - w[1]) < 140)) continue;
@@ -100,7 +108,7 @@ export class Commander {
     this.outbreaks = pts.map((w, k) => ({ x: w[0], z: w[1], at: OUTBREAK_AT[k] ?? 30 + k * 10, fired: false }));
     g.lookAt(0, 0);
     this.hud();
-    g.toast('Three 911 calls are coming in. Watch for panic, crashes and smoke, then send help', 5000);
+    g.toast((nOut === 1 ? 'A 911 call is coming in' : nOut === 2 ? 'Two 911 calls are coming in' : 'Three 911 calls are coming in') + '. Watch for panic, crashes and smoke, then send help', 5000);
   }
 
   // a 911 call: toast, call strip, and a search zone on the map (jittered, so it is a hunt)
@@ -153,7 +161,7 @@ export class Commander {
   sendPolice(x, z) {
     const g = this.g, c = this.cards.police;
     const car = g.traffic.dispatchTo(x, z, {
-      onArrive: (ax, az) => { g.people.spawnOfficers(ax, az, 2); g.toast('Officers on scene in the ' + this.district(ax, az)); },
+      onArrive: (ax, az) => { g.people.spawnOfficers(ax, az, this.pr.has('squad4') ? 4 : 2); g.toast('Officers on scene in the ' + this.district(ax, az)); },
       onLost: () => { this.lost++; g.toast('A cruiser was wrecked on the way'); },
     });
     if (!car) { g.toast(g.traffic.missions.length >= 24 ? 'All cruisers are out' : 'No road to that spot'); return; }
@@ -163,7 +171,7 @@ export class Commander {
 
   spend(id) {
     const c = this.cards[id];
-    this.rp -= c.u.cost; this.cool[id] = c.u.cd;
+    this.rp -= c.u.cost; this.cool[id] = this.cdOf(id);
     this.sel = null; c.btn.classList.remove('sel');
   }
 
@@ -231,7 +239,7 @@ export class Commander {
     const car = g.traffic.dispatchTo(x, z, {
       kind: 'bus',
       onArrive: (ax, az, bus) => {
-        bus.loadT = 0; bus.loaded = 0; bus.called = p.callToBus(ax, az, 45, 30, bus.id);
+        bus.cap = this.pr.has('bigbus') ? 45 : 30; bus.loadT = 0; bus.loaded = 0; bus.called = p.callToBus(ax, az, bus.cap > 30 ? 55 : 45, bus.cap, bus.id);
         g.toast(bus.called ? 'Bus loading in the ' + this.district(ax, az) + '. ' + bus.called + ' people running for it' : 'Bus arrived but nobody is around to board');
         if (!bus.called) { bus.loadT = 20; }
       },
@@ -260,7 +268,7 @@ export class Commander {
       bus.loadT += sdt;
       const zn = p.zombiesNear(bus.x, bus.z, 10);
       if (zn >= 4 && bus.loadT > 3) { p.releaseBus(bus.id); g.toast('Bus swarmed! Leaving with ' + bus.loaded + ' aboard'); g.traffic.depart(bus); continue; }
-      if (bus.loaded >= 30 || bus.loadT >= 25) { p.releaseBus(bus.id); g.traffic.depart(bus); }
+      if (bus.loaded >= (bus.cap || 30) || bus.loadT >= ((bus.cap || 30) > 30 ? 35 : 25)) { p.releaseBus(bus.id); g.traffic.depart(bus); }
     }
   }
 
@@ -304,7 +312,7 @@ export class Commander {
     for (const o of this.outbreaks) {
       if (o.fired || this.t < o.at) continue;
       o.fired = true; this.spawned++;
-      p.infectAt(o.x, o.z, 3);
+      p.infectAt(o.x, o.z, this.diff.seeds);
       this.report(o.x, o.z, '911 · ' + this.district(o.x, o.z) + ': "someone is biting people!"', 70);
     }
     const income = (1 + p.stats.humans / 2000) * sdt;
@@ -331,14 +339,14 @@ export class Commander {
     if (this.heatT >= 1) { this.heatT = 0; this.heat(); }
     // the switchboard: every so often a caller reports where they saw one
     this.callT -= sdt;
-    if (this.callT <= 0 && p.stats.zombies > 0 && this.spawned === 3) {
+    if (this.callT <= 0 && p.stats.zombies > 0 && this.spawned === this.outbreaks.length) {
       this.callT = 15 + p.r() * 10;
       const zs = []; for (let i = 0; i < p.active; i++) if (p.st[i] === ST.ZOMBIE && p.lvl[i] === -1) zs.push(i);
       if (zs.length) { const i = zs[Math.floor(p.r() * zs.length)]; this.report(p.x[i], p.z[i], '911 · ' + this.district(p.x[i], p.z[i]) + ': "' + CALLS[Math.floor(p.r() * CALLS.length)] + '"', 55); }
     }
     // end of round
     const hum = p.stats.humans, tot = p.nHuman;
-    if (this.spawned === 3 && this.t > 40 && p.stats.zombies === 0 && p.stats.infected === 0) this.finish('contained');
+    if (this.spawned === this.outbreaks.length && this.t > 40 && p.stats.zombies === 0 && p.stats.infected === 0) this.finish('contained');
     else if (hum < tot * 0.2) this.finish('lost');
     else if (this.t >= ROUND) this.finish('holdout');
     this.hud();
@@ -354,7 +362,7 @@ export class Commander {
     e.clock.textContent = m + ':' + String(sec).padStart(2, '0');
     for (const c of Object.values(this.cards)) {
       const cd = this.cool[c.u.id];
-      c.cd.style.height = cd > 0 ? (100 * cd / c.u.cd) + '%' : '0';
+      c.cd.style.height = cd > 0 ? (100 * cd / this.cdOf(c.u.id)) + '%' : '0';
       c.btn.classList.toggle('off', (c.u.once && this.nuked) || cd > 0 || this.rp < c.u.cost || this.alert < c.u.alert);
       if (c.u.once) c.cd.style.height = '0';
     }
@@ -388,11 +396,16 @@ export class Commander {
       ['Buildings burned', (g.fire.bFire.length - intact).toLocaleString()],
       ['Time', Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0')],
     ];
+    const r = this.pr.addRound(score, stars);
+    const xpLine = '<div class="xp">+' + r.xp.toLocaleString() + ' XP · level ' + r.level + (this.pr.nextXp ? ' · ' + (this.pr.nextXp - this.pr.xp).toLocaleString() + ' to next' : '') + '</div>' +
+      (r.levelUp ? '<div class="lvl">Level up! Commander level ' + r.level + this.g.nextUnlockText(r.level) + '</div>' : '');
     this.end.innerHTML = '<div class="box"><h2>' + title + '</h2><div>' + sub + '</div>' +
       '<div class="stars">' + '★'.repeat(stars) + '<span>' + '★'.repeat(3 - stars) + '</span></div>' +
       lines.map(l => '<div class="line"><span>' + l[0] + '</span><b>' + l[1] + '</b></div>').join('') +
-      '<div class="score">Score ' + score.toLocaleString() + '</div><button class="zd-btn" type="button" id="zd-again">Play again</button></div>';
-    this.end.querySelector('#zd-again').onclick = () => this.start();
+      '<div class="score">Score ' + score.toLocaleString() + '</div>' + xpLine +
+      '<div class="row2"><button class="zd-btn" type="button" id="zd-again">Play again</button><button class="zd-btn" type="button" id="zd-tomenu" style="background:rgba(28,20,12,.9);border-color:rgba(255,236,200,.25)">Menu</button></div></div>';
+    this.end.querySelector('#zd-again').onclick = () => { if (r.levelUp) { location.href = location.pathname + '?mode=commander'; return; } this.start(); };
+    this.end.querySelector('#zd-tomenu').onclick = () => { location.href = location.pathname; };
     this.end.hidden = false;
     g.setSpeed(1);
   }

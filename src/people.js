@@ -81,6 +81,7 @@ export class People {
     this.opts = opts;
     this.nWalk = opts.people ?? 3200;
     this.fire = null; this.onOverrun = null;
+    this.incubate = INCUBATE.slice(); this.runnerBoost = false; this.markInfected = false;
     this.buildWalkGrid();
     this.setupBuildings();
 
@@ -120,6 +121,10 @@ export class People {
     this.mounds = new THREE.InstancedMesh(moundGeometry(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, map: bodiesTexture() }), Math.max(1, this.bld.length));
     this.mounds.count = 0; this.mounds.castShadow = true; this.mounds.receiveShadow = true; this.mounds.frustumCulled = false;
     parent.add(this.mounds);
+    const ringG = new THREE.RingGeometry(0.8, 1.05, 18); ringG.rotateX(-Math.PI / 2);
+    this.marks = new THREE.InstancedMesh(ringG, new THREE.MeshBasicMaterial({ color: '#ffc233', transparent: true, opacity: 0.85, depthWrite: false, depthTest: false }), 512);
+    this.marks.count = 0; this.marks.frustumCulled = false; this.marks.renderOrder = 2;
+    parent.add(this.marks);
     this.flashMax = 48;
     this.flashes = new THREE.InstancedMesh(new THREE.SphereGeometry(0.35, 6, 4), new THREE.MeshBasicMaterial({ color: '#fff2a0' }), this.flashMax);
     this.flashes.count = 0; this.flashes.frustumCulled = false;
@@ -445,7 +450,7 @@ export class People {
   }
 
   becomeZombie(i, type = -1) {
-    this.zt[i] = type >= 0 ? type : rollZombieType(this.r);
+    this.zt[i] = type >= 0 ? type : (this.runnerBoost && this.r() < 0.3 ? 1 : rollZombieType(this.r));
     const Z = ZTYPES[this.zt[i]];
     this.hp[i] = Z.hp; this.inc[i] = Z.scream ? 4 + this.r() * 4 : 0;
     this.zombieLook(i);
@@ -665,7 +670,7 @@ export class People {
         case S.GRABBED:
           if ((this.t1[i] -= h) <= 0) {
             this.inf[i] = 1;
-            this.inc[i] = this.inc0[i] = INCUBATE[0] + this.r() * (INCUBATE[1] - INCUBATE[0]);
+            this.inc[i] = this.inc0[i] = this.incubate[0] + this.r() * (this.incubate[1] - this.incubate[0]);
             const b = this.target[i];
             if (this.kind[i] === KIND.OFFICER) { this.st[i] = S.COP; this.target[i] = -1; break; }
             if (this.kind[i] === KIND.FIREFIGHTER) { this.st[i] = S.FIREMAN; this.target[i] = -1; break; }
@@ -1199,6 +1204,20 @@ export class People {
     }
     this.mounds.count = mc;
     this.mounds.instanceMatrix.needsUpdate = true;
+    // drone recon: amber rings on the infected who have not turned yet
+    let mk = 0;
+    if (this.markInfected) {
+      const ma = this.marks.instanceMatrix.array;
+      for (let i = 0; i < this.active && mk < 512; i++) {
+        if (!this.inf[i] || !CIV[this.st[i]] || this.lvl[i] < -1) continue;
+        const o = mk * 16; ma.fill(0, o, o + 16);
+        ma[o] = 1; ma[o + 5] = 1; ma[o + 10] = 1; ma[o + 15] = 1;
+        ma[o + 12] = this.x[i]; ma[o + 13] = this.y[i] + 0.08; ma[o + 14] = this.z[i];
+        mk++;
+      }
+      this.marks.instanceMatrix.needsUpdate = true;
+    }
+    this.marks.count = mk;
     // muzzle flashes
     let fc = 0;
     for (const f of this.flashList) { m.identity(); m.setPosition(f.x, f.y, f.z); this.flashes.setMatrixAt(fc++, m); }

@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { ST } from './people.js';
 import { Commander } from './commander.js';
+import { Profile, UNLOCK, UPGRADES, LEVELS, MAX_LEVEL } from './profile.js';
 
 const CSS = `
 #zd-top{position:fixed;left:0;right:0;top:0;display:flex;gap:6px;align-items:center;flex-wrap:wrap;
@@ -55,8 +56,46 @@ const CSS = `
 #zd-end .line b{color:#fff4e0}
 #zd-end .score{font-size:20px;margin:12px 0 4px;color:#7be0ff}
 #zd-end .zd-btn{margin-top:12px;background:rgba(70,98,34,.9);border-color:rgba(166,255,77,.5);padding:13px 22px;font-size:13px}
+#zd-menu{position:fixed;inset:0;z-index:6;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 40%,rgba(20,14,8,.55),rgba(14,10,6,.86));
+  padding:max(16px, env(safe-area-inset-left));font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;color:#f6ead2}
+#zd-menu[hidden]{display:none}
+#zd-menu .box{width:100%;max-width:380px;background:rgba(32,24,14,.92);border:1px solid rgba(255,236,200,.18);border-radius:16px;padding:22px 20px 18px;text-align:center;max-height:calc(100vh - 32px);overflow:auto}
+#zd-menu h1{margin:0;font-size:34px;letter-spacing:.18em;color:#fff4e0}
+#zd-menu .tag{font-size:12px;letter-spacing:.12em;text-transform:uppercase;opacity:.7;margin:2px 0 14px}
+#zd-menu .rank{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;margin:0 0 6px}
+#zd-menu .rank b{font-size:16px;color:#a6ff4d}
+#zd-menu .bar{height:8px;border-radius:4px;background:rgba(255,236,200,.12);overflow:hidden;margin:0 0 4px}
+#zd-menu .bar i{display:block;height:100%;background:linear-gradient(90deg,#7be0ff,#a6ff4d)}
+#zd-menu .next{font-size:11px;opacity:.7;margin:0 0 16px}
+#zd-menu .btns{display:flex;flex-direction:column;gap:9px}
+#zd-menu .zd-btn{padding:14px 16px;font-size:14px}
+#zd-menu .zd-btn.main{background:rgba(70,98,34,.9);border-color:rgba(166,255,77,.5)}
+#zd-menu .zd-btn.dim{opacity:.8}
+#zd-menu .list{text-align:left;margin:14px 0 0;display:flex;flex-direction:column;gap:6px}
+#zd-menu .row{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:8px 10px;border-radius:9px;background:rgba(255,236,200,.05);border:1px solid rgba(255,236,200,.1)}
+#zd-menu .row.locked{opacity:.5}
+#zd-menu .row .n{font-weight:700;font-size:13px}
+#zd-menu .row .d{font-size:11px;opacity:.75}
+#zd-menu .row .s{font-size:11px;white-space:nowrap;color:#ffc233;font-variant-numeric:tabular-nums}
+#zd-menu .row .zd-btn{padding:8px 10px;font-size:11px;min-width:0}
+#zd-menu .row .zd-btn.own{background:rgba(70,98,34,.9);border-color:rgba(166,255,77,.5);pointer-events:none}
+#zd-menu .back{margin-top:12px}
+#zd-menu .foot{font-size:11px;opacity:.55;margin:12px 0 0}
+#zd-end .xp{font-size:13px;color:#7be0ff;margin:4px 0 0}
+#zd-end .lvl{font-size:15px;color:#a6ff4d;font-weight:700;margin:6px 0 0}
+#zd-end .row2{display:flex;gap:8px;justify-content:center}
 @media (prefers-reduced-motion: reduce){#zd-toast{transition:none}}
 `;
+
+const UNIT_NAMES = { police: 'Police cruiser', bus: 'Evacuation bus', fire: 'Fire truck', water: 'Water helicopter', rescue: 'Rescue helicopter', apc: 'Army APC', strike: 'Airstrike', nuke: 'Nuke' };
+
+// the city runs on its own behind the menu
+class Idle {
+  constructor() { this.msgs = {}; }
+  update() {}
+  tap() {}
+  phase() { return 0.06; }
+}
 
 export class Game {
   constructor({ people, traffic, fire, city, camera, controls, renderer, mode, daylight, helis, post }) {
@@ -65,9 +104,61 @@ export class Game {
     this.pendingFires = []; this.simT = 0; this.realT = 0; this.acc = 0; this.speed = 1; this.follow = -1; this.seen = {};
     people.fire = fire; traffic.people = people; traffic.fire = fire;
     people.onOverrun = (k, why) => { if (Math.random() < (why === 'breach' ? 0.25 : 0.3)) this.pendingFires.push({ k, t: this.simT + 3 + Math.random() * 8 }); };
+    this.profile = new Profile();
     this.buildUI();
     this.bindInput();
-    this.mode = mode === 'sandbox' ? new Sandbox(this) : new Commander(this);
+    this.menu = document.createElement('div'); this.menu.id = 'zd-menu'; this.menu.hidden = true;
+    document.body.appendChild(this.menu);
+    if (mode === 'sandbox') this.mode = new Sandbox(this);
+    else if (mode === 'commander') this.mode = new Commander(this);
+    else { this.mode = new Idle(); this.showMenu(); }
+  }
+
+  startMode(which) {
+    this.menu.hidden = true;
+    this.top.innerHTML = ''; this.bar.innerHTML = '';
+    this.mode = which === 'sandbox' ? new Sandbox(this) : new Commander(this);
+  }
+
+  // ---------- main menu and unlocks
+  showMenu(panel = 'main') {
+    const pr = this.profile, lvl = pr.level, next = pr.nextXp;
+    const rank = '<div class="rank"><span>Commander level <b>' + lvl + '</b></span><span>' + pr.xp.toLocaleString() + ' XP' + (next ? ' / ' + next.toLocaleString() : '') + '</span></div>' +
+      '<div class="bar"><i style="width:' + Math.round(pr.progress * 100) + '%"></i></div>' +
+      '<div class="next">' + (next ? (next - pr.xp).toLocaleString() + ' XP to level ' + (lvl + 1) + this.nextUnlockText(lvl + 1) : 'Maximum level') + '</div>';
+    let body;
+    if (panel === 'main') {
+      body = '<h1>Z-DAY</h1><div class="tag">Emergency commander</div>' + rank +
+        '<div class="btns"><button class="zd-btn main" type="button" data-go="commander">Play · Commander</button>' +
+        '<button class="zd-btn" type="button" data-go="unlocks">Units and upgrades' + (pr.bank >= 3000 && UPGRADES.some(u => pr.canBuy(u.id)) ? ' · upgrade available' : '') + '</button>' +
+        '<button class="zd-btn dim" type="button" data-go="sandbox">Sandbox · drop zombies</button>' +
+        '<a class="zd-btn dim" href="showcase.html" style="text-decoration:none;display:block">Roster · every model</a></div>' +
+        '<div class="foot">' + pr.data.rounds + ' rounds played · best score ' + pr.data.best.toLocaleString() + ' · ' + pr.data.stars + ' stars' + (pr.ok ? '' : ' · progress is not being saved on this device') + '</div>';
+    } else {
+      const units = Object.keys(UNIT_NAMES).map(id => {
+        const need = UNLOCK[id], ok = lvl >= need;
+        return '<div class="row' + (ok ? '' : ' locked') + '"><div><div class="n">' + UNIT_NAMES[id] + '</div><div class="d">' + (ok ? 'Unlocked' : 'Unlocks at level ' + need) + '</div></div><span class="s">' + (ok ? '✓' : 'L' + need) + '</span></div>';
+      }).join('');
+      const ups = UPGRADES.map(u => {
+        const own = pr.has(u.id), can = pr.canBuy(u.id), locked = lvl < u.level;
+        return '<div class="row' + (locked ? ' locked' : '') + '"><div><div class="n">' + u.name + '</div><div class="d">' + u.desc + '</div></div>' +
+          (own ? '<button class="zd-btn own" type="button">Owned</button>' : locked ? '<span class="s">L' + u.level + '</span>' : '<button class="zd-btn" type="button" data-buy="' + u.id + '"' + (can ? '' : ' disabled style="opacity:.5"') + '>' + u.cost.toLocaleString() + ' XP</button>') + '</div>';
+      }).join('');
+      body = '<h1>UNLOCKS</h1><div class="tag">' + pr.bank.toLocaleString() + ' XP to spend</div>' + rank +
+        '<div class="list">' + units + '</div><div class="tag" style="margin-top:16px">Upgrades</div><div class="list">' + ups + '</div>' +
+        '<div class="btns back"><button class="zd-btn" type="button" data-go="main">Back</button></div>';
+    }
+    this.menu.innerHTML = '<div class="box">' + body + '</div>';
+    this.menu.hidden = false;
+    this.menu.querySelectorAll('[data-go]').forEach(b => { b.onclick = () => { const go = b.dataset.go; if (go === 'commander' || go === 'sandbox') this.startMode(go); else this.showMenu(go); }; });
+    this.menu.querySelectorAll('[data-buy]').forEach(b => { b.onclick = () => { if (pr.buy(b.dataset.buy)) { this.toast('Upgrade bought'); this.showMenu('unlocks'); } }; });
+  }
+
+  nextUnlockText(level) {
+    const units = Object.keys(UNLOCK).filter(id => UNLOCK[id] === level).map(id => UNIT_NAMES[id]);
+    const ups = UPGRADES.filter(u => u.level === level).map(u => u.name);
+    const all = units.concat(ups);
+    return all.length ? ' · unlocks ' + all.join(', ') : '';
   }
 
   buildUI() {
@@ -237,6 +328,7 @@ class Sandbox {
     g.followBtn = g.addButton('zd-find', 'Follow', () => g.cycleFollow());
     g.addSpeedButton();
     g.addButton('zd-reset', 'Reset', () => this.reset());
+    g.addButton('zd-menu-btn', 'Menu', () => { location.href = location.pathname; });
     this.dropsLeft = START_DROPS; this.clock = -1; this.milestone = 0;
     g.toast('Tap a street to drop a Shambler zombie', 4500);
   }

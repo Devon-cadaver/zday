@@ -92,8 +92,14 @@ READ THIS FIRST after a compaction. Current as of 2026-10-25.
 - Headless: bus to a plaza crowd: 30 called, 20 aboard in 10 s, 10 stragglers, left at 25 s, gone at 35 s. Nuke at the centre: ~1190 civilians dead, 185 buildings scorched, ~108 fires in the ring.
 - HUD: 8 unit cards wrap to two rows of four at 390 px, plus speed and restart on a third row (bar ~150 px tall). Sean may want this tighter.
 
+## Commander phase 5: progression and menu (v0.9, 2026-10-25)
+- src/profile.js: Profile saved in localStorage key zday_profile { xp, spent, upgrades, rounds, best, stars, lastLevel }. XP = max(200, score/10) per round. LEVELS cumulative [0, 6000, 14000, 26000, 44000, 70000, 105000, 150000, 210000, 290000, 390000, 520000] (12 levels). UNLOCK: police/bus L1, fire L2, water/rescue L3, apc L4, strike L5, nuke L6. UPGRADES bought with banked XP (xp - spent): squad4 3000 @L7 (cruisers carry 4), drone 4000 @L7 (amber rings on infected before they turn: people.markInfected, marks InstancedMesh), bigbus 3000 @L8 (45 seats, 55 m call radius, 35 s wait), doubledrop 4000 @L8 (helis.doubleDrop: second drop 45 m further along the run), fastcops 5000 @L9 (police and fire cooldowns halved). difficulty(): outbreaks 1/2/3 at L1/L2/L3+, incubation [20,30]/[15,24]/[10,18], seeds 4 from L8, runners from L10 (30% of turns become Runners), police cd 15 from L5.
+- Menu: default page (no ?mode) shows #zd-menu over the living city (Idle mode, morning light): title, rank line, XP bar, next unlock text, Play Commander, Units and upgrades (unlock list + buy buttons), Sandbox, Roster link, footer with rounds/best/stars. ?mode=commander or ?mode=sandbox skips the menu (Restart and the Menu button use location.href so modes never stack). Commander shows only unlocked unit cards (L1 = two cards, so the bar is small early).
+- End screen: +XP, level, XP to next, Level up line with what it unlocks, Play again (reloads into ?mode=commander after a level up so new cards appear) and Menu.
+- Tested: fresh profile L1 -> 1 outbreak, cards Police + Evac bus, incubation 20-30; a holdout at 0:59 scored 102k = +10,247 XP -> level 2, saved. L8 profile: buy squad4 works (bank 157,000). Max profile: 8 cards, 3 outbreaks, 4 seeds, runners, drone marks, double drop, cooldowns 10/15.
+
 ## Next
-- Commander phase 5 per DESIGN.md: XP, commander level, unlocks, upgrades, difficulty ramp, localStorage save, Runner-heavy rounds, main menu with Commander and Sandbox.: fire truck, water and rescue helicopters, army APC, airstrike, nuke, evacuation bus, XP and levels, menu.
+- All five phases are in. Sean is testing on his phone; tune from his notes. Candidates: card bar height on the phone, unit costs and cooldowns, airstrike and nuke civilian penalties, outbreak timing, more zombie types in play.: fire truck, water and rescue helicopters, army APC, airstrike, nuke, evacuation bus, XP and levels, menu.
 
 ## Earlier plan note
 - Sean decided on 2026-10-25 to make the player the hero (emergency commander) instead of dropping zombies. The full plan is DESIGN.md (round, alert levels, units, points, levelling, 5 implementation phases). Sandbox stays at ?mode=sandbox.

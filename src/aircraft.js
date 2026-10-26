@@ -63,7 +63,11 @@ export class Helicopters {
       } else if (hl.state === 'hover') {
         hl.t += h; hl.v = 0;
         if (hl.kind === 'water') {
-          if (hl.t >= 2.5) { this.fire.dropWater(hl.tx, hl.tz, 40); hl.state = 'out'; hl.t = 0; if (hl.onDone) hl.onDone(); }
+          if (hl.t >= 2.5) {
+            this.fire.dropWater(hl.tx, hl.tz, 40);
+            if (this.doubleDrop && !hl.second) { hl.second = true; hl.tx += hl.hx * 45; hl.tz += hl.hz * 45; hl.state = 'in'; hl.t = 0; }
+            else { hl.state = 'out'; hl.t = 0; if (hl.onDone) hl.onDone(); }
+          }
         } else {
           const b = this.people.bld[hl.k];
           hl.y += (b.roofY + 4 - hl.y) * Math.min(1, h * 2);
