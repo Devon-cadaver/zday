@@ -97,7 +97,9 @@ vec2 lensUV(vec2 uv) {
   vec2 a = vec2(res.x / res.y, 1.0), d = (uv - uLensC) * a;
   float r = max(length(d), 1e-4), re = uLensR * uLens;
   float b = max(r - re * re / r, -2.5 * re), f = 1.0 - smoothstep(re * 2.0, re * 4.5, r);
-  return uLensC + d / r * mix(r, b, f) / a;
+  vec2 sp = uLensC + d / r * mix(r, b, f) / a;
+  float e = min(min(sp.x, 1.0 - sp.x), min(sp.y, 1.0 - sp.y));
+  return mix(uv, sp, smoothstep(-0.02, 0.04, e)); // nothing to bend in from off screen: fade the lens out there
 }
 void main() {
   vec2 uv = lensUV(vUv);

@@ -187,6 +187,16 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 - Sandbox: picking a tap-placed disaster closes the panel; the Disasters button reads 'Cancel <disaster>' until you tap the map.
 - Tested headless (390x844 q=low): every disaster 40 s without errors, all Be modes, a Commander round with black hole + tsunami + nuke + outbreak, 10 min of traffic with no wrecks, 60 fps pouring lava; screenshots in shots/ (pit-car, bh-3, bh-void, gait-roster2/3, zombies-roster2, radioactive, boat, nuke-2/3).
 
+## Hold to grow: sinkholes and black holes up to ten blocks (v1.6, 2026-10-26)
+- Sean: sinkholes and black holes should grow while the click is held, up to 10 city blocks.
+- D.maxHoleR = block pitch x 1.78 (about 112 m on the 63 m q=low grid: a 225 m pit covering about ten blocks). HAZARDS sinkhole/blackhole have hold: true.
+- Sandbox: picking one disables the camera controls and says 'press and hold'; pointerdown on the map starts it with { grow: true }, pointerup calls ev.release(); the Disasters button shows 'Growing · N m'; tap() ignores the release (noTapUntil) so no Shambler drops.
+- Sinkhole grow mode: 0.8 s rumble (short cracks), then R grows at 3 + 0.09 R m/s (about 16 s to the maximum), depth 90; it settles 5 s after release or at the maximum, then blocks the grid and closes roads.
+- BlackHole grow mode: holdT drives the sphere (Rh 1 + 0.4/s, up to 9) and the void (3 + 5.5 m/s up to maxHoleR); pull radius max(18 + 15 Rh, void + 45), tear radius void + 10, up to 3 buildings inside the void torn per 0.25 s; feeds 10 s after release, then collapses. The void is bottomless (Hole { void: true }: floorAt -400 inside, so what falls in drops out of sight). post.js lens fades out where it would sample off screen.
+- Be The Disaster: the sinkhole grows the same way to maxHoleR; new 8th disaster 'Black hole' (BE_LEVEL 7, k 0.5): press and hold to grow, release to let it feed and collapse, then press again. Simulated 3-minute runs: sinkhole 69k, black hole 63k (rank A at 65k).
+- Bug fixed on the way: an inline comment had swallowed this.fb (the pit floor size) in Hole, so pit floors were missing (sky showed through).
+- Measured on the dev PC at full size: about 3 ms of simulation per 0.1 s (worst 15 ms) and under 2 ms GPU per frame. The Playwright window was throttled to 1 fps by the OS (occluded), so real-time fps could not be read this time.
+
 ## Next
 - Sean tests v1.3 on his phone; tune from his notes. Candidates: Be The Disaster score scales and ranks once real scores come in, the saucer size at close zoom, how often zombie outbreaks turn up in Commander, incident pacing, card bar height on the phone.
 

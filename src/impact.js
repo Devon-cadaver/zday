@@ -65,6 +65,7 @@ export class Hole {
   constructor(D, x, z, o = {}) {
     this.D = D; this.x = x; this.z = z; this.R = o.R ?? 10; this.glow = o.glow ?? 0; this.cool = o.cool ?? 0;
     this.depth = o.depth ?? this.R * 0.7; this.shape = o.shape ?? 'bowl'; this.fb = PROFILE[this.shape][4][0];
+    this.bottomless = !!o.void; // a void: what falls in drops out of sight
     const rim = o.rim ?? 1.35, scene = D.ctx.scene;
     const common = { uC: { value: new THREE.Vector3(x, TOP, z) }, uR: { value: this.R }, uDepth: { value: this.depth }, uGlow: { value: this.glow }, uLight: { value: 1 }, uFogDensity: { value: 0.0006 }, uFogColor: { value: new THREE.Color() } };
     const lipGeo = new THREE.CircleGeometry(rim, 72); lipGeo.rotateX(-Math.PI / 2);
@@ -95,6 +96,7 @@ export class Hole {
   floorAt(x, z) {
     const r = Math.hypot(x - this.x, z - this.z) / Math.max(0.01, this.R);
     if (r >= 1) return null;
+    if (this.bottomless && r < this.fb) return -400;
     return TOP - this.depth * Math.min(1, (1 - r) / (1 - this.fb));
   }
   update(h) {
@@ -225,20 +227,29 @@ export class Sinkhole {
   constructor(D, x, z, o = {}) {
     this.type = 'sinkhole'; this.D = D; this.x = x; this.z = z; this.t = 0; this.alive = true;
     this.Rmax = o.size ?? 11 + Math.random() * 13; this.rumble = 3.5; this.grow = 7; this.hole = null; this.cracked = false;
-    D.emit({ type: 'warn', hazard: 'sinkhole', x, z, r: this.Rmax * 2, exact: true, text: 'Sinkhole! The ground is giving way in the ' + D.district(x, z) + ' district' });
+    this.hold = !!o.grow; this.holding = this.hold; this.R = 0; // held: it widens for as long as the finger is down
+    if (this.hold) { this.Rmax = D.maxHoleR; this.rumble = 0.8; }
+    if (!this.hold || !o.quiet) D.emit({ type: 'warn', hazard: 'sinkhole', x, z, r: this.Rmax * 2, exact: true, text: 'Sinkhole! The ground is giving way in the ' + D.district(x, z) + ' district' });
   }
-  poi() { return { x: this.x, z: this.z, danger: this.Rmax * 1.5, range: 160 }; }
+  get size() { return this.R; }
+  release() { this.holding = false; }
+  poi() { return { x: this.x, z: this.z, danger: (this.hold ? this.R + 15 : this.Rmax) * 1.5, range: 160 + this.R * 2 }; }
   update(h) {
     const D = this.D, { people, fire, city } = D.ctx;
     this.t += h;
     if (this.t < this.rumble) {
       D.shake(0.2);
-      if (!this.cracked) { this.cracked = true; for (let n = 0; n < 9; n++) { const a = n / 9 * Math.PI * 2 + Math.random() * 0.4, L = this.Rmax * (0.8 + Math.random() * 0.6); D.decals.add('crack', this.x + Math.cos(a) * L * 0.6, this.z + Math.sin(a) * L * 0.6, L, 2.5, -a); } }
+      if (!this.cracked) { this.cracked = true; for (let n = 0; n < 9; n++) { const a = n / 9 * Math.PI * 2 + Math.random() * 0.4, L = (this.hold ? 22 : this.Rmax) * (0.8 + Math.random() * 0.6); D.decals.add('crack', this.x + Math.cos(a) * L * 0.6, this.z + Math.sin(a) * L * 0.6, L, 2.5, -a); } }
       if (Math.random() < h * 2) people.scare(this.x, this.z, this.Rmax * 2.5, 0.3);
       return;
     }
-    const k = Math.min(1, (this.t - this.rumble) / this.grow), R = this.Rmax * (1 - Math.pow(1 - k, 2.2));
-    if (!this.hole) this.hole = new Hole(D, this.x, this.z, { R: 0.5, depth: this.Rmax * 1.4, rim: 1.3, shape: 'shaft', wall: '#6e5a46', floor: '#4a3c2a', rimCol: '#7a6650' });
+    let k, R;
+    if (this.hold) { // widens faster the bigger it gets, until let go or ten blocks across
+      if (this.holding && this.R < this.Rmax) this.R = Math.min(this.Rmax, Math.max(1.5, this.R) + h * (3 + this.R * 0.09));
+      R = this.R; k = this.holding && this.R < this.Rmax ? 0.5 : 1;
+      if (k >= 1) this.doneT = (this.doneT || 0) + h;
+    } else { k = Math.min(1, (this.t - this.rumble) / this.grow); R = this.R = this.Rmax * (1 - Math.pow(1 - k, 2.2)); }
+    if (!this.hole) this.hole = new Hole(D, this.x, this.z, { R: 0.5, depth: this.hold ? 90 : this.Rmax * 1.4, rim: 1.3, shape: 'shaft', wall: '#6e5a46', floor: '#4a3c2a', rimCol: '#7a6650' });
     this.hole.setR(R);
     D.shake(0.3 * (1 - k) + 0.05);
     swallow(this.D, this.x, this.z, R);
@@ -248,8 +259,8 @@ export class Sinkhole {
     });
     if (Math.random() < h * 4) { const a = Math.random() * Math.PI * 2; fire.dustCloud(this.x + Math.cos(a) * R, this.z + Math.sin(a) * R, 4, 8); }
     // a broken water main sprays muddy water out of the pit for a while
-    if (k > 0.3 && this.t < this.rumble + this.grow + 6 && Math.random() < 0.6) D.water.splash.emit(this.x, 0.5, this.z, 4, { up: [8, 16], spread: 4, life: 2, size: 1.8 });
-    if (k >= 1 && this.t > this.rumble + this.grow + 6) {
+    if (k > 0.3 && (this.hold ? !(this.doneT > 2) : this.t < this.rumble + this.grow + 6) && Math.random() < 0.6) D.water.splash.emit(this.x, 0.5, this.z, 4, { up: [8, 16], spread: 4, life: 2, size: 1.8 });
+    if (k >= 1 && (this.hold ? this.doneT > 5 : this.t > this.rumble + this.grow + 6)) {
       people.block(this.x, this.z, R + 0.3);
       D.ctx.traffic.closeNear(this.x, this.z, R + 3);
       this.alive = false;

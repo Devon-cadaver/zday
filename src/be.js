@@ -14,11 +14,12 @@ const RUN = 180;
 const RANKS = [[0, 'F'], [8000, 'D'], [20000, 'C'], [40000, 'B'], [65000, 'A'], [95000, 'S']];
 export const BE = {
   tornado: { name: 'Tornado', k: 0.9, hint: 'Drag to steer the tornado. It grows as it feeds' },
-  sinkhole: { name: 'Sinkhole', k: 0.6, hint: 'Press and hold to open a sinkhole. The longer you hold, the bigger it gets' },
+  sinkhole: { name: 'Sinkhole', k: 0.6, hint: 'Press and hold to open a sinkhole. The longer you hold, the bigger it gets, up to ten blocks wide' },
   quake: { name: 'Earthquake', k: 1, hint: 'Drag across the city to tear a fault line through it' },
   meteor: { name: 'Meteor shower', k: 0.45, hint: 'Tap where the next meteor should land' },
   lava: { name: 'Lava', k: 1.6, hint: 'Drag to pour lava. It runs down the streets and swallows what it touches' },
   tsunami: { name: 'Tsunami', k: 0.35, hint: 'Drag to pull the wave. The water surges toward your finger' },
+  blackhole: { name: 'Black hole', k: 0.5, hint: 'Press and hold to grow a black hole, up to ten blocks wide. Let go and it feeds, then collapses into a void' },
   saucer: { name: 'Alien saucer', k: 3.5, hint: 'Drag to fly and blast the streets. Hold still over a crowd to beam them up' },
 };
 
@@ -38,13 +39,13 @@ class TornadoCtl {
 
 class SinkholeCtl {
   constructor(be) { this.be = be; this.cur = null; this.n = 0; be.D.list.push(wrap(this)); }
-  down(x, z) { const D = this.be.D; this.n++; this.cur = { x, z, R: 2, hole: new Hole(D, x, z, { R: 2, depth: 32, rim: 1.3, shape: 'shaft', wall: '#6e5a46', floor: '#4a3c2a', rimCol: '#7a6650' }) }; D.shake(0.4); D.ctx.people.scare(x, z, 40, 0.6); }
+  down(x, z) { const D = this.be.D; this.n++; this.cur = { x, z, R: 2, hole: new Hole(D, x, z, { R: 2, depth: 90, rim: 1.3, shape: 'shaft', wall: '#6e5a46', floor: '#4a3c2a', rimCol: '#7a6650' }) }; D.shake(0.4); D.ctx.people.scare(x, z, 40, 0.6); }
   move() {} // a sinkhole opens where you pressed
   up() { const c = this.cur; if (!c) return; this.cur = null; this.be.D.ctx.people.block(c.x, c.z, c.R + 0.3); this.be.D.ctx.traffic.closeNear(c.x, c.z, c.R + 3); }
   update(h) {
     const c = this.cur; if (!c) return;
     const D = this.be.D, { city, fire } = D.ctx;
-    c.R = Math.min(38, c.R + h * 4.5); c.hole.setR(c.R); D.shake(0.15);
+    c.R = Math.min(D.maxHoleR, c.R + h * (3 + c.R * 0.09)); c.hole.setR(c.R); D.shake(0.15); // faster the wider it gets, up to ten blocks
     swallow(D, c.x, c.z, c.R);
     city.buildingsNear(c.x, c.z, c.R, (k, d, b) => { const bx = (b.x0 + b.x1) / 2, bz = (b.z0 + b.z1) / 2; if (Math.hypot(bx - c.x, bz - c.z) < c.R + 2) D.destroyBuilding(k, 'collapse', { dir: Math.atan2(c.z - bz, c.x - bx), noRubble: true, noCrush: true }); });
     if (Math.random() < h * 4) { const a = Math.random() * 6.28; fire.dustCloud(c.x + Math.cos(a) * c.R, c.z + Math.sin(a) * c.R, 4, 8); }
@@ -87,6 +88,15 @@ class QuakeCtl {
   }
   label() { return Math.round(this.len) + ' m of faults'; }
   poi() { return this.held ? { x: this.last[0], z: this.last[1], danger: 20, range: 150 } : null; }
+}
+
+class BlackHoleCtl {
+  constructor(be) { this.be = be; this.ev = null; be.D.list.push(wrap(this)); }
+  down(x, z) { if (this.ev && this.ev.holding) return; this.ev = this.be.D.start('blackhole', x, z, { grow: true, quiet: true }); }
+  move() {} // it stays where it opened
+  up() { if (this.ev) this.ev.release(); }
+  update() {}
+  label() { return this.ev && this.ev.alive ? Math.round(this.ev.size * 2) + ' m wide' : 'Press and hold'; }
 }
 
 class MeteorCtl {
@@ -271,6 +281,7 @@ export class BeTheDisaster {
     else if (k === 'saucer') { this.ctl = new SaucerCtl(this, cx, cz); g.lookAt(cx, cz, 380); }
     else if (k === 'sinkhole') { this.ctl = new SinkholeCtl(this); g.lookAt(cx, cz, 420); }
     else if (k === 'quake') { this.ctl = new QuakeCtl(this); g.lookAt(cx, cz, 450); }
+    else if (k === 'blackhole') { this.ctl = new BlackHoleCtl(this); g.lookAt(cx, cz, 560); }
     else if (k === 'meteor') { this.ctl = new MeteorCtl(this); g.lookAt(cx, cz, 520); }
     else if (k === 'lava') { this.ctl = new LavaCtl(this); g.lookAt(cx, cz, 420); }
     else if (k === 'tsunami') { this.ctl = new TsunamiCtl(this); g.lookAt(cx, B.z1 - 120, 520); }

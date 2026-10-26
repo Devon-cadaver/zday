@@ -41,6 +41,7 @@ export class BlackHole {
     this.type = 'blackhole'; this.D = D; this.x = x; this.z = z; this.y = 15; this.t = 0; this.alive = true; this.phase = 'form';
     this.Rmax = o.size ?? 3.2 + Math.random() * 1.3; this.life = o.life ?? 26; this.Rh = 0.05; this.tick = 0;
     this.lift = []; this.cars = []; this.eaten = 0;
+    this.hold = !!o.grow; this.holding = this.hold; this.holdT = 0; this.voidR = 3; // held: it swells for as long as the finger is down
     const scene = D.ctx.scene;
     this.ball = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 20), new THREE.MeshBasicMaterial({ color: 0x000000, fog: false }));
     this.diskMat = new THREE.ShaderMaterial({ vertexShader: DISK_VS, fragmentShader: DISK_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
@@ -54,18 +55,28 @@ export class BlackHole {
     // debris drawn in spirals into it (debris.js treats a sink vortex specially)
     this.vort = { x, z, y: this.y, H: this.y * 2, sink: true, horizon: 0.1, scale: 1, spin: 1, alive: true, radiusAt: () => 2 };
     this.vi = D.debris.vortices.push(this.vort) - 1;
-    this.hole = new Hole(D, x, z, { R: 0.5, depth: 70, rim: 1.25, shape: 'shaft', wall: '#16120f', floor: '#000000', rimCol: '#2c2622' });
-    D.emit({ type: 'warn', hazard: 'blackhole', x, z, r: 70, exact: true, text: 'Gravitational anomaly in the ' + D.district(x, z) + ' district! Something is tearing a hole in space. Get away from it' });
+    this.hole = new Hole(D, x, z, { R: 0.5, depth: 70, rim: 1.25, shape: 'shaft', wall: '#16120f', floor: '#000000', rimCol: '#2c2622', void: true });
+    if (!o.quiet) D.emit({ type: 'warn', hazard: 'blackhole', x, z, r: 70, exact: true, text: 'Gravitational anomaly in the ' + D.district(x, z) + ' district! Something is tearing a hole in space. Get away from it' });
     D.flash(0.25); D.shake(0.6);
   }
-  get pullR() { return 18 + this.Rh * 15; }
-  get tearR() { return 5 + this.Rh * 6; }
+  get pullR() { return Math.max(18 + this.Rh * 15, this.voidR + 45); }
+  get tearR() { return Math.max(5 + this.Rh * 6, this.voidR + 10); }
+  get size() { return this.hole.R; }
+  release() { if (this.holding) { this.holding = false; this.ft = 0; } }
   poi() { return this.phase === 'gone' ? null : { x: this.x, z: this.z, danger: this.pullR * 1.15, range: 520 }; }
 
   update(h) {
     const D = this.D;
     this.t += h;
-    if (this.phase === 'form') {
+    if (this.hold && (this.phase === 'form' || this.phase === 'feed')) { // swells while held, feeds a while after it is let go
+      if (this.holding) { this.holdT += h; if (this.holdT > 90) this.release(); }
+      const tRh = (this.phase === 'form' ? Math.min(1, this.t / 1.5) : 1) * (1 + Math.min(8, this.holdT * 0.4));
+      this.Rh += (tRh - this.Rh) * Math.min(1, h * 2);
+      this.voidR = Math.min(D.maxHoleR, 3 + this.holdT * 5.5);
+      D.shake(0.12 + this.Rh * 0.03);
+      if (this.phase === 'form' && this.t >= 1.5) { this.phase = 'feed'; this.ft = 0; }
+      if (!this.holding && this.phase === 'feed' && (this.ft += h) >= 10) { this.phase = 'collapse'; this.ct = 0; this.R0 = this.Rh; }
+    } else if (this.phase === 'form') {
       this.Rh = 0.05 + Math.min(1, this.t / 3) * 0.95;
       D.shake(0.15);
       if (this.t >= 3) { this.phase = 'feed'; this.ft = 0; }
@@ -109,8 +120,11 @@ export class BlackHole {
       D.debris.addObject(m, 'orbit', { vort: this.vi, hold: 99 });
     }
     // buildings in reach are torn apart and drawn in, the nearest first
-    let k0 = -1, dk = 1e9;
-    city.buildingsNear(x, z, T, (k, d) => { if (d < dk) { dk = d; k0 = k; } });
+    let k0 = -1, dk = 1e9, inside = 0;
+    city.buildingsNear(x, z, T, (k, d, b) => {
+      if (this.hold && inside < 3 && Math.hypot((b.x0 + b.x1) / 2 - x, (b.z0 + b.z1) / 2 - z) < this.hole.R + 4 && D.destroyBuilding(k, 'tear', { vort: this.vi, noRubble: true })) { inside++; for (const j of people.lifted) this.lift.push(j); people.lifted.length = 0; return; }
+      if (d < dk) { dk = d; k0 = k; }
+    });
     if (k0 >= 0 && Math.random() < 0.5 && D.destroyBuilding(k0, 'tear', { vort: this.vi, noRubble: true })) { for (const j of people.lifted) this.lift.push(j); people.lifted.length = 0; } // the people inside go with it
     for (const it of city.takeStreetNear(x, z, T)) D.debris.add(it.x, it.y, it.z, it.s * 0.8, it.s * 0.6, it.s * 0.8, it.kind === 'tree' ? it.col : '#4a4540', 'orbit', { vort: this.vi, hold: 99 });
     // the street itself comes up in chunks
@@ -118,7 +132,7 @@ export class BlackHole {
       const a = Math.random() * 6.28, r = this.hole.R + Math.random() * T * 0.5, s = 0.4 + Math.random() * 1.3;
       D.debris.add(x + Math.cos(a) * r, 0.3, z + Math.sin(a) * r, s, s * 0.35, s * (0.6 + Math.random() * 0.6), Math.random() < 0.6 ? 0x6a655c : 0x8a8274, 'orbit', { vort: this.vi, hold: 99 });
     }
-    this.hole.setR(Math.max(this.hole.R, Math.min(T * 0.85, 3 + this.Rh * 4.6)));
+    this.hole.setR(Math.max(this.hole.R, this.hold ? this.voidR : Math.min(T * 0.85, 3 + this.Rh * 4.6)));
   }
 
   // everything caught spirals in: tighter and faster as it falls, gone at the horizon

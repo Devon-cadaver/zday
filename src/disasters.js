@@ -27,14 +27,14 @@ export const HAZARDS = {
   riot: { name: 'Riot', tap: true },
   aliens: { name: 'Alien invasion', tap: false },
   meteor: { name: 'Meteor', tap: true },
-  sinkhole: { name: 'Sinkhole', tap: true },
+  sinkhole: { name: 'Sinkhole', tap: true, hold: true }, // hold: grows for as long as you press
   volcano: { name: 'Volcano', tap: true },
   haboob: { name: 'Dust storm', tap: false },
   coldwave: { name: 'Cold wave', tap: false },
   solar: { name: 'Solar flare', tap: false },
   nuclear: { name: 'Nuclear attack', tap: true },
   meltdown: { name: 'Plant meltdown', tap: false },
-  blackhole: { name: 'Black hole', tap: true },
+  blackhole: { name: 'Black hole', tap: true, hold: true },
 };
 export { WEATHER };
 
@@ -104,6 +104,8 @@ export class Disasters {
   }
   mushroom(x, z, R) { return new Mushroom(this, x, z, R); }
   nukeBlast(x, z, R, o = {}) { return nuclearDamage(this, x, z, R, o); }
+  // the widest a held sinkhole or black hole can get: a pit covering about ten city blocks
+  get maxHoleR() { const c = this.ctx.city, B = c.bounds; return (B.x1 - B.x0) / c.NB * 1.78; }
   inHole(x, z) { return this.holeFloor(x, z) != null; }
   // the surface of the deepest pit under (x, z), or null
   holeFloor(x, z) { let y = null; for (const l of this.leftovers) if (l.floorAt) { const f = l.floorAt(x, z); if (f != null && (y == null || f < y)) y = f; } return y; }
