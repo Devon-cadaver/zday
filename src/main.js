@@ -7,6 +7,7 @@ import { Traffic } from './traffic.js';
 import { Post } from './post.js';
 import { People } from './people.js';
 import { Game } from './game.js';
+import { Fire } from './fire.js';
 
 const P = new URLSearchParams(location.search);
 const coarse = matchMedia('(pointer: coarse)').matches;
@@ -31,7 +32,7 @@ const controls = new MapControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 controls.screenSpacePanning = false;
-controls.minDistance = 80;
+controls.minDistance = 200;
 controls.maxDistance = 1100;
 controls.minPolarAngle = 0.35;
 controls.maxPolarAngle = 1.05;
@@ -69,6 +70,7 @@ const city = buildCity(tex, { seed: num('seed', 20261025), blocks: low ? 10 : 12
 scene.add(city.group);
 const traffic = new Traffic(city, scene, { cars: low ? 160 : 280 });
 const people = new People(city, scene, { people: low ? 2600 : 5200 });
+const fire = new Fire(scene, city, { low });
 const buildMs = Math.round(performance.now() - t0);
 
 const post = new Post(renderer, { samples: low ? 0 : 4 });
@@ -83,7 +85,7 @@ addEventListener('resize', () => {
 
 const clock = new THREE.Clock();
 let frames = 0, fpsT = 0, fps = 0, time = 0;
-const B = city.bounds, M = 60;
+const B = city.bounds, M = 10;
 
 function frame() {
   const dt = Math.min(0.05, clock.getDelta());
@@ -107,6 +109,6 @@ function frame() {
 }
 requestAnimationFrame(frame);
 
-const game = new Game({ people, traffic, camera, controls, renderer });
+const game = new Game({ people, traffic, fire, city, camera, controls, renderer });
 
-window.__z = { THREE, scene, camera, controls, renderer, post, city, traffic, people, game, sun, hemi, setView, buildMs, info: () => renderer.info.render };
+window.__z = { THREE, scene, camera, controls, renderer, post, city, traffic, people, fire, game, sun, hemi, setView, buildMs, info: () => renderer.info.render };

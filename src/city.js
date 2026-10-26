@@ -103,7 +103,7 @@ export function buildCity(tex, opts = {}) {
     fac: [new Bucket(), new Bucket(), new Bucket(), new Bucket()],
     shop: new Bucket(), roof: new Bucket(), walk: new Bucket(), grass: new Bucket(),
   };
-  const crowns = [], trunks = [], tanks = [], lamps = [], stripes = [], parked = [], crowds = [], walkBlocks = [], open = [];
+  const crowns = [], trunks = [], tanks = [], lamps = [], stripes = [], parked = [], crowds = [], walkBlocks = [], open = [], buildings = [];
 
   // downtown clusters
   const centers = [];
@@ -195,7 +195,7 @@ export function buildCity(tex, opts = {}) {
     }
   }
 
-  function building(lot, interior) {
+  function building(lot, interior, blk) {
     const ins = r() < 0.75 ? 0.12 : 0.4 + r() * 1.4;
     const b = { x0: lot.x0 + ins, x1: lot.x1 - ins, z0: lot.z0 + ins, z1: lot.z1 - ins };
     const w = b.x1 - b.x0, d = b.z1 - b.z0;
@@ -212,6 +212,7 @@ export function buildCity(tex, opts = {}) {
     const style = fl >= 9 ? (sq < 0.25 ? 1 : sq < 0.7 ? 0 : 2) : (sq < 0.45 ? 0 : sq < 0.72 ? 2 : sq < 0.93 ? 3 : 1);
     const col = lin(pick(WALLS));
     const y0 = CURB;
+    const fk = 'fac' + style, vStart = { [fk]: B.fac[style].v, shop: B.shop.v, roof: B.roof.v };
     sides(B.shop, b, y0, y0 + GF, toWhite(col, 0.35), { su: 24, sv: GF, v0: y0 });
     const h = y0 + GF + fl * FH;
     sides(B.fac[style], b, y0 + GF, h, col, { su: 12, sv: 12, v0: y0 + GF });
@@ -241,6 +242,26 @@ export function buildCity(tex, opts = {}) {
       }
     }
     roofStuff({ x0: tr.x0 + 0.35, x1: tr.x1 - 0.35, z0: tr.z0 + 0.35, z1: tr.z1 - 0.35 }, th, col);
+    // gameplay record: street door, roof, vertex ranges (for charring)
+    const ranges = [{ key: fk, v0: vStart[fk], v1: B.fac[style].v }, { key: 'shop', v0: vStart.shop, v1: B.shop.v }, { key: 'roof', v0: vStart.roof, v1: B.roof.v }];
+    const rec = { x0: b.x0, x1: b.x1, z0: b.z0, z1: b.z1, roofY: th, baseY: y0, fl, ranges, door: null,
+      roof: { x0: tr.x0 + 0.7, x1: tr.x1 - 0.7, z0: tr.z0 + 0.7, z1: tr.z1 - 0.7 } };
+    if (!interior) {
+      const dr = rng(buildings.length * 7919 + 13), e = 0.05, opts = [];
+      if (Math.abs(lot.z0 - blk.z0) < e) opts.push(3);
+      if (Math.abs(lot.z1 - blk.z1) < e) opts.push(2);
+      if (Math.abs(lot.x0 - blk.x0) < e) opts.push(1);
+      if (Math.abs(lot.x1 - blk.x1) < e) opts.push(0);
+      if (opts.length) {
+        const sd = opts[Math.floor(dr() * opts.length)];
+        const ax = b.x0 + 1.2 + dr() * Math.max(0, w - 2.4), az = b.z0 + 1.2 + dr() * Math.max(0, d - 2.4);
+        if (sd === 3) { rec.wall = [ax, b.z0]; rec.door = [ax, blk.z0 - 0.9]; rec.n = [0, -1]; }
+        else if (sd === 2) { rec.wall = [ax, b.z1]; rec.door = [ax, blk.z1 + 0.9]; rec.n = [0, 1]; }
+        else if (sd === 1) { rec.wall = [b.x0, az]; rec.door = [blk.x0 - 0.9, az]; rec.n = [-1, 0]; }
+        else { rec.wall = [b.x1, az]; rec.door = [blk.x1 + 0.9, az]; rec.n = [1, 0]; }
+      }
+    }
+    buildings.push(rec);
   }
 
   function split(rect, out, depth) {
@@ -305,7 +326,7 @@ export function buildCity(tex, opts = {}) {
         } else if (k < 0.13 && area > 250 && !interior) {
           parkingLot(lot); open.push(lot);
         } else {
-          building(lot, interior);
+          building(lot, interior, blk);
         }
       }
     }
@@ -368,14 +389,16 @@ export function buildCity(tex, opts = {}) {
     walk: std({ map: tex.sidewalk, vertexColors: true }),
     grass: std({ map: tex.grass, vertexColors: true, roughness: 1 }),
   };
-  const add = (bk, mat, cast = true) => {
+  const meshes = {};
+  const add = (bk, mat, cast = true, key = null) => {
     if (!bk.v) return;
     const m = new THREE.Mesh(bk.geometry(), mat);
+    if (key) { meshes[key] = m; m.userData.orig = m.geometry.attributes.color.array.slice(); }
     m.castShadow = cast; m.receiveShadow = true; m.matrixAutoUpdate = false;
     group.add(m);
   };
-  B.fac.forEach((bk, k) => add(bk, mats.fac[k]));
-  add(B.shop, mats.shop); add(B.roof, mats.roof); add(B.walk, mats.walk, false); add(B.grass, mats.grass, false);
+  B.fac.forEach((bk, k) => add(bk, mats.fac[k], true, 'fac' + k));
+  add(B.shop, mats.shop, true, 'shop'); add(B.roof, mats.roof, true, 'roof'); add(B.walk, mats.walk, false); add(B.grass, mats.grass, false);
 
   // ground (roads everywhere under the blocks)
   const ground = new THREE.PlaneGeometry(4000, 4000);
@@ -419,7 +442,21 @@ export function buildCity(tex, opts = {}) {
     q.identity(); m4.compose(p.set(st.x, 0.02, st.z), q, s.set(st.w, 1, st.d));
   }, false);
 
+  // darken one building's vertex colours (fire damage); uncharAll restores
+  const char = (k, f) => {
+    for (const rg of buildings[k].ranges) {
+      const m = meshes[rg.key]; if (!m || rg.v1 <= rg.v0) continue;
+      const col = m.geometry.attributes.color, a = col.array;
+      for (let v = rg.v0 * 3; v < rg.v1 * 3; v++) a[v] *= f;
+      col.addUpdateRange(rg.v0 * 3, (rg.v1 - rg.v0) * 3); col.needsUpdate = true;
+    }
+  };
+  const uncharAll = () => {
+    for (const m of Object.values(meshes)) { const col = m.geometry.attributes.color; col.array.set(m.userData.orig); col.clearUpdateRanges(); col.needsUpdate = true; }
+  };
+
   return {
+    buildings, char, uncharAll,
     group, sx, sz, NB, parked, crowds, walkBlocks, open,
     bounds: { x0: sx[0], x1: sx[NB], z0: sz[0], z1: sz[NB] },
     stats: { crowns: crowns.length, tanks: tanks.length, parked: parked.length, verts: Object.values(B).flat().reduce((a, b) => a + b.v, 0) },

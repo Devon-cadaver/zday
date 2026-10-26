@@ -39,6 +39,14 @@ READ THIS FIRST after a compaction. Current as of 2026-10-25.
 - src/game.js: tap a street to drop (3 Shamblers per run), HUD counters, outbreak clock, speed 1/2/4/8x (fixed 1/30 s substeps), Follow (zooms to 170 m and tracks a zombie, cancels on drag), Reset.
 - Markers: green ring = zombie, amber = infected; drawn through buildings; scale with zoom. Blood decals at bites.
 
+## Chaos (v0.3, 2026-10-25)
+- Cars (src/traffic.js): lane following with braking, intersection reservation taken at the stop line (STOPLINE 3.4 m), stale reservations dropped, U-turn only mid-block with a clear opposite lane. Panic when 2+ zombies within 22 m or a bite within 20 m (game calls traffic.panicNear on bite events): x1.6 speed, weak late braking, ignore pedestrians and right of way. Run-overs kill civilians; zombies hit under 11 m/s are knocked down 65% of the time and get back up. Crashes (relative speed > 5 m/s) become sliding spinning wrecks (REST when stopped) with 28-63% fire chance; crash panics drivers within 18 m for 10 s. Spawn placement keeps cars 10 m apart (overlapping spawns caused phantom crashes).
+- Rooftops (src/people.js): city.buildings gives each street-facing building a door, wall anchor, outward normal, roof rect, roofY and vertex ranges. Panicked civilians (60% when 30+ zombies or 2+ within 18 m) SEEK the nearest refuge door within 35 m, go INSIDE (hidden, stairs time), then ROOF (lvl = building index; interactions only on the same lvl). Capacity area/5.
+- Piles: ground zombies with no prey head for buildings with living roof survivors within 60 m, join a PILE on the door side (pileH = 1.7 sqrt(n) + 0.5, pileR = 0.65 H + 1). Mound mesh (half cone, tangled-bodies canvas texture) per pile. When pileH reaches the roof the building is breached: top 8 climb (CLIMB) onto the roof, later arrivals climb straight up. Roof zombies hunt roof survivors; idle roof zombies eventually step off the edge (FALLING). When a roof has no living survivors for 3 s the pile collapses (everyone falls back to the street).
+- Fire (src/fire.js): GPU point sprites, teardrop flames (additive) and smoke (alpha), pools with free-list recycling. Building fires: overrun at breach (25%) or at collapse (30%) after 3-11 s; burn 90-160 s, spread to buildings within 2 m at 0.6% per 4 s, char vertex colours (city.char, undone by city.uncharAll on reset). Survivors on a burning roof jump (JUMP, die on landing). Car fires burn 50-100 s.
+- Corpses (DEAD) lie flat, darkened. HUD has a Dead counter. Camera min distance 200 (Follow zooms to 230). Camera edge clamp margin 10 m.
+- Test harness note: when stepping the sim by hand call people.sync() every simulated second; roof counts (bRoof) come from sync and piles collapse without it.
+
 ## Next (not started)
 - Police and army response. More zombie types.
 

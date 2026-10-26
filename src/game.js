@@ -11,7 +11,7 @@ const CSS = `
   border-radius:8px;padding:6px 9px;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
 .zd-pill b{font-size:15px;font-variant-numeric:tabular-nums;letter-spacing:0}
 .zd-pill i{font-style:normal;font-size:10px;opacity:.75;text-transform:uppercase}
-.zd-h b{color:#fff4e0}.zd-i b{color:#ffc233}.zd-z b{color:#a6ff4d}
+.zd-h b{color:#fff4e0}.zd-i b{color:#ffc233}.zd-z b{color:#a6ff4d}.zd-d b{color:#e07a6a}
 #zd-clock{margin-left:auto;opacity:.8;font-variant-numeric:tabular-nums}
 #zd-bar{position:fixed;left:0;right:0;bottom:0;display:flex;gap:8px;justify-content:center;
   padding:0 max(10px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left))}
@@ -34,10 +34,13 @@ const CSS = `
 const START_DROPS = 3;
 
 export class Game {
-  constructor({ people, traffic, camera, controls, renderer }) {
-    Object.assign(this, { people, traffic, camera, controls, renderer });
+  constructor({ people, traffic, fire, city, camera, controls, renderer }) {
+    Object.assign(this, { people, traffic, fire, city, camera, controls, renderer });
+    this.pendingFires = []; this.simT = 0; this.realT = 0;
+    people.fire = fire; traffic.people = people; traffic.fire = fire;
+    people.onOverrun = (k, why) => { if (Math.random() < (why === 'breach' ? 0.25 : 0.3)) this.pendingFires.push({ k, t: this.simT + 3 + Math.random() * 8 }); };
     this.speed = 1; this.follow = -1; this.dropsLeft = START_DROPS;
-    this.acc = 0; this.clock = -1; this.seen = { bite: false, turned: false, milestone: 0 };
+    this.acc = 0; this.clock = -1; this.seen = { milestone: 0 };
     this.buildUI();
     this.bindInput();
     this.toast('Tap a street to drop a Shambler zombie', 4500);
@@ -49,6 +52,7 @@ export class Game {
     top.innerHTML = '<div class="zd-pill zd-h"><b id="zd-h">0</b><i>Humans</i></div>' +
       '<div class="zd-pill zd-i"><b id="zd-i">0</b><i>Infected</i></div>' +
       '<div class="zd-pill zd-z"><b id="zd-z">0</b><i>Zombies</i></div>' +
+      '<div class="zd-pill zd-d"><b id="zd-d">0</b><i>Dead</i></div>' +
       '<div class="zd-pill" id="zd-clock">--:--</div>';
     const bar = document.createElement('div'); bar.id = 'zd-bar';
     bar.innerHTML = '<button class="zd-btn" id="zd-drop" type="button">Shambler <span class="n" id="zd-n">3</span></button>' +
@@ -59,7 +63,7 @@ export class Game {
     const fps = document.createElement('div'); fps.id = 'zd-fps';
     document.body.append(top, bar, toast, fps);
     const old = document.getElementById('hud'); if (old) old.remove();
-    this.el = { h: top.querySelector('#zd-h'), i: top.querySelector('#zd-i'), z: top.querySelector('#zd-z'), clock: top.querySelector('#zd-clock'),
+    this.el = { h: top.querySelector('#zd-h'), i: top.querySelector('#zd-i'), z: top.querySelector('#zd-z'), d: top.querySelector('#zd-d'), clock: top.querySelector('#zd-clock'),
       drop: bar.querySelector('#zd-drop'), n: bar.querySelector('#zd-n'), find: bar.querySelector('#zd-find'), speed: bar.querySelector('#zd-speed'), toast, fps };
     this.el.drop.onclick = () => this.toast(this.dropsLeft > 0 ? 'Tap any street on the map to drop it' : 'No Shamblers left. Tap Reset to start over');
     this.el.find.onclick = () => this.cycleFollow();
@@ -124,13 +128,14 @@ export class Game {
     } else i = p.nearestZombie(tg.x, tg.z);
     if (i < 0) { this.toast('No zombies yet. Tap a street to drop one'); return; }
     this.setFollow(i);
-    if (this.camera.position.distanceTo(tg) > 190) this.zoomTo = 170;
+    if (this.camera.position.distanceTo(tg) > 260) this.zoomTo = 230;
   }
 
   reset() {
+    this.fire.reset(); this.city.uncharAll(); this.traffic.reset(); this.pendingFires.length = 0;
     this.people.reset();
     this.dropsLeft = START_DROPS; this.el.n.textContent = START_DROPS; this.el.drop.classList.remove('empty');
-    this.clock = -1; this.seen = { bite: false, turned: false, milestone: 0 };
+    this.clock = -1; this.seen = { milestone: 0 };
     this.setFollow(-1);
     this.toast('City reset. Tap a street to drop a Shambler');
   }
@@ -139,8 +144,13 @@ export class Game {
     const p = this.people, h = 1 / 30;
     const sdt = dt * this.speed;
     this.acc = Math.min(this.acc + sdt, h * 12);
-    while (this.acc >= h) { p.step(h); this.acc -= h; }
-    this.traffic.update(sdt);
+    while (this.acc >= h) { p.step(h); this.traffic.step(h); this.acc -= h; this.simT += h; }
+    for (let k = this.pendingFires.length - 1; k >= 0; k--) {
+      if (this.simT >= this.pendingFires[k].t) { this.fire.igniteBuilding(this.pendingFires[k].k); this.pendingFires.splice(k, 1); }
+    }
+    this.realT += dt;
+    this.traffic.sync();
+    this.fire.update(sdt, this.realT, this.camera, this.renderer);
     p.sync(this.camera.position.distanceTo(this.controls.target));
     if (this.clock >= 0) this.clock += sdt;
 
@@ -164,18 +174,31 @@ export class Game {
     }
 
     // events
-    for (const e of p.events) {
-      if (e.type === 'bite' && !this.seen.bite) { this.seen.bite = true; this.toast('First bite! The victim is infected and will turn soon'); }
-      if (e.type === 'turned' && !this.seen.turned) { this.seen.turned = true; this.toast('A victim has turned. The outbreak is spreading'); }
+    const MSG = {
+      bite: 'First bite! The victim is infected and will turn soon',
+      turned: 'A victim has turned. The outbreak is spreading',
+      runover: 'A panicked driver plowed through the street',
+      crash: 'Panicked drivers are crashing',
+      carfire: 'A wrecked car is burning',
+      roof: 'Survivors are barricading themselves on the rooftops',
+      breach: 'The horde piled up and reached a rooftop!',
+      fire: 'An overrun building has caught fire',
+      jump: 'Survivors are jumping from a burning roof',
+    };
+    for (const list of [p.events, this.traffic.events, this.fire.events]) {
+      for (const e of list) {
+        if (e.type === 'bite') this.traffic.panicNear(e.x, e.z, 20);
+        if (MSG[e.type] && !this.seen[e.type]) { this.seen[e.type] = true; this.toast(MSG[e.type], 3200); }
+      }
+      list.length = 0;
     }
-    p.events.length = 0;
     const z = p.stats.zombies;
     for (const m of [10, 50, 100, 250, 500, 1000, 2000]) {
       if (z >= m && this.seen.milestone < m) { this.seen.milestone = m; if (m >= 10) this.toast(m + ' zombies roam the city'); }
     }
 
     const s = p.stats;
-    this.el.h.textContent = s.humans; this.el.i.textContent = s.infected; this.el.z.textContent = s.zombies;
+    this.el.h.textContent = s.humans; this.el.i.textContent = s.infected; this.el.z.textContent = s.zombies; this.el.d.textContent = s.dead;
     if (this.clock >= 0) { const t = Math.floor(this.clock); this.el.clock.textContent = 'T+' + String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0'); }
     else this.el.clock.textContent = 'Waiting';
     if (fps) this.el.fps.textContent = fps + ' fps';
