@@ -1,10 +1,36 @@
-# Z-Day: project notes
+# My Tiny Disaster (was Z-Day): project notes
 
-READ THIS FIRST after a compaction. Current as of 2026-10-25.
+READ THIS FIRST after a compaction. Current as of 2026-10-26.
 
-## Concept (from Sean)
-- Living miniature city. The player drops zombies in to spread the infection.
-- Army and police respond and try to take out the zombies.
+## Where things stand (summary for picking up after a compact)
+- The game is **My Tiny Disaster** (renamed from Z-Day on 2026-10-26; the repo and URL stay devon-cadaver/zday, the save key stays zday_profile so progress is kept).
+- A warm sepia tilt-shift miniature city (procedural Three.js) that disasters hit. Sean plays on an older iPhone through GitHub Pages and wants finished, pushed work with screenshots sent via SendUserFile.
+- Modes (menu = default page):
+  - **Commander** (main game): random disasters each round that the player reacts to with rescue units (police, evacuation bus, fire truck, water and rescue helicopters, army APC, airstrike, nuke). XP, levels (12), unlocks, upgrades, stars. Zombie outbreaks are one of the possible disasters.
+  - **Be The Disaster** (was Storm mode): pick a disaster unlocked by your level and control it by dragging a finger (tornado, alien saucer, tsunami, lava, earthquake cracks, sinkhole, meteor). Score, ranks, best per disaster.
+  - **Sandbox**: drop zombies, Disasters panel triggers any of the 14 disasters and 9 weathers.
+  - showcase.html: roster of every model.
+- Disasters (src/disasters.js registry HAZARDS + start()): tornado, quake, flood, tsunami, riot, aliens, meteor, sinkhole, volcano, haboob (dust storm), coldwave, solar, nuclear, meltdown, plus zombie outbreaks. Weather: clear, rain, storm, fog, snow, heat, ash, dust, sand.
+- Living city features: traffic (roundabouts, diagonal avenue, superblocks), ~10k people with states (walk, flee, shelter indoors, roofs via stair huts, film disasters on phones, freeze, riot...), fire spread, day/night, weather, debris, rubble, craters, outskirts (desert E, beach and ocean S with a nuclear plant, mountains N, forest W).
+- Testing workflow: dev server launch config "zday" (port 5191); Playwright (mcp__playwright__*) with window.__z hooks; step the sim by hand with `g.speed = 1; g.update(0.1, 0)` (each call = 0.1 s), set g.speed = 0 to freeze for screenshots; screenshots must be saved under shots/ in the project; check the live site with ?v=<commit> after a push (Pages deploys in about 1 minute).
+- Patch workflow: node .cjs scripts in the scratchpad that throw if an anchor is missing (bash heredocs mangle backticks and quotes in shader code: use Write or Edit for those).
+- Commit messages end with: Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+## File map
+- main.js: renderer, camera, lights, render loop, camera shake per frame, window.__z.
+- game.js: shared layer (HUD, toasts, tap input, speed, fixed 1/30 s step, menu, unlock screen) and the Sandbox mode with the Disasters panel.
+- commander.js: the main game round. profile.js: XP, levels, UNLOCK, UPGRADES, HAZARD_LEVEL, WEATHER_LEVEL, difficulty().
+- storm.js: Be The Disaster mode.
+- city.js: layout (grid, superblocks, roundabouts, diagonal avenue), buildings (records with door, roof, hut/hatch, vertex ranges), street furniture, destruction API (hideBuilding, extractBuilding, addRubble, takeStreetNear, restoreAll, char).
+- outskirts.js: terrain biomes, sea, highways, trees, the nuclear power plant (plant.group, towers, reactor, lightMat, steam()).
+- traffic.js: cars on the node graph (insets, roundabout polylines, don't-block-the-box, closed roads), mission vehicles, parked cars, flinging.
+- people.js: the agent sim (states in ST), walk grid (block(), grid0), rooftop refuges and watchers, filming onlookers (poi), freeze, fallIn, riots, aliens, officers, firefighters, soldiers.
+- figures.js (procedural figure kit), vehicles.js (vehicle library), aircraft.js (helicopters, A-10, B-2), fire.js (GPU flame/smoke/mist/dust pools, building fires), daylight.js, post.js (DOF, grade, flash, black-light band), textures.js.
+- disasters.js: Disasters manager (events list, leftovers, debris, decals, weather, water, splash, poiAt, destroyBuilding, strike, light levels, afterLight).
+- weather.js, debris.js, water.js (WaterSurface, Splash, SweepFront, Flood, Tsunami), twister.js, quake.js, riot.js, aliens.js, impact.js (Hole, Meteor, Sinkhole), volcano.js (LavaField, Volcano), fronts.js (BillowWall, Haboob, ColdWave), solar.js, nuke.js (Mushroom, nuclearDamage, NuclearStrike, Meltdown).
+
+## Original concept (2026-10-25)
+- Living miniature city. At first the player dropped zombies to spread an infection; it became an emergency-commander game, then a disaster game.
 - Look target: warm sepia tilt-shift miniature city (Sean's reference: 4 aerial Midjourney-style shots of a dense sand-coloured mid-rise city, rooftop greenery, terracotta roof patches, tiny people and cars, strong depth of field top and bottom).
 
 ## Stack
