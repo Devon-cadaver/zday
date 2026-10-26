@@ -114,7 +114,7 @@ void main() {
 export class Post {
   constructor(renderer, opts = {}) {
     this.renderer = renderer;
-    this.opts = { blurFrac: 0.022, bandK: 0.028, rangeK: 0.17, exposure: 1.3, glow: 0.35, sepia: 0.22, dof: true, grade: true, ...opts };
+    this.opts = { blurFrac: 0.022, bandK: 0.042, rangeK: 0.26, exposure: 1.3, glow: 0.35, sepia: 0.22, dof: true, grade: true, ...opts };
     const size = renderer.getDrawingBufferSize(new THREE.Vector2());
     this.sceneRT = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: opts.samples ?? 4 });
     this.sceneRT.depthTexture = new THREE.DepthTexture(size.x, size.y);
