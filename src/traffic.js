@@ -12,7 +12,8 @@ const IN = RW / 2;        // lanes stop this far before an intersection centre
 const ACC = 3.5, BRAKE = 8, BRAKE_PANIC = 4.5;
 const LEN = 4.3, HALF_L = 2.2, HALF_W = 0.95;
 const CELL = 10;
-const DRIVE = 0, WRECK = 1, REST = 2, PARKED = 3;
+const DRIVE = 0, WRECK = 1, REST = 2, PARKED = 3, EXT = 4, AIR = 5;
+export const CAR_MODE = { DRIVE, WRECK, REST, PARKED, EXT, AIR };
 const MISSION_CAP = 24;
 const MISSION_KINDS = { police: { geo: () => cruiserGeometry(), cap: 12, cruise: 14 }, fire: { geo: () => VEHICLES.fire_truck.build(), cap: 8, cruise: 11 }, apc: { geo: () => VEHICLES.stryker.build(), cap: 6, cruise: 12, tough: true }, bus: { geo: () => VEHICLES.bus.build(), cap: 8, cruise: 10 } };
 const STOPLINE = 3.4; // car centre stops this far before the lane end
@@ -62,6 +63,7 @@ export class Traffic {
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), p = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1), col = new THREE.Color();
     const pk = city.parked;
     const byType = {}; for (const t of TRAFFIC_MIX) byType[t.id] = [];
+    this.parkedList = []; this.parkedMeshes = [];
     for (const c of pk) byType[this.rollType(r)].push(c);
     for (const t of TRAFFIC_MIX) {
       const list = byType[t.id];
@@ -70,14 +72,54 @@ export class Traffic {
         e.set(0, c.rot, 0); q.setFromEuler(e);
         m4.compose(p.set(c.x, c.y, c.z), q, one);
         im.setMatrixAt(k, m4);
-        im.setColorAt(k, col.set(t.id === 'taxi' ? '#f2c300' : CAR_COLS[Math.floor(r() * CAR_COLS.length)]));
+        const hex = t.id === 'taxi' ? '#f2c300' : CAR_COLS[Math.floor(r() * CAR_COLS.length)];
+        im.setColorAt(k, col.set(hex));
+        this.parkedList.push({ im, k, type: t.id, x: c.x, z: c.z, rot: c.rot, hex, alive: true });
       });
       im.count = list.length; im.castShadow = im.receiveShadow = true; im.computeBoundingSphere();
+      im.userData.orig = im.instanceMatrix.array.slice(); im.userData.origCol = im.instanceColor ? im.instanceColor.array.slice() : null; this.parkedMeshes.push(im);
       parent.add(im);
     }
 
     this._m4 = m4; this._q = q; this._e = e; this._p = p; this._one = one; this._c = col;
     this.reset();
+  }
+
+  // parked cars within R (alive ones); take() hides one
+  parkedNear(x, z, R) { const out = []; for (const pc of this.parkedList) if (pc.alive && Math.abs(pc.x - x) < R && Math.abs(pc.z - z) < R && Math.hypot(pc.x - x, pc.z - z) < R) out.push(pc); return out; }
+  takeParked(pc) { pc.alive = false; this._zero = this._zero || new THREE.Matrix4().makeScale(0, 0, 0); pc.im.setMatrixAt(pc.k, this._zero); pc.im.instanceMatrix.needsUpdate = true; }
+  burnParked(pc) { pc.im.setColorAt(pc.k, this._c.set('#1a1714')); pc.im.instanceColor.needsUpdate = true; pc.burnt = true; }
+  geometryOf(type) { return this.typeMeshes[type].geometry; }
+
+  // ---------- disasters: cars can be taken over (tornado, wave), thrown, and stalled by flood water
+  grab(car) {
+    if (car.gone || car.mode === EXT || car.mode === AIR) return false;
+    const node = this.nodes[car.b]; if (node && node.occ === car.id) node.occ = -1;
+    if (car.mission && (car.mode === DRIVE || car.mode === PARKED)) { if (car.onLost) car.onLost(car); }
+    car.mode = EXT; car.v = 0; car.leaving = false;
+    return true;
+  }
+  fling(car, vx, vy, vz) {
+    if (car.mode !== EXT && !this.grab(car)) return;
+    car.mode = AIR; car.vx = vx; car.vy = vy; car.vz = vz; car.w = (this.r() - 0.5) * 6; car.rw = (this.r() - 0.5) * 8; car.pw = (this.r() - 0.5) * 6;
+  }
+  airStep(car, h) {
+    car.vy -= 9.8 * h; car.x += car.vx * h; car.y += car.vy * h; car.z += car.vz * h;
+    car.yaw += car.w * h; car.roll += car.rw * h; car.pitch += car.pw * h;
+    const w = this.waterAt ? this.waterAt(car.x, car.z) : -99;
+    if (car.y > Math.max(0, w > 0.5 ? w - 0.8 : -99)) return;
+    car.y = Math.max(0, w > 0.5 ? w - 0.9 : 0);
+    car.mode = REST; car.vx = car.vz = car.vy = 0; car.v = 0;
+    car.roll = this.r() < 0.45 ? Math.PI : 0; car.pitch = (this.r() - 0.5) * 0.2;
+    if (!car.mission) this.tint(car, '#2a2622');
+    if (this.people) this.people.crushNear(car.x, car.z, 2.6);
+    if (this.fire && this.r() < 0.35) { this.fire.carFire(car.x, car.z); car.burning = true; if (!car.mission) this.tint(car, '#1a1714'); }
+    this.events.push({ type: 'carland', x: car.x, z: car.z });
+  }
+  burn(car) { // molotov or laser on a moving car
+    if (car.mode === DRIVE) this.crash(car, null, 9);
+    car.ignite = true;
+    if (car.mode === REST && !car.burning) { this.fire && this.fire.carFire(car.x, car.z); car.burning = true; if (!car.mission) this.tint(car, '#1a1714'); }
   }
 
   rollType(r) {
@@ -100,7 +142,7 @@ export class Traffic {
       const a = Math.floor(r() * this.nodes.length);
       const nb = this.nodes[a].nb, b = nb[Math.floor(r() * nb.length)];
       const car = { id: k, mode: DRIVE, cruise: 8 + r() * 2.5, v: 0, panic: 0, think: r() * 0.5, pedGap: 99, blocked: 0, resume: -1,
-        x: 0, z: 0, hx: 1, hz: 0, yaw: 0, vx: 0, vz: 0, w: 0, ignite: false, burning: false, hits: 0, zx: 0, zz: 0,
+        x: 0, z: 0, y: 0, roll: 0, pitch: 0, hx: 1, hz: 0, yaw: 0, vx: 0, vz: 0, vy: 0, w: 0, ignite: false, burning: false, hits: 0, zx: 0, zz: 0,
         colHex: CAR_COLS[Math.floor(r() * CAR_COLS.length)] };
       car.type = this.rollType(r); car.slot = counts[car.type]++;
       if (car.type === 'taxi') car.colHex = '#f2c300';
@@ -117,6 +159,9 @@ export class Traffic {
       this.cars.push(car);
       this.typeMeshes[car.type].setColorAt(car.slot, this._c.set(car.colHex));
     }
+    this.speedK = 1; this.gripK = 1; this.waterAt = null;
+    for (const pc of this.parkedList || []) { pc.alive = true; pc.burnt = false; }
+    for (const im of this.parkedMeshes || []) { im.instanceMatrix.array.set(im.userData.orig); im.instanceMatrix.needsUpdate = true; if (im.userData.origCol) { im.instanceColor.array.set(im.userData.origCol); im.instanceColor.needsUpdate = true; } }
     for (const t of TRAFFIC_MIX) { const im = this.typeMeshes[t.id]; im.count = counts[t.id]; if (im.instanceColor) im.instanceColor.needsUpdate = true; }
     this.missions = []; for (const im of Object.values(this.missionMeshes)) im.count = 0;
     this.events = [];
@@ -274,6 +319,7 @@ export class Traffic {
     this.buildHash();
     for (const car of this.cars) {
       if (car.mode === DRIVE) this.driveStep(car, h, P);
+      else if (car.mode === AIR) this.airStep(car, h);
       else if (car.mode === WRECK) this.wreckStep(car, h, P);
     }
     this.collisions(P);
@@ -281,6 +327,8 @@ export class Traffic {
 
   driveStep(car, h, P) {
     if (car.grace > 0) car.grace -= h;
+    if (this.waterAt && !(car.kind === 'apc') && this.waterAt(car.x, car.z) > 0.55) { car.v = 0; car.stalled = true; return; } // stalled in flood water
+    car.stalled = false;
     // zombies nearby? panic. Pedestrians ahead? (calm drivers only)
     if ((car.think -= h) <= 0) {
       car.think = 0.25 + this.r() * 0.15;
@@ -301,8 +349,8 @@ export class Traffic {
     }
     if (car.panic > 0) car.panic -= h;
     const panic = car.panic > 0;
-    let vDes = panic ? car.cruise * 1.6 : car.cruise;
-    const brake = panic ? BRAKE_PANIC : BRAKE;
+    let vDes = (panic ? car.cruise * 1.6 : car.cruise) * this.speedK;
+    const brake = (panic ? BRAKE_PANIC : BRAKE) * this.gripK;
     if (car.resume < 0) {
       const gap = this.gapAhead(car, panic ? 12 : 20);
       const stop = panic ? 0.6 : 2.5;
@@ -378,7 +426,7 @@ export class Traffic {
 
   collisions(P) {
     for (const car of this.cars) {
-      if (car.mode === REST || car.mode === PARKED) continue;
+      if (car.mode === REST || car.mode === PARKED || car.mode === EXT || car.mode === AIR) continue;
       // run over anyone in the footprint
       if (P && car.v > 2) {
         P.around(car.x, car.z, 2.7, (j) => {
@@ -398,7 +446,7 @@ export class Traffic {
       }
       // car against car (circle pairs along each body)
       this.near(car.x, car.z, 6, (o) => {
-        if (o === car || car.grace > 0 || o.grace > 0) return; // fresh mission car: let traffic flow round it
+        if (o === car || car.grace > 0 || o.grace > 0 || o.mode === EXT || o.mode === AIR) return; // fresh mission car: let traffic flow round it
         if (o.id < car.id && o.mode !== REST && o.mode !== PARKED) return; // pair handled from the other side
         if (!this.overlap(car, o)) return;
         const rvx = car.hx * car.v - o.hx * o.v, rvz = car.hz * car.v - o.hz * o.v;
@@ -430,8 +478,8 @@ export class Traffic {
   sync(realT = 0) {
     const { _m4: m4, _q: q, _e: e, _p: p, _one: one } = this;
     for (const car of this.cars) {
-      e.set(0, car.yaw, 0); q.setFromEuler(e);
-      m4.compose(p.set(car.x, 0, car.z), q, one);
+      e.set(car.roll || 0, car.yaw, car.pitch || 0, 'YXZ'); q.setFromEuler(e);
+      m4.compose(p.set(car.x, car.y || 0, car.z), q, one);
       if (car.mission) this.missionMeshes[car.kind].setMatrixAt(car.slot, m4); else this.typeMeshes[car.type].setMatrixAt(car.slot, m4);
     }
     for (const t of TRAFFIC_MIX) this.typeMeshes[t.id].instanceMatrix.needsUpdate = true;
@@ -542,7 +590,7 @@ export class Traffic {
     if (!route || route.length < 2 || this.missions.length >= MISSION_CAP || slot >= def.cap) return null;
     const id = this.cars.length;
     const car = { id, mission: true, kind, slot, route, ri: 0, mode: DRIVE, cruise: opts.cruise ?? def.cruise, v: 0, panic: 0, think: 0,
-      pedGap: 99, blocked: 0, resume: -1, x: 0, z: 0, hx: 1, hz: 0, yaw: 0, vx: 0, vz: 0, w: 0, ignite: false, burning: false, hits: 0, zx: 0, zz: 0,
+      pedGap: 99, blocked: 0, resume: -1, x: 0, z: 0, y: 0, roll: 0, pitch: 0, vy: 0, hx: 1, hz: 0, yaw: 0, vx: 0, vz: 0, w: 0, ignite: false, burning: false, hits: 0, zx: 0, zz: 0,
       colHex: '#f4f4f0', held: false, to: opts.to || null, onArrive: opts.onArrive, onLost: opts.onLost, onGone: opts.onGone, grace: 2.5, leaving: false, gone: false };
     this.startSeg(car, route[0], route[1]);
     car.s = 0; this.pose(car);

@@ -104,6 +104,7 @@ export function buildCity(tex, opts = {}) {
     shop: new Bucket(), roof: new Bucket(), walk: new Bucket(), grass: new Bucket(),
   };
   const crowns = [], trunks = [], tanks = [], lamps = [], stripes = [], parked = [], crowds = [], walkBlocks = [], open = [], buildings = [];
+  let curB = -1; // building being generated (rooftop clutter remembers its owner)
 
   // downtown clusters
   const centers = [];
@@ -115,8 +116,8 @@ export function buildCity(tex, opts = {}) {
   };
 
   const addTree = (x, z, y, s, trunkH) => {
-    trunks.push({ x, z, y, h: trunkH, s: s * 0.5 });
-    crowns.push({ x, y: y + trunkH + s * 0.75, z, s, col: pick(GREENS) });
+    trunks.push({ x, z, y, h: trunkH, s: s * 0.5, b: curB });
+    crowns.push({ x, y: y + trunkH + s * 0.75, z, s, col: pick(GREENS), b: curB });
   };
 
   function parapet(b, y, col, hgt = 0.9) {
@@ -156,7 +157,7 @@ export function buildCity(tex, opts = {}) {
       const n = 1 + Math.floor(r() * 3);
       for (let k = 0; k < n; k++) {
         const rr = 0.6 + r() * 0.5; const p = rp(rr * 2, rr * 2);
-        tanks.push({ x: (p.x0 + p.x1) / 2, z: (p.z0 + p.z1) / 2, y, r: rr, h: 1.0 + r() * 1.0, dark: r() < 0.5 });
+        tanks.push({ x: (p.x0 + p.x1) / 2, z: (p.z0 + p.z1) / 2, y, r: rr, h: 1.0 + r() * 1.0, dark: r() < 0.5, b: curB });
       }
     }
     if (r() < 0.55) { // roof garden
@@ -164,7 +165,7 @@ export function buildCity(tex, opts = {}) {
       const n = 2 + Math.floor(r() * Math.min(14, area / 20));
       for (let k = 0; k < n; k++) {
         const s = 0.45 + r() * 0.7; const p = rp(s * 2, s * 2);
-        crowns.push({ x: (p.x0 + p.x1) / 2, z: (p.z0 + p.z1) / 2, y: y + s * 0.7, s, col: pick(GREENS) });
+        crowns.push({ x: (p.x0 + p.x1) / 2, z: (p.z0 + p.z1) / 2, y: y + s * 0.7, s, col: pick(GREENS), b: curB });
       }
       if (r() < 0.3 && w > 8 && d > 8) { const p = rp(4, 4); addTree((p.x0 + p.x1) / 2, (p.z0 + p.z1) / 2, y, 1.4 + r() * 0.8, 1.2); }
     }
@@ -200,6 +201,7 @@ export function buildCity(tex, opts = {}) {
     const b = { x0: lot.x0 + ins, x1: lot.x1 - ins, z0: lot.z0 + ins, z1: lot.z1 - ins };
     const w = b.x1 - b.x0, d = b.z1 - b.z0;
     if (w < 3.5 || d < 3.5) return;
+    curB = buildings.length;
     const hf = heightAt((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2);
     let fl; const q = r();
     if (q < 0.38) fl = 1 + Math.floor(r() * 3);
@@ -261,7 +263,9 @@ export function buildCity(tex, opts = {}) {
         else { rec.wall = [b.x1, az]; rec.door = [blk.x1 + 0.9, az]; rec.n = [1, 0]; }
       }
     }
+    rec.wallCol = col; rec.top = th;
     buildings.push(rec);
+    curB = -1;
   }
 
   function split(rect, out, depth) {
@@ -393,7 +397,7 @@ export function buildCity(tex, opts = {}) {
   const add = (bk, mat, cast = true, key = null) => {
     if (!bk.v) return;
     const m = new THREE.Mesh(bk.geometry(), mat);
-    if (key) { meshes[key] = m; m.userData.orig = m.geometry.attributes.color.array.slice(); }
+    if (key) { meshes[key] = m; m.userData.orig = m.geometry.attributes.color.array.slice(); m.userData.origPos = m.geometry.attributes.position.array.slice(); }
     m.castShadow = cast; m.receiveShadow = true; m.matrixAutoUpdate = false;
     group.add(m);
   };
@@ -406,6 +410,7 @@ export function buildCity(tex, opts = {}) {
   const uv = ground.attributes.uv;
   for (let k = 0; k < uv.count; k++) uv.setXY(k, uv.getX(k) * 500, uv.getY(k) * 500);
   const gm = new THREE.Mesh(ground, std({ map: tex.asphalt, color: '#ffffff' }));
+  mats.ground = gm.material;
   gm.receiveShadow = true; group.add(gm);
 
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), p = new THREE.Vector3(), s = new THREE.Vector3(), col = new THREE.Color();
@@ -420,20 +425,20 @@ export function buildCity(tex, opts = {}) {
     group.add(im);
     return im;
   };
-  inst(crownGeometry(), std({ vertexColors: true, roughness: 1 }), crowns, (c) => {
+  const crownIM = inst(crownGeometry(), std({ vertexColors: true, roughness: 1 }), crowns, (c) => {
     e.set(0, r() * Math.PI * 2, 0); q.setFromEuler(e);
     m4.compose(p.set(c.x, c.y, c.z), q, s.set(c.s, c.s * (0.8 + r() * 0.3), c.s));
   });
   const trunkG = new THREE.CylinderGeometry(0.12, 0.2, 1, 5); trunkG.translate(0, 0.5, 0);
-  inst(trunkG, std({ color: '#5a4430' }), trunks, (t) => { q.identity(); m4.compose(p.set(t.x, t.y, t.z), q, s.set(t.s, t.h + 0.6, t.s)); });
+  const trunkIM = inst(trunkG, std({ color: '#5a4430' }), trunks, (t) => { q.identity(); m4.compose(p.set(t.x, t.y, t.z), q, s.set(t.s, t.h + 0.6, t.s)); });
   const tankG = new THREE.CylinderGeometry(1, 1, 1, 10); tankG.translate(0, 0.5, 0);
   tanks.forEach(t => { t.col = t.dark ? '#3a3632' : '#e9e4da'; });
-  inst(tankG, std({ color: '#ffffff', roughness: 0.6 }), tanks, (t) => { q.identity(); m4.compose(p.set(t.x, t.y, t.z), q, s.set(t.r, t.h, t.r)); });
+  const tankIM = inst(tankG, std({ color: '#ffffff', roughness: 0.6 }), tanks, (t) => { q.identity(); m4.compose(p.set(t.x, t.y, t.z), q, s.set(t.r, t.h, t.r)); });
   const lampG = mergeGeometries([
     new THREE.CylinderGeometry(0.07, 0.1, 6.5, 4).translate(0, 3.25, 0),
     new THREE.BoxGeometry(1.4, 0.12, 0.25).translate(0.65, 6.45, 0),
   ]);
-  inst(lampG, std({ color: '#4a4540' }), lamps, (l) => {
+  const lampIM = inst(lampG, std({ color: '#4a4540' }), lamps, (l) => {
     e.set(0, Math.atan2(-l.arm[1], l.arm[0]), 0); q.setFromEuler(e);
     m4.compose(p.set(l.x, CURB, l.z), q, s.set(1, 1, 1));
   });
@@ -441,6 +446,136 @@ export function buildCity(tex, opts = {}) {
   inst(stripeG, std({ color: '#f3ede0', polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), stripes, (st) => {
     q.identity(); m4.compose(p.set(st.x, 0.02, st.z), q, s.set(st.w, 1, st.d));
   }, false);
+
+  // ---------- destruction: buildings can be hidden, lifted out as a separate shell, and replaced by rubble
+  const instMeshes = [crownIM, trunkIM, tankIM, lampIM];
+  for (const im of instMeshes) im.userData.orig = im.instanceMatrix.array.slice();
+  const bInst = buildings.map(() => []);
+  crowns.forEach((c, k) => { if (c.b >= 0) bInst[c.b].push([crownIM, k]); });
+  trunks.forEach((t, k) => { if (t.b >= 0) bInst[t.b].push([trunkIM, k]); });
+  tanks.forEach((t, k) => { if (t.b >= 0) bInst[t.b].push([tankIM, k]); });
+  // street furniture grid (street and park trees, lamps) so storms can rip them out
+  const SG = 20, streetGrid = new Map();
+  const sgAdd = (x, z, item) => { const key = Math.floor(x / SG) + ',' + Math.floor(z / SG); let a = streetGrid.get(key); if (!a) streetGrid.set(key, (a = [])); a.push(item); };
+  crowns.forEach((c, k) => { if (c.b < 0) sgAdd(c.x, c.z, { kind: 'tree', x: c.x, z: c.z, y: c.y, s: c.s, ims: [[crownIM, k]], col: c.col, alive: true }); });
+  // pair trunks with the crown at the same spot
+  { const byPos = new Map(); for (const a of streetGrid.values()) for (const it of a) byPos.set(it.x.toFixed(2) + ',' + it.z.toFixed(2), it);
+    trunks.forEach((t, k) => { if (t.b >= 0) return; const it = byPos.get(t.x.toFixed(2) + ',' + t.z.toFixed(2)); if (it) it.ims.push([trunkIM, k]); }); }
+  lamps.forEach((l, k) => sgAdd(l.x, l.z, { kind: 'lamp', x: l.x, z: l.z, y: CURB, s: 1, ims: [[lampIM, k]], col: '#4a4540', alive: true }));
+  const zeroM = new THREE.Matrix4().makeScale(0, 0, 0);
+  const dead = new Uint8Array(buildings.length);
+  const center = (b) => [(b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2];
+  // building grid for area queries
+  const BG = 25, bGrid = new Map();
+  buildings.forEach((b, k) => { for (let gx = Math.floor(b.x0 / BG); gx <= Math.floor(b.x1 / BG); gx++) for (let gz = Math.floor(b.z0 / BG); gz <= Math.floor(b.z1 / BG); gz++) { const key = gx + ',' + gz; let a = bGrid.get(key); if (!a) bGrid.set(key, (a = [])); a.push(k); } });
+  const buildingsNear = (x, z, R, fn) => {
+    const seen = new Set();
+    for (let gx = Math.floor((x - R) / BG); gx <= Math.floor((x + R) / BG); gx++) for (let gz = Math.floor((z - R) / BG); gz <= Math.floor((z + R) / BG); gz++) {
+      const a = bGrid.get(gx + ',' + gz); if (!a) continue;
+      for (const k of a) {
+        if (seen.has(k) || dead[k]) continue; seen.add(k);
+        const b = buildings[k], cx = Math.min(Math.max(x, b.x0), b.x1), cz = Math.min(Math.max(z, b.z0), b.z1);
+        const d = Math.hypot(cx - x, cz - z);
+        if (d <= R) fn(k, d, b);
+      }
+    }
+  };
+  const hideBuilding = (k) => {
+    if (dead[k]) return false; dead[k] = 1;
+    const b = buildings[k], [cx, cz] = center(b);
+    for (const rg of b.ranges) {
+      const m = meshes[rg.key]; if (!m || rg.v1 <= rg.v0) continue;
+      const pos = m.geometry.attributes.position, a = pos.array;
+      for (let v = rg.v0; v < rg.v1; v++) { a[v * 3] = cx; a[v * 3 + 1] = -30; a[v * 3 + 2] = cz; }
+      pos.addUpdateRange(rg.v0 * 3, (rg.v1 - rg.v0) * 3); pos.needsUpdate = true;
+    }
+    for (const [im, i] of bInst[k]) { im.setMatrixAt(i, zeroM); im.instanceMatrix.needsUpdate = true; }
+    return true;
+  };
+  // a separate copy of one building (its walls, shopfronts, roof and trim) centred on its footprint
+  const extractBuilding = (k) => {
+    const b = buildings[k], [cx, cz] = center(b);
+    const g = new THREE.Group(); g.position.set(cx, 0, cz);
+    for (const rg of b.ranges) {
+      const m = meshes[rg.key]; if (!m || rg.v1 <= rg.v0) continue;
+      const src = m.geometry, n = rg.v1 - rg.v0;
+      const P = new Float32Array(n * 3), N = new Float32Array(n * 3), U = new Float32Array(n * 2), C = new Float32Array(n * 3);
+      const op = m.userData.origPos, sn = src.attributes.normal.array, su = src.attributes.uv.array, sc = src.attributes.color.array;
+      for (let i = 0; i < n; i++) {
+        const v = rg.v0 + i;
+        P[i * 3] = op[v * 3] - cx; P[i * 3 + 1] = op[v * 3 + 1]; P[i * 3 + 2] = op[v * 3 + 2] - cz;
+        N[i * 3] = sn[v * 3]; N[i * 3 + 1] = sn[v * 3 + 1]; N[i * 3 + 2] = sn[v * 3 + 2];
+        U[i * 2] = su[v * 2]; U[i * 2 + 1] = su[v * 2 + 1];
+        C[i * 3] = sc[v * 3]; C[i * 3 + 1] = sc[v * 3 + 1]; C[i * 3 + 2] = sc[v * 3 + 2];
+      }
+      const idx = new Uint32Array((n / 4) * 6);
+      for (let q = 0; q < n / 4; q++) { const o = q * 4, w = q * 6; idx[w] = o; idx[w + 1] = o + 1; idx[w + 2] = o + 2; idx[w + 3] = o; idx[w + 4] = o + 2; idx[w + 5] = o + 3; }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(P, 3)); geo.setAttribute('normal', new THREE.BufferAttribute(N, 3));
+      geo.setAttribute('uv', new THREE.BufferAttribute(U, 2)); geo.setAttribute('color', new THREE.BufferAttribute(C, 3));
+      geo.setIndex(new THREE.BufferAttribute(idx, 1)); geo.computeBoundingSphere();
+      const mm = new THREE.Mesh(geo, m.material); mm.castShadow = true; g.add(mm);
+    }
+    g.userData.disposeGeo = true;
+    return g;
+  };
+  // rubble: low heaps of blocks in the building's colours
+  const RUB = 6000;
+  const rubble = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), std({ roughness: 1 }), RUB);
+  rubble.count = 0; rubble.castShadow = true; rubble.receiveShadow = true; rubble.frustumCulled = false;
+  rubble.setColorAt(0, new THREE.Color()); group.add(rubble);
+  let rubN = 0;
+  const addRubble = (k, charred = 0.75) => {
+    const b = buildings[k], w = b.x1 - b.x0, d = b.z1 - b.z0, area = w * d;
+    const n = Math.min(90, Math.max(10, Math.round(area / 5)));
+    const wc = b.wallCol, hgt = Math.min(8, 1.5 + (b.top - b.baseY) * 0.12);
+    // a few big slabs make the core of the heap
+    for (let i = 0; i < 3 && rubN < RUB; i++) {
+      const sw = w * (0.35 + Math.random() * 0.25), sd = d * (0.35 + Math.random() * 0.25), sh = hgt * (0.45 + Math.random() * 0.35);
+      e.set((Math.random() - 0.5) * 0.35, Math.random() * Math.PI, (Math.random() - 0.5) * 0.35); q.setFromEuler(e);
+      m4.compose(p.set(b.x0 + w * (0.35 + Math.random() * 0.3), CURB + sh * 0.35, b.z0 + d * (0.35 + Math.random() * 0.3)), q, s.set(sw, sh, sd));
+      rubble.setMatrixAt(rubN, m4);
+      const k2 = (0.6 + Math.random() * 0.3) * charred; col.setRGB(wc[0] * k2, wc[1] * k2, wc[2] * k2);
+      rubble.setColorAt(rubN, col); rubN++;
+    }
+    for (let i = 0; i < n && rubN < RUB; i++) {
+      const u = Math.random(), v = Math.random(), bs = 0.8 + Math.random() * 2.6;
+      const cxr = b.x0 + 0.5 + u * (w - 1), czr = b.z0 + 0.5 + v * (d - 1);
+      const edge = Math.min(u, 1 - u, v, 1 - v) * 2; // heaps are higher in the middle
+      e.set(Math.random() * 0.6, Math.random() * Math.PI, Math.random() * 0.6); q.setFromEuler(e);
+      const sy = (0.4 + Math.random() * 1.2) * (0.5 + edge);
+      m4.compose(p.set(cxr, CURB + sy * 0.3 + Math.random() * hgt * edge * 0.6, czr), q, s.set(bs, sy, bs * (0.5 + Math.random())));
+      rubble.setMatrixAt(rubN, m4);
+      const k2 = (0.55 + Math.random() * 0.45) * charred, grey = Math.random() < 0.3;
+      col.setRGB(grey ? 0.45 * k2 : wc[0] * k2, grey ? 0.43 * k2 : wc[1] * k2, grey ? 0.4 * k2 : wc[2] * k2);
+      rubble.setColorAt(rubN, col); rubN++;
+    }
+    rubble.count = rubN; rubble.instanceMatrix.needsUpdate = true; rubble.instanceColor.needsUpdate = true;
+  };
+  const hidden = [];
+  // street trees and lamps within R are ripped out; returns what was taken
+  const takeStreetNear = (x, z, R) => {
+    const out = [];
+    for (let gx = Math.floor((x - R) / SG); gx <= Math.floor((x + R) / SG); gx++) for (let gz = Math.floor((z - R) / SG); gz <= Math.floor((z + R) / SG); gz++) {
+      const a = streetGrid.get(gx + ',' + gz); if (!a) continue;
+      for (const it of a) {
+        if (!it.alive || Math.hypot(it.x - x, it.z - z) > R) continue;
+        it.alive = false; hidden.push(it);
+        for (const [im, i] of it.ims) { im.setMatrixAt(i, zeroM); im.instanceMatrix.needsUpdate = true; }
+        out.push(it);
+      }
+    }
+    return out;
+  };
+  const restoreAll = () => {
+    for (const m of Object.values(meshes)) {
+      const col = m.geometry.attributes.color; col.array.set(m.userData.orig); col.clearUpdateRanges(); col.needsUpdate = true;
+      const pos = m.geometry.attributes.position; pos.array.set(m.userData.origPos); pos.clearUpdateRanges(); pos.needsUpdate = true;
+    }
+    for (const im of instMeshes) { im.instanceMatrix.array.set(im.userData.orig); im.instanceMatrix.needsUpdate = true; }
+    for (const it of hidden) it.alive = true; hidden.length = 0;
+    dead.fill(0); rubN = 0; rubble.count = 0;
+  };
 
   // darken one building's vertex colours (fire damage); uncharAll restores
   const char = (k, f) => {
@@ -457,6 +592,7 @@ export function buildCity(tex, opts = {}) {
 
   return {
     buildings, char, uncharAll, lamps, mats,
+    dead, buildingsNear, hideBuilding, extractBuilding, addRubble, takeStreetNear, restoreAll,
     group, sx, sz, NB, parked, crowds, walkBlocks, open,
     bounds: { x0: sx[0], x1: sx[NB], z0: sz[0], z1: sz[NB] },
     stats: { crowns: crowns.length, tanks: tanks.length, parked: parked.length, verts: Object.values(B).flat().reduce((a, b) => a + b.v, 0) },

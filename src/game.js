@@ -4,7 +4,9 @@
 import * as THREE from 'three';
 import { ST } from './people.js';
 import { Commander } from './commander.js';
-import { Profile, UNLOCK, UPGRADES, LEVELS, MAX_LEVEL } from './profile.js';
+import { Profile, UNLOCK, UPGRADES, LEVELS, MAX_LEVEL, HAZARD_LEVEL } from './profile.js';
+import { HAZARDS, WEATHER } from './disasters.js';
+import { Storm } from './storm.js';
 
 const CSS = `
 #zd-top{position:fixed;left:0;right:0;top:0;display:flex;gap:6px;align-items:center;flex-wrap:wrap;
@@ -84,6 +86,15 @@ const CSS = `
 #zd-end .xp{font-size:13px;color:#7be0ff;margin:4px 0 0}
 #zd-end .lvl{font-size:15px;color:#a6ff4d;font-weight:700;margin:6px 0 0}
 #zd-end .row2{display:flex;gap:8px;justify-content:center}
+#zd-dis{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(64px + env(safe-area-inset-bottom));width:min(94vw,440px);background:rgba(28,20,12,.9);
+  border:1px solid rgba(255,236,200,.16);border-radius:12px;padding:10px;z-index:3;font:600 11px/1.2 system-ui,-apple-system,"Segoe UI",sans-serif;color:#f6ead2}
+#zd-dis[hidden]{display:none}
+#zd-dis .h{font-size:10px;letter-spacing:.1em;text-transform:uppercase;opacity:.7;margin:2px 2px 6px}
+#zd-dis .g{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px}
+#zd-dis .g.w{grid-template-columns:repeat(4,1fr);margin-bottom:0}
+#zd-dis .zd-btn{padding:10px 4px;min-width:0;font-size:11px;letter-spacing:.03em;text-transform:none}
+#zd-dis .zd-btn.sel{border-color:#a6ff4d;color:#a6ff4d}
+#zd-disb.on{border-color:#ff9a5a;color:#ffb070}
 @media (prefers-reduced-motion: reduce){#zd-toast{transition:none}}
 `;
 
@@ -98,9 +109,10 @@ class Idle {
 }
 
 export class Game {
-  constructor({ people, traffic, fire, city, camera, controls, renderer, mode, daylight, helis, post }) {
-    Object.assign(this, { people, traffic, fire, city, camera, controls, renderer, daylight, helis, post });
-    this.flash = 0;
+  constructor({ people, traffic, fire, city, camera, controls, renderer, mode, daylight, helis, post, disasters }) {
+    Object.assign(this, { people, traffic, fire, city, camera, controls, renderer, daylight, helis, post, disasters });
+    this.flash = 0; this.shake = 0;
+    if (disasters) disasters.ctx.game = this;
     this.pendingFires = []; this.simT = 0; this.realT = 0; this.acc = 0; this.speed = 1; this.follow = -1; this.seen = {};
     people.fire = fire; traffic.people = people; traffic.fire = fire;
     people.onOverrun = (k, why) => { if (Math.random() < (why === 'breach' ? 0.25 : 0.3)) this.pendingFires.push({ k, t: this.simT + 3 + Math.random() * 8 }); };
@@ -111,13 +123,14 @@ export class Game {
     document.body.appendChild(this.menu);
     if (mode === 'sandbox') this.mode = new Sandbox(this);
     else if (mode === 'commander') this.mode = new Commander(this);
+    else if (mode === 'storm') this.mode = new Storm(this);
     else { this.mode = new Idle(); this.showMenu(); }
   }
 
   startMode(which) {
     this.menu.hidden = true;
     this.top.innerHTML = ''; this.bar.innerHTML = '';
-    this.mode = which === 'sandbox' ? new Sandbox(this) : new Commander(this);
+    this.mode = which === 'sandbox' ? new Sandbox(this) : which === 'storm' ? new Storm(this) : new Commander(this);
   }
 
   // ---------- main menu and unlocks
@@ -131,7 +144,8 @@ export class Game {
       body = '<h1>Z-DAY</h1><div class="tag">Emergency commander</div>' + rank +
         '<div class="btns"><button class="zd-btn main" type="button" data-go="commander">Play · Commander</button>' +
         '<button class="zd-btn" type="button" data-go="unlocks">Units and upgrades' + (pr.bank >= 3000 && UPGRADES.some(u => pr.canBuy(u.id)) ? ' · upgrade available' : '') + '</button>' +
-        '<button class="zd-btn dim" type="button" data-go="sandbox">Sandbox · drop zombies</button>' +
+        '<button class="zd-btn" type="button" data-go="storm">Storm · be the tornado' + (pr.data.stormBest ? ' · best ' + pr.data.stormBest.toLocaleString() : '') + '</button>' +
+        '<button class="zd-btn dim" type="button" data-go="sandbox">Sandbox · drop zombies and disasters</button>' +
         '<a class="zd-btn dim" href="showcase.html" style="text-decoration:none;display:block">Roster · every model</a></div>' +
         '<div class="foot">' + pr.data.rounds + ' rounds played · best score ' + pr.data.best.toLocaleString() + ' · ' + pr.data.stars + ' stars' + (pr.ok ? '' : ' · progress is not being saved on this device') + '</div>';
     } else {
@@ -146,19 +160,20 @@ export class Game {
       }).join('');
       body = '<h1>UNLOCKS</h1><div class="tag">' + pr.bank.toLocaleString() + ' XP to spend</div>' + rank +
         '<div class="list">' + units + '</div><div class="tag" style="margin-top:16px">Upgrades</div><div class="list">' + ups + '</div>' +
+        '<div class="tag" style="margin-top:16px">Threats</div><div class="list">' + Object.keys(HAZARD_LEVEL).map(h => '<div class="row' + (lvl >= HAZARD_LEVEL[h] ? '' : ' locked') + '"><div><div class="n">' + HAZARDS[h].name + '</div><div class="d">' + (lvl >= HAZARD_LEVEL[h] ? 'Can strike during a round' : 'Starts at level ' + HAZARD_LEVEL[h]) + '</div></div><span class="s">L' + HAZARD_LEVEL[h] + '</span></div>').join('') + '</div>' +
         '<div class="btns back"><button class="zd-btn" type="button" data-go="main">Back</button></div>';
     }
     this.menu.innerHTML = '<div class="box">' + body + '</div>';
     this.menu.hidden = false;
-    this.menu.querySelectorAll('[data-go]').forEach(b => { b.onclick = () => { const go = b.dataset.go; if (go === 'commander' || go === 'sandbox') this.startMode(go); else this.showMenu(go); }; });
+    this.menu.querySelectorAll('[data-go]').forEach(b => { b.onclick = () => { const go = b.dataset.go; if (go === 'commander' || go === 'sandbox' || go === 'storm') this.startMode(go); else this.showMenu(go); }; });
     this.menu.querySelectorAll('[data-buy]').forEach(b => { b.onclick = () => { if (pr.buy(b.dataset.buy)) { this.toast('Upgrade bought'); this.showMenu('unlocks'); } }; });
   }
 
   nextUnlockText(level) {
     const units = Object.keys(UNLOCK).filter(id => UNLOCK[id] === level).map(id => UNIT_NAMES[id]);
     const ups = UPGRADES.filter(u => u.level === level).map(u => u.name);
-    const all = units.concat(ups);
-    return all.length ? ' · unlocks ' + all.join(', ') : '';
+    const all = units.concat(ups), hz = Object.keys(HAZARD_LEVEL).filter(h => HAZARD_LEVEL[h] === level).map(h => HAZARDS[h].name);
+    return (all.length ? ' · unlocks ' + all.join(', ') : '') + (hz.length ? ' · new threat: ' + hz.join(', ') : '');
   }
 
   buildUI() {
@@ -233,9 +248,11 @@ export class Game {
   }
 
   resetWorld() {
+    if (this.disasters) this.disasters.reset();
     this.fire.reset(); this.city.uncharAll(); this.traffic.reset(); this.pendingFires.length = 0; if (this.helis) this.helis.reset();
+    this.city.restoreAll();
     this.people.reset();
-    this.simT = 0; this.seen = {}; this.setFollow(-1);
+    this.simT = 0; this.shake = 0; this.seen = {}; this.setFollow(-1);
   }
 
   setFollow(i) {
@@ -258,7 +275,7 @@ export class Game {
     const sdt = dt * this.speed;
     this.acc = Math.min(this.acc + sdt, h * 12);
     while (this.acc >= h) {
-      p.step(h); this.traffic.step(h); if (this.helis) this.helis.update(h); this.acc -= h; this.simT += h;
+      p.step(h); this.traffic.step(h); if (this.helis) this.helis.update(h); if (this.disasters) this.disasters.update(h); this.acc -= h; this.simT += h;
       for (const e of p.events) if (e.type === 'bite') this.traffic.panicNear(e.x, e.z, 20);
       this.mode.afterStep && this.mode.afterStep(h);
     }
@@ -269,9 +286,10 @@ export class Game {
     p.uTime.value = this.realT;
     this.traffic.sync(this.realT);
     if (this.helis) this.helis.sync(dt * this.speed);
-    if (this.daylight) { this.daylight.set(this.mode.phase ? this.mode.phase() : 0); this.daylight.update(); }
+    if (this.daylight) { this.daylight.set(this.mode.phase ? this.mode.phase() : 0); if (this.disasters) this.disasters.weather.apply(dt); this.daylight.update(); }
     this.fire.update(sdt, this.realT, this.camera, this.renderer);
     p.sync();
+    if (this.disasters) this.disasters.sync(dt * this.speed, this.realT);
 
     if (this.follow >= 0) {
       let f = this.follow;
@@ -290,15 +308,19 @@ export class Game {
     }
 
     const msgs = this.mode.msgs;
-    for (const list of [p.events, this.traffic.events, this.fire.events, this.helis ? this.helis.events : []]) {
+    const dEv = this.disasters ? this.disasters.events : [];
+    for (const list of [p.events, this.traffic.events, this.fire.events, this.helis ? this.helis.events : [], dEv]) {
       for (const e of list) {
-        if (this.mode.onEvent) this.mode.onEvent(e);
+        if (this.disasters) this.disasters.onEvent(e);
+        const handled = this.mode.onEvent ? this.mode.onEvent(e) : false;
+        if (list === dEv && e.text && handled !== true) this.toast(e.text, 4200);
         if (msgs[e.type] && !this.seen[e.type]) { this.seen[e.type] = true; this.toast(msgs[e.type], 3200); }
       }
       list.length = 0;
     }
     this.mode.update(sdt, dt);
     if (this.flash > 0) { this.flash = Math.max(0, this.flash - dt * 0.6); this.post.opts.flash = Math.min(1, this.flash * this.flash); } else this.post.opts.flash = 0;
+    if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 1.2);
     if (fps) this.el.fps.textContent = fps + ' fps';
   }
 }
@@ -311,7 +333,7 @@ const SANDBOX_MSGS = {
   carfire: 'A wrecked car is burning',
   roof: 'Survivors are barricading themselves on the rooftops',
   breach: 'The horde piled up and reached a rooftop!',
-  fire: 'An overrun building has caught fire',
+  fire: 'A building has caught fire',
   jump: 'Survivors are jumping from a burning roof',
 };
 const START_DROPS = 3;
@@ -327,13 +349,33 @@ class Sandbox {
     this.el.n = this.el.drop.querySelector('#zd-n');
     g.followBtn = g.addButton('zd-find', 'Follow', () => g.cycleFollow());
     g.addSpeedButton();
+    this.disBtn = g.addButton('zd-disb', 'Disasters', () => { this.panel.style.bottom = (g.bar.offsetHeight + 8) + 'px'; this.panel.hidden = !this.panel.hidden; this.disBtn.classList.toggle('on', !this.panel.hidden); });
     g.addButton('zd-reset', 'Reset', () => this.reset());
     g.addButton('zd-menu-btn', 'Menu', () => { location.href = location.pathname; });
+    this.buildPanel();
     this.dropsLeft = START_DROPS; this.clock = -1; this.milestone = 0;
     g.toast('Tap a street to drop a Shambler zombie', 4500);
   }
+  buildPanel() {
+    const g = this.g, d = document.createElement('div'); d.id = 'zd-dis'; d.hidden = true;
+    d.innerHTML = '<div class="h">Disasters</div><div class="g">' + Object.keys(HAZARDS).map(h => '<button class="zd-btn" type="button" data-hz="' + h + '">' + HAZARDS[h].name + '</button>').join('') + '</div>' +
+      '<div class="h">Weather</div><div class="g w">' + Object.keys(WEATHER).map(w => '<button class="zd-btn" type="button" data-wx="' + w + '">' + WEATHER[w].name.replace('Thunderstorm', 'Storm') + '</button>').join('') + '</div>';
+    document.body.appendChild(d); this.panel = d;
+    d.querySelectorAll('[data-hz]').forEach(b => { b.onclick = () => {
+      const h = b.dataset.hz;
+      if (HAZARDS[h].tap) { this.pending = this.pending === h ? null : h; d.querySelectorAll('[data-hz]').forEach(o => o.classList.toggle('sel', o.dataset.hz === this.pending)); if (this.pending) g.toast('Tap the map where the ' + HAZARDS[h].name.toLowerCase() + ' should strike'); return; }
+      g.disasters.start(h); this.close(); if (this.clock < 0) this.clock = 0;
+    }; });
+    d.querySelectorAll('[data-wx]').forEach(b => { b.onclick = () => { g.disasters.weather.set(b.dataset.wx); g.toast('Weather: ' + WEATHER[b.dataset.wx].name); this.close(); }; });
+  }
+  close() { this.panel.hidden = true; this.disBtn.classList.remove('on'); }
   tap(x, z) {
     const g = this.g;
+    if (this.pending) {
+      const h = this.pending; this.pending = null; this.panel.querySelectorAll('[data-hz]').forEach(o => o.classList.remove('sel'));
+      g.disasters.start(h, x, z); this.close(); if (this.clock < 0) this.clock = 0;
+      return;
+    }
     if (this.dropsLeft <= 0) { g.toast('No Shamblers left. Tap Reset to start over'); return; }
     const i = g.people.drop(x, z);
     if (i < 0) { g.toast('Too far from a street. Tap closer to a road'); return; }

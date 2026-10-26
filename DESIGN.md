@@ -107,3 +107,21 @@ Each phase ships playable to GitHub Pages. The sandbox stays reachable at ?mode=
 
 Starting RP, income curve, unit costs and cooldowns, alert thresholds, police hit rate and retreat threshold, incubation range by
 level, outbreak count by level, airstrike fire chance, nuke radius, score weights.
+
+## Disasters and weather (v1.0)
+
+- Each Commander round can bring weather and, from level 2, a disaster on top of the outbreak. They are new problems for the same
+  cards, not a new control scheme: the alert floor they raise unlocks what you need.
+  - Earthquake (L2): buildings collapse on people, fires from gas lines, panicked drivers. Fire trucks and rescue helicopters.
+  - Riot (L2): a mob burning cars and shops. Police make arrests (+3 each), soldiers use tear gas.
+  - Flood (L3): streets under water, cars stall, people climb onto roofs and the slow ones drown. Rescue helicopters.
+  - Tornado (L4): a storm cell crossing the city, tearing up blocks. Clear-up afterwards: fires, roofs.
+  - Tsunami (L5): an 18 second warning, then a wave from one coast. Get people high, then lift them off.
+  - Alien invasion (L6): saucers abduct, burn and land troops. Soldiers and police shoot them down when they fly low (+500).
+- Weather changes the rules a little: rain and storms slow fires, heat spreads them, snow and sand slow cars and make them skid,
+  fog hides the city, storms throw lightning.
+
+## Storm mode
+
+- You are the tornado for three minutes. Drag to steer. It grows from EF1 (only sheds and kiosks) to EF5 (towers) as it eats.
+  Score = what it swallows x its EF rating; zombies are worth more than people. Earns Commander XP; best score on the menu.

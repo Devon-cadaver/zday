@@ -10,6 +10,7 @@ import { Game } from './game.js';
 import { Fire } from './fire.js';
 import { Daylight } from './daylight.js';
 import { Helicopters } from './aircraft.js';
+import { Disasters } from './disasters.js';
 
 const P = new URLSearchParams(location.search);
 const coarse = matchMedia('(pointer: coarse)').matches;
@@ -81,6 +82,7 @@ const buildMs = Math.round(performance.now() - t0);
 const post = new Post(renderer, { samples: low ? 0 : 4 });
 const daylight = new Daylight({ scene, sun, hemi, post, city, traffic, people });
 daylight.set(0);
+const disasters = new Disasters({ scene, city, people, traffic, fire, post, camera, controls, renderer, sun, hemi, low });
 if (P.has('blur')) post.opts.blurFrac = num('blur', 0.018);
 if (P.get('dof') === '0') post.opts.dof = false;
 if (P.get('grade') === '0') post.opts.grade = false;
@@ -108,7 +110,15 @@ function frame() {
   sun.position.copy(tg).addScaledVector(sunDir, 700);
   sun.target.position.copy(tg);
   const focus = camera.position.distanceTo(tg);
+  // camera shake (quakes, blasts, the tsunami): a jolt for this frame only
+  let jx = 0, jy = 0, jz = 0;
+  if (game.shake > 0) {
+    const k = Math.min(2.5, game.shake) * 2.2 * focus / 430;
+    jx = (Math.random() - 0.5) * k; jy = (Math.random() - 0.5) * k * 0.5; jz = (Math.random() - 0.5) * k;
+    camera.position.x += jx; camera.position.y += jy; camera.position.z += jz;
+  }
   post.render(scene, camera, focus, time);
+  camera.position.x -= jx; camera.position.y -= jy; camera.position.z -= jz;
 
   frames++; fpsT += dt;
   if (fpsT > 0.5) { fps = Math.round(frames / fpsT); frames = 0; fpsT = 0; }
@@ -116,6 +126,6 @@ function frame() {
 }
 requestAnimationFrame(frame);
 
-const game = new Game({ people, traffic, fire, city, camera, controls, renderer, mode, daylight, helis, post });
+const game = new Game({ people, traffic, fire, city, camera, controls, renderer, mode, daylight, helis, post, disasters });
 
-window.__z = { THREE, scene, camera, controls, renderer, post, city, traffic, people, fire, game, daylight, helis, sun, hemi, setView, buildMs, info: () => renderer.info.render };
+window.__z = { THREE, scene, camera, controls, renderer, post, city, traffic, people, fire, game, daylight, helis, disasters, sun, hemi, setView, buildMs, info: () => renderer.info.render };

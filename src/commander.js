@@ -3,6 +3,8 @@
 // Phase 1: police cruisers only.
 import * as THREE from 'three';
 import { ST } from './people.js';
+import { HAZARD_LEVEL, WEATHER_LEVEL } from './profile.js';
+import { HAZARDS, WEATHER } from './disasters.js';
 
 export const UNITS = [
   { id: 'police', name: 'Police', cost: 50, cd: 20, alert: 0 },
@@ -38,6 +40,8 @@ const MSGS = {
   blast: 'Airstrike on target. Fires are starting in the blast zone',
   boarded: 'Civilians are boarding the evacuation bus',
   nuke: 'Nuclear detonation. The district is gone',
+  arrest: 'Officers are arresting rioters',
+  aliendrop: 'Armed aliens are on the ground! Soldiers and police will engage them',
 };
 
 export class Commander {
@@ -106,9 +110,22 @@ export class Commander {
       pts.push(w);
     }
     this.outbreaks = pts.map((w, k) => ({ x: w[0], z: w[1], at: OUTBREAK_AT[k] ?? 30 + k * 10, fired: false }));
+    // the weather and the disasters this round brings (more kinds as you level up)
+    const lvl = this.pr.level, wPool = Object.keys(WEATHER_LEVEL).filter(w => lvl >= WEATHER_LEVEL[w]);
+    this.weather = lvl < 2 || p.r() < 0.4 ? 'clear' : wPool[Math.floor(p.r() * wPool.length)];
+    g.disasters.weather.set(this.weather, true);
+    this.wxShift = wPool.length > 1 && p.r() < 0.35 ? 220 + p.r() * 140 : -1;
+    const hPool = Object.keys(HAZARD_LEVEL).filter(h => lvl >= HAZARD_LEVEL[h]);
+    this.hazards = [];
+    for (let k = 0; k < this.diff.hazards && hPool.length; k++) {
+      if (k === 0 && p.r() > this.diff.hazardChance) break;
+      this.hazards.push({ type: hPool.splice(Math.floor(p.r() * hPool.length), 1)[0], at: 150 + p.r() * 330, fired: false });
+    }
+    if (this.hazards.length === 2 && Math.abs(this.hazards[0].at - this.hazards[1].at) < 90) this.hazards[1].at = Math.min(560, this.hazards[0].at + 90 + p.r() * 60);
+    this.alertFloor = 0; this.saucers = 0; this.arrests0 = 0; this.alienK0 = 0; this.riotsBroken = 0; this.hit = [];
     g.lookAt(0, 0);
     this.hud();
-    g.toast((nOut === 1 ? 'A 911 call is coming in' : nOut === 2 ? 'Two 911 calls are coming in' : 'Three 911 calls are coming in') + '. Watch for panic, crashes and smoke, then send help', 5000);
+    g.toast((nOut === 1 ? 'A 911 call is coming in' : nOut === 2 ? 'Two 911 calls are coming in' : 'Three 911 calls are coming in') + '. Watch for panic, crashes and smoke, then send help' + (this.weather !== 'clear' ? '. Weather: ' + WEATHER[this.weather].name.toLowerCase() : ''), 5000);
   }
 
   // a 911 call: toast, call strip, and a search zone on the map (jittered, so it is a hunt)
@@ -227,7 +244,7 @@ export class Commander {
 
   sendStrike(x, z) {
     const g = this.g;
-    const jet = g.helis.strike(x, z, { radius: 25, onBlast: (bx, bz) => { if (g.camera.position.distanceTo(g.controls.target) < 500) this.shake = 1; } });
+    const jet = g.helis.strike(x, z, { radius: 25, onBlast: (bx, bz) => { if (g.camera.position.distanceTo(g.controls.target) < 500) g.shake = Math.max(g.shake, 1); } });
     this.spend('strike'); this.strikes++;
     // mark the target for the player
     this.report(x, z, 'Airstrike inbound. Impact in ' + Math.ceil(jet.eta) + ' s. Clear the area!', 25, true);
@@ -254,7 +271,7 @@ export class Commander {
   sendNuke(x, z) {
     const g = this.g;
     this.nuked = true; this.nukeAt = { x, z };
-    const jet = g.helis.nuke(x, z, { radius: 150, onBlast: (bx, bz) => { g.flash = 1.6; this.shake = 2.5; } });
+    const jet = g.helis.nuke(x, z, { radius: 150, onBlast: (bx, bz) => { g.flash = 1.6; g.shake = 2.5; } });
     this.spend('nuke');
     this.report(x, z, 'NUCLEAR STRIKE AUTHORISED. Impact in ' + Math.ceil(jet.eta) + ' s. Get everyone out!', 150, true);
     this.lastCall = { x, z };
@@ -275,6 +292,12 @@ export class Commander {
   onEvent(e) {
     if (e.type === 'bite' && e.officer && !this.g.seen.copbit) { this.g.seen.copbit = true; this.g.toast(MSGS.copbit, 3200); }
     if (e.type === 'boarded') { const bus = this.g.traffic.cars[e.bus]; if (bus) bus.loaded = (bus.loaded || 0) + 1; }
+    if (e.type === 'saucerdown') { this.saucers++; this.rp += 500; this.earned += 500; }
+    if (e.type === 'riotend' && e.broken) { this.riotsBroken++; this.rp += 100; this.earned += 100; }
+    if (e.type === 'warn') {
+      this.alertFloor = Math.max(this.alertFloor, e.hazard === 'aliens' ? 3 : e.hazard === 'riot' ? 1 : 2); // disasters open up the units you need
+      if (e.x != null && !this.ended) { this.report(e.x, e.z, e.text, e.r || 60, e.exact); return true; }
+    }
   }
 
   // zombies per street block; a block with 3+ is infected
@@ -297,6 +320,7 @@ export class Commander {
     if (n >= 2 || f > 0) a = 2;
     if (n >= 5) a = 3;
     if (n >= 10) a = 4;
+    a = Math.max(a, this.alertFloor);
     if (a > this.alert) {
       this.alert = a;
       if (a >= 2) this.g.toast('Alert raised: ' + ALERTS[a] + (n ? ' · ' + n + ' blocks overrun' : ''), 3500);
@@ -315,18 +339,30 @@ export class Commander {
       p.infectAt(o.x, o.z, this.diff.seeds);
       this.report(o.x, o.z, '911 · ' + this.district(o.x, o.z) + ': "someone is biting people!"', 70);
     }
+    for (const hz of this.hazards) {
+      if (hz.fired || this.t < hz.at) continue;
+      hz.fired = true; this.hit.push(hz.type);
+      g.disasters.start(hz.type);
+    }
+    if (this.wxShift > 0 && this.t >= this.wxShift) {
+      this.wxShift = -1;
+      const pool = Object.keys(WEATHER_LEVEL).filter(w => this.pr.level >= WEATHER_LEVEL[w] && w !== this.weather);
+      this.weather = pool[Math.floor(p.r() * pool.length)]; g.disasters.weather.set(this.weather);
+      g.toast('The weather is turning: ' + WEATHER[this.weather].name.toLowerCase(), 3500);
+    }
     const income = (1 + p.stats.humans / 2000) * sdt;
     this.rp += income; this.earned += income;
     const k = p.stats.shot; if (k > this.kills0) { this.rp += k - this.kills0; this.earned += k - this.kills0; this.kills0 = k; }
     const fo = g.fire.stats.out; if (fo > this.out0) { this.rp += 30 * (fo - this.out0); this.earned += 30 * (fo - this.out0); this.out0 = fo; }
     const rs = p.stats.rescued; if (rs > this.rescued0) { this.rp += 3 * (rs - this.rescued0); this.earned += 3 * (rs - this.rescued0); this.rescued0 = rs; }
+    const ar = p.stats.arrests; if (ar > this.arrests0) { this.rp += 3 * (ar - this.arrests0); this.earned += 3 * (ar - this.arrests0); this.arrests0 = ar; }
+    const ak = p.stats.aliensKilled; if (ak > this.alienK0) { this.rp += 10 * (ak - this.alienK0); this.earned += 10 * (ak - this.alienK0); this.alienK0 = ak; }
     const bz = p.stats.bombed; if (bz > this.bombed0) { this.rp += bz - this.bombed0; this.earned += bz - this.bombed0; this.bombed0 = bz; }
     const bc = p.stats.bombedCiv; if (bc > this.bombedCiv0) { this.rp -= 5 * (bc - this.bombedCiv0); this.earned -= 5 * (bc - this.bombedCiv0); this.bombedCiv0 = bc; g.toast('Your airstrike killed ' + bc + ' civilians so far', 3500); }
     this.busTick(sdt);
     const bu = p.stats.bused; if (bu > this.bused0) { this.rp += 3 * (bu - this.bused0); this.earned += 3 * (bu - this.bused0); this.bused0 = bu; }
     const nc = p.stats.nukedCiv; if (nc > this.nukedCiv0) { this.rp -= 5 * (nc - this.nukedCiv0); this.earned -= 5 * (nc - this.nukedCiv0); this.nukedCiv0 = nc; g.toast('The nuke killed ' + nc + ' civilians', 5000); }
     if (this.rp < 0) this.rp = 0; // penalties cost score, never lock the cards
-    if (this.shake > 0) { this.shake -= sdt * 1.2; const k = Math.max(0, this.shake) * 2.5; g.camera.position.x += (Math.random() - 0.5) * k; g.camera.position.z += (Math.random() - 0.5) * k; }
     for (const id in this.cool) if (this.cool[id] > 0) this.cool[id] = Math.max(0, this.cool[id] - sdt);
     for (const q of this.pins) {
       if (q.life <= 0) continue;
@@ -346,7 +382,7 @@ export class Commander {
     }
     // end of round
     const hum = p.stats.humans, tot = p.nHuman;
-    if (this.spawned === this.outbreaks.length && this.t > 40 && p.stats.zombies === 0 && p.stats.infected === 0) this.finish('contained');
+    if (this.spawned === this.outbreaks.length && this.t > 40 && p.stats.zombies === 0 && p.stats.infected === 0 && !g.disasters.list.length) this.finish('contained');
     else if (hum < tot * 0.2) this.finish('lost');
     else if (this.t >= ROUND) this.finish('holdout');
     this.hud();
@@ -393,7 +429,11 @@ export class Commander {
       ['Evacuated by bus', s.bused.toLocaleString()],
       ['Nuke: zombies / civilians', this.nuked ? s.nukedZ + ' / ' + s.nukedCiv : 'not used'],
       ['Fires put out', g.fire.stats.out],
-      ['Buildings burned', (g.fire.bFire.length - intact).toLocaleString()],
+      ['Buildings burned or destroyed', (g.fire.bFire.length - intact).toLocaleString()],
+      ...(this.weather !== 'clear' ? [['Weather', WEATHER[this.weather].name]] : []),
+      ...(this.hit.length ? [['Disasters', this.hit.map(h => HAZARDS[h].name).join(', ')], ['Killed by disasters', (s.disasterCiv + s.drowned).toLocaleString()]] : []),
+      ...(s.arrests ? [['Rioters arrested', s.arrests]] : []),
+      ...(this.hit.includes('aliens') ? [['Saucers downed / aliens killed', this.saucers + ' / ' + s.aliensKilled], ['Abducted', s.abducted]] : []),
       ['Time', Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0')],
     ];
     const r = this.pr.addRound(score, stars);

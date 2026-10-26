@@ -126,13 +126,14 @@ export class Fire {
     this.flames = new Pool(low ? 4000 : 8000, FLAME_VS, FLAME_FS, THREE.AdditiveBlending, parent, this.uniforms);
     this.smoke = new Pool(low ? 1600 : 3200, SMOKE_VS, SMOKE_FS, THREE.NormalBlending, parent, { ...this.uniforms, uColA: { value: new THREE.Vector3(0.06, 0.05, 0.045) }, uColB: { value: new THREE.Vector3(0.34, 0.31, 0.28) } });
     this.mist = new Pool(low ? 800 : 1600, SMOKE_VS, SMOKE_FS, THREE.NormalBlending, parent, { ...this.uniforms, uColA: { value: new THREE.Vector3(0.8, 0.88, 0.97) }, uColB: { value: new THREE.Vector3(0.97, 0.98, 1.0) } });
-    this.smoke.points.renderOrder = 3; this.flames.points.renderOrder = 4; this.mist.points.renderOrder = 5;
+    this.dust = new Pool(low ? 900 : 1800, SMOKE_VS, SMOKE_FS, THREE.NormalBlending, parent, { ...this.uniforms, uColA: { value: new THREE.Vector3(0.3, 0.26, 0.2) }, uColB: { value: new THREE.Vector3(0.52, 0.46, 0.37) } });
+    this.smoke.points.renderOrder = 3; this.dust.points.renderOrder = 3; this.flames.points.renderOrder = 4; this.mist.points.renderOrder = 5;
     this.events = [];
     this.reset();
   }
 
   reset() {
-    this.flames.reset(); this.smoke.reset(); this.mist.reset();
+    this.flames.reset(); this.smoke.reset(); this.mist.reset(); this.dust.reset();
     if (this.scorch) this.scorch.visible = false;
     this.burning = new Map(); // building index -> { until, fl: [], sm, wet }
     this.bFire = new Uint8Array(this.city.buildings.length); // 0 none, 1 burning, 2 burnt out, 3 put out
@@ -140,6 +141,7 @@ export class Fire {
     this.simT = 0; this.spreadT = 0; this.realT = 0;
     this.timers = []; // { at (sim time), fn }
     this.stats = { out: 0, drops: 0 };
+    this.spreadK = 1; this.rainK = 0;
   }
 
   later(dt, fn) { this.timers.push({ at: this.simT + dt, fn }); }
@@ -210,7 +212,7 @@ export class Fire {
   }
 
   igniteBuilding(k) {
-    if (this.bFire[k] || this.soaked[k] > this.simT) return false;
+    if (this.bFire[k] || this.soaked[k] > this.simT || (this.city.dead && this.city.dead[k])) return false;
     const b = this.city.buildings[k], t = this.uniforms.uTime.value;
     const rf = b.roof, cx = (rf.x0 + rf.x1) / 2, cz = (rf.z0 + rf.z1) / 2;
     const hx = Math.max(0.5, (rf.x1 - rf.x0) / 2), hz = Math.max(0.5, (rf.z1 - rf.z0) / 2);
@@ -233,6 +235,30 @@ export class Fire {
     this.city.char(k, 0.75);
     this.events.push({ type: 'fire', k });
     return true;
+  }
+
+  // a building coming down: a billow of dust about as tall as it was, and a low skirt rolling out
+  dustCloud(x, z, R = 10, hgt = 20) {
+    const t = this.uniforms.uTime.value;
+    const col = this.dust.alloc(Math.round(Math.min(36, 12 + R)), x, 0.5, z, R, R, Math.max(0.7, Math.min(3, hgt * 0.045)), t);
+    const skirt = this.dust.alloc(18, x, 0.2, z, R * 2.2, R * 2.2, 0.55, t);
+    this.later(3.5, () => { this.dust.end(col, this.uniforms.uTime.value); this.dust.end(skirt, this.uniforms.uTime.value); });
+    this.later(12, () => { this.dust.release(col); this.dust.release(skirt); });
+  }
+  // a petrol bomb or laser hit: a short splash of flame
+  burst(x, y, z, n = 8, size = 1.3) {
+    const r = this.flames.alloc(n, x, y, z, 0.8, 0.8, size, this.uniforms.uTime.value);
+    if (!r) return;
+    this.later(0.7, () => this.flames.end(r, this.uniforms.uTime.value));
+    this.later(5, () => this.flames.release(r));
+  }
+  // tear gas: a low white cloud
+  gasCloud(x, z, R = 8) {
+    const t = this.uniforms.uTime.value;
+    const r = this.mist.alloc(16, x, 0.3, z, R, R, 0.7, t);
+    if (!r) return;
+    this.later(5, () => this.mist.end(r, this.uniforms.uTime.value));
+    this.later(13, () => this.mist.release(r));
   }
 
   // ---------- fighting fires
@@ -267,6 +293,13 @@ export class Fire {
     this.stats.out++;
     this.events.push({ type: 'fireout', k });
     return true;
+  }
+
+  // the building is gone (tornado, collapse): its flames go with it
+  gone(k) {
+    const f = this.burning.get(k);
+    if (f && this.bFire[k] === 1) { for (const r of f.fl) { this.flames.end(r, this.realT); } const fl = f.fl, sm = f.sm; this.later(4, () => { for (const r of fl) this.flames.release(r); }); this.later(8, () => this.smoke.end(sm, this.uniforms.uTime.value)); this.later(18, () => this.smoke.release(sm)); }
+    this.bFire[k] = 2; this.soaked[k] = 1e9;
   }
 
   soak(k, secs = 150) { this.soaked[k] = Math.max(this.soaked[k], this.simT + secs); }
@@ -315,6 +348,7 @@ export class Fire {
     const doSpread = this.spreadT >= 4; if (doSpread) this.spreadT = 0;
     for (let i = this.timers.length - 1; i >= 0; i--) if (this.simT >= this.timers[i].at) { const t = this.timers[i]; this.timers.splice(i, 1); t.fn(); }
     for (const [k, f] of this.burning) {
+      if (this.rainK && this.bFire[k] === 1) f.until -= dt * this.rainK; // rain beats fires down
       if (this.simT >= f.until && this.bFire[k] === 1) {
         for (const r of f.fl) this.flames.end(r, realT);
         this.bFire[k] = 2;
@@ -326,7 +360,7 @@ export class Fire {
         continue;
       }
       if (doSpread && this.bFire[k] === 1) {
-        for (const j of this.neighbours(k)) if (!this.bFire[j] && this.soaked[j] <= this.simT && Math.random() < 0.006) this.igniteBuilding(j);
+        for (const j of this.neighbours(k)) if (!this.bFire[j] && this.soaked[j] <= this.simT && Math.random() < 0.006 * this.spreadK) this.igniteBuilding(j);
       }
     }
   }

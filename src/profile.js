@@ -8,6 +8,10 @@ export const MAX_LEVEL = LEVELS.length;
 // level at which each unit becomes available
 export const UNLOCK = { police: 1, bus: 1, fire: 2, water: 3, rescue: 3, apc: 4, strike: 5, nuke: 6 };
 
+// level from which each disaster and kind of weather can turn up in a Commander round
+export const HAZARD_LEVEL = { quake: 2, riot: 2, flood: 3, tornado: 4, tsunami: 5, aliens: 6 };
+export const WEATHER_LEVEL = { clear: 1, rain: 2, fog: 2, storm: 4, snow: 4, heat: 5, sand: 5 };
+
 export const UPGRADES = [
   { id: 'squad4', name: 'Four-officer cruisers', cost: 3000, level: 7, desc: 'Every cruiser carries four officers instead of two.' },
   { id: 'drone', name: 'Drone recon', cost: 4000, level: 7, desc: 'Bitten civilians are marked with an amber ring before they turn.' },
@@ -18,7 +22,7 @@ export const UPGRADES = [
 
 export class Profile {
   constructor() {
-    this.data = { xp: 0, spent: 0, upgrades: {}, rounds: 0, best: 0, stars: 0, lastLevel: 1 };
+    this.data = { xp: 0, spent: 0, upgrades: {}, rounds: 0, best: 0, stars: 0, lastLevel: 1, stormBest: 0, stormRuns: 0 };
     try { const s = localStorage.getItem(KEY); if (s) Object.assign(this.data, JSON.parse(s)); } catch (e) { /* no storage */ }
     this.ok = true;
   }
@@ -52,6 +56,17 @@ export class Profile {
     return { xp, levelUp: level > before, level, before };
   }
 
+  // a Storm run: XP for the damage done, best score kept
+  addStorm(score) {
+    const before = this.level;
+    const xp = Math.max(100, Math.round(score / 20));
+    this.data.xp += xp; this.data.stormRuns = (this.data.stormRuns || 0) + 1;
+    const best = score > (this.data.stormBest || 0);
+    if (best) this.data.stormBest = score;
+    this.save();
+    return { xp, best, levelUp: this.level > before, level: this.level };
+  }
+
   // round difficulty for the current level
   difficulty() {
     const l = this.level;
@@ -62,6 +77,8 @@ export class Profile {
       runners: l >= 10,
       policeCd: (l >= 5 ? 15 : 20) * (this.has('fastcops') ? 0.5 : 1),
       fireCd: 30 * (this.has('fastcops') ? 0.5 : 1),
+      hazards: l >= 7 ? 2 : l >= 2 ? 1 : 0, // disasters per round
+      hazardChance: l >= 4 ? 0.85 : 0.65,     // odds the first one happens at all
     };
   }
 }
