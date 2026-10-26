@@ -8,11 +8,11 @@
 // climb over. Officers hold a post, shoot zombies within range, fall back when
 // overrun and can be bitten like anyone else.
 import * as THREE from 'three';
-import { HALF, RW, CURB } from './city.js';
+import { HALF, RW, SW, CURB } from './city.js';
 import { rng } from './textures.js';
 import { figureGeometry, figureMaterial, figureAttributes, rollArchetype, OFFICER_LOOK, FIREFIGHTER_LOOK, SOLDIER_LOOK, ALIEN_LOOK, ZTYPES, rollZombieType, ZSKIN, FLAG, HAT } from './figures.js';
 
-export const ST = { WALK: 0, IDLE: 1, FLEE: 2, RETURN: 3, GRABBED: 4, TURNING: 5, ZOMBIE: 6, FALLING: 7, DEAD: 8, SEEK: 9, INSIDE: 10, ROOF: 11, PILE: 12, CLIMB: 13, JUMP: 14, COP: 15, FIREMAN: 16, EVAC: 17, BOARD: 18, EXT: 19, AIR: 20, RIOT: 21, ALIEN: 22 };
+export const ST = { WALK: 0, IDLE: 1, FLEE: 2, RETURN: 3, GRABBED: 4, TURNING: 5, ZOMBIE: 6, FALLING: 7, DEAD: 8, SEEK: 9, INSIDE: 10, ROOF: 11, PILE: 12, CLIMB: 13, JUMP: 14, COP: 15, FIREMAN: 16, EVAC: 17, BOARD: 18, EXT: 19, AIR: 20, RIOT: 21, ALIEN: 22, FROZEN: 23 };
 export const KIND = { CIVILIAN: 0, OFFICER: 1, FIREFIGHTER: 2, SOLDIER: 3, ALIEN: 4 };
 export { ZTYPES };
 
@@ -27,10 +27,11 @@ const pileR = (n) => pileH(n) * 0.65 + 1.0;
 
 const S = ST;
 const CIV = new Uint8Array(32); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.ROOF, S.COP, S.FIREMAN, S.BOARD, S.RIOT].forEach(s => { CIV[s] = 1; });
-const INHASH = new Uint8Array(32); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.ROOF, S.COP, S.FIREMAN, S.BOARD, S.RIOT, S.GRABBED, S.TURNING, S.ZOMBIE, S.ALIEN].forEach(s => { INHASH[s] = 1; });
-const HITTABLE = new Uint8Array(32); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.COP, S.FIREMAN, S.BOARD, S.RIOT, S.GRABBED, S.TURNING, S.ZOMBIE, S.ALIEN].forEach(s => { HITTABLE[s] = 1; });
+const INHASH = new Uint8Array(32); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.ROOF, S.COP, S.FIREMAN, S.BOARD, S.RIOT, S.GRABBED, S.TURNING, S.ZOMBIE, S.ALIEN, S.FROZEN].forEach(s => { INHASH[s] = 1; });
+const HITTABLE = new Uint8Array(32); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.COP, S.FIREMAN, S.BOARD, S.RIOT, S.GRABBED, S.TURNING, S.ZOMBIE, S.ALIEN, S.FROZEN].forEach(s => { HITTABLE[s] = 1; });
 export const HOSTILE = new Uint8Array(32); HOSTILE[S.ZOMBIE] = 1; HOSTILE[S.ALIEN] = 1;
-const GRABBABLE = new Uint8Array(32); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.ROOF, S.COP, S.FIREMAN, S.BOARD, S.RIOT, S.GRABBED, S.TURNING, S.ZOMBIE, S.ALIEN, S.PILE, S.CLIMB, S.FALLING, S.JUMP].forEach(s => { GRABBABLE[s] = 1; });
+const GRABBABLE = new Uint8Array(32); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.ROOF, S.COP, S.FIREMAN, S.BOARD, S.RIOT, S.GRABBED, S.TURNING, S.ZOMBIE, S.ALIEN, S.PILE, S.CLIMB, S.FALLING, S.JUMP, S.FROZEN].forEach(s => { GRABBABLE[s] = 1; });
+const DISASTER_CAUSE = new Set(['fling', 'crush', 'drown', 'zap', 'bolt', 'freeze', 'burn', 'impact']);
 const ZSTATE = new Uint8Array(32); [S.ZOMBIE, S.TURNING, S.PILE, S.CLIMB, S.FALLING].forEach(s => { ZSTATE[s] = 1; });
 const ANIM = new Float32Array(32);
 ANIM[S.WALK] = 1; ANIM[S.FLEE] = 2; ANIM[S.RETURN] = 1; ANIM[S.TURNING] = 5; ANIM[S.ZOMBIE] = 3; ANIM[S.FALLING] = 5;
@@ -85,6 +86,7 @@ export class People {
     this.nWalk = opts.people ?? 3200;
     this.fire = null; this.onOverrun = null;
     this.incubate = INCUBATE.slice(); this.runnerBoost = false; this.markInfected = false;
+    this.rings = (city.layout && city.layout.rounds) || [];
     this.buildWalkGrid();
     this.setupBuildings();
 
@@ -158,7 +160,7 @@ export class People {
     for (let k = 0; k < 320; k++) {
       const b = blocks[Math.floor(r() * blocks.length)]; const n = 3 + Math.floor(r() * 10);
       const cx = r() < 0.5 ? b.x0 : b.x1, cz = r() < 0.5 ? b.z0 : b.z1;
-      for (let m = 0; m < n; m++) pts.push([cx + (r() - 0.5) * 3, CURB, cz + (r() - 0.5) * 3]);
+      for (let m = 0; m < n; m++) { const [px, pz] = this.offRing(cx + (r() - 0.5) * 3, cz + (r() - 0.5) * 3); pts.push([px, CURB, pz]); }
     }
     return pts;
   }
@@ -177,12 +179,43 @@ export class People {
     for (let j = 0; j < this.gh; j++) for (let i = 0; i < this.gw; i++) {
       g[j * this.gw + i] = ((corrX[i] | corrZ[j]) ? 1 : 0) | ((roadX[i] | roadZ[j]) ? 2 : 0);
     }
+    const L = this.city.layout, cell = (fn, x0, x1, z0, z1) => {
+      const i0 = Math.max(0, Math.floor((x0 - this.gx0) / RES)), i1 = Math.min(this.gw - 1, Math.floor((x1 - this.gx0) / RES));
+      const j0 = Math.max(0, Math.floor((z0 - this.gz0) / RES)), j1 = Math.min(this.gh - 1, Math.floor((z1 - this.gz0) / RES));
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) fn(j * this.gw + i, this.gx0 + (i + 0.5) * RES, this.gz0 + (j + 0.5) * RES);
+    };
+    // superblocks: the street that was taken out is now inside the block
+    if (L) for (const sb of L.superblocks) cell((c) => { g[c] = 0; }, sb.x0 + 0.4, sb.x1 - 0.4, sb.z0 + 0.4, sb.z1 - 0.4);
     for (const o of open) {
       const i0 = Math.ceil((o.x0 + 0.4 - this.gx0) / RES), i1 = Math.floor((o.x1 - 0.4 - this.gx0) / RES);
       const j0 = Math.ceil((o.z0 + 0.4 - this.gz0) / RES), j1 = Math.floor((o.z1 - 0.4 - this.gz0) / RES);
       for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) g[j * this.gw + i] |= 1;
     }
-    this.grid = g;
+    if (L) {
+      // roundabouts: the ring is road, the island and the curved sidewalk are walkable at curb height
+      for (const rd of L.rounds) {
+        const R = rd.ro + SW;
+        cell((c, x, z) => { const d = Math.hypot(x - rd.x, z - rd.z); if (d > R - 0.35) return; g[c] = 1 | (d >= rd.ri && d < rd.ro ? 2 : 0); }, rd.x - R, rd.x + R, rd.z - R, rd.z + R);
+      }
+      // the diagonal avenue: road down the middle, sidewalks either side
+      for (const sg of L.diags) {
+        cell((c, x, z) => {
+          const t = (x - sg.ax) * sg.ux + (z - sg.az) * sg.uz, d = Math.abs(sg.ux * (z - sg.az) - sg.uz * (x - sg.ax));
+          if (t < -HALF || t > sg.L + HALF || d > HALF - 0.35) return;
+          g[c] |= 1; if (d < RW / 2) g[c] |= 2;
+        }, Math.min(sg.ax, sg.bx) - HALF, Math.max(sg.ax, sg.bx) + HALF, Math.min(sg.az, sg.bz) - HALF, Math.max(sg.az, sg.bz) + HALF);
+      }
+    }
+    this.grid = g; this.grid0 = g.slice();
+  }
+  // a disaster makes ground impassable (a pit, a lava field); reset() puts the original grid back
+  block(x, z, R, test = null) {
+    const i0 = Math.max(0, Math.floor((x - R - this.gx0) / RES)), i1 = Math.min(this.gw - 1, Math.floor((x + R - this.gx0) / RES));
+    const j0 = Math.max(0, Math.floor((z - R - this.gz0) / RES)), j1 = Math.min(this.gh - 1, Math.floor((z + R - this.gz0) / RES));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+      const cx = this.gx0 + (i + 0.5) * RES, cz = this.gz0 + (j + 0.5) * RES;
+      if (Math.hypot(cx - x, cz - z) <= R && (!test || test(cx, cz))) this.grid[j * this.gw + i] = 0;
+    }
   }
 
   setupBuildings() {
@@ -249,6 +282,7 @@ export class People {
   }
 
   reset() {
+    if (this.grid0) this.grid.set(this.grid0);
     const r = this.r = rng(this.opts.seed ?? 99);
     this.makeCrowds(r);
     const blocks = this.blocks = this.city.walkBlocks.map(b => ({ ...b, w: b.x1 - b.x0, d: b.z1 - b.z0, P: 2 * (b.x1 - b.x0 + b.z1 - b.z0) }));
@@ -296,7 +330,17 @@ export class People {
     else if ((s -= b.w) < b.d) { x = b.x1 + lat; z = b.z0 + s; this.hx[i] = 0; this.hz[i] = fwd; }
     else if ((s -= b.d) < b.w) { x = b.x1 - s; z = b.z1 + lat; this.hx[i] = -fwd; this.hz[i] = 0; }
     else { s -= b.w; x = b.x0 - lat; z = b.z1 - s; this.hx[i] = 0; this.hz[i] = -fwd; }
+    [x, z] = this.offRing(x, z);
     this.x[i] = x; this.z[i] = z; this.y[i] = CURB;
+  }
+
+  // a spot on a block corner that a roundabout cut away moves out onto the curved sidewalk
+  offRing(x, z) {
+    for (const rd of this.rings) {
+      const dx = x - rd.x, dz = z - rd.z, d = Math.hypot(dx, dz), R = rd.ro + SW * 0.55;
+      if (d < R && d > 0.01) return [rd.x + dx / d * R, rd.z + dz / d * R];
+    }
+    return [x, z];
   }
 
   wk(x, z) {
@@ -654,7 +698,8 @@ export class People {
     this.deadLook(j);
     if (this.kind[j] === KIND.ALIEN) { this.stats.aliensKilled++; this.events.push({ type: 'alienkill', j, cause }); return; }
     if (cause === 'zap') { const A = this.fa.arrays, o = j * 3; for (let c = 0; c < 3; c++) { A.shirt[o + c] *= 0.35; A.pants[o + c] *= 0.35; A.skin[o + c] *= 0.3; } }
-    if (cause === 'fling' || cause === 'crush' || cause === 'drown' || cause === 'zap' || cause === 'bolt') { if (wasZ || this.wz[j]) this.stats.disasterZ++; else if (this.kind[j] === KIND.CIVILIAN) this.stats.disasterCiv++; }
+    if (cause === 'burn') { const A = this.fa.arrays, o = j * 3; for (let c = 0; c < 3; c++) { A.shirt[o + c] *= 0.25; A.pants[o + c] *= 0.25; A.skin[o + c] *= 0.2; } }
+    if (DISASTER_CAUSE.has(cause)) { if (wasZ || this.wz[j]) this.stats.disasterZ++; else if (this.kind[j] === KIND.CIVILIAN) this.stats.disasterCiv++; }
     if (cause === 'car') { this.stats.runover++; this.events.push({ type: 'runover', j, zombie: wasZ }); }
     else if (cause === 'shot') { if (wasZ) this.stats.shot++; this.events.push({ type: 'shotdead', j, zombie: wasZ }); }
   }
@@ -674,6 +719,7 @@ export class People {
         case S.WALK: this.s[i] += this.spd[i] * h * ((this.waterAt || this.speedK !== 1) ? this.wk(this.x[i], this.z[i]) : 1); this.walkPos(i); break;
         case S.AIR: this.airStep(i, h); break;
         case S.RIOT: this.riotStep(i, h); break;
+        case S.FROZEN: this.frozenStep(i, h); break;
         case S.ALIEN: this.alienStep(i, h); break;
         case S.FLEE: this.fleeStep(i, h); break;
         case S.RETURN: {
@@ -1035,6 +1081,37 @@ export class People {
       if ((s === S.WALK || s === S.IDLE || s === S.RETURN || s === S.FLEE) && this.r() < 0.8) this.trySeek(i) || this.panic(i, this.x[i] + 1, this.z[i], -1);
     }
   }
+  // ---------- cold: frozen solid where they stood. Civilians die after a while; zombies thaw when the cold passes
+  freeze(i) {
+    const s = this.st[i];
+    if (!HITTABLE[s] || this.lvl[i] !== -1 || this.kind[i] === KIND.ALIEN) return false;
+    this.wz[i] = ZSTATE[s] || s === S.ZOMBIE ? 1 : 0;
+    if (s === S.GRABBED || s === S.TURNING) this.wz[i] = 0;
+    this.st[i] = S.FROZEN; this.t1[i] = 0; this.target[i] = -1; this.fx[i] = 0; this.bt[i] = -1;
+    this.events.push({ type: 'frozen', i, x: this.x[i], z: this.z[i] });
+    return true;
+  }
+  frozenStep(i, h) {
+    this.t1[i] += h;
+    if (!this.wz[i] && this.t1[i] > 18) { this.st[i] = S.IDLE; this.kill(i, 0, 0, 'freeze'); }
+  }
+  frozenLook(i) {
+    const A = this.fa.arrays, o = i * 3, ice = [0.62, 0.74, 0.86];
+    for (const key of ['shirt', 'pants', 'skin', 'accent', 'accent2']) for (let c = 0; c < 3; c++) A[key][o + c] = A[key][o + c] * 0.3 + ice[c] * 0.7;
+    A.kit[i * 4 + 1] = (A.kit[i * 4 + 1] | 0) & ~FLAG.GLOW;
+    this.lookDirty = true; this.dirty[i] = 4;
+  }
+  thawAll() { for (let i = 0; i < this.active; i++) if (this.st[i] === S.FROZEN) { if (this.wz[i]) { this.st[i] = S.ZOMBIE; this.t1[i] = 0; } else { this.st[i] = S.IDLE; this.setLook(i, this.base[i]); this.dirty[i] = 0; } } }
+  // swallowed by the ground (a sinkhole, a crater): gone for good
+  fallIn(j) {
+    const s = this.st[j];
+    if (s === S.DEAD || s === S.EVAC || s === S.INSIDE || this.lvl[j] !== -1) return;
+    const z = ZSTATE[s] || s === S.ZOMBIE || ((s === S.EXT || s === S.AIR || s === S.FROZEN) && this.wz[j]);
+    if (this.kind[j] === KIND.ALIEN) this.stats.aliensKilled++;
+    else if (z) this.stats.disasterZ++; else if (this.kind[j] === KIND.CIVILIAN) this.stats.disasterCiv++;
+    this.st[j] = S.DEAD; this.inf[j] = 0; this.y[j] = -25; this.dirty[j] = 3;
+  }
+
   // ---------- riots
   startRiot(x, z, n, mob) {
     const c = [];
@@ -1376,6 +1453,7 @@ export class People {
       if (s === S.ALIEN) continue;
       if ((s === S.EXT || s === S.AIR) && this.wz[i]) { zombies++; continue; }
       if (s === S.RIOT) rioters++;
+      if (s === S.FROZEN) { if (this.wz[i]) zombies++; else if (this.kind[i] === KIND.CIVILIAN) humans++; if (this.dirty[i] !== 4) { this.frozenLook(i); colDirty = true; } continue; }
       if (s === S.ZOMBIE || s === S.FALLING || s === S.TURNING || s === S.PILE || s === S.CLIMB) {
         zombies++;
         if (s !== S.TURNING && this.dirty[i] !== 2) { this.zombieLook(i); colDirty = true; }

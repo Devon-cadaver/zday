@@ -33,7 +33,13 @@ export class Traffic {
       if (i < NX - 1) nb.push((i + 1) * NZ + j);
       if (j > 0) nb.push(i * NZ + j - 1);
       if (j < NZ - 1) nb.push(i * NZ + j + 1);
-      this.nodes.push({ x: sx[i], z: sz[j], nb, occ: -1 });
+      this.nodes.push({ id: this.nodes.length, x: sx[i], z: sz[j], nb, occ: -1, inset: IN });
+    }
+    const L = city.layout;
+    if (L) {
+      this.nodes.forEach((n, a) => { n.nb = n.nb.filter(b => !L.removed.has(a < b ? a + '-' + b : b + '-' + a)); });
+      for (const sg of L.diags) { this.nodes[sg.a].nb.push(sg.b); this.nodes[sg.b].nb.push(sg.a); this.nodes[sg.a].inset = this.nodes[sg.b].inset = IN + 5; }
+      for (const rd of L.rounds) { const n = this.nodes[rd.id]; n.round = rd; n.inset = rd.ro + 1.5; }
     }
     const B = city.bounds;
     this.gx0 = B.x0 - 20; this.gz0 = B.z0 - 20;
@@ -94,7 +100,7 @@ export class Traffic {
   // ---------- disasters: cars can be taken over (tornado, wave), thrown, and stalled by flood water
   grab(car) {
     if (car.gone || car.mode === EXT || car.mode === AIR) return false;
-    const node = this.nodes[car.b]; if (node && node.occ === car.id) node.occ = -1;
+    const node = this.nodes[car.b]; if (node) this.release(node, car);
     if (car.mission && (car.mode === DRIVE || car.mode === PARKED)) { if (car.onLost) car.onLost(car); }
     car.mode = EXT; car.v = 0; car.leaving = false;
     return true;
@@ -159,7 +165,7 @@ export class Traffic {
       this.cars.push(car);
       this.typeMeshes[car.type].setColorAt(car.slot, this._c.set(car.colHex));
     }
-    this.speedK = 1; this.gripK = 1; this.waterAt = null;
+    this.speedK = 1; this.gripK = 1; this.waterAt = null; this.closed = new Set();
     for (const pc of this.parkedList || []) { pc.alive = true; pc.burnt = false; }
     for (const im of this.parkedMeshes || []) { im.instanceMatrix.array.set(im.userData.orig); im.instanceMatrix.needsUpdate = true; if (im.userData.origCol) { im.instanceColor.array.set(im.userData.origCol); im.instanceColor.needsUpdate = true; } }
     for (const t of TRAFFIC_MIX) { const im = this.typeMeshes[t.id]; im.count = counts[t.id]; if (im.instanceColor) im.instanceColor.needsUpdate = true; }
@@ -174,13 +180,14 @@ export class Traffic {
     const A = this.nodes[a], Bn = this.nodes[b];
     let dx = Bn.x - A.x, dz = Bn.z - A.z; const L = Math.hypot(dx, dz); dx /= L; dz /= L;
     car.a = a; car.b = b; car.dx = dx; car.dz = dz;
-    car.p0x = A.x + dx * IN - dz * LANE; car.p0z = A.z + dz * IN + dx * LANE;
-    car.len = L - 2 * IN; car.s = 0; car.turn = false; car.held = false;
+    car.p0x = A.x + dx * A.inset - dz * LANE; car.p0z = A.z + dz * A.inset + dx * LANE;
+    car.len = L - A.inset - Bn.inset; car.s = 0; car.turn = false; car.held = false; car.poly = null; car.plan = null;
   }
 
-  startTurn(car) {
+  // which way to leave the junction ahead
+  pickNext(car) {
     const Bn = this.nodes[car.b];
-    const opts = Bn.nb.filter(n => n !== car.a);
+    const opts = Bn.nb.filter(n => n !== car.a && !this.isClosed(car.b, n));
     let c;
     if (car.mission) c = car.route[car.ri + 2];
     else if (!opts.length) c = car.a;
@@ -192,12 +199,37 @@ export class Traffic {
         const sc = (C.x - Bn.x) * (Bn.x - car.zx) + (C.z - Bn.z) * (Bn.z - car.zz) + this.r() * 40;
         if (sc > best) { best = sc; c = o; }
       }
-    } else c = opts[Math.floor(this.r() * opts.length)];
+    } else {
+      // most drivers carry straight on
+      const ahead = opts.find(o => { const C = this.nodes[o], L = Math.hypot(C.x - Bn.x, C.z - Bn.z); return ((C.x - Bn.x) * car.dx + (C.z - Bn.z) * car.dz) / L > 0.9; });
+      c = ahead != null && this.r() < 0.6 ? ahead : opts[Math.floor(this.r() * opts.length)];
+    }
+    return c;
+  }
+  isClosed(a, b) { return this.closed.size > 0 && this.closed.has(a < b ? a + '-' + b : b + '-' + a); }
+  // close every road that passes within R of (x, z)
+  closeNear(x, z, R) {
+    this.nodes.forEach((A, a) => { for (const b of A.nb) { if (b < a) continue; const Bn = this.nodes[b], dx = Bn.x - A.x, dz = Bn.z - A.z, L2 = dx * dx + dz * dz;
+      const t = Math.max(0, Math.min(1, ((x - A.x) * dx + (z - A.z) * dz) / L2)); if (Math.hypot(A.x + dx * t - x, A.z + dz * t - z) < R) this.closed.add(a + '-' + b); } });
+  }
+  // leave a junction
+  release(node, car) { if (node.occ === car.id) node.occ = -1; }
+  // room to get out the other side? (don't block the box)
+  exitClear(b, c) {
+    if (c == null) return true;
+    for (const o of this.cars) if (o.mode === DRIVE && o.a === b && o.b === c && !o.turn && o.s < 9 && o.v < 2) return false;
+    return true;
+  }
+
+  startTurn(car) {
+    const Bn = this.nodes[car.b];
+    const c = car.plan ?? this.pickNext(car); car.plan = null;
     const C = this.nodes[c];
     let ex = C.x - Bn.x, ez = C.z - Bn.z; const L = Math.hypot(ex, ez); ex /= L; ez /= L;
     const rx = -car.dz, rz = car.dx, r2x = -ez, r2z = ex;
     const q0x = car.p0x + car.dx * car.len, q0z = car.p0z + car.dz * car.len;
-    const q2x = Bn.x + ex * IN + r2x * LANE, q2z = Bn.z + ez * IN + r2z * LANE;
+    const q2x = Bn.x + ex * Bn.inset + r2x * LANE, q2z = Bn.z + ez * Bn.inset + r2z * LANE;
+    if (Bn.round) { this.roundTurn(car, Bn, q0x, q0z, q2x, q2z, c); return; }
     const dot = car.dx * ex + car.dz * ez;
     let cx, cz;
     if (dot > 0.5) { cx = (q0x + q2x) / 2; cz = (q0z + q2z) / 2; }
@@ -205,6 +237,20 @@ export class Traffic {
     else { cx = Bn.x + (rx + r2x) * LANE; cz = Bn.z + (rz + r2z) * LANE; }
     car.q = [q0x, q0z, cx, cz, q2x, q2z];
     car.tlen = (Math.hypot(cx - q0x, cz - q0z) + Math.hypot(q2x - cx, q2z - cz) + Math.hypot(q2x - q0x, q2z - q0z)) / 2;
+    car.next = c; car.turn = true; car.t = 0; car.resume = -1;
+    if (Bn.occ < 0) Bn.occ = car.id;
+    car.held = false;
+  }
+
+  // around a roundabout: in, round the ring with the island on the driver's left, out
+  roundTurn(car, Bn, q0x, q0z, q2x, q2z, c) {
+    const R = Bn.round.rc, a0 = Math.atan2(q0z - Bn.z, q0x - Bn.x) - 0.3, a1 = Math.atan2(q2z - Bn.z, q2x - Bn.x) + 0.3;
+    let span = a0 - a1; span = ((span % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2); if (span < 0.25) span += Math.PI * 2;
+    const pts = [q0x, q0z], n = Math.max(3, Math.ceil(span / 0.18));
+    for (let k = 0; k <= n; k++) { const a = a0 - span * k / n; pts.push(Bn.x + Math.cos(a) * R, Bn.z + Math.sin(a) * R); }
+    pts.push(q2x, q2z);
+    const cum = [0]; for (let k = 2; k < pts.length; k += 2) cum.push(cum[cum.length - 1] + Math.hypot(pts[k] - pts[k - 2], pts[k + 1] - pts[k - 1]));
+    car.poly = pts; car.pcum = cum; car.tlen = cum[cum.length - 1];
     car.next = c; car.turn = true; car.t = 0; car.resume = -1;
     if (Bn.occ < 0) Bn.occ = car.id;
     car.held = false;
@@ -227,17 +273,23 @@ export class Traffic {
   // turn around in place onto the opposite lane (used when stuck)
   uturn(car) {
     const cx = car.x, cz = car.z, odx = car.dx, odz = car.dz, sOld = car.s;
-    const nb = this.nodes[car.b]; if (nb.occ === car.id) nb.occ = -1;
+    this.release(this.nodes[car.b], car);
     this.startSeg(car, car.b, car.a);
     const sNew = Math.min(car.len, Math.max(0, car.len - sOld));
     const tx = car.p0x + car.dx * sNew, tz = car.p0z + car.dz * sNew;
     car.q = [cx, cz, cx + odx * 3 + (tx - cx) * 0.5, cz + odz * 3 + (tz - cz) * 0.5, tx, tz];
-    car.tlen = 8; car.turn = true; car.t = 0; car.resume = sNew; car.blocked = 0;
+    car.tlen = 8; car.turn = true; car.t = 0; car.resume = sNew; car.blocked = 0; car.poly = null;
   }
 
   pose(car) {
     if (!car.turn) {
       car.x = car.p0x + car.dx * car.s; car.z = car.p0z + car.dz * car.s; car.hx = car.dx; car.hz = car.dz;
+    } else if (car.poly) {
+      const P = car.poly, C = car.pcum, d = Math.min(1, car.t) * car.tlen;
+      let k = 1; while (k < C.length - 1 && C[k] < d) k++;
+      const f = (d - C[k - 1]) / Math.max(1e-6, C[k] - C[k - 1]), ax = P[(k - 1) * 2], az = P[(k - 1) * 2 + 1], bx = P[k * 2], bz = P[k * 2 + 1];
+      car.x = ax + (bx - ax) * f; car.z = az + (bz - az) * f;
+      const n = Math.hypot(bx - ax, bz - az) || 1; car.hx = (bx - ax) / n; car.hz = (bz - az) / n;
     } else {
       const t = Math.min(1, car.t), u = 1 - t, Q = car.q;
       car.x = u * u * Q[0] + 2 * u * t * Q[2] + t * t * Q[4];
@@ -253,9 +305,13 @@ export class Traffic {
       const before = car.s;
       car.s += d;
       const node = this.nodes[car.b];
-      if (node.occ >= 0) { const o = this.cars[node.occ]; if (!o || o.mode !== DRIVE || o.b !== car.b || !(o.held || o.turn)) node.occ = -1; }
+      if (node.occ >= 0) { const o = this.cars[node.occ]; if (!o || o.mode !== DRIVE || o.b !== car.b || !(o.held || o.turn)) this.release(node, o || { id: node.occ }); }
       if (car.s >= car.len - STOPLINE && !car.held) {
         if (!car.mission && car.panic <= 0 && this.sirenNear(node)) { car.s = Math.max(before, car.len - STOPLINE); car.v = 0; return; }
+        if (car.panic <= 0) {
+          if (car.plan == null) car.plan = this.pickNext(car);
+          if (!this.exitClear(car.b, car.plan)) { car.s = Math.max(before, car.len - STOPLINE); car.v = 0; return; }
+        }
         if (node.occ < 0) { node.occ = car.id; car.held = true; }
         else if (node.occ === car.id) car.held = true;
         else if (car.panic <= 0 && !car.mission) { car.s = Math.max(before, car.len - STOPLINE); car.v = 0; return; }
@@ -272,7 +328,7 @@ export class Traffic {
         const over = (car.t - 1) * car.tlen;
         if (car.resume >= 0) { car.turn = false; car.s = car.resume + over; car.resume = -1; }
         else {
-          const node = this.nodes[car.b]; if (node.occ === car.id) node.occ = -1;
+          this.release(this.nodes[car.b], car);
           if (car.mission) car.ri++;
           this.startSeg(car, car.b, car.next); car.s = over;
         }
@@ -305,6 +361,8 @@ export class Traffic {
     let gap = 99;
     this.near(car.x, car.z, look, (o) => {
       if (o === car) return;
+      // in a junction only cars in the same junction or on the way out count (not the queues at the other entries)
+      if (car.turn && o.mode === DRIVE && !(o.turn && o.b === car.b) && !(!o.turn && o.a === car.b)) return;
       const dx = o.x - car.x, dz = o.z - car.z;
       const lx = dx * car.hx + dz * car.hz, lz = -dx * car.hz + dz * car.hx;
       const wide = o.mode === DRIVE ? 1.8 : 3.2;
@@ -355,7 +413,7 @@ export class Traffic {
       const gap = this.gapAhead(car, panic ? 12 : 20);
       const stop = panic ? 0.6 : 2.5;
       if (gap < 99) vDes = Math.min(vDes, Math.sqrt(Math.max(0, 2 * brake * (gap - stop))));
-      if (!panic && car.pedGap < 99) vDes = Math.min(vDes, Math.sqrt(Math.max(0, 2 * BRAKE * (car.pedGap - 1.5))));
+      if (!panic && car.pedGap < 99 && !(car.blocked > 4 && (car.held || car.turn))) vDes = Math.min(vDes, Math.sqrt(Math.max(0, 2 * BRAKE * (car.pedGap - 1.5)))); // after a wait, edge through the crowd
       if (!panic && !car.turn && !car.mission) {
         const node = this.nodes[car.b], toEnd = car.len - car.s;
         if (((node.occ >= 0 && node.occ !== car.id) || this.sirenNear(node)) && !car.held && toEnd < 18) vDes = Math.min(vDes, Math.sqrt(Math.max(0, 2 * BRAKE * (toEnd - STOPLINE))));
@@ -403,7 +461,7 @@ export class Traffic {
     for (const c of [car, other]) {
       if (!c || c.mode !== DRIVE) continue;
       c.mode = WRECK;
-      { const node = this.nodes[c.b]; if (node.occ === c.id) node.occ = -1; }
+      this.release(this.nodes[c.b], c);
       c.ignite = this.r() < 0.28 + Math.min(0.35, impact / 40);
       if (c.mission) { if (c.onLost) c.onLost(c); }
       else { this._c.set(c.colHex).multiplyScalar(0.6); this.tint(c, '#' + this._c.getHexString()); }
@@ -505,7 +563,7 @@ export class Traffic {
     const qn = [target]; dist[target] = 0;
     for (let qi = 0; qi < qn.length; qi++) {
       const u = qn[qi];
-      for (const v of this.nodes[u].nb) if (dist[v] < 0) { dist[v] = dist[u] + 1; par[v] = u; qn.push(v); }
+      for (const v of this.nodes[u].nb) if (dist[v] < 0 && !this.isClosed(u, v)) { dist[v] = dist[u] + 1; par[v] = u; qn.push(v); }
     }
     const NZ = this.city.sz.length, NX = this.city.sx.length;
     let best = 1e9, start = -1;
@@ -528,7 +586,7 @@ export class Traffic {
       if (car.gone || Math.hypot(car.x - x, car.z - z) > R) continue;
       if (car.mission) { if (car.mode === DRIVE || car.mode === PARKED) { if (car.onLost) car.onLost(car); } }
       car.mode = REST; car.v = 0; car.vx = car.vz = car.w = 0; car.burning = true; car.leaving = false;
-      const node = this.nodes[car.b]; if (node && node.occ === car.id) node.occ = -1;
+      const node = this.nodes[car.b]; if (node) this.release(node, car);
       if (!car.mission) this.tint(car, '#141210');
       if (this.fire && Math.random() < 0.3) this.fire.carFire(car.x, car.z);
     }
@@ -553,7 +611,7 @@ export class Traffic {
   // pull over where it is and deploy
   park(car) {
     car.mode = PARKED; car.v = 0; car.turn = false; this.pose(car);
-    const node = this.nodes[car.b]; if (node.occ === car.id) node.occ = -1;
+    this.release(this.nodes[car.b], car);
     if (car.onArrive) car.onArrive(car.x, car.z, car);
   }
 
@@ -576,7 +634,7 @@ export class Traffic {
       tried.add(r[0]);
       const A = this.nodes[r[0]], B = this.nodes[r[1]];
       const L = Math.hypot(B.x - A.x, B.z - A.z), dx = (B.x - A.x) / L, dz = (B.z - A.z) / L;
-      const sx = A.x + dx * IN - dz * LANE, sz = A.z + dz * IN + dx * LANE;
+      const sx = A.x + dx * A.inset - dz * LANE, sz = A.z + dz * A.inset + dx * LANE;
       let clear = true;
       this.near(sx, sz, 14, (o) => { if (Math.hypot(o.x - sx, o.z - sz) < 14) clear = false; });
       if (clear) { route = r; break; }

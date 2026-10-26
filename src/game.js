@@ -286,7 +286,7 @@ export class Game {
     p.uTime.value = this.realT;
     this.traffic.sync(this.realT);
     if (this.helis) this.helis.sync(dt * this.speed);
-    if (this.daylight) { this.daylight.set(this.mode.phase ? this.mode.phase() : 0); if (this.disasters) this.disasters.weather.apply(dt); this.daylight.update(); }
+    if (this.daylight) { this.daylight.set(this.mode.phase ? this.mode.phase() : 0); if (this.disasters) { this.disasters.weather.apply(dt); this.disasters.afterLight(); } this.daylight.update(); }
     this.fire.update(sdt, this.realT, this.camera, this.renderer);
     p.sync();
     if (this.disasters) this.disasters.sync(dt * this.speed, this.realT);

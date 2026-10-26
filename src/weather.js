@@ -11,6 +11,7 @@ export const WEATHER = {
   fog: { name: 'Fog', sun: 0.55, hemi: 1.05, fog: 3.2, sky: '#d4cec4', skyK: 0.85, sepia: 0.55, exp: 1.02, rain: 0, snow: 0, sand: 0, cover: 0 },
   snow: { name: 'Snow', sun: 0.62, hemi: 1.1, fog: 1.9, sky: '#d6dae0', skyK: 0.7, sepia: 0.25, exp: 0.97, rain: 0, snow: 1, sand: 0, cover: 0.15 },
   heat: { name: 'Heat wave', sun: 1.25, hemi: 1.05, fog: 1.7, sky: '#e9b56f', skyK: 0.45, sepia: 1.5, exp: 1.07, rain: 0, snow: 0, sand: 0, cover: 0 },
+  ash: { name: 'Ash fall', sun: 0.32, hemi: 0.8, fog: 2.4, sky: '#6a6460', skyK: 0.75, sepia: 0.5, exp: 0.9, rain: 0, snow: 0.9, sand: 0, cover: 0, ash: true },
   sand: { name: 'Sandstorm', sun: 0.5, hemi: 0.95, fog: 2.8, sky: '#c78a48', skyK: 0.85, sepia: 1.4, exp: 0.96, rain: 0, snow: 0, sand: 1, cover: 0 },
 };
 const KEYS = ['sun', 'hemi', 'fog', 'skyK', 'sepia', 'exp', 'rain', 'snow', 'sand', 'cover'];
@@ -85,7 +86,7 @@ export class Weather {
     const { fire, traffic, people } = this.ctx;
     fire.rainK = type === 'storm' ? 2.2 : type === 'rain' ? 1.4 : 0;
     fire.spreadK = type === 'heat' ? 3.5 : (type === 'rain' || type === 'storm') ? 0.15 : type === 'snow' ? 0.5 : 1;
-    traffic.speedK = type === 'snow' ? 0.65 : type === 'sand' ? 0.8 : type === 'fog' ? 0.85 : 1;
+    traffic.speedK = type === 'snow' ? 0.65 : type === 'sand' || type === 'ash' ? 0.8 : type === 'fog' ? 0.85 : 1;
     traffic.gripK = type === 'snow' ? 0.45 : type === 'storm' ? 0.75 : type === 'sand' ? 0.7 : 1;
     people.speedK = type === 'snow' ? 0.8 : type === 'sand' ? 0.9 : 1;
   }
@@ -138,6 +139,7 @@ export class Weather {
       u.uTime.value = realT; u.uFocus.value = dist; u.uSpeed.value = dist * speed; u.uLen.value = dist * len; u.uAlpha.value = alpha * Math.min(1, amount);
     };
     set(this.rain, p.rain, 0.15 * Math.min(1.4, p.rain), 0.085, 0.008, [0.6, 0.5, 0.6]);
+    if (this.snow.visible || p.snow > 0.02) this.snow.material.uniforms.uColor.value.set(this.target.ash ? '#7a746e' : '#ffffff'); // grey ash falls like snow
     set(this.snow, p.snow, 0.85, 0.006, 0.009, [0.6, 0.5, 0.6]);
     set(this.sand, p.sand, 0.22, 0.1, 0.03, [0.6, 0.45, 0.6]);
   }

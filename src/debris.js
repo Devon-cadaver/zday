@@ -91,7 +91,7 @@ export class Debris {
         this.vy[i] -= G * h; this.x[i] += this.vx[i] * h; this.y[i] += this.vy[i] * h; this.z[i] += this.vz[i] * h;
         this.rx[i] += this.wx[i] * h; this.ry[i] += this.wy[i] * h; this.rz[i] += this.wz[i] * h;
         const w = wy ? wy(this.x[i], this.z[i]) : -99;
-        if (w > 0.3 && this.y[i] <= w) { this.mode[i] = M.FLOAT; this.vy[i] = 0; }
+        if (w > 0.3 && this.y[i] <= w) { this.mode[i] = M.FLOAT; if (this.onSplash && this.vy[i] < -6) this.onSplash(this.x[i], w, this.z[i], this.sx[i]); this.vy[i] = 0; }
         else if (this.y[i] <= this.groundY(this.x[i], this.z[i]) + this.sy[i] * 0.4) { this.y[i] = this.groundY(this.x[i], this.z[i]) + this.sy[i] * 0.4; this.mode[i] = M.REST; this.t[i] = 25 + Math.random() * 10; this.rx[i] = 0; this.rz[i] = (Math.random() - 0.5) * 0.3; }
       } else if (md === M.FLOAT) {
         const w = wy ? wy(this.x[i], this.z[i]) : -99;
@@ -141,7 +141,7 @@ export class Debris {
         d.v.y -= G * h; o.position.addScaledVector(d.v, h);
         o.rotation.x += d.w.x * h; o.rotation.y += d.w.y * h; o.rotation.z += d.w.z * h;
         const w = wy ? wy(o.position.x, o.position.z) : -99;
-        if (w > 0.4 && o.position.y <= w) { d.mode = M.FLOAT; d.v.y = 0; }
+        if (w > 0.4 && o.position.y <= w) { d.mode = M.FLOAT; if (this.onSplash) this.onSplash(o.position.x, w, o.position.z, 3); d.v.y = 0; }
         else if (o.position.y <= 0.2) { o.position.y = 0.2; d.mode = M.REST; d.t = 0; o.rotation.x = Math.random() < 0.5 ? 0 : Math.PI; o.rotation.z = (Math.random() - 0.5) * 0.4; if (d.onLand) d.onLand(o); }
       } else if (d.mode === M.FLOAT) {
         const w = wy ? wy(o.position.x, o.position.z) : -99;

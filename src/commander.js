@@ -131,6 +131,7 @@ export class Commander {
   // a 911 call: toast, call strip, and a search zone on the map (jittered, so it is a hunt)
   report(x, z, text, radius, exact = false) {
     const p = this.g.people;
+    if (this.g.disasters.active('solar') && !exact) { radius *= 1.6; text = 'Static on the line... ' + text; } // the radio blackout garbles calls
     const a = p.r() * Math.PI * 2, jit = exact ? 0 : p.r() * radius * 0.45;
     const cx = x + Math.cos(a) * jit, cz = z + Math.sin(a) * jit;
     this.lastCall = { x: cx, z: cz };
@@ -156,6 +157,7 @@ export class Commander {
     if (this.cool[id] > 0) { this.g.toast(c.u.name + ' is busy for ' + Math.ceil(this.cool[id]) + ' s'); return; }
     if (this.rp < c.u.cost) { this.g.toast('Not enough points. ' + c.u.name + ' costs ' + c.u.cost); return; }
     if (this.alert < c.u.alert) { this.g.toast(c.u.name + ' needs alert level ' + c.u.alert); return; }
+    if ((id === 'water' || id === 'rescue') && this.g.disasters.active('solar')) { this.g.toast('Helicopters are grounded by the solar storm'); return; }
     for (const o of Object.values(this.cards)) o.btn.classList.remove('sel');
     this.sel = id; c.btn.classList.add('sel');
     this.g.toast('Tap the map where the ' + c.u.name.toLowerCase() + ' should go');
@@ -295,7 +297,7 @@ export class Commander {
     if (e.type === 'saucerdown') { this.saucers++; this.rp += 500; this.earned += 500; }
     if (e.type === 'riotend' && e.broken) { this.riotsBroken++; this.rp += 100; this.earned += 100; }
     if (e.type === 'warn') {
-      this.alertFloor = Math.max(this.alertFloor, e.hazard === 'aliens' ? 3 : e.hazard === 'riot' ? 1 : 2); // disasters open up the units you need
+      this.alertFloor = Math.max(this.alertFloor, e.hazard === 'aliens' || e.hazard === 'volcano' || e.hazard === 'meteor' ? 3 : e.hazard === 'riot' ? 1 : 2); // disasters open up the units you need
       if (e.x != null && !this.ended) { this.report(e.x, e.z, e.text, e.r || 60, e.exact); return true; }
     }
   }

@@ -118,6 +118,10 @@ level, outbreak count by level, airstrike fire chance, nuke radius, score weight
   - Tornado (L4): a storm cell crossing the city, tearing up blocks. Clear-up afterwards: fires, roofs.
   - Tsunami (L5): an 18 second warning, then a wave from one coast. Get people high, then lift them off.
   - Alien invasion (L6): saucers abduct, burn and land troops. Soldiers and police shoot them down when they fly low (+500).
+  - Sinkhole (L3): a street swallows people, cars and buildings. Cold wave (L5): anyone outdoors freezes; zombies freeze too
+    until it breaks. Dust storm (L6): a wall of sand lifts people and cars. Solar flare (L7): blackout, fires, helicopters
+    grounded, garbled 911 calls. Volcano (L8): lava through the streets and burning roofs. Meteor (L9): a warning, then a
+    crater and a burning district.
 - Weather changes the rules a little: rain and storms slow fires, heat spreads them, snow and sand slow cars and make them skid,
   fog hides the city, storms throw lightning.
 

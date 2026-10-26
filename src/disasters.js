@@ -9,6 +9,10 @@ import { Quake } from './quake.js';
 import { WaterSurface, Flood, Tsunami } from './water.js';
 import { Riot } from './riot.js';
 import { Invasion } from './aliens.js';
+import { Meteor, Sinkhole } from './impact.js';
+import { Volcano } from './volcano.js';
+import { Haboob, ColdWave } from './fronts.js';
+import { SolarStorm } from './solar.js';
 
 export const HAZARDS = {
   tornado: { name: 'Tornado', tap: true },
@@ -17,6 +21,12 @@ export const HAZARDS = {
   tsunami: { name: 'Tsunami', tap: false },
   riot: { name: 'Riot', tap: true },
   aliens: { name: 'Alien invasion', tap: false },
+  meteor: { name: 'Meteor', tap: true },
+  sinkhole: { name: 'Sinkhole', tap: true },
+  volcano: { name: 'Volcano', tap: true },
+  haboob: { name: 'Dust storm', tap: false },
+  coldwave: { name: 'Cold wave', tap: false },
+  solar: { name: 'Solar flare', tap: false },
 };
 export { WEATHER };
 
@@ -40,11 +50,13 @@ export class Disasters {
     this.ctx = ctx; // { scene, city, people, traffic, fire, post, camera, controls, renderer, sun, hemi, low, game }
     const { scene, people } = ctx;
     this.debris = new Debris(scene, ctx.low ? 1000 : 1600);
-    this.debris.groundY = (x, z) => people.groundY(x, z);
+    this.debris.groundY = (x, z) => (this.inHole(x, z) ? -40 : people.groundY(x, z)); // debris falls into pits and craters
     this.decals = new Decals(scene);
     this.weather = new Weather({ ...ctx, disasters: this });
     this.water = new WaterSurface(this);
-    this.list = []; this.events = []; this.bolts = []; this.timers = [];
+    // things falling into flood water or the sea throw up a splash
+    this.debris.onSplash = (x, y, z, s) => this.water.splash.emit(x, y, z, Math.round(4 + s * 3), { up: [3, 4 + s * 2], spread: 3, life: 1.1, size: 1.2 + s * 0.3 });
+    this.list = []; this.events = []; this.bolts = []; this.timers = []; this.leftovers = []; // craters, pits and lava stay until the world is reset
     this.lightK = 1; this.sunK = 1; // how bright the scene is lit right now (weather, night), for the unlit effects
     this.stats = { buildings: 0, hazards: 0 };
     this._carMats = new Map();
@@ -67,7 +79,13 @@ export class Disasters {
   shake(a) { const g = this.ctx.game; if (g) g.shake = Math.max(g.shake || 0, a); }
   flash(a) { const g = this.ctx.game; if (g) g.flash = Math.max(g.flash || 0, a); }
   later(secs, fn) { this.timers.push({ t: secs, fn }); }
-  onEvent(e) { for (const ev of this.list) if (ev.onEvent) ev.onEvent(e); }
+  inHole(x, z) { for (const l of this.leftovers) if (l.R && Math.hypot(x - l.x, z - l.z) < l.R) return true; return false; }
+  // after the day/night cycle and the weather have set the lights (a solar storm cuts the power)
+  afterLight() { for (const e of this.list) if (e.afterLight) e.afterLight(); }
+  onEvent(e) {
+    if (e.type === 'carland' && this.water.active && this.water.levelAt(e.x, e.z) > 0.4) this.water.splash.emit(e.x, this.water.level, e.z, 16, { up: [4, 9], spread: 5, life: 1.4, size: 2 });
+    for (const ev of this.list) if (ev.onEvent) ev.onEvent(e);
+  }
   active(type) { return this.list.some(e => e.type === type && e.alive); }
 
   // ---------- starting hazards
@@ -81,6 +99,12 @@ export class Disasters {
     else if (type === 'tsunami') ev = new Tsunami(this, opts);
     else if (type === 'riot') ev = new Riot(this, x, z, opts);
     else if (type === 'aliens') ev = new Invasion(this, opts);
+    else if (type === 'meteor') ev = new Meteor(this, x, z, opts);
+    else if (type === 'sinkhole') ev = new Sinkhole(this, x, z, opts);
+    else if (type === 'volcano') ev = new Volcano(this, x, z, opts);
+    else if (type === 'haboob') ev = new Haboob(this, opts);
+    else if (type === 'coldwave') ev = new ColdWave(this, opts);
+    else if (type === 'solar') ev = new SolarStorm(this, opts);
     if (!ev) return null;
     this.list.push(ev); this.stats.hazards++;
     return ev;
@@ -106,13 +130,13 @@ export class Disasters {
       city.addRubble(k, 0.7);
     } else {
       const dur = 2.2 + Math.random() * 1.4;
-      dbr.addObject(shell, 'sink', { dur, h: hgt + 2, dir: opts.dir ?? Math.random() * 6.28, onDone: () => city.addRubble(k, 0.75) });
+      dbr.addObject(shell, 'sink', { dur, h: hgt + 2, dir: opts.dir ?? Math.random() * 6.28, onDone: () => { if (!opts.noRubble) city.addRubble(k, 0.75); } });
       fire.dustCloud(cx, cz, Math.max(w, d) * 0.6, hgt);
       for (let i = 0; i < 14; i++) {
         const a = Math.random() * 6.28, sp = 3 + Math.random() * 6, s = 0.6 + Math.random() * 1.6;
         dbr.add(cx + Math.cos(a) * w * 0.4, b.baseY + Math.random() * hgt * 0.6, cz + Math.sin(a) * d * 0.4, s, s * 0.6, s, Math.random() < 0.7 ? hex : 0x6a6660, 'fly', { v: [Math.cos(a) * sp, 2 + Math.random() * 5, Math.sin(a) * sp] });
       }
-      people.crushNear(cx, cz, Math.max(w, d) * 0.5 + 4);
+      if (!opts.noCrush) people.crushNear(cx, cz, Math.max(w, d) * 0.5 + 4);
       this.shake(0.35);
     }
     this.stats.buildings++;
@@ -155,6 +179,7 @@ export class Disasters {
   update(h) {
     for (let i = this.timers.length - 1; i >= 0; i--) { const t = this.timers[i]; t.t -= h; if (t.t <= 0) { this.timers.splice(i, 1); t.fn(); } }
     for (const e of this.list) e.update(h);
+    for (const l of this.leftovers) if (l.update) l.update(h);
     for (let i = this.list.length - 1; i >= 0; i--) if (!this.list[i].alive) { this.list[i].dispose(); this.list.splice(i, 1); }
     this.water.update(h);
     this.weather.update(h);
@@ -165,6 +190,7 @@ export class Disasters {
     this.sunK = Math.min(1.2, sun.intensity / 5) * (1 - night);
     this.lightK = (0.3 + 0.7 * Math.min(1.2, (sun.intensity * 0.6 + hemi.intensity * 0.55) / 3.7)) * (1 - night * 0.55);
     for (const e of this.list) e.sync(dt, realT);
+    for (const l of this.leftovers) l.sync(dt, realT);
     this.water.sync(dt, realT);
     this.weather.sync(dt, realT);
     this.debris.sync();
@@ -176,6 +202,7 @@ export class Disasters {
   reset() {
     for (const e of this.list) e.dispose();
     this.list.length = 0; this.timers.length = 0; this.events.length = 0;
+    for (const l of this.leftovers) l.dispose(); this.leftovers.length = 0;
     for (const b of this.bolts) this.ctx.scene.remove(b.g); this.bolts.length = 0;
     this.debris.reset(); this.decals.reset(); this.water.reset();
     this.weather.set('clear', true);
