@@ -162,7 +162,7 @@ export class BillowWall {
 export class Haboob {
   constructor(D, opts = {}) {
     this.type = 'haboob'; this.D = D; this.t = 0; this.alive = true; this.phase = 'sweep'; this.fade = 1;
-    const side = opts.side ?? (Math.random() < 0.75 ? 2 : Math.floor(Math.random() * 4)), sw = this.sw = new SweepFront(D, side, { speed: 12, slow: 0.8, fast: 1.05, pile: 1.15, start: -90 });
+    const side = opts.side ?? (Math.random() < 0.75 ? 2 : Math.floor(Math.random() * 4)), sw = this.sw = new SweepFront(D, side, { speed: 12, slow: 0.8, fast: 1.05, pile: 1.15, start: -90, pull: opts.pull });
     this.billow = new BillowWall(D, sw, { H: 270 });
     // a dense backdrop behind the billows so no gaps show through
     this.walls = [curtain(D, sw, { H: 240, alpha: 0.95, back: 60, a: '#6a4428', b: '#b8804a', rise: 0.08 }), curtain(D, sw, { H: 210, alpha: 0.9, back: 120, a: '#6a4428', b: '#a07040', rise: 0.06 })];
@@ -170,8 +170,8 @@ export class Haboob {
     const { people } = D.ctx;
     this.hit = new Uint8Array(people.x.length); this.carsHit = new Set(); this.damaged = new Set(); this.stepN = 0;
     this.prevWeather = D.weather.type; this.sandOn = false; this.dustOn = false;
-    people.alarm(20);
-    D.emit({ type: 'warn', hazard: 'haboob', x: sw.origin.x + sw.dir.x * 80, z: sw.origin.y + sw.dir.y * 80, r: 120, exact: true, text: 'Dust storm! A wall of sand is rolling in from the ' + sw.coast + '. Get people indoors' });
+    if (!opts.quiet) people.alarm(20);
+    if (!opts.quiet) D.emit({ type: 'warn', hazard: 'haboob', x: sw.origin.x + sw.dir.x * 80, z: sw.origin.y + sw.dir.y * 80, r: 120, exact: true, text: 'Dust storm! A wall of sand is rolling in from the ' + sw.coast + '. Get people indoors' });
   }
   update(h) {
     const D = this.D, { people, traffic, city, fire } = D.ctx, sw = this.sw, d = sw.dir;

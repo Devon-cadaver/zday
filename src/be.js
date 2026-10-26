@@ -9,18 +9,29 @@ import { LavaField } from './volcano.js';
 import { Hole, swallow } from './impact.js';
 import { saucerMesh, beamMesh } from './aliens.js';
 import { ST, KIND } from './people.js';
+import { ZombiesCtl, RiotCtl, FloodCtl, VolcanoCtl, DustCtl, BlizzardCtl, SolarCtl, NukeCtl, ReactorCtl, RoamingHoleCtl, TripodCtl } from './be-more.js';
 
 const RUN = 180;
 const RANKS = [[0, 'F'], [8000, 'D'], [20000, 'C'], [40000, 'B'], [65000, 'A'], [95000, 'S']];
 export const BE = {
   tornado: { name: 'Tornado', k: 0.9, hint: 'Drag to steer the tornado. It grows as it feeds' },
   sinkhole: { name: 'Sinkhole', k: 0.6, hint: 'Press and hold to open a sinkhole. The longer you hold, the bigger it gets, up to ten blocks wide' },
+  zombies: { name: 'Zombie outbreak', k: 2.2, zom: true, hint: 'Tap to bite someone. Hold and drag and the horde follows your finger' },
+  riot: { name: 'Riot', k: 7, hint: 'Drag to lead the mob. It smashes and burns wherever you take it, and grows' },
   quake: { name: 'Earthquake', k: 1, hint: 'Drag across the city to tear a fault line through it' },
+  flood: { name: 'Flood', k: 0.8, hint: 'Hold to make it pour: the water rises while you hold and drains when you let go' },
   meteor: { name: 'Meteor shower', k: 0.45, hint: 'Tap where the next meteor should land' },
   lava: { name: 'Lava', k: 1.6, hint: 'Drag to pour lava. It runs down the streets and swallows what it touches' },
+  haboob: { name: 'Dust storm', k: 0.62, hint: 'Drag to pull the wall of dust through the streets. It lifts cars and people' },
+  coldwave: { name: 'Blizzard', k: 4, hint: 'Drag to steer a freezing blizzard. Everyone it catches freezes solid' },
   tsunami: { name: 'Tsunami', k: 0.35, hint: 'Drag to pull the wave. The water surges toward your finger' },
-  blackhole: { name: 'Black hole', k: 0.5, hint: 'Press and hold to grow a black hole, up to ten blocks wide. Let go and it feeds, then collapses into a void' },
   saucer: { name: 'Alien saucer', k: 3.5, hint: 'Drag to fly and blast the streets. Hold still over a crowd to beam them up' },
+  solar: { name: 'Solar flare', k: 1, hint: 'Hold to charge a flare, let go to strike. The longer you hold, the wider it hits' },
+  tripod: { name: 'Alien tripod', k: 3.5, hint: 'Drag to walk it. Hold under it to beam people up. Tap to sweep the heat ray' },
+  volcano: { name: 'Volcano', k: 2.5, hint: 'Tap where the volcano bursts out, then hold anywhere to rain lava bombs there' },
+  blackhole: { name: 'Black hole', k: 1.4, hint: 'Drag to move the black hole. It grows with everything it swallows' },
+  nuclear: { name: 'Nuclear strike', k: 0.2, hint: 'Hold to set the yield, let go to launch. Three warheads, another every minute' },
+  meltdown: { name: 'Meltdown', k: 1.4, zom: true, hint: 'Hold to overload the reactor until it blows, then drag to steer the fallout over the city' },
 };
 
 // a disaster the player drives, run by the disaster manager like any other event
@@ -88,15 +99,6 @@ class QuakeCtl {
   }
   label() { return Math.round(this.len) + ' m of faults'; }
   poi() { return this.held ? { x: this.last[0], z: this.last[1], danger: 20, range: 150 } : null; }
-}
-
-class BlackHoleCtl {
-  constructor(be) { this.be = be; this.ev = null; be.D.list.push(wrap(this)); }
-  down(x, z) { if (this.ev && this.ev.holding) return; this.ev = this.be.D.start('blackhole', x, z, { grow: true, quiet: true }); }
-  move() {} // it stays where it opened
-  up() { if (this.ev) this.ev.release(); }
-  update() {}
-  label() { return this.ev && this.ev.alive ? Math.round(this.ev.size * 2) + ' m wide' : 'Press and hold'; }
 }
 
 class MeteorCtl {
@@ -281,7 +283,17 @@ export class BeTheDisaster {
     else if (k === 'saucer') { this.ctl = new SaucerCtl(this, cx, cz); g.lookAt(cx, cz, 380); }
     else if (k === 'sinkhole') { this.ctl = new SinkholeCtl(this); g.lookAt(cx, cz, 420); }
     else if (k === 'quake') { this.ctl = new QuakeCtl(this); g.lookAt(cx, cz, 450); }
-    else if (k === 'blackhole') { this.ctl = new BlackHoleCtl(this); g.lookAt(cx, cz, 560); }
+    else if (k === 'blackhole') { this.ctl = new RoamingHoleCtl(this, cx, cz); g.lookAt(cx, cz, 520); }
+    else if (k === 'zombies') { this.ctl = new ZombiesCtl(this); g.lookAt(cx, cz, 420); }
+    else if (k === 'riot') { this.ctl = new RiotCtl(this, cx, cz); g.lookAt(cx, cz, 360); }
+    else if (k === 'flood') { this.ctl = new FloodCtl(this); g.lookAt(cx, cz, 480); }
+    else if (k === 'haboob') { this.ctl = new DustCtl(this); g.lookAt(B.x1 - 160, cz, 540); }
+    else if (k === 'coldwave') { this.ctl = new BlizzardCtl(this, cx, cz); g.lookAt(cx, cz, 420); }
+    else if (k === 'solar') { this.ctl = new SolarCtl(this); g.lookAt(cx, cz, 480); }
+    else if (k === 'tripod') { this.ctl = new TripodCtl(this, cx, cz); g.lookAt(cx, cz, 380); }
+    else if (k === 'volcano') { this.ctl = new VolcanoCtl(this); g.lookAt(cx, cz, 500); }
+    else if (k === 'nuclear') { this.ctl = new NukeCtl(this); g.lookAt(cx, cz, 600); }
+    else if (k === 'meltdown') { this.ctl = new ReactorCtl(this); }
     else if (k === 'meteor') { this.ctl = new MeteorCtl(this); g.lookAt(cx, cz, 520); }
     else if (k === 'lava') { this.ctl = new LavaCtl(this); g.lookAt(cx, cz, 420); }
     else if (k === 'tsunami') { this.ctl = new TsunamiCtl(this); g.lookAt(cx, B.z1 - 120, 520); }
@@ -295,7 +307,7 @@ export class BeTheDisaster {
     let cars = 0; for (const c of traffic.cars) if (!c.mission && (c.gone || c.mode !== 0)) cars++;
     for (const pc of traffic.parkedList) if (!pc.alive || pc.burnt) cars++;
     let fires = 0; const dead = this.g.city.dead; for (let k = 0; k < fire.bFire.length; k++) if (fire.bFire[k] && !dead[k]) fires++;
-    return { b: D.stats.buildings, dead: people.stats.dead, abd: people.stats.abducted, cars, fires };
+    return { b: D.stats.buildings, dead: people.stats.dead, abd: people.stats.abducted, cars, fires, zom: people.stats.zombies };
   }
 
   tap() {}
@@ -313,8 +325,8 @@ export class BeTheDisaster {
     if ((this.tick -= sdt) <= 0) {
       this.tick = 0.5;
       const m = this.measure(), b = this.base;
-      this.got = { b: m.b - b.b, dead: m.dead - b.dead, abd: m.abd - b.abd, cars: m.cars - b.cars, fires: m.fires - b.fires };
-      const G = this.got; this.score = Math.round(BE[this.kind].k * (150 * G.b + 12 * G.dead + 30 * G.abd + 40 * G.cars + 60 * G.fires));
+      this.got = { b: m.b - b.b, dead: m.dead - b.dead, abd: m.abd - b.abd, cars: m.cars - b.cars, fires: m.fires - b.fires, zom: BE[this.kind].zom ? Math.max(0, m.zom - b.zom) : 0 };
+      const G = this.got; this.score = Math.round(BE[this.kind].k * (150 * G.b + 12 * G.dead + 30 * G.abd + 40 * G.cars + 60 * G.fires + 12 * G.zom)); // the zombie modes count their horde too
     }
     if (this.t >= RUN) this.finish();
     this.hud();
@@ -337,6 +349,7 @@ export class BeTheDisaster {
     const r = g.profile.addBe(this.kind, this.score), best = (g.profile.data.beBest || {})[this.kind] || 0;
     const lines = [['Buildings destroyed', G.b], ['Victims', (G.dead + G.abd).toLocaleString()], ['Cars wrecked', G.cars], ['Fires started', G.fires]];
     if (G.abd) lines.splice(2, 0, ['Beamed up', G.abd.toLocaleString()]);
+    if (G.zom) lines.splice(2, 0, ['Zombies made', G.zom.toLocaleString()]);
     this.end.innerHTML = '<div class="box"><h2>' + BE[this.kind].name + '</h2><div>Rank ' + rank + (r.best ? ' · new best!' : ' · best ' + best.toLocaleString()) + '</div>' +
       '<div class="stars" style="letter-spacing:0">' + rank + '</div>' +
       lines.map(l => '<div class="line"><span>' + l[0] + '</span><b>' + l[1] + '</b></div>').join('') +

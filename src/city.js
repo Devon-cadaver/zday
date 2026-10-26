@@ -17,9 +17,26 @@ const lin = (hex) => { const c = new THREE.Color(hex); return [c.r, c.g, c.b]; }
 const shade = (c, k) => [c[0] * k, c[1] * k, c[2] * k];
 const toWhite = (c, k) => [c[0] + (1 - c[0]) * k, c[1] + (1 - c[1]) * k, c[2] + (1 - c[2]) * k];
 
-const WALLS = ['#e8c79a', '#d9a978', '#f0dcb8', '#c98f62', '#e3cba4', '#d6b98e', '#cfae84', '#c9a57a', '#dcc39b', '#bf9b72', '#e8d6b5', '#c7a07a',
-  '#d9b48a', '#b99573', '#e0c7a6', '#cdb08f', '#ece2cf', '#d4a98c', '#c2a184', '#e6cfa8'];
-const ROOFS = ['#d3c7b0', '#c8b99d', '#d9cbae', '#bfae92', '#cdbda3'];
+const ROOFS = ['#d3c7b0', '#c8b99d', '#d9cbae', '#bfae92', '#cdbda3', '#8d877c', '#77726a', '#a39c8e', '#6d6a64', '#b0a898'];
+// what real city blocks are built of; districts mix them differently (see wallColor)
+const MATERIALS = {
+  brick: ['#a65a3e', '#9a4f37', '#b3664a', '#8e4a34', '#b97257', '#a35f44', '#c07a5c', '#8a3f2e'],
+  brown: ['#7b5a45', '#86644c', '#6e5040', '#93705a'],
+  stone: ['#ddd2bb', '#e4dac6', '#d2c5aa', '#e9e1cf', '#cbbd9f'],
+  sand: ['#e8c79a', '#d9a978', '#d6b98e', '#c9a57a', '#e0c7a6', '#cfae84'],
+  concrete: ['#b6b2a8', '#a9a59b', '#c4c0b5', '#9d9a92', '#bdb8ad'],
+  white: ['#f0ebe1', '#ece5d8', '#f4efe6', '#e8e2d4'],
+  dark: ['#5f5c58', '#6a6660', '#55524e', '#4b4a48'],
+  pastel: ['#a8b49a', '#9fb0b8', '#d9a28a', '#d8b766', '#c7a2a6', '#b8c4a8', '#e2b98f'],
+  glass: ['#7f94a2', '#8aa1aa', '#6f8290', '#93a7a5', '#6c7c86'],
+};
+const MIX = {
+  down: { stone: 3, concrete: 3, dark: 1.6, white: 1.2, brick: 1, sand: 0.6 },
+  old: { brick: 5, brown: 2.5, stone: 1.2, sand: 1, pastel: 0.4 },
+  res: { white: 2.2, pastel: 2.4, sand: 2, brick: 1.4, stone: 0.8 },
+  ind: { concrete: 3, brick: 3, dark: 1.6, sand: 0.8 },
+  mixed: { brick: 2.2, sand: 1.6, stone: 1.6, white: 1.2, concrete: 1, pastel: 0.8, brown: 0.6, dark: 0.4 },
+};
 const RUST = ['#b86a3e', '#a85d36', '#c27c4b', '#9c5a3a', '#b5774f', '#a8673f'];
 const GREENS = ['#6f7f3a', '#5d7034', '#7d8a45', '#56692f', '#8a9150', '#68783c', '#4f6330'];
 
@@ -167,6 +184,23 @@ export function buildCity(tex, opts = {}) {
     return h;
   };
 
+  // districts: a brick old town, a stone, glass and concrete downtown, lighter painted residential streets, industrial edges
+  const dS = [r() * 100, r() * 100, r() * 100];
+  const district = (x, z) => {
+    if (heightAt(x, z) > 0.55) return 'down';
+    const edge = Math.max(Math.abs(x) / sx[NB], Math.abs(z) / sz[NB]), n1 = Math.sin(x * 0.006 + dS[0]) * Math.cos(z * 0.005 + dS[1]), n2 = Math.sin(x * 0.0045 - z * 0.004 + dS[2]);
+    if (edge > 0.8 && n2 > 0.1) return 'ind';
+    return n1 > 0.15 ? 'old' : n1 < -0.25 ? 'res' : 'mixed';
+  };
+  const wallColor = (x, z, fl, style) => {
+    let w;
+    if (style === 1) w = { glass: 6, concrete: 2, dark: 1.5, stone: 1 }; // ribbon windows: a modern office block
+    else { w = { ...MIX[district(x, z)] }; if (fl >= 9) for (const k of ['stone', 'concrete', 'dark']) w[k] = (w[k] || 0) * 2 + 1; }
+    let t = r() * Object.values(w).reduce((a, b) => a + b, 0), m = 'sand';
+    for (const k in w) { if ((t -= w[k]) <= 0) { m = k; break; } }
+    return shade(lin(pick(MATERIALS[m])), 0.92 + r() * 0.14);
+  };
+
   const addTree = (x, z, y, s, trunkH) => {
     trunks.push({ x, z, y, h: trunkH, s: s * 0.5, b: curB });
     crowns.push({ x, y: y + trunkH + s * 0.75, z, s, col: pick(GREENS), b: curB });
@@ -272,7 +306,7 @@ export function buildCity(tex, opts = {}) {
     fl = Math.min(fl, Math.floor(Math.min(w, d) * 0.9), 16);
     const sq = r();
     const style = fl >= 9 ? (sq < 0.25 ? 1 : sq < 0.7 ? 0 : 2) : (sq < 0.45 ? 0 : sq < 0.72 ? 2 : sq < 0.93 ? 3 : 1);
-    const col = lin(pick(WALLS));
+    const col = wallColor((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2, fl, style);
     const y0 = CURB;
     const fk = 'fac' + style, vStart = { [fk]: B.fac[style].v, shop: B.shop.v, roof: B.roof.v, grass: B.grass.v };
     sides(B.shop, b, y0, y0 + GF, toWhite(col, 0.35), { su: 24, sv: GF, v0: y0 });
@@ -326,6 +360,74 @@ export function buildCity(tex, opts = {}) {
     rec.wallCol = col; rec.top = th; rec.hut = hut || null; rec.hatch = hut ? hut.door : null;
     buildings.push(rec);
     curB = -1;
+  }
+
+  // ---- landmarks: one building of stacked tiers on a whole block, recorded like any other (it can burn and fall)
+  const sq = (cx, cz, hw, hd = hw) => ({ x0: cx - hw, x1: cx + hw, z0: cz - hd, z1: cz + hd });
+  function tiered(tiers, style, col, blk, o = {}) {
+    curB = buildings.length;
+    const fk = 'fac' + style, vStart = { [fk]: B.fac[style].v, shop: B.shop.v, roof: B.roof.v, grass: B.grass.v }, y0 = CURB, base = tiers[0].b;
+    sides(B.shop, base, y0, y0 + GF, toWhite(col, 0.3), { su: 24, sv: GF, v0: y0 });
+    let y = y0 + GF, fl = 0;
+    for (const t of tiers) {
+      const y1 = y + t.fl * FH; fl += t.fl;
+      sides(B.fac[style], t.b, y, y1, col, { su: 12, sv: 12, v0: y0 + GF });
+      top(B.roof, t.b, y1, lin(o.roof || '#a39c8e'));
+      box(B.roof, { x0: t.b.x0 - 0.35, x1: t.b.x1 + 0.35, z0: t.b.z0 - 0.35, z1: t.b.z1 + 0.35 }, y1 - 0.7, y1, toWhite(col, o.trim ?? 0.25)); // cornice
+      parapet(t.b, y1, col, 1.0);
+      y = y1;
+    }
+    const tb = tiers[tiers.length - 1].b, tcx = (tb.x0 + tb.x1) / 2, tcz = (tb.z0 + tb.z1) / 2;
+    const hut = o.noHut ? null : roofStuff({ x0: tb.x0 + 0.35, x1: tb.x1 - 0.35, z0: tb.z0 + 0.35, z1: tb.z1 - 0.35 }, y, col, true);
+    const th = o.crown ? o.crown(tcx, tcz, y, tb) : y;
+    const ranges = [{ key: fk, v0: vStart[fk], v1: B.fac[style].v }, { key: 'shop', v0: vStart.shop, v1: B.shop.v }, { key: 'roof', v0: vStart.roof, v1: B.roof.v }, { key: 'grass', v0: vStart.grass, v1: B.grass.v }];
+    const rec = { x0: base.x0, x1: base.x1, z0: base.z0, z1: base.z1, roofY: y, baseY: y0, fl, ranges, door: null, roof: { x0: tb.x0 + 0.7, x1: tb.x1 - 0.7, z0: tb.z0 + 0.7, z1: tb.z1 - 0.7 }, landmark: o.name };
+    const cx = (base.x0 + base.x1) / 2; rec.wall = [cx, base.z0]; rec.door = [cx, blk.z0 - 0.9]; rec.n = [0, -1];
+    rec.wallCol = col; rec.top = th; rec.hut = hut || null; rec.hatch = hut ? hut.door : null;
+    buildings.push(rec); curB = -1;
+    return rec;
+  }
+  // a round drum and a dome made of quads (the dome of a civic building)
+  function drum(cx, cz, y0, y1, R, col, segs = 18) {
+    for (let j = 0; j < segs; j++) {
+      const b0 = j / segs * Math.PI * 2, b1 = (j + 1) / segs * Math.PI * 2, bm = (b0 + b1) / 2;
+      const P = (b, y) => [cx + Math.cos(b) * R, y, cz + Math.sin(b) * R];
+      B.roof.quad(P(b1, y0), P(b0, y0), P(b0, y1), P(b1, y1), [Math.cos(bm), 0, Math.sin(bm)], [0, 0], [1, 0], [1, 1], [0, 1], shade(col, 0.82), col);
+    }
+  }
+  function dome(cx, cz, y, R, col, segs = 18, rings = 7) {
+    for (let i = 0; i < rings; i++) {
+      const a0 = i / rings * Math.PI / 2, a1 = (i + 1) / rings * Math.PI / 2, am = (a0 + a1) / 2;
+      for (let j = 0; j < segs; j++) {
+        const b0 = j / segs * Math.PI * 2, b1 = (j + 1) / segs * Math.PI * 2, bm = (b0 + b1) / 2;
+        const P = (a, b) => [cx + Math.cos(a) * Math.cos(b) * R, y + Math.sin(a) * R, cz + Math.cos(a) * Math.sin(b) * R];
+        const c = shade(col, 0.8 + 0.2 * Math.sin(am));
+        B.roof.quad(P(a0, b1), P(a0, b0), P(a1, b0), P(a1, b1), [Math.cos(am) * Math.cos(bm), Math.sin(am), Math.cos(am) * Math.sin(bm)], [0, 0], [1, 0], [1, 1], [0, 1], c, c);
+      }
+    }
+  }
+  const mast = (cx, cz, y, hgt, s = 0.5) => { box(B.roof, sq(cx, cz, s), y, y + hgt, lin('#c9c4ba')); box(B.roof, sq(cx, cz, s * 2.2), y + hgt * 0.35, y + hgt * 0.35 + 0.6, lin('#9a958c')); return y + hgt; };
+  function landmark(kind, blk) {
+    const cx = (blk.x0 + blk.x1) / 2, cz = (blk.z0 + blk.z1) / 2, W = (blk.x1 - blk.x0) / 2, D = (blk.z1 - blk.z0) / 2;
+    top(B.walk, blk, CURB + 0.03, lin('#ece2cf'), 4); // a paved forecourt all round
+    crowds.push({ x: cx, z: blk.z0 + 3, y: CURB + 0.03, n: 14 + Math.floor(r() * 14), rad: 4 });
+    if (kind === 'spire') // a glass skyscraper in three setbacks with a spire
+      tiered([{ b: sq(cx, cz, W * 0.62, D * 0.62), fl: 14 }, { b: sq(cx, cz, W * 0.5, D * 0.5), fl: 12 }, { b: sq(cx, cz, W * 0.38, D * 0.38), fl: 10 }], 1, lin('#6f8290'), blk,
+        { name: 'Skyscraper', roof: '#5f6a72', trim: 0.15, crown: (x, z, y, t) => { box(B.roof, sq(x, z, (t.x1 - t.x0) * 0.32), y, y + 5, lin('#8a98a2')); box(B.roof, sq(x, z, (t.x1 - t.x0) * 0.18), y + 5, y + 10, lin('#a7b2b8')); return mast(x, z, y + 10, 26, 0.45); } });
+    else if (kind === 'deco') // a stepped limestone Art Deco tower
+      tiered([{ b: sq(cx, cz, W * 0.66, D * 0.66), fl: 10 }, { b: sq(cx, cz, W * 0.54, D * 0.54), fl: 8 }, { b: sq(cx, cz, W * 0.42, D * 0.42), fl: 7 }, { b: sq(cx, cz, W * 0.3, D * 0.3), fl: 5 }], 0, lin('#e2d6bc'), blk,
+        { name: 'Art Deco tower', trim: 0.4, crown: (x, z, y, t) => { const s = (t.x1 - t.x0) / 2; box(B.roof, sq(x, z, s * 0.7), y, y + 5, lin('#e8dcc2')); box(B.roof, sq(x, z, s * 0.45), y + 5, y + 9, lin('#d9c9a4')); box(B.roof, sq(x, z, s * 0.25), y + 9, y + 13, lin('#cdb98c')); return mast(x, z, y + 13, 16, 0.35); } });
+    else if (kind === 'twins') { // two slim glass towers
+      for (const sd of [-1, 1]) tiered([{ b: sq(cx + sd * W * 0.38, cz, W * 0.3, D * 0.42), fl: 32 }], 1, lin(sd < 0 ? '#8aa1aa' : '#93a7a5'), blk,
+        { name: 'Twin towers', roof: '#6c7c86', trim: 0.1, crown: (x, z, y) => { box(B.roof, sq(x, z, W * 0.2, D * 0.3), y, y + 3, lin('#7a8a94')); return mast(x, z, y + 3, 14, 0.4); } });
+    } else if (kind === 'dome') { // city hall: white stone, a columned portico and a green copper dome
+      const hw = W * 0.8, hd = D * 0.55, h = CURB + GF + 4 * FH, R = Math.min(hw, hd) * 0.42;
+      tiered([{ b: sq(cx, cz, hw, hd), fl: 4 }], 3, lin('#efe9dc'), blk, { name: 'City hall', noHut: true, trim: 0.45, roof: '#cfc6b4',
+        crown: (x, z, y) => { drum(x, z, y, y + 7, R, lin('#ebe4d5')); box(B.roof, sq(x, z, R * 1.05, R * 1.05), y + 6.6, y + 7.2, lin('#dcd3c0')); dome(x, z, y + 7, R, lin('#86a596')); drum(x, z, y + 7 + R, y + 10 + R, R * 0.18, lin('#e8e1d2'), 8); dome(x, z, y + 10 + R, R * 0.2, lin('#86a596'), 8, 3); return y + 10 + R * 1.2; } });
+      for (let k = 0; k < 8; k++) { const x = cx - hw * 0.55 + k * hw * 1.1 / 7; box(B.roof, sq(x, cz - hd - 2.2, 0.5), CURB, h, lin('#f2ece0')); } // the portico
+      box(B.roof, { x0: cx - hw * 0.62, x1: cx + hw * 0.62, z0: cz - hd - 3.2, z1: cz - hd }, h, h + 1.4, lin('#ebe4d5'));
+      box(B.roof, { x0: cx - hw * 0.62, x1: cx + hw * 0.62, z0: cz - hd - 3.4, z1: cz - hd }, CURB, CURB + 0.6, lin('#e2dacb')); // steps
+    }
   }
 
   function split(rect, out, depth) {
@@ -458,6 +560,25 @@ export function buildCity(tex, opts = {}) {
     crowds.push({ x: cx + (blk.x1 - blk.x0) * 0.25, z: cz, y: CURB + 0.07, n: 12, rad: 5 });
   }
 
+  // ---- where the landmarks go: whole ordinary blocks in the busiest districts, well apart
+  const landmarks = new Map();
+  {
+    const cand = [];
+    for (let i = 1; i < NB - 1; i++) for (let j = 1; j < NB - 1; j++) {
+      const key = i + ',' + j;
+      if (owner.get(key) || splitBlk.get(key) || cornersOf(i, j).some(c => roundAt.get(c))) continue;
+      const x = (sx[i] + sx[i + 1]) / 2, z = (sz[j] + sz[j + 1]) / 2;
+      cand.push({ key, x, z, s: heightAt(x, z) + r() * 0.35 });
+    }
+    cand.sort((a, b) => b.s - a.s);
+    const kinds = ['spire', 'deco', 'dome', 'twins'];
+    for (const c of cand) {
+      if (landmarks.size >= kinds.length) break;
+      if ([...landmarks.values()].some(o => Math.hypot(o.x - c.x, o.z - c.z) < 140)) continue;
+      landmarks.set(c.key, { kind: kinds[landmarks.size], x: c.x, z: c.z });
+    }
+  }
+
   // ---- blocks (a merged superblock is handled once, by its first block)
   for (let i = 0; i < NB; i++) {
     for (let j = 0; j < NB; j++) {
@@ -476,6 +597,7 @@ export function buildCity(tex, opts = {}) {
       walkBlocks.push({ x0: blk.x0 - SW * 0.5, x1: blk.x1 + SW * 0.5, z0: blk.z0 - SW * 0.5, z1: blk.z1 + SW * 0.5 });
 
       if (own && own.kind === 'park') { bigPark(blk); continue; }
+      const lm = landmarks.get(key); if (lm && !own && !diag && !cuts.length) { landmark(lm.kind, blk); continue; }
       if (!own && !diag && !cuts.length && r() < 0.05) { // whole-block park
         top(B.grass, blk, CURB + 0.04, lin('#ffffff'), 6);
         const n = Math.floor((blk.x1 - blk.x0) * (blk.z1 - blk.z0) / 45);

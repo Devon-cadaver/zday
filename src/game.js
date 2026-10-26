@@ -80,6 +80,8 @@ const CSS = `
 #zd-menu .row .d{font-size:11px;opacity:.75}
 #zd-menu .row .s{font-size:11px;white-space:nowrap;color:#ffc233;font-variant-numeric:tabular-nums}
 #zd-menu .row .zd-btn{padding:8px 10px;font-size:11px;min-width:0}
+#zd-menu .row > div{min-width:0}
+#zd-menu .row .zd-btn, #zd-menu .row .s{flex:none}
 #zd-menu .row .zd-btn.own-go{background:rgba(70,98,34,.9);border-color:rgba(166,255,77,.5)}
 #zd-menu .row .zd-btn.own{background:rgba(70,98,34,.9);border-color:rgba(166,255,77,.5);pointer-events:none}
 #zd-menu .back{margin-top:12px}

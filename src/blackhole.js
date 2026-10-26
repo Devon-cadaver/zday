@@ -5,7 +5,7 @@
 // eaten into a black void. When it has fed it collapses in a flash and the
 // void stays behind, a sinkhole into nothing.
 import * as THREE from 'three';
-import { Hole } from './impact.js';
+import { Hole, swallow } from './impact.js';
 import { NOISE } from './water.js';
 
 const DISK_VS = /* glsl */`
@@ -41,7 +41,8 @@ export class BlackHole {
     this.type = 'blackhole'; this.D = D; this.x = x; this.z = z; this.y = 15; this.t = 0; this.alive = true; this.phase = 'form';
     this.Rmax = o.size ?? 3.2 + Math.random() * 1.3; this.life = o.life ?? 26; this.Rh = 0.05; this.tick = 0;
     this.lift = []; this.cars = []; this.eaten = 0;
-    this.hold = !!o.grow; this.holding = this.hold; this.holdT = 0; this.voidR = 3; // held: it swells for as long as the finger is down
+    this.hold = !!o.grow; this.holding = this.hold; this.holdT = 0; this.voidR = 3;
+    this.steer = !!o.steer; this.tx = x; this.tz = z; this.torn = 0; // steered (Be The Disaster): it roams after your finger and leaves its void where it dies // held: it swells for as long as the finger is down
     const scene = D.ctx.scene;
     this.ball = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 20), new THREE.MeshBasicMaterial({ color: 0x000000, fog: false }));
     this.diskMat = new THREE.ShaderMaterial({ vertexShader: DISK_VS, fragmentShader: DISK_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
@@ -55,7 +56,7 @@ export class BlackHole {
     // debris drawn in spirals into it (debris.js treats a sink vortex specially)
     this.vort = { x, z, y: this.y, H: this.y * 2, sink: true, horizon: 0.1, scale: 1, spin: 1, alive: true, radiusAt: () => 2 };
     this.vi = D.debris.vortices.push(this.vort) - 1;
-    this.hole = new Hole(D, x, z, { R: 0.5, depth: 70, rim: 1.25, shape: 'shaft', wall: '#16120f', floor: '#000000', rimCol: '#2c2622', void: true });
+    this.hole = this.steer ? { R: 3, setR(r) { this.R = r; } } : new Hole(D, x, z, { R: 0.5, depth: 70, rim: 1.25, shape: 'shaft', wall: '#16120f', floor: '#000000', rimCol: '#2c2622', void: true });
     if (!o.quiet) D.emit({ type: 'warn', hazard: 'blackhole', x, z, r: 70, exact: true, text: 'Gravitational anomaly in the ' + D.district(x, z) + ' district! Something is tearing a hole in space. Get away from it' });
     D.flash(0.25); D.shake(0.6);
   }
@@ -63,12 +64,21 @@ export class BlackHole {
   get tearR() { return Math.max(5 + this.Rh * 6, this.voidR + 10); }
   get size() { return this.hole.R; }
   release() { if (this.holding) { this.holding = false; this.ft = 0; } }
+  collapse() { if (this.phase === 'form' || this.phase === 'feed') { this.phase = 'collapse'; this.ct = 0; this.R0 = this.Rh; } }
   poi() { return this.phase === 'gone' ? null : { x: this.x, z: this.z, danger: this.pullR * 1.15, range: 520 }; }
 
   update(h) {
     const D = this.D;
     this.t += h;
-    if (this.hold && (this.phase === 'form' || this.phase === 'feed')) { // swells while held, feeds a while after it is let go
+    if (this.steer && (this.phase === 'form' || this.phase === 'feed')) { // roams after the finger, slower the bigger it is, and grows with what it eats
+      const dx = this.tx - this.x, dz = this.tz - this.z, d = Math.hypot(dx, dz), sp = Math.max(2, 9 - this.Rh);
+      if (d > 1) { this.x += dx / d * Math.min(d, sp * h); this.z += dz / d * Math.min(d, sp * h); this.vort.x = this.x; this.vort.z = this.z; }
+      const tRh = (this.phase === 'form' ? Math.min(1, this.t / 1.5) : 1) * Math.min(7, 1 + this.eaten * 0.01 + this.torn * 0.12);
+      this.Rh += (tRh - this.Rh) * Math.min(1, h);
+      this.hole.R = 3 + this.Rh * 3;
+      D.shake(0.1 + this.Rh * 0.03);
+      if (this.phase === 'form' && this.t >= 1.5) { this.phase = 'feed'; this.ft = 0; }
+    } else if (this.hold && (this.phase === 'form' || this.phase === 'feed')) { // swells while held, feeds a while after it is let go
       if (this.holding) { this.holdT += h; if (this.holdT > 90) this.release(); }
       const tRh = (this.phase === 'form' ? Math.min(1, this.t / 1.5) : 1) * (1 + Math.min(8, this.holdT * 0.4));
       this.Rh += (tRh - this.Rh) * Math.min(1, h * 2);
@@ -125,14 +135,14 @@ export class BlackHole {
       if (this.hold && inside < 3 && Math.hypot((b.x0 + b.x1) / 2 - x, (b.z0 + b.z1) / 2 - z) < this.hole.R + 4 && D.destroyBuilding(k, 'tear', { vort: this.vi, noRubble: true })) { inside++; for (const j of people.lifted) this.lift.push(j); people.lifted.length = 0; return; }
       if (d < dk) { dk = d; k0 = k; }
     });
-    if (k0 >= 0 && Math.random() < 0.5 && D.destroyBuilding(k0, 'tear', { vort: this.vi, noRubble: true })) { for (const j of people.lifted) this.lift.push(j); people.lifted.length = 0; } // the people inside go with it
+    if (k0 >= 0 && Math.random() < 0.5 && D.destroyBuilding(k0, 'tear', { vort: this.vi, noRubble: true }) && ++this.torn) { for (const j of people.lifted) this.lift.push(j); people.lifted.length = 0; } // the people inside go with it
     for (const it of city.takeStreetNear(x, z, T)) D.debris.add(it.x, it.y, it.z, it.s * 0.8, it.s * 0.6, it.s * 0.8, it.kind === 'tree' ? it.col : '#4a4540', 'orbit', { vort: this.vi, hold: 99 });
     // the street itself comes up in chunks
     for (let n = 0; n < 4; n++) {
       const a = Math.random() * 6.28, r = this.hole.R + Math.random() * T * 0.5, s = 0.4 + Math.random() * 1.3;
       D.debris.add(x + Math.cos(a) * r, 0.3, z + Math.sin(a) * r, s, s * 0.35, s * (0.6 + Math.random() * 0.6), Math.random() < 0.6 ? 0x6a655c : 0x8a8274, 'orbit', { vort: this.vi, hold: 99 });
     }
-    this.hole.setR(Math.max(this.hole.R, this.hold ? this.voidR : Math.min(T * 0.85, 3 + this.Rh * 4.6)));
+    if (!this.steer) this.hole.setR(Math.max(this.hole.R, this.hold ? this.voidR : Math.min(T * 0.85, 3 + this.Rh * 4.6)));
   }
 
   // everything caught spirals in: tighter and faster as it falls, gone at the horizon
@@ -168,6 +178,11 @@ export class BlackHole {
     for (const c of this.cars) if (c.mode === 4 && !c.gone) { const dx = c.x - this.x, dz = c.z - this.z, d = Math.hypot(dx, dz) || 1; traffic.fling(c, dx / d * 16, 6, dz / d * 16); }
     this.lift.length = 0; this.cars.length = 0;
     this.vort.alive = false;
+    if (this.steer) { // it dies where it stands and the ground there is gone
+      const R = Math.min(D.maxHoleR, 6 + this.Rh * 7);
+      this.hole = new Hole(D, this.x, this.z, { R, depth: 70, rim: 1.25, shape: 'shaft', wall: '#16120f', floor: '#000000', rimCol: '#2c2622', void: true });
+      swallow(D, this.x, this.z, R); D.ctx.city.buildingsNear(this.x, this.z, R, (k, d, b) => { if (Math.hypot((b.x0 + b.x1) / 2 - this.x, (b.z0 + b.z1) / 2 - this.z) < R) D.destroyBuilding(k, 'collapse', { noRubble: true, noCrush: true }); });
+    }
     people.block(this.x, this.z, this.hole.R + 0.3); traffic.closeNear(this.x, this.z, this.hole.R + 3);
     D.ctx.post.opts.lens = null;
     this.phase = 'gone'; this.alive = false;

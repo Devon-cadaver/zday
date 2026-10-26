@@ -5,6 +5,7 @@
 // airstrike or a nuke brings them down too. The fleet leaves after a few
 // minutes, or once every saucer is down.
 import * as THREE from 'three';
+import { Tripod } from './tripod.js';
 import { ST, KIND } from './people.js';
 
 const PROFILE = [[0, 1.5], [1.9, 1.35], [3.4, 0.75], [6.6, 0.16], [7, 0], [6.6, -0.14], [4.6, -0.55], [2.4, -0.85], [0, -0.95]];
@@ -69,13 +70,15 @@ export class Invasion {
     this.mother = saucerMesh(true); this.mother.scale.setScalar(7.5); this.mother.position.set(cx, this.my, cz);
     scene.add(this.mother);
     this.saucers = []; this.toLaunch = opts.n ?? 5; this.launchT = 9;
+    this.tripods = []; this.toDrop = opts.tripods ?? 2; this.dropT = 16; // walking machines lowered into the streets
     this.lasers = []; this.stats = { down: 0, abducted: 0, aliens: 0 };
-    D.emit({ type: 'warn', hazard: 'aliens', x: cx, z: cz, r: 160, exact: true, text: 'UFOs over the city! Alien saucers are abducting people. Send soldiers and police to shoot them down' });
+    D.emit({ type: 'warn', hazard: 'aliens', x: cx, z: cz, r: 160, exact: true, text: 'UFOs over the city! Alien saucers are abducting people and tripods are coming down. Send soldiers and police to fight them' });
   }
   get x() { return this.mx; } get z() { return this.mz; }
 
   poi(x, z) {
     let best = null, bd = Infinity;
+    for (const t of this.tripods) { if (t.gone) continue; const d = Math.hypot(t.x - x, t.z - z); if (d < bd) { bd = d; best = { x: t.x, z: t.z, state: t.state === 'wreck' ? 'wreck' : 'walk' }; } }
     for (const s of this.saucers) { if (s.state === 'gone') continue; const d = Math.hypot(s.x - x, s.z - z); if (d < bd) { bd = d; best = s; } }
     return best ? { x: best.x, z: best.z, danger: best.state === 'wreck' ? 10 : 22, range: best.state === 'wreck' ? 120 : 280 } : { x: this.mx, z: this.mz, danger: 0, range: 500 };
   }
@@ -108,14 +111,23 @@ export class Invasion {
     const goal = this.leaving ? 900 : this.mAlt;
     this.my += (goal - this.my) * Math.min(1, h * (this.leaving ? 0.25 : 0.35));
     if (!this.leaving && this.toLaunch > 0 && (this.launchT -= h) <= 0) { this.launchT = 2.2; this.toLaunch--; this.launch(); }
-    if (!this.leaving && (this.t > this.life || (this.toLaunch === 0 && this.saucers.every(s => s.state === 'down' || s.state === 'wreck')))) {
-      this.leaving = true;
-      const won = this.saucers.every(s => s.state === 'down' || s.state === 'wreck');
+    if (!this.leaving && this.toDrop > 0 && (this.dropT -= h) <= 0) { // a tripod is lowered on cables
+      this.dropT = 10; this.toDrop--;
+      const B = D.ctx.city.bounds, a = Math.random() * 6.28, r = 30 + Math.random() * 60;
+      const x = Math.max(B.x0 + 40, Math.min(B.x1 - 40, this.mx + Math.cos(a) * r)), z = Math.max(B.z0 + 40, Math.min(B.z1 - 40, this.mz + Math.sin(a) * r));
+      this.tripods.push(new Tripod(D, x, z, { fromY: this.my - 30 }));
+      D.emit({ type: 'tripodland', x, z, text: 'A tripod is coming down in the ' + D.district(x, z) + ' district!' });
+    }
+    for (const t of this.tripods) t.update(h);
+    const tripodsDown = this.toDrop === 0 && this.tripods.every(t => t.state === 'fall' || t.state === 'wreck');
+    if (!this.leaving && (this.t > this.life || (this.toLaunch === 0 && tripodsDown && this.saucers.every(s => s.state === 'down' || s.state === 'wreck')))) {
+      this.leaving = true; for (const t of this.tripods) t.recall();
+      const won = tripodsDown && this.saucers.every(s => s.state === 'down' || s.state === 'wreck');
       D.emit({ type: 'aliensend', won, text: won ? 'Every saucer is down. The mothership is retreating' : 'The aliens are leaving with their captives' });
     }
     for (const s of this.saucers) this.saucerStep(s, h);
     for (let i = this.lasers.length - 1; i >= 0; i--) { const l = this.lasers[i]; l.t -= h; if (l.t <= 0) { D.ctx.scene.remove(l.m); this.lasers.splice(i, 1); } }
-    if (this.leaving && this.my > 860 && this.saucers.every(s => s.state === 'wreck' || s.state === 'gone')) this.alive = false;
+    if (this.leaving && this.my > 860 && this.saucers.every(s => s.state === 'wreck' || s.state === 'gone') && this.tripods.every(t => t.gone || t.state === 'wreck')) this.alive = false;
   }
 
   saucerStep(s, h) {
@@ -258,13 +270,15 @@ export class Invasion {
 
   // airstrikes and nukes: saucers caught in the blast come down
   onEvent(e) {
-    if (e.type !== 'blast' && e.type !== 'nuked') return;
-    const R = e.type === 'nuked' ? 170 : 32;
+    if (e.type !== 'blast' && e.type !== 'nuked' && e.type !== 'nukeflash') return;
+    const R = e.type === 'blast' ? 32 : 170;
+    for (const t of this.tripods) { const d = Math.hypot(t.x - e.x, t.z - e.z); if (d < R + 10) t.damage(e.type === 'blast' ? 80 * (1 - d / (R + 10)) + 20 : 999); }
     for (const s of this.saucers) if (s.state !== 'down' && s.state !== 'wreck' && s.state !== 'gone' && s.y < 90 && Math.hypot(s.x - e.x, s.z - e.z) < R) this.shootDown(s);
   }
 
   sync(dt, realT) {
     this.mother.position.set(this.mx, this.my, this.mz); this.mother.userData.spin.rotation.y += dt * 0.08;
+    for (const t of this.tripods) t.sync(dt, realT);
     for (const s of this.saucers) {
       if (s.state === 'gone') continue;
       const o = s.obj, hover = s.state === 'wreck' ? 0 : Math.sin(realT * 2 + s.x) * 0.3;
@@ -281,6 +295,8 @@ export class Invasion {
     scene.remove(this.mother);
     for (const s of this.saucers) { scene.remove(s.obj, s.beam); s.beam.material.dispose(); for (const j of s.lift) if (people.st[j] === ST.EXT) this.drop(j); if (s.car) this.D.ctx.traffic.remove(s.car); }
     for (const l of this.lasers) scene.remove(l.m);
+    for (const t of this.tripods) { if (t.state === 'wreck') this.D.leftovers.push(t); else t.dispose(); } // wrecks stay in the street
+    this.tripods.length = 0;
     this.saucers.length = 0; this.lasers.length = 0;
   }
 }

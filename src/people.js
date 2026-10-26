@@ -1386,6 +1386,15 @@ export class People {
     }
   }
 
+  // zombies within R that are not after anyone shamble towards (x, z) (Be The Disaster: the horde follows your finger)
+  lure(x, z, R) {
+    this.around(x, z, R, (k) => {
+      if (this.st[k] !== S.ZOMBIE || this.target[k] >= 0 || this.bt[k] >= 0) return;
+      const dx = x - this.x[k], dz = z - this.z[k], dd = Math.hypot(dx, dz) || 1;
+      this.hx[k] = dx / dd; this.hz[k] = dz / dd; this.wt[k] = 3; this.fx[k] = 3;
+    });
+  }
+
   // the screamer: everyone nearby scatters, every zombie nearby comes running
   scream(i) {
     const x = this.x[i], z = this.z[i];

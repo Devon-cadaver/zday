@@ -117,7 +117,7 @@ export class Commander {
       this.incidents.push({ type, at: k === 0 ? 4 : 4 + k * 420 / Math.max(1, n - 1) * (0.85 + R() * 0.3), fired: false });
     }
     this.sites = []; this.quietT = 0; this.lastInc = 0;
-    this.alertFloor = 0; this.saucers = 0; this.arrests0 = 0; this.alienK0 = 0; this.riotsBroken = 0; this.hit = [];
+    this.alertFloor = 0; this.saucers = 0; this.tripods = 0; this.arrests0 = 0; this.alienK0 = 0; this.riotsBroken = 0; this.hit = [];
     g.lookAt(0, 0);
     this.hud();
     g.toast('Dispatch is open. ' + (n === 1 ? 'One incident' : n + ' incidents') + ' expected this round: answer each call with your rescue units' + (this.weather !== 'clear' ? '. Weather: ' + WEATHER[this.weather].name.toLowerCase() : ''), 5000);
@@ -321,6 +321,7 @@ export class Commander {
     if (e.type === 'bite' && e.officer && !this.g.seen.copbit) { this.g.seen.copbit = true; this.g.toast(MSGS.copbit, 3200); }
     if (e.type === 'boarded') { const bus = this.g.traffic.cars[e.bus]; if (bus) bus.loaded = (bus.loaded || 0) + 1; }
     if (e.type === 'saucerdown') { this.saucers++; this.rp += 500; this.earned += 500; }
+    if (e.type === 'tripoddown') { this.tripods = (this.tripods || 0) + 1; this.rp += 800; this.earned += 800; }
     if (e.type === 'riotend' && e.broken) { this.riotsBroken++; this.rp += 100; this.earned += 100; }
     if (e.type === 'warn') {
       this.alertFloor = Math.max(this.alertFloor, e.hazard === 'aliens' || e.hazard === 'volcano' || e.hazard === 'meteor' || e.hazard === 'nuclear' || e.hazard === 'meltdown' || e.hazard === 'blackhole' ? 3 : e.hazard === 'riot' ? 1 : 2); // disasters open up the units you need
@@ -462,7 +463,7 @@ export class Commander {
       ['Incidents', this.hit.map(threatName).join(', ') || 'none'],
       ...(this.hit.some(h => h !== 'zombies') ? [['Killed by disasters', (s.disasterCiv + s.drowned).toLocaleString()]] : []),
       ...(s.arrests ? [['Rioters arrested', s.arrests]] : []),
-      ...(this.hit.includes('aliens') ? [['Saucers downed / aliens killed', this.saucers + ' / ' + s.aliensKilled], ['Abducted', s.abducted]] : []),
+      ...(this.hit.includes('aliens') ? [['Saucers / tripods downed', this.saucers + ' / ' + (this.tripods || 0)], ['Aliens killed', s.aliensKilled], ['Abducted', s.abducted]] : []),
       ['Time', Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0')],
     ];
     const r = this.pr.addRound(score, stars);

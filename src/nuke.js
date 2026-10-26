@@ -243,8 +243,8 @@ export class NuclearStrike {
     this.type = 'nuclear'; this.D = D; this.x = x; this.z = z; this.t = 0; this.alive = true; this.phase = 'warn';
     this.R = o.size ?? 280; this.warnT = o.warn ?? 20;
     const a = Math.random() * Math.PI * 2; this.from = new THREE.Vector3(x + Math.cos(a) * 900, 1300, z + Math.sin(a) * 900); this.to = new THREE.Vector3(x, 60, z); // it bursts in the air above the target
-    D.ctx.people.alarm(30);
-    D.emit({ type: 'warn', hazard: 'nuclear', x, z, r: this.R, exact: true, text: 'Air raid sirens! A nuclear missile is inbound to the ' + D.district(x, z) + ' district. ' + Math.round(this.warnT) + ' seconds to impact' });
+    if (!o.quiet) D.ctx.people.alarm(30);
+    if (!o.quiet) D.emit({ type: 'warn', hazard: 'nuclear', x, z, r: this.R, exact: true, text: 'Air raid sirens! A nuclear missile is inbound to the ' + D.district(x, z) + ' district. ' + Math.round(this.warnT) + ' seconds to impact' });
   }
   update(h) {
     const D = this.D, fire = D.ctx.fire;
@@ -300,8 +300,9 @@ export class Meltdown {
     const O = D.ctx.outskirts;
     if (!O || !O.plant.group.visible) { this.alive = false; return; } // no plant (or it has already gone up)
     this.plant = O.plant; this.x = O.plant.reactor.x; this.z = O.plant.reactor.z; this.R = opts.size ?? 230; this.warnT = opts.warn ?? 32;
-    D.ctx.people.alarm(35);
-    D.emit({ type: 'warn', hazard: 'meltdown', x: this.x, z: this.z, r: this.R, exact: true, text: 'Reactor overload at the nuclear power plant! The core is overheating' });
+    this.fallLife = opts.fallLife ?? 75;
+    if (!opts.quiet) D.ctx.people.alarm(35);
+    if (!opts.quiet) D.emit({ type: 'warn', hazard: 'meltdown', x: this.x, z: this.z, r: this.R, exact: true, text: 'Reactor overload at the nuclear power plant! The core is overheating' });
   }
   update(h) {
     const D = this.D, { fire, people } = D.ctx;
@@ -335,7 +336,7 @@ export class Meltdown {
     }
     nuclearDamage(D, this.x, this.z, this.R);
     const B = city.bounds, tx = (B.x0 + B.x1) / 2, tz = (B.z0 + B.z1) / 2, d = Math.hypot(tx - this.x, tz - this.z) || 1;
-    this.fall = { x: this.x, z: this.z, vx: (tx - this.x) / d * 5, vz: (tz - this.z) / d * 5, R: 170, t: 0, k: 0, life: 75, doseT: 2 };
+    this.fall = { x: this.x, z: this.z, vx: (tx - this.x) / d * 5, vz: (tz - this.z) / d * 5, R: 170, t: 0, k: 0, life: this.fallLife, doseT: 2 };
     const geo = new THREE.PlaneGeometry(420, 420, 1, 1); geo.rotateX(-Math.PI / 2);
     this.cloud = new THREE.Mesh(geo, new THREE.ShaderMaterial({ vertexShader: FALLOUT_VS, fragmentShader: FALLOUT_FS, transparent: true, depthWrite: false,
       uniforms: { uTime: { value: 0 }, uR: { value: 170 }, uK: { value: 0 }, uLight: { value: 1 }, uC: { value: new THREE.Vector2() } } }));

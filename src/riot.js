@@ -21,7 +21,7 @@ export class Riot {
     this.prev = -1; this.next = traffic.nearestNode(x, z); this.pause = 3;
     this.throwT = 2; this.tick = 0; this.recruitT = 6; this.count = this.members.length; this.peak = this.count;
     this.shots = []; this.burnt = 0; this.scorched = new Set();
-    D.emit({ type: 'warn', hazard: 'riot', x: this.mob.x, z: this.mob.z, r: 45, exact: true, text: 'Riot! An angry mob is smashing up the ' + D.district(x, z) + ' district. Send police to make arrests' });
+    if (!opts.quiet) D.emit({ type: 'warn', hazard: 'riot', x: this.mob.x, z: this.mob.z, r: 45, exact: true, text: 'Riot! An angry mob is smashing up the ' + D.district(x, z) + ' district. Send police to make arrests' });
   }
   get x() { return this.mob.x; } get z() { return this.mob.z; }
 
@@ -36,16 +36,21 @@ export class Riot {
     const D = this.D, { people, traffic, city } = D.ctx, mob = this.mob;
     this.t += h;
     // march from crossing to crossing, stopping now and then to smash the place up
+    if (this.lead) this.pause = 0; // someone is leading it: no stopping
     if (this.pause > 0) this.pause -= h;
     else {
       const N = traffic.nodes[this.next], dx = N.x - mob.x, dz = N.z - mob.z, d = Math.hypot(dx, dz);
-      if (d < 1.5) {
+      if (d < 1.5 && this.lead) { // take the street that heads most towards the leader
+        const [lx, lz] = this.lead; let best = this.next, bd = Math.hypot(N.x - lx, N.z - lz);
+        for (const v of N.nb) { const n = traffic.nodes[v], dd = Math.hypot(n.x - lx, n.z - lz); if (dd < bd - 2) { bd = dd; best = v; } }
+        this.prev = this.next; this.next = best;
+      } else if (d < 1.5) {
         if (Math.random() < 0.5) this.pause = 4 + Math.random() * 8;
         const B = city.bounds, nb = N.nb.filter(v => v !== this.prev);
         const ok = nb.filter(v => { const n = traffic.nodes[v]; return n.x > B.x0 + 40 && n.x < B.x1 - 40 && n.z > B.z0 + 40 && n.z < B.z1 - 40; });
         const pick = ok.length ? ok : nb.length ? nb : N.nb;
         this.prev = this.next; this.next = pick[Math.floor(Math.random() * pick.length)];
-      } else { const s = Math.min(d, 1.4 * h); mob.x += dx / d * s; mob.z += dz / d * s; }
+      } else if (d >= 1.5) { const s = Math.min(d, (this.lead ? 2.6 : 1.4) * h); mob.x += dx / d * s; mob.z += dz / d * s; }
     }
     if ((this.tick -= h) <= 0) {
       this.tick = 1;

@@ -130,7 +130,7 @@ export class Volcano {
     this.type = 'volcano'; this.D = D; this.x = x; this.z = z; this.t = 0; this.alive = true; this.phase = 'rumble';
     this.warnT = o.warn ?? 14; this.eruptT = o.erupt ?? 60; this.waneT = 25; this.bombT = 1; this.ashT = 0; this.bombs = [];
     this.prevWeather = D.weather.type;
-    D.emit({ type: 'warn', hazard: 'volcano', x, z, r: 130, exact: true, text: 'Magma is rising under the ' + D.district(x, z) + ' district! An eruption is coming. Get everyone out' });
+    if (!o.quiet) D.emit({ type: 'warn', hazard: 'volcano', x, z, r: 130, exact: true, text: 'Magma is rising under the ' + D.district(x, z) + ' district! An eruption is coming. Get everyone out' });
     this.bombMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(4, 1.4, 0.3) }); this.bombGeo = new THREE.SphereGeometry(1.1, 8, 6);
   }
   update(h) {
@@ -156,7 +156,7 @@ export class Volcano {
       fire.later(9, () => fire.smoke.end(r, fire.uniforms.uTime.value)); fire.later(22, () => fire.smoke.release(r));
     }
     // lava bombs
-    if ((this.bombT -= h) <= 0 && k > 0.15) { this.bombT = (0.5 + Math.random() * 0.6) / k; this.launch(); }
+    if ((this.bombT -= h) <= 0 && k > 0.15) { this.bombT = this.aim ? 0.16 : (0.5 + Math.random() * 0.6) / k; this.launch(); } // aimed (Be The Disaster): a barrage at the finger
     for (let i = this.bombs.length - 1; i >= 0; i--) {
       const b = this.bombs[i]; b.vy -= 9.8 * h; b.m.position.x += b.vx * h; b.m.position.y += b.vy * h; b.m.position.z += b.vz * h; b.m.rotation.x += h * 4;
       if ((b.trail -= h) <= 0) { b.trail = 0.12; fire.burst(b.m.position.x, b.m.position.y, b.m.position.z, 2, 1.4); }
@@ -184,7 +184,9 @@ export class Volcano {
     D.emit({ type: 'eruption', x: this.x, z: this.z, text: 'Eruption! Lava is pouring into the streets' });
   }
   launch() {
-    const a = Math.random() * Math.PI * 2, d = 35 + Math.pow(Math.random(), 0.7) * 200, T = 2.4 + d / 110;
+    let a = Math.random() * Math.PI * 2, d = 35 + Math.pow(Math.random(), 0.7) * 200;
+    if (this.aim) { const tx = this.aim[0] + (Math.random() - 0.5) * 18, tz = this.aim[1] + (Math.random() - 0.5) * 18; a = Math.atan2(tz - this.z, tx - this.x); d = Math.max(12, Math.hypot(tx - this.x, tz - this.z)); }
+    const T = 2.4 + d / 110;
     const m = new THREE.Mesh(this.bombGeo, this.bombMat); m.position.set(this.x, 4, this.z); this.D.ctx.scene.add(m);
     this.bombs.push({ m, vx: Math.cos(a) * d / T, vz: Math.sin(a) * d / T, vy: (-4 + 4.9 * T * T) / T, trail: 0 });
   }
