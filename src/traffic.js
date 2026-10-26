@@ -474,6 +474,19 @@ export class Traffic {
     return route;
   }
 
+  // the nuke: every car within R is a burnt-out wreck
+  nuke(x, z, R) {
+    for (const car of this.cars) {
+      if (car.gone || Math.hypot(car.x - x, car.z - z) > R) continue;
+      if (car.mission) { if (car.mode === DRIVE || car.mode === PARKED) { if (car.onLost) car.onLost(car); } }
+      car.mode = REST; car.v = 0; car.vx = car.vz = car.w = 0; car.burning = true; car.leaving = false;
+      const node = this.nodes[car.b]; if (node && node.occ === car.id) node.occ = -1;
+      if (!car.mission) this.tint(car, '#141210');
+      if (this.fire && Math.random() < 0.3) this.fire.carFire(car.x, car.z);
+    }
+    this.stats.wrecks += 0;
+  }
+
   // a parked bus leaves: new route back to the edge, then it vanishes
   depart(car) {
     const route = this.routeTo(car.x, car.z); // edge -> here

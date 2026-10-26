@@ -133,6 +133,7 @@ export class Fire {
 
   reset() {
     this.flames.reset(); this.smoke.reset(); this.mist.reset();
+    if (this.scorch) this.scorch.visible = false;
     this.burning = new Map(); // building index -> { until, fl: [], sm, wet }
     this.bFire = new Uint8Array(this.city.buildings.length); // 0 none, 1 burning, 2 burnt out, 3 put out
     this.soaked = new Float32Array(this.city.buildings.length); // sim time until which it cannot catch
@@ -165,6 +166,13 @@ export class Fire {
         this.bFire[k] = 2; this.soaked[k] = this.simT + 1e9;
       } else if (Math.random() < 0.6 && this.igniteBuilding(k)) lit++;
     });
+    // scorched ground
+    if (!this.scorch) {
+      const g = new THREE.CircleGeometry(1, 64); g.rotateX(-Math.PI / 2);
+      this.scorch = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: '#1c1714', roughness: 1, transparent: true, opacity: 0.85, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
+      this.scorch.renderOrder = 1; this.scorch.visible = false; this.flames.points.parent.add(this.scorch);
+    }
+    this.scorch.position.set(x, 0.03, z); this.scorch.scale.setScalar(R * 0.95); this.scorch.visible = true;
     this.events.push({ type: 'nuked', x, z, lit });
     return lit;
   }

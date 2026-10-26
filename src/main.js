@@ -75,6 +75,7 @@ const traffic = new Traffic(city, scene, { cars: low ? 160 : 280 });
 const people = new People(city, scene, { people: low ? 2600 : 5200 });
 const fire = new Fire(scene, city, { low });
 const helis = new Helicopters(scene, city, fire, people);
+helis.traffic = traffic;
 const buildMs = Math.round(performance.now() - t0);
 
 const post = new Post(renderer, { samples: low ? 0 : 4 });
