@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { LANE, RW } from './city.js';
 import { rng } from './textures.js';
-import { CAR_TYPES, TRAFFIC_MIX, cruiserGeometry } from './vehicles.js';
+import { CAR_TYPES, TRAFFIC_MIX, cruiserGeometry, VEHICLES } from './vehicles.js';
 
 const IN = RW / 2;        // lanes stop this far before an intersection centre
 const ACC = 3.5, BRAKE = 8, BRAKE_PANIC = 4.5;
@@ -14,6 +14,7 @@ const LEN = 4.3, HALF_L = 2.2, HALF_W = 0.95;
 const CELL = 10;
 const DRIVE = 0, WRECK = 1, REST = 2, PARKED = 3;
 const MISSION_CAP = 24;
+const MISSION_KINDS = { police: { geo: () => cruiserGeometry(), cap: 12, cruise: 14 }, fire: { geo: () => VEHICLES.fire_truck.build(), cap: 8, cruise: 11 } };
 const STOPLINE = 3.4; // car centre stops this far before the lane end
 
 const CAR_COLS = ['#f2efe8', '#f2efe8', '#f2efe8', '#e8e6e0', '#b8b8b4', '#9a9a98', '#2a2a2c', '#8c2a22', '#2f4566', '#d8c9a8', '#e0b030', '#5b6b4a'];
@@ -47,11 +48,14 @@ export class Traffic {
       im.count = 0; im.castShadow = im.receiveShadow = true; im.frustumCulled = false;
       this.typeMeshes[t.id] = im; parent.add(im);
     }
-    // mission vehicles (police cruisers) on their own mesh
-    this.cruiserMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4, metalness: 0.1, emissive: '#000000' });
-    this.cruiserMesh = new THREE.InstancedMesh(cruiserGeometry(), this.cruiserMat, MISSION_CAP);
-    this.cruiserMesh.count = 0; this.cruiserMesh.castShadow = this.cruiserMesh.receiveShadow = true; this.cruiserMesh.frustumCulled = false;
-    parent.add(this.cruiserMesh);
+    // mission vehicles (police cruisers, fire trucks), one mesh per kind
+    this.missionMeshes = {}; this.missionMats = {};
+    for (const [kind, def] of Object.entries(MISSION_KINDS)) {
+      const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4, metalness: 0.1, emissive: '#000000' });
+      const im = new THREE.InstancedMesh(def.geo(), mat, def.cap);
+      im.count = 0; im.castShadow = im.receiveShadow = true; im.frustumCulled = false;
+      this.missionMeshes[kind] = im; this.missionMats[kind] = mat; parent.add(im);
+    }
 
     // parked cars (static), a mix of types
     const r = rng(1234);
@@ -114,7 +118,7 @@ export class Traffic {
       this.typeMeshes[car.type].setColorAt(car.slot, this._c.set(car.colHex));
     }
     for (const t of TRAFFIC_MIX) { const im = this.typeMeshes[t.id]; im.count = counts[t.id]; if (im.instanceColor) im.instanceColor.needsUpdate = true; }
-    this.missions = []; this.cruiserMesh.count = 0;
+    this.missions = []; for (const im of Object.values(this.missionMeshes)) im.count = 0;
     this.events = [];
     this.stats = { crashes: 0, wrecks: 0 };
     this.sync(0);
@@ -380,6 +384,7 @@ export class Traffic {
           const dx = P.x[j] - car.x, dz = P.z[j] - car.z;
           const lx = dx * car.hx + dz * car.hz, lz = -dx * car.hz + dz * car.hx;
           if (Math.abs(lx) < HALF_L + 0.1 && Math.abs(lz) < HALF_W + 0.1) {
+            if (P.st[j] !== 6 && car.panic <= 0) { car.v = Math.min(car.v, 0.4); return; } // a calm driver stands on the brakes for a person
             P.kill(j, car.hx * car.v, car.hz * car.v, 'car');
             car.hits++;
             if (car.mode === DRIVE) {
@@ -422,13 +427,14 @@ export class Traffic {
     for (const car of this.cars) {
       e.set(0, car.yaw, 0); q.setFromEuler(e);
       m4.compose(p.set(car.x, 0, car.z), q, one);
-      if (car.mission) this.cruiserMesh.setMatrixAt(car.slot, m4); else this.typeMeshes[car.type].setMatrixAt(car.slot, m4);
+      if (car.mission) this.missionMeshes[car.kind].setMatrixAt(car.slot, m4); else this.typeMeshes[car.type].setMatrixAt(car.slot, m4);
     }
     for (const t of TRAFFIC_MIX) this.typeMeshes[t.id].instanceMatrix.needsUpdate = true;
-    if (this.missions.length) {
-      this.cruiserMesh.instanceMatrix.needsUpdate = true;
-      const lit = this.missions.some(c => c.mode === DRIVE);
-      this.cruiserMat.emissive.setHex(!lit ? 0x000000 : Math.floor(realT * 5) % 2 ? 0x3a0404 : 0x04083a);
+    for (const kind in this.missionMeshes) {
+      const im = this.missionMeshes[kind]; if (!im.count) continue;
+      im.instanceMatrix.needsUpdate = true;
+      const lit = this.missions.some(c => c.kind === kind && c.mode === DRIVE);
+      this.missionMats[kind].emissive.setHex(!lit ? 0x000000 : Math.floor(realT * 5) % 2 ? 0x3a0404 : 0x04083a);
     }
   }
 
@@ -497,15 +503,17 @@ export class Traffic {
   }
 
   dispatch(route, opts = {}) {
-    if (!route || route.length < 2 || this.missions.length >= MISSION_CAP) return null;
+    const kind = opts.kind || 'police', def = MISSION_KINDS[kind];
+    const slot = this.missions.filter(m => m.kind === kind).length;
+    if (!route || route.length < 2 || this.missions.length >= MISSION_CAP || slot >= def.cap) return null;
     const id = this.cars.length;
-    const car = { id, mission: true, slot: this.missions.length, route, ri: 0, mode: DRIVE, cruise: opts.cruise ?? 14, v: 0, panic: 0, think: 0,
+    const car = { id, mission: true, kind, slot, route, ri: 0, mode: DRIVE, cruise: opts.cruise ?? def.cruise, v: 0, panic: 0, think: 0,
       pedGap: 99, blocked: 0, resume: -1, x: 0, z: 0, hx: 1, hz: 0, yaw: 0, vx: 0, vz: 0, w: 0, ignite: false, burning: false, hits: 0, zx: 0, zz: 0,
       colHex: '#f4f4f0', held: false, to: opts.to || null, onArrive: opts.onArrive, onLost: opts.onLost, grace: 2.5 };
     this.startSeg(car, route[0], route[1]);
     car.s = 0; this.pose(car);
     this.cars.push(car); this.missions.push(car);
-    this.cruiserMesh.count = this.missions.length;
+    this.missionMeshes[kind].count = slot + 1;
     let len = 0;
     for (let k = 1; k < route.length; k++) len += Math.hypot(this.nodes[route[k]].x - this.nodes[route[k - 1]].x, this.nodes[route[k]].z - this.nodes[route[k - 1]].z);
     car.eta = len / car.cruise;

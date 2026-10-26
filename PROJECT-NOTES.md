@@ -69,8 +69,17 @@ READ THIS FIRST after a compaction. Current as of 2026-10-25.
 - src/daylight.js: phase 0..1 per round (commander t/600, sandbox clock/600): sun elevation 45 deg -> sunset at 0.4 -> night 0.5-0.82 (moonlight, blue) -> dawn 0.9 -> morning. Drives sun/hemi/fog/background, post night uniform (cool grade, more exposure), lit windows (emissiveMap from textures.js facadesLit/shopLit, intensity 0.75 at night), street lamp light pools (instanced additive quads at city.lamps), car headlight pools, zombie glow.
 - showcase.html + src/showcase.js: roster page, one WebGL canvas with scissor viewports per tile, sections Civilians / Responders / Zombies / Police / Fire and rescue / Military / Aircraft / Civilian. Live at /zday/showcase.html.
 
+## Commander phase 2: fire response (v0.6, 2026-10-25)
+- Cards: Fire truck 80 pts / 30 s, Water heli 150 / 60 s, Rescue heli 120 / 45 s, all from alert 2.
+- src/fire.js: bFire 3 = put out. douse(k, dt) accumulates wet, extinguish at 20 s; extinguish() ends flames, soaks neighbours (soaked[k] = simT + 150 s, no ignition or spread while soaked), stats.out++, event fireout. dropWater(x, z, 40) extinguishes every fire within 40 m, soaks all buildings in it for 200 s, big mist splash, stats.drops++. Mist pool (white smoke shader with uColA/uColB uniforms) for hose spray and drops: spray(x, z, y, n, spread, size).
+- Fire truck: traffic MISSION_KINDS { police: cruiser cap 12 cruise 14, fire: VEHICLES.fire_truck cap 8 cruise 11 }, one InstancedMesh per kind, car.kind/car.slot. Commander.sendFire routes to the door of the nearest fire within 80 m of the tap, else to the tap (truck stands by). On arrival people.spawnFirefighters(x, z, 2): kind FIREFIGHTER, state FIREMAN, post = truck. firemanStep: every 1 s pick the nearest burning building within 110 m of the post, walk to door + normal*1.6 (detours), then face the wall, fire.douse and spray every 0.35 s; fall back (FLEE) when panicked, return to FIREMAN; can be bitten.
+- Calm drivers (panic <= 0, incl. mission cars) no longer run over non-zombies: they brake to 0.4 m/s on contact. Panicked drivers still kill. This was needed because crews crossing streets died instantly.
+- src/aircraft.js Helicopters: send(kind, x, z, {k, onDone}) spawns a buildVehicle group (heli_wildfire / heli_rescue, scale 2) 600+ m out, flies in at 30 m/s, cruise alt 48. Water: hover at 28 m for 2.5 s, fire.dropWater, leave. Rescue: Commander.sendRescue picks the roof with the most survivors within 90 m of the tap (bRoof), heli descends to roofY + 4, people.evacuateFrom(k) every 0.5 s (uninfected ROOF survivors -> state EVAC, hidden, stats.rescued), leaves at 12 or after 6 s with nobody, event rescued. Helis fly out and are removed 300 m past the bounds.
+- Points: +30 per fire put out, +3 per rescued. End screen: helicopters sent, rescued, fires put out.
+- Headless check: at a 325-zombie outbreak at 163 s, truck + crew arrive but the crew dies within a minute (fine, sent late); water drop put out 3 buildings; rescue heli lifted 12. Calm test: crew hoses a building out in ~10 s with two on the line.
+
 ## Next
-- Commander phases 2-5 per DESIGN.md: fire truck, water and rescue helicopters, army APC, airstrike, nuke, evacuation bus, XP and levels, menu.
+- Commander phases 3-5 per DESIGN.md: fire truck, water and rescue helicopters, army APC, airstrike, nuke, evacuation bus, XP and levels, menu.
 
 ## Earlier plan note
 - Sean decided on 2026-10-25 to make the player the hero (emergency commander) instead of dropping zombies. The full plan is DESIGN.md (round, alert levels, units, points, levelling, 5 implementation phases). Sandbox stays at ?mode=sandbox.

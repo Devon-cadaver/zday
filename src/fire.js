@@ -56,11 +56,12 @@ void main() {
 }`;
 
 const SMOKE_FS = /* glsl */`
+uniform vec3 uColA, uColB;
 varying float vA; varying float vT;
 void main() {
   float d = length(gl_PointCoord - 0.5);
   float a = smoothstep(0.5, 0.1, d) * vA;
-  vec3 c = mix(vec3(0.06, 0.05, 0.045), vec3(0.34, 0.31, 0.28), vT);
+  vec3 c = mix(uColA, uColB, vT);
   gl_FragColor = vec4(c, a);
 }`;
 
@@ -123,18 +124,21 @@ export class Fire {
     this.uniforms = { uTime: { value: 0 }, uScale: { value: 500 }, uWind: { value: new THREE.Vector2(0.35, -0.2) } };
     const low = opts.low;
     this.flames = new Pool(low ? 4000 : 8000, FLAME_VS, FLAME_FS, THREE.AdditiveBlending, parent, this.uniforms);
-    this.smoke = new Pool(low ? 1600 : 3200, SMOKE_VS, SMOKE_FS, THREE.NormalBlending, parent, this.uniforms);
-    this.smoke.points.renderOrder = 3; this.flames.points.renderOrder = 4;
+    this.smoke = new Pool(low ? 1600 : 3200, SMOKE_VS, SMOKE_FS, THREE.NormalBlending, parent, { ...this.uniforms, uColA: { value: new THREE.Vector3(0.06, 0.05, 0.045) }, uColB: { value: new THREE.Vector3(0.34, 0.31, 0.28) } });
+    this.mist = new Pool(low ? 800 : 1600, SMOKE_VS, SMOKE_FS, THREE.NormalBlending, parent, { ...this.uniforms, uColA: { value: new THREE.Vector3(0.8, 0.88, 0.97) }, uColB: { value: new THREE.Vector3(0.97, 0.98, 1.0) } });
+    this.smoke.points.renderOrder = 3; this.flames.points.renderOrder = 4; this.mist.points.renderOrder = 5;
     this.events = [];
     this.reset();
   }
 
   reset() {
-    this.flames.reset(); this.smoke.reset();
-    this.burning = new Map(); // building index -> { until, fl: [], sm }
-    this.bFire = new Uint8Array(this.city.buildings.length); // 0 none, 1 burning, 2 burnt out
-    this.simT = 0; this.spreadT = 0;
+    this.flames.reset(); this.smoke.reset(); this.mist.reset();
+    this.burning = new Map(); // building index -> { until, fl: [], sm, wet }
+    this.bFire = new Uint8Array(this.city.buildings.length); // 0 none, 1 burning, 2 burnt out, 3 put out
+    this.soaked = new Float32Array(this.city.buildings.length); // sim time until which it cannot catch
+    this.simT = 0; this.spreadT = 0; this.realT = 0;
     this.timers = []; // { at (sim time), fn }
+    this.stats = { out: 0, drops: 0 };
   }
 
   later(dt, fn) { this.timers.push({ at: this.simT + dt, fn }); }
@@ -152,7 +156,7 @@ export class Fire {
   }
 
   igniteBuilding(k) {
-    if (this.bFire[k]) return false;
+    if (this.bFire[k] || this.soaked[k] > this.simT) return false;
     const b = this.city.buildings[k], t = this.uniforms.uTime.value;
     const rf = b.roof, cx = (rf.x0 + rf.x1) / 2, cz = (rf.z0 + rf.z1) / 2;
     const hx = Math.max(0.5, (rf.x1 - rf.x0) / 2), hz = Math.max(0.5, (rf.z1 - rf.z0) / 2);
@@ -177,6 +181,64 @@ export class Fire {
     return true;
   }
 
+  // ---------- fighting fires
+  // a short burst of white mist (hose spray, water drop)
+  spray(x, z, y = 1.5, n = 4, spread = 1.2, size = 0.5) {
+    const t = this.uniforms.uTime.value;
+    const r = this.mist.alloc(n, x, y, z, spread, spread, size, t);
+    if (!r) return;
+    this.later(2.0, () => this.mist.end(r, this.uniforms.uTime.value));
+    this.later(9, () => this.mist.release(r));
+  }
+
+  // hosing: dt seconds of water on building k; out after 20 s of it
+  douse(k, dt) {
+    const f = this.burning.get(k);
+    if (!f || this.bFire[k] !== 1) return false;
+    f.wet = (f.wet || 0) + dt;
+    if (f.wet >= 20) this.extinguish(k);
+    return true;
+  }
+
+  extinguish(k) {
+    if (this.bFire[k] !== 1) return false;
+    const f = this.burning.get(k);
+    for (const r of f.fl) this.flames.end(r, this.realT);
+    this.bFire[k] = 3;
+    const fl = f.fl, sm = f.sm;
+    this.later(6, () => { for (const r of fl) this.flames.release(r); });
+    this.later(18, () => { this.smoke.end(sm, this.uniforms.uTime.value); });
+    this.later(28, () => { this.smoke.release(sm); });
+    for (const j of this.neighbours(k)) this.soak(j);
+    this.stats.out++;
+    this.events.push({ type: 'fireout', k });
+    return true;
+  }
+
+  soak(k, secs = 150) { this.soaked[k] = Math.max(this.soaked[k], this.simT + secs); }
+
+  firesWithin(x, z, R) {
+    const out = [];
+    for (const [k] of this.burning) {
+      if (this.bFire[k] !== 1) continue;
+      const b = this.city.buildings[k], cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2, d = Math.hypot(cx - x, cz - z);
+      if (d <= R) out.push([d, k]);
+    }
+    return out.sort((a, b) => a[0] - b[0]).map(e => e[1]);
+  }
+
+  // helicopter drop: everything within R goes out and stays wet
+  dropWater(x, z, R = 40) {
+    let n = 0;
+    for (const k of this.firesWithin(x, z, R)) if (this.extinguish(k)) n++;
+    this.city.buildings.forEach((b, k) => { if (Math.hypot((b.x0 + b.x1) / 2 - x, (b.z0 + b.z1) / 2 - z) <= R) this.soak(k, 200); });
+    this.spray(x, z, 2, 70, R * 0.9, 1.8);
+    this.spray(x, z, 6, 30, R * 0.5, 1.2);
+    this.stats.drops++;
+    this.events.push({ type: 'waterdrop', x, z, n });
+    return n;
+  }
+
   neighbours(k) {
     const b = this.city.buildings[k];
     if (b._nb) return b._nb;
@@ -191,7 +253,7 @@ export class Fire {
 
   // dt is simulation time (scaled by game speed); realT drives the sprite animation
   update(dt, realT, camera, renderer) {
-    this.uniforms.uTime.value = realT;
+    this.uniforms.uTime.value = realT; this.realT = realT;
     const h = renderer.getDrawingBufferSize(this._v || (this._v = new THREE.Vector2())).y;
     this.uniforms.uScale.value = h / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
     this.simT += dt;
@@ -210,7 +272,7 @@ export class Fire {
         continue;
       }
       if (doSpread && this.bFire[k] === 1) {
-        for (const j of this.neighbours(k)) if (!this.bFire[j] && Math.random() < 0.006) this.igniteBuilding(j);
+        for (const j of this.neighbours(k)) if (!this.bFire[j] && this.soaked[j] <= this.simT && Math.random() < 0.006) this.igniteBuilding(j);
       }
     }
   }

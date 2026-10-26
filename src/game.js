@@ -28,8 +28,8 @@ const CSS = `
 #zd-drop .n{background:#a6ff4d;color:#1d2a0e;border-radius:6px;padding:3px 6px;font-variant-numeric:tabular-nums}
 #zd-drop.empty{background:rgba(28,20,12,.72);border-color:rgba(255,236,200,.18);opacity:.7}
 #zd-find.on{border-color:#a6ff4d;color:#a6ff4d}
-.zd-card{display:flex;flex-direction:column;gap:5px;align-items:center;min-width:74px;padding:9px 10px 8px;text-transform:none;letter-spacing:.02em}
-.zd-card .nm{font-size:12px}
+.zd-card{display:flex;flex-direction:column;gap:4px;align-items:center;min-width:62px;padding:8px 7px 7px;text-transform:none;letter-spacing:.02em}
+.zd-card .nm{font-size:11px;white-space:nowrap}
 .zd-card .cost{font-size:11px;color:#7be0ff;font-variant-numeric:tabular-nums}
 .zd-card .cd{position:absolute;left:0;right:0;bottom:0;height:0;background:rgba(255,236,200,.18);pointer-events:none}
 .zd-card.sel{border-color:#a6ff4d;box-shadow:0 0 0 2px rgba(166,255,77,.35) inset;background:rgba(60,88,30,.85)}
@@ -58,8 +58,8 @@ const CSS = `
 `;
 
 export class Game {
-  constructor({ people, traffic, fire, city, camera, controls, renderer, mode, daylight }) {
-    Object.assign(this, { people, traffic, fire, city, camera, controls, renderer, daylight });
+  constructor({ people, traffic, fire, city, camera, controls, renderer, mode, daylight, helis }) {
+    Object.assign(this, { people, traffic, fire, city, camera, controls, renderer, daylight, helis });
     this.pendingFires = []; this.simT = 0; this.realT = 0; this.acc = 0; this.speed = 1; this.follow = -1; this.seen = {};
     people.fire = fire; traffic.people = people; traffic.fire = fire;
     people.onOverrun = (k, why) => { if (Math.random() < (why === 'breach' ? 0.25 : 0.3)) this.pendingFires.push({ k, t: this.simT + 3 + Math.random() * 8 }); };
@@ -140,7 +140,7 @@ export class Game {
   }
 
   resetWorld() {
-    this.fire.reset(); this.city.uncharAll(); this.traffic.reset(); this.pendingFires.length = 0;
+    this.fire.reset(); this.city.uncharAll(); this.traffic.reset(); this.pendingFires.length = 0; if (this.helis) this.helis.reset();
     this.people.reset();
     this.simT = 0; this.seen = {}; this.setFollow(-1);
   }
@@ -165,7 +165,7 @@ export class Game {
     const sdt = dt * this.speed;
     this.acc = Math.min(this.acc + sdt, h * 12);
     while (this.acc >= h) {
-      p.step(h); this.traffic.step(h); this.acc -= h; this.simT += h;
+      p.step(h); this.traffic.step(h); if (this.helis) this.helis.update(h); this.acc -= h; this.simT += h;
       for (const e of p.events) if (e.type === 'bite') this.traffic.panicNear(e.x, e.z, 20);
       this.mode.afterStep && this.mode.afterStep(h);
     }
@@ -175,6 +175,7 @@ export class Game {
     this.realT += dt;
     p.uTime.value = this.realT;
     this.traffic.sync(this.realT);
+    if (this.helis) this.helis.sync(dt * this.speed);
     if (this.daylight) { this.daylight.set(this.mode.phase ? this.mode.phase() : 0); this.daylight.update(); }
     this.fire.update(sdt, this.realT, this.camera, this.renderer);
     p.sync();
@@ -196,7 +197,7 @@ export class Game {
     }
 
     const msgs = this.mode.msgs;
-    for (const list of [p.events, this.traffic.events, this.fire.events]) {
+    for (const list of [p.events, this.traffic.events, this.fire.events, this.helis ? this.helis.events : []]) {
       for (const e of list) {
         if (this.mode.onEvent) this.mode.onEvent(e);
         if (msgs[e.type] && !this.seen[e.type]) { this.seen[e.type] = true; this.toast(msgs[e.type], 3200); }

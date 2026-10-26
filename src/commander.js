@@ -6,6 +6,9 @@ import { ST } from './people.js';
 
 export const UNITS = [
   { id: 'police', name: 'Police', cost: 50, cd: 20, alert: 0 },
+  { id: 'fire', name: 'Fire truck', cost: 80, cd: 30, alert: 2 },
+  { id: 'water', name: 'Water heli', cost: 150, cd: 60, alert: 2 },
+  { id: 'rescue', name: 'Rescue heli', cost: 120, cd: 45, alert: 2 },
 ];
 const ALERTS = ['Quiet', 'Outbreak', 'Spreading', 'Major incident', 'City emergency'];
 const ROUND = 600;
@@ -24,6 +27,9 @@ const MSGS = {
   jump: 'Survivors are jumping from a burning roof',
   fallback: 'Officers are falling back! Too many zombies',
   copbit: 'An officer has been bitten',
+  fireout: 'The fire crew knocked down a blaze',
+  waterdrop: 'Water drop! Everything under it is out and soaked',
+  rescued: 'Survivors are being lifted off a rooftop',
 };
 
 export class Commander {
@@ -69,7 +75,9 @@ export class Commander {
     g.resetWorld(); g.setSpeed(1);
     this.t = 0; this.rp = START_RP; this.earned = 0; this.alert = 0; this.blocksInf = 0; this.fires = 0; this.ended = false;
     this.sel = null; this.cool = {}; for (const u of UNITS) this.cool[u.id] = 0;
+    if (g.helis) g.helis.reset();
     this.kills0 = 0; this.sent = 0; this.lost = 0; this.heatT = 0; this.spawned = 0; this.callT = 30;
+    this.out0 = 0; this.rescued0 = 0; this.trucks = 0; this.helisSent = 0;
     this.lastCall = null; this.call.hidden = true; for (const p of this.pins) { p.life = 0; p.m.visible = false; }
     for (const c of Object.values(this.cards)) c.btn.classList.remove('sel');
     // three outbreak sites, well apart, away from the edge
@@ -123,6 +131,9 @@ export class Commander {
     if (!this.sel) { this.g.toast('Pick a unit below, then tap the map'); return; }
     const id = this.sel;
     if (id === 'police') this.sendPolice(x, z);
+    else if (id === 'fire') this.sendFire(x, z);
+    else if (id === 'water') this.sendWater(x, z);
+    else if (id === 'rescue') this.sendRescue(x, z);
   }
 
   sendPolice(x, z) {
@@ -132,9 +143,52 @@ export class Commander {
       onLost: () => { this.lost++; g.toast('A cruiser was wrecked on the way'); },
     });
     if (!car) { g.toast(g.traffic.missions.length >= 24 ? 'All cruisers are out' : 'No road to that spot'); return; }
-    this.rp -= c.u.cost; this.cool.police = c.u.cd; this.sent++;
-    this.sel = null; c.btn.classList.remove('sel');
+    this.spend('police'); this.sent++;
     g.toast('Cruiser dispatched, about ' + Math.ceil(car.eta) + ' s out');
+  }
+
+  spend(id) {
+    const c = this.cards[id];
+    this.rp -= c.u.cost; this.cool[id] = c.u.cd;
+    this.sel = null; c.btn.classList.remove('sel');
+  }
+
+  sendFire(x, z) {
+    const g = this.g, p = g.people;
+    const fires = g.fire.firesWithin(x, z, 80);
+    let to = [x, z];
+    if (fires.length) { const b = p.bld[fires[0]]; to = b.door || [(b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2]; }
+    const car = g.traffic.dispatchTo(to[0], to[1], {
+      kind: 'fire',
+      onArrive: (ax, az) => { p.spawnFirefighters(ax, az, 2); g.toast('Fire crew on scene in the ' + this.district(ax, az)); },
+      onLost: () => { this.lost++; g.toast('The fire truck was wrecked on the way'); },
+    });
+    if (!car) { g.toast('No fire truck available'); return; }
+    this.spend('fire'); this.trucks++;
+    g.toast((fires.length ? 'Fire truck rolling to the blaze, about ' : 'No fire there yet. Truck will stand by, about ') + Math.ceil(car.eta) + ' s out');
+  }
+
+  sendWater(x, z) {
+    const g = this.g;
+    const fires = g.fire.firesWithin(x, z, 40).length;
+    const hl = g.helis.send('water', x, z, {});
+    this.spend('water'); this.helisSent++;
+    g.toast((fires ? 'Water helicopter inbound, ' : 'No fire under that spot. Helicopter will soak the area, ') + Math.ceil(hl.eta) + ' s out');
+  }
+
+  sendRescue(x, z) {
+    const g = this.g, p = g.people;
+    let best = 0, bk = -1;
+    p.bld.forEach((b, k) => {
+      if (!p.bRoof[k]) return;
+      const d = Math.hypot((b.x0 + b.x1) / 2 - x, (b.z0 + b.z1) / 2 - z);
+      if (d <= 90 && p.bRoof[k] - d * 0.05 > best) { best = p.bRoof[k] - d * 0.05; bk = k; }
+    });
+    if (bk < 0) { g.toast('Nobody is on a rooftop near there'); return; }
+    const b = p.bld[bk], rf = b.roof;
+    const hl = g.helis.send('rescue', (rf.x0 + rf.x1) / 2, (rf.z0 + rf.z1) / 2, { k: bk, onDone: (n) => g.toast(n ? 'Rescue helicopter leaving with ' + n + ' survivors' : 'Rescue helicopter found nobody left to lift') });
+    this.spend('rescue'); this.helisSent++;
+    g.toast('Rescue helicopter inbound to a roof with ' + p.bRoof[bk] + ' people, ' + Math.ceil(hl.eta) + ' s out');
   }
 
   onEvent(e) {
@@ -182,6 +236,8 @@ export class Commander {
     const income = (1 + p.stats.humans / 2000) * sdt;
     this.rp += income; this.earned += income;
     const k = p.stats.shot; if (k > this.kills0) { this.rp += k - this.kills0; this.earned += k - this.kills0; this.kills0 = k; }
+    const fo = g.fire.stats.out; if (fo > this.out0) { this.rp += 30 * (fo - this.out0); this.earned += 30 * (fo - this.out0); this.out0 = fo; }
+    const rs = p.stats.rescued; if (rs > this.rescued0) { this.rp += 3 * (rs - this.rescued0); this.earned += 3 * (rs - this.rescued0); this.rescued0 = rs; }
     for (const id in this.cool) if (this.cool[id] > 0) this.cool[id] = Math.max(0, this.cool[id] - sdt);
     for (const q of this.pins) {
       if (q.life <= 0) continue;
@@ -238,7 +294,10 @@ export class Commander {
       ['Survivors', s.humans.toLocaleString() + ' of ' + tot.toLocaleString()],
       ['Dead', s.dead.toLocaleString()],
       ['Zombies shot by police', s.shot.toLocaleString()],
-      ['Cruisers sent / wrecked', this.sent + ' / ' + this.lost],
+      ['Cruisers and trucks sent / wrecked', (this.sent + this.trucks) + ' / ' + this.lost],
+      ['Helicopters sent', this.helisSent],
+      ['Rescued by helicopter', s.rescued.toLocaleString()],
+      ['Fires put out', g.fire.stats.out],
       ['Buildings burned', (g.fire.bFire.length - intact).toLocaleString()],
       ['Time', Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0')],
     ];

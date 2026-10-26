@@ -9,6 +9,7 @@ import { People } from './people.js';
 import { Game } from './game.js';
 import { Fire } from './fire.js';
 import { Daylight } from './daylight.js';
+import { Helicopters } from './aircraft.js';
 
 const P = new URLSearchParams(location.search);
 const coarse = matchMedia('(pointer: coarse)').matches;
@@ -73,6 +74,7 @@ scene.add(city.group);
 const traffic = new Traffic(city, scene, { cars: low ? 160 : 280 });
 const people = new People(city, scene, { people: low ? 2600 : 5200 });
 const fire = new Fire(scene, city, { low });
+const helis = new Helicopters(scene, city, fire, people);
 const buildMs = Math.round(performance.now() - t0);
 
 const post = new Post(renderer, { samples: low ? 0 : 4 });
@@ -113,6 +115,6 @@ function frame() {
 }
 requestAnimationFrame(frame);
 
-const game = new Game({ people, traffic, fire, city, camera, controls, renderer, mode, daylight });
+const game = new Game({ people, traffic, fire, city, camera, controls, renderer, mode, daylight, helis });
 
-window.__z = { THREE, scene, camera, controls, renderer, post, city, traffic, people, fire, game, daylight, sun, hemi, setView, buildMs, info: () => renderer.info.render };
+window.__z = { THREE, scene, camera, controls, renderer, post, city, traffic, people, fire, game, daylight, helis, sun, hemi, setView, buildMs, info: () => renderer.info.render };
