@@ -62,7 +62,7 @@ add('Civilians', 'Infected', figure({ ...ARCHETYPES[0].roll(r), skin: new THREE.
 add('Responders', 'Police officer', figure(OFFICER_LOOK(r), 6), 1.9);
 for (const [k, Z] of ZTYPES.entries()) {
   const base = ARCHETYPES[k % 3 === 0 ? 0 : k % 3 === 1 ? 4 : 2].roll(r);
-  const L = Z.look(base); L.scale = Z.scale || 1; L.torso = Z.torso || 1; L.flags = (L.flags || 0) | FLAG.GLOW;
+  const L = Z.look(base); L.scale = Z.scale || 1; L.torso = Z.torso || 1;
   add('Zombies', Z.name, figure(L, Z.anim), 2.3 * (Z.scale || 1));
 }
 // ---------- vehicles

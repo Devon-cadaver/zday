@@ -9,6 +9,7 @@ import { WEATHER, threatName } from './disasters.js';
 export const UNITS = [
   { id: 'police', name: 'Police', cost: 50, cd: 20, alert: 0 },
   { id: 'bus', name: 'Evac bus', cost: 60, cd: 30, alert: 0 },
+  { id: 'boat', name: 'Rescue boat', cost: 80, cd: 20, alert: 0 }, // only once the streets flood
   { id: 'fire', name: 'Fire truck', cost: 80, cd: 30, alert: 2 },
   { id: 'water', name: 'Water heli', cost: 150, cd: 60, alert: 2 },
   { id: 'rescue', name: 'Rescue heli', cost: 120, cd: 45, alert: 2 },
@@ -97,7 +98,7 @@ export class Commander {
     if (g.helis) g.helis.reset();
     this.kills0 = 0; this.sent = 0; this.lost = 0; this.heatT = 0; this.callT = 30;
     this.out0 = 0; this.rescued0 = 0; this.trucks = 0; this.helisSent = 0; this.apcs = 0; this.strikes = 0; this.bombedCiv0 = 0; this.bombed0 = 0;
-    this.buses = 0; this.bused0 = 0; this.nuked = false; this.nukeAt = null; this.nukedCiv0 = 0;
+    this.buses = 0; this.bused0 = 0; this.boatsSent = 0; g.disasters.boats.auto = false; this.nuked = false; this.nukeAt = null; this.nukedCiv0 = 0;
     this.lastCall = null; this.call.hidden = true; for (const p of this.pins) { p.life = 0; p.m.visible = false; }
     for (const c of Object.values(this.cards)) c.btn.classList.remove('sel');
     // the weather this round (the people RNG restarts with every reset, so the round plan rolls its own dice)
@@ -173,6 +174,7 @@ export class Commander {
     if (this.rp < c.u.cost) { this.g.toast('Not enough points. ' + c.u.name + ' costs ' + c.u.cost); return; }
     if (this.alert < c.u.alert) { this.g.toast(c.u.name + ' needs alert level ' + c.u.alert); return; }
     if ((id === 'water' || id === 'rescue') && this.g.disasters.active('solar')) { this.g.toast('Helicopters are grounded by the solar storm'); return; }
+    if (id === 'boat' && !this.g.disasters.boats.flooded) { this.g.toast('Rescue boats need flooded streets'); return; }
     for (const o of Object.values(this.cards)) o.btn.classList.remove('sel');
     this.sel = id; c.btn.classList.add('sel');
     this.g.toast('Tap the map where the ' + c.u.name.toLowerCase() + ' should go');
@@ -190,6 +192,7 @@ export class Commander {
     else if (id === 'strike') this.sendStrike(x, z);
     else if (id === 'bus') this.sendBus(x, z);
     else if (id === 'nuke') this.sendNuke(x, z);
+    else if (id === 'boat') this.sendBoat(x, z);
   }
 
   sendPolice(x, z) {
@@ -201,6 +204,14 @@ export class Commander {
     if (!car) { g.toast(g.traffic.missions.length >= 24 ? 'All cruisers are out' : 'No road to that spot'); return; }
     this.spend('police'); this.sent++;
     g.toast('Cruiser dispatched, about ' + Math.ceil(car.eta) + ' s out');
+  }
+
+  sendBoat(x, z) {
+    const g = this.g, big = this.boatsSent % 2 === 1;
+    const b = g.disasters.boats.send(x, z, { kind: big ? 'patrol' : 'speed', onArrive: () => g.toast('The rescue boat is pulling people out of the water in the ' + this.district(x, z)), onFull: (bt) => g.toast('Rescue boat heading out with ' + bt.load + ' aboard') });
+    if (!b) { g.toast('No flooded street leads there'); return; }
+    this.spend('boat'); this.boatsSent++;
+    g.toast((big ? 'Patrol boat' : 'Speedboat') + ' on its way through the flooded streets');
   }
 
   spend(id) {
@@ -288,7 +299,7 @@ export class Commander {
   sendNuke(x, z) {
     const g = this.g;
     this.nuked = true; this.nukeAt = { x, z };
-    const jet = g.helis.nuke(x, z, { radius: 150, onBlast: (bx, bz) => { g.flash = 1.6; g.shake = 2.5; } });
+    const jet = g.helis.nuke(x, z, { radius: 230, onBlast: (bx, bz) => { g.flash = 1.6; g.shake = 2.5; } });
     this.spend('nuke');
     this.report(x, z, 'NUCLEAR STRIKE AUTHORISED. Impact in ' + Math.ceil(jet.eta) + ' s. Get everyone out!', 150, true);
     this.lastCall = { x, z };
@@ -312,7 +323,7 @@ export class Commander {
     if (e.type === 'saucerdown') { this.saucers++; this.rp += 500; this.earned += 500; }
     if (e.type === 'riotend' && e.broken) { this.riotsBroken++; this.rp += 100; this.earned += 100; }
     if (e.type === 'warn') {
-      this.alertFloor = Math.max(this.alertFloor, e.hazard === 'aliens' || e.hazard === 'volcano' || e.hazard === 'meteor' || e.hazard === 'nuclear' || e.hazard === 'meltdown' ? 3 : e.hazard === 'riot' ? 1 : 2); // disasters open up the units you need
+      this.alertFloor = Math.max(this.alertFloor, e.hazard === 'aliens' || e.hazard === 'volcano' || e.hazard === 'meteor' || e.hazard === 'nuclear' || e.hazard === 'meltdown' || e.hazard === 'blackhole' ? 3 : e.hazard === 'riot' ? 1 : 2); // disasters open up the units you need
       if (e.x != null && !this.ended) { this.report(e.x, e.z, e.text, e.r || 60, e.exact); return true; }
     }
   }
@@ -442,7 +453,7 @@ export class Commander {
       ['Helicopters sent', this.helisSent],
       ['APCs / airstrikes', this.apcs + ' / ' + this.strikes],
       ['Killed by bombs: zombies / civilians', s.bombed + ' / ' + s.bombedCiv],
-      ['Rescued by helicopter', s.rescued.toLocaleString()],
+      ['Rescued by helicopter or boat', s.rescued.toLocaleString()],
       ['Evacuated by bus', s.bused.toLocaleString()],
       ['Nuke: zombies / civilians', this.nuked ? s.nukedZ + ' / ' + s.nukedCiv : 'not used'],
       ['Fires put out', g.fire.stats.out],

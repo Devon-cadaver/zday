@@ -1,6 +1,7 @@
 // Fire and smoke: GPU-animated point sprites (one draw call each), plus
 // building fire logic (burn time, spread to neighbours, charring).
 import * as THREE from 'three';
+import { cutGround } from './holes.js';
 
 const COMMON_VS = /* glsl */`
 uniform float uTime, uScale;
@@ -136,6 +137,7 @@ export class Fire {
     this.flames.reset(); this.smoke.reset(); this.mist.reset(); this.dust.reset();
     if (this.scorch) this.scorch.visible = false;
     this.burning = new Map(); // building index -> { until, fl: [], sm, wet }
+    this.carFires = [];
     this.bFire = new Uint8Array(this.city.buildings.length); // 0 none, 1 burning, 2 burnt out, 3 put out
     this.soaked = new Float32Array(this.city.buildings.length); // sim time until which it cannot catch
     this.simT = 0; this.spreadT = 0; this.realT = 0;
@@ -173,7 +175,7 @@ export class Fire {
     // scorched ground
     if (!this.scorch) {
       const g = new THREE.CircleGeometry(1, 64); g.rotateX(-Math.PI / 2);
-      this.scorch = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: '#1c1714', roughness: 1, transparent: true, opacity: 0.85, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
+      this.scorch = new THREE.Mesh(g, cutGround(new THREE.MeshStandardMaterial({ color: '#1c1714', roughness: 1, transparent: true, opacity: 0.85, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 })));
       this.scorch.renderOrder = 1; this.scorch.visible = false; this.flames.points.parent.add(this.scorch);
     }
     this.scorch.position.set(x, 0.03, z); this.scorch.scale.setScalar(R * 0.95); this.scorch.visible = true;
@@ -206,8 +208,8 @@ export class Fire {
     const t = this.uniforms.uTime.value;
     const fl = this.flames.alloc(10, x, 0.6, z, 1.1, 0.6, 1.5, t);
     const sm = this.smoke.alloc(10, x, 1.5, z, 1.0, 1.0, 0.8, t);
-    const burn = 50 + Math.random() * 50;
-    this.later(burn, () => { this.flames.end(fl, this.uniforms.uTime.value); });
+    const burn = 50 + Math.random() * 50, rec = { x, z, fl, on: true }; this.carFires.push(rec); // tracked, so flood water can drown it
+    this.later(burn, () => { if (rec.on) { rec.on = false; this.flames.end(fl, this.uniforms.uTime.value); } const i = this.carFires.indexOf(rec); if (i >= 0) this.carFires.splice(i, 1); });
     this.later(burn + 6, () => { this.flames.release(fl); });
     this.later(burn + 40, () => { this.smoke.end(sm, this.uniforms.uTime.value); });
     this.later(burn + 50, () => { this.smoke.release(sm); });
@@ -296,6 +298,19 @@ export class Fire {
     this.events.push({ type: 'fireout', k });
     return true;
   }
+
+  // water over the street: car fires and buildings burning at street level go out in a hiss of steam
+  quench(depthAt) {
+    for (const f of this.carFires) if (f.on && depthAt(f.x, f.z) > 0.45) { f.on = false; this.flames.end(f.fl, this.uniforms.uTime.value); this.steam(f.x, f.z); }
+    for (const [k] of this.burning) {
+      if (this.bFire[k] !== 1) continue;
+      const b = this.city.buildings[k];
+      if (depthAt(b.x0 - 1.5, (b.z0 + b.z1) / 2) > 1.1 || depthAt(b.x1 + 1.5, (b.z0 + b.z1) / 2) > 1.1 || depthAt((b.x0 + b.x1) / 2, b.z0 - 1.5) > 1.1 || depthAt((b.x0 + b.x1) / 2, b.z1 + 1.5) > 1.1) {
+        if (this.extinguish(k)) this.steam((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2, Math.max(b.x1 - b.x0, b.z1 - b.z0) * 0.5);
+      }
+    }
+  }
+  steam(x, z, R = 2) { const t = this.uniforms.uTime.value, sm = this.smoke.alloc(Math.round(4 + R), x, 1, z, R, R, 1.2, t); this.later(2.5, () => this.smoke.end(sm, this.uniforms.uTime.value)); this.later(12, () => this.smoke.release(sm)); }
 
   // the building is gone (tornado, collapse): its flames go with it
   gone(k) {

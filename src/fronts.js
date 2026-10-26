@@ -219,7 +219,7 @@ export class Haboob {
           const qx = Math.max(b.x0, Math.min(b.x1, px)), qz = Math.max(b.z0, Math.min(b.z1, pz));
           this.dust.emit(qx - d.x * 2, 1, qz - d.y * 2, 16, { up: [4, 12], dir: [-d.x * 2, -d.y * 2], spread: 7, life: 2, size: 4, along: [sw.tan.x, sw.tan.y, 6], rise: 6 });
           if (b.top - b.baseY < 10 && Math.random() < 0.25) D.destroyBuilding(kb, 'collapse', { dir: Math.atan2(d.y, d.x) });
-          else city.char(kb, 0.93); // sandblasted
+          else { city.char(kb, 0.93); if (Math.random() < 0.55) D.blowWindows(kb, d.x, d.y, 0.7); } // sandblasted; some windows give
         });
       }
     }

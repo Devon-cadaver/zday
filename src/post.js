@@ -60,6 +60,7 @@ uniform sampler2D tColor, tBlur;
 uniform vec2 res;
 uniform float maxBlurFull, exposure, time, gradeOn, dofOn, glow, sepia, night, flash;
 uniform float uBL, uBLFront, uBLWidth; uniform vec2 uBLOrigin, uBLDir; uniform mat4 uInvProj, uCamWorld;
+uniform float uLens, uLensR; uniform vec2 uLensC; uniform float uHeat;
 varying vec2 vUv;
 ${COMMON}
 vec3 RRTAndODTFit(vec3 v) {
@@ -90,16 +91,26 @@ vec3 blackLight(vec3 c) {
   float e = length(vec2(dFdx(l), dFdy(l))) * 7.0;
   return neon + vec3(0.7, 1.0, 0.95) * e;
 }
+// a black hole bends the light around it (point lens): an image at radius r shows what lies at r - Re^2 / r
+vec2 lensUV(vec2 uv) {
+  if (uLens <= 0.0) return uv;
+  vec2 a = vec2(res.x / res.y, 1.0), d = (uv - uLensC) * a;
+  float r = max(length(d), 1e-4), re = uLensR * uLens;
+  float b = max(r - re * re / r, -2.5 * re), f = 1.0 - smoothstep(re * 2.0, re * 4.5, r);
+  return uLensC + d / r * mix(r, b, f) / a;
+}
 void main() {
-  vec3 sharp = texture2D(tColor, vUv).rgb;
+  vec2 uv = lensUV(vUv);
+  vec3 sharp = texture2D(tColor, uv).rgb;
   vec3 col = sharp;
   if (dofOn > 0.5) {
-    vec4 bl = texture2D(tBlur, vUv);
-    float c = cocN(viewZ(vUv)) * maxBlurFull;
+    vec4 bl = texture2D(tBlur, uv);
+    float c = cocN(viewZ(uv)) * maxBlurFull;
     col = mix(sharp, bl.rgb, smoothstep(0.6, 2.5, c));
   }
+  if (uLens > 0.0) { float r = length((vUv - uLensC) * vec2(res.x / res.y, 1.0)); col *= smoothstep(uLensR * uLens * 0.4, uLensR * uLens * 0.48, r); } // its shadow
   // soft glow from the blurred mip chain
-  vec3 g = textureLod(tBlur, vUv, 4.0).rgb * 0.5 + textureLod(tBlur, vUv, 6.0).rgb * 0.5;
+  vec3 g = textureLod(tBlur, uv, 4.0).rgb * 0.5 + textureLod(tBlur, uv, 6.0).rgb * 0.5;
   col += max(g - 0.55, 0.0) * glow + g * glow * 0.12;
   col = aces(col * exposure * (1.0 + 0.9 * night));
   col = toSRGB(col);
@@ -119,6 +130,10 @@ void main() {
     vec2 q = (vUv - 0.5) * vec2(1.0, 1.15);
     float v = smoothstep(0.95, 0.3, length(q));
     col *= mix(mix(vec3(0.55, 0.40, 0.26), vec3(0.42, 0.44, 0.56), night), vec3(1.0), v);
+  }
+  if (uHeat > 0.0) { // a nuclear flash: the whole city washed in hot orange light
+    float l = dot(col, vec3(0.299, 0.587, 0.114));
+    col = mix(col, vec3(1.0, 0.7, 0.34) * (0.42 + l * 1.05) + vec3(0.14, 0.05, 0.0), uHeat * 0.85);
   }
   if (uBL > 0.0) { // the solar wave passing: the strip just behind it glows like a black-light poster
     vec3 w = worldAt(vUv); float behind = uBLFront - dot(w.xz - uBLOrigin, uBLDir);
@@ -157,6 +172,7 @@ export class Post {
         res: { value: new THREE.Vector2() }, maxBlurFull: { value: 20 }, exposure: { value: 1 }, time: { value: 0 },
         gradeOn: { value: 1 }, dofOn: { value: 1 }, glow: { value: 0.3 }, sepia: { value: 0.3 }, night: { value: 0 }, flash: { value: 0 },
         uBL: { value: 0 }, uBLFront: { value: 0 }, uBLWidth: { value: 120 }, uBLOrigin: { value: new THREE.Vector2() }, uBLDir: { value: new THREE.Vector2(1, 0) }, uInvProj: { value: new THREE.Matrix4() }, uCamWorld: { value: new THREE.Matrix4() },
+        uLens: { value: 0 }, uLensR: { value: 0.05 }, uLensC: { value: new THREE.Vector2(0.5, 0.5) }, uHeat: { value: 0 },
       },
     });
     // share the common uniform objects so one write updates both passes
@@ -190,6 +206,8 @@ export class Post {
     const bl = o.blacklight; f.uBL.value = bl ? bl.amount : 0;
     if (bl && bl.amount > 0) { f.uBLFront.value = bl.front; f.uBLWidth.value = bl.width; f.uBLOrigin.value.set(bl.origin[0], bl.origin[1]); f.uBLDir.value.set(bl.dir[0], bl.dir[1]); f.uInvProj.value.copy(camera.projectionMatrixInverse); f.uCamWorld.value.copy(camera.matrixWorld); }
 
+    f.uHeat.value = o.heat || 0;
+    const ln = o.lens; f.uLens.value = ln ? ln.amount : 0; if (ln) { f.uLensC.value.set(ln.x, ln.y); f.uLensR.value = ln.r; }
     const r = this.renderer;
     r.setRenderTarget(this.sceneRT); r.render(scene, camera);
     this.quad.material = this.dofMat; r.setRenderTarget(this.blurRT); r.render(this.fsScene, this.cam);

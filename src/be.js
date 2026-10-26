@@ -38,7 +38,7 @@ class TornadoCtl {
 
 class SinkholeCtl {
   constructor(be) { this.be = be; this.cur = null; this.n = 0; be.D.list.push(wrap(this)); }
-  down(x, z) { const D = this.be.D; this.n++; this.cur = { x, z, R: 2, hole: new Hole(D, x, z, { R: 2, depth: 32, rim: 1.3, wall: '#6e5a46', floor: '#4a3c2a', rimCol: '#7a6650' }) }; D.shake(0.4); D.ctx.people.scare(x, z, 40, 0.6); }
+  down(x, z) { const D = this.be.D; this.n++; this.cur = { x, z, R: 2, hole: new Hole(D, x, z, { R: 2, depth: 32, rim: 1.3, shape: 'shaft', wall: '#6e5a46', floor: '#4a3c2a', rimCol: '#7a6650' }) }; D.shake(0.4); D.ctx.people.scare(x, z, 40, 0.6); }
   move() {} // a sinkhole opens where you pressed
   up() { const c = this.cur; if (!c) return; this.cur = null; this.be.D.ctx.people.block(c.x, c.z, c.R + 0.3); this.be.D.ctx.traffic.closeNear(c.x, c.z, c.R + 3); }
   update(h) {
@@ -261,7 +261,7 @@ export class BeTheDisaster {
   start() {
     const g = this.g, D = g.disasters, B = g.city.bounds, p = g.people, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2;
     this.end.hidden = true; this.ended = false;
-    g.resetWorld(); g.setSpeed(1);
+    g.resetWorld(); g.setSpeed(1); D.boats.auto = false; // nobody comes to the rescue
     this.t = 0; this.score = 0; this.tick = 0;
     D.weather.set(this.kind === 'tornado' ? 'storm' : 'clear', true);
     // a few outbreaks already under way, for some extra chaos

@@ -6,14 +6,16 @@ import { Debris, Decals } from './debris.js';
 import { Weather, WEATHER } from './weather.js';
 import { Twister } from './twister.js';
 import { Quake } from './quake.js';
-import { WaterSurface, Flood, Tsunami } from './water.js';
+import { WaterSurface, Flood, Tsunami, Splash } from './water.js';
 import { Riot } from './riot.js';
 import { Invasion } from './aliens.js';
 import { Meteor, Sinkhole } from './impact.js';
 import { Volcano } from './volcano.js';
 import { Haboob, ColdWave } from './fronts.js';
 import { SolarStorm } from './solar.js';
-import { Mushroom, NuclearStrike, Meltdown } from './nuke.js';
+import { BlackHole } from './blackhole.js';
+import { Boats } from './boats.js';
+import { Mushroom, NuclearStrike, Meltdown, nuclearDamage } from './nuke.js';
 
 export const threatName = (h) => (h === 'zombies' ? 'Zombie outbreak' : HAZARDS[h].name);
 
@@ -32,6 +34,7 @@ export const HAZARDS = {
   solar: { name: 'Solar flare', tap: false },
   nuclear: { name: 'Nuclear attack', tap: true },
   meltdown: { name: 'Plant meltdown', tap: false },
+  blackhole: { name: 'Black hole', tap: true },
 };
 export { WEATHER };
 
@@ -56,10 +59,14 @@ export class Disasters {
     this.ctx = ctx; // { scene, city, people, traffic, fire, post, camera, controls, renderer, sun, hemi, low, game }
     const { scene, people } = ctx;
     this.debris = new Debris(scene, ctx.low ? 1000 : 1600);
-    this.debris.groundY = (x, z) => (this.inHole(x, z) ? -40 : people.groundY(x, z)); // debris falls into pits and craters
+    this.debris.groundY = (x, z) => this.holeFloor(x, z) ?? people.groundY(x, z); // debris, cars and people fall into pits and craters
+    ctx.traffic.groundAt = (x, z) => this.holeFloor(x, z) ?? 0;
+    people.holeAt = (x, z) => this.holeFloor(x, z);
     this.decals = new Decals(scene);
     this.weather = new Weather({ ...ctx, disasters: this });
     this.water = new WaterSurface(this);
+    this.boats = new Boats(this); // rescue boats in floods and tsunamis
+    this.spitFx = new Splash(scene, 500); this.spitFx.mat.uniforms.uColor.value.setRGB(0.5, 0.95, 0.18); // spitter acid
     people.poi = (x, z) => this.poiAt(x, z); // onlookers watch (and film) whatever is happening near them
     // things falling into flood water or the sea throw up a splash
     this.debris.onSplash = (x, y, z, s) => this.water.splash.emit(x, y, z, Math.round(4 + s * 3), { up: [3, 4 + s * 2], spread: 3, life: 1.1, size: 1.2 + s * 0.3 });
@@ -96,10 +103,17 @@ export class Disasters {
     return best;
   }
   mushroom(x, z, R) { return new Mushroom(this, x, z, R); }
-  inHole(x, z) { for (const l of this.leftovers) if (l.R && Math.hypot(x - l.x, z - l.z) < l.R) return true; return false; }
+  nukeBlast(x, z, R, o = {}) { return nuclearDamage(this, x, z, R, o); }
+  inHole(x, z) { return this.holeFloor(x, z) != null; }
+  // the surface of the deepest pit under (x, z), or null
+  holeFloor(x, z) { let y = null; for (const l of this.leftovers) if (l.floorAt) { const f = l.floorAt(x, z); if (f != null && (y == null || f < y)) y = f; } return y; }
   // after the day/night cycle and the weather have set the lights (a solar storm cuts the power)
   afterLight() { for (const e of this.list) if (e.afterLight) e.afterLight(); }
   onEvent(e) {
+    if (e.type === 'spit') { // an arc of green acid from the spitter to its target
+      for (let k = 0; k <= 6; k++) { const t = k / 6; this.spitFx.emit(e.x + (e.tx - e.x) * t, 1.5 + Math.sin(t * Math.PI) * 1.2, e.z + (e.tz - e.z) * t, 3, { up: [0, 1.5], spread: 0.8, life: 0.7, size: 0.9 }); }
+      this.spitFx.emit(e.tx, 1.2, e.tz, 14, { up: [1, 3], spread: 2.5, life: 0.9, size: 1 });
+    }
     if (e.type === 'carland' && this.water.active && this.water.levelAt(e.x, e.z) > 0.4) this.water.splash.emit(e.x, this.water.level, e.z, 16, { up: [4, 9], spread: 5, life: 1.4, size: 2 });
     for (const ev of this.list) if (ev.onEvent) ev.onEvent(e);
   }
@@ -124,9 +138,26 @@ export class Disasters {
     else if (type === 'solar') ev = new SolarStorm(this, opts);
     else if (type === 'nuclear') ev = new NuclearStrike(this, x, z, opts);
     else if (type === 'meltdown') ev = new Meltdown(this, opts);
+    else if (type === 'blackhole') ev = new BlackHole(this, x, z, opts);
     if (!ev) return null;
     this.list.push(ev); this.stats.hazards++;
     return ev;
+  }
+
+  // a wave or a dust wall slams into building k from direction (dx, dz): the windows on the far side blow out
+  blowWindows(k, dx, dz, power = 1) {
+    const { city } = this.ctx, b = city.buildings[k]; if (!b || city.dead[k]) return;
+    const xs = Math.abs(dx) > Math.abs(dz), s = xs ? Math.sign(dx) : Math.sign(dz), hgt = b.top - b.baseY;
+    // the far face bursts outwards; the face taking the hit shatters and rains down the wall
+    for (const [face, out, k0] of [[s, 1, 1], [-s, 0.25, 0.5]]) {
+      const n = Math.round(Math.min(50, 14 + hgt * 0.9) * power * k0);
+      for (let i = 0; i < n; i++) {
+        const t = Math.random(), y = b.baseY + 3 + Math.random() * Math.max(1, hgt - 4), sp = (5 + Math.random() * 8) * power * out, sz = 0.2 + Math.random() * 0.4;
+        const x = xs ? (face > 0 ? b.x1 + 0.2 : b.x0 - 0.2) : b.x0 + t * (b.x1 - b.x0), z = xs ? b.z0 + t * (b.z1 - b.z0) : (face > 0 ? b.z1 + 0.2 : b.z0 - 0.2);
+        this.debris.add(x, y, z, sz, 0.05, sz * (0.6 + Math.random()), Math.random() < 0.7 ? 0xeefcff : 0xb4d6de, 'fly', { v: [(xs ? face * sp : 0) + (Math.random() - 0.5) * 3, out > 0.5 ? 1 + Math.random() * 4 : -1 - Math.random() * 2, (xs ? 0 : face * sp) + (Math.random() - 0.5) * 3] });
+      }
+    }
+    city.char(k, 0.9); // dark, empty window holes
   }
 
   // ---------- tearing down a building: 'tear' (tornado: the shell flies up the funnel) or 'collapse'
@@ -146,7 +177,7 @@ export class Disasters {
         const s = 0.6 + Math.random() * Math.min(2.4, w * 0.2);
         dbr.add(b.x0 + Math.random() * w, b.baseY + Math.random() * hgt, b.z0 + Math.random() * d, s, 0.3 + Math.random() * s * 0.5, s * (0.5 + Math.random()), Math.random() < 0.75 ? hex : 0x8a8478, 'orbit', { vort: opts.vort, hold: 1.5 + Math.random() * 3 });
       }
-      city.addRubble(k, 0.7);
+      if (!opts.noRubble) city.addRubble(k, 0.7);
     } else {
       const dur = 2.2 + Math.random() * 1.4;
       dbr.addObject(shell, 'sink', { dur, h: hgt + 2, dir: opts.dir ?? Math.random() * 6.28, onDone: () => { if (!opts.noRubble) city.addRubble(k, 0.75); } });
@@ -200,7 +231,8 @@ export class Disasters {
     for (const e of this.list) e.update(h);
     for (let i = this.leftovers.length - 1; i >= 0; i--) { const l = this.leftovers[i]; if (l.update) l.update(h); if (l.alive === false) { l.dispose(); this.leftovers.splice(i, 1); } }
     for (let i = this.list.length - 1; i >= 0; i--) if (!this.list[i].alive) { this.list[i].dispose(); this.list.splice(i, 1); }
-    this.water.update(h);
+    this.water.update(h); this.spitFx.update(h); this.boats.update(h);
+    if (this.water.active && (this.quenchT = (this.quenchT || 0) - h) <= 0) { this.quenchT = 0.5; const W = this.water, P = this.ctx.people; this.ctx.fire.quench((x, z) => W.levelAt(x, z) - P.groundY(x, z)); } // water puts fires out
     this.weather.update(h);
     this.debris.update(h);
   }
@@ -210,7 +242,7 @@ export class Disasters {
     this.lightK = (0.3 + 0.7 * Math.min(1.2, (sun.intensity * 0.6 + hemi.intensity * 0.55) / 3.7)) * (1 - night * 0.55);
     for (const e of this.list) e.sync(dt, realT);
     for (const l of this.leftovers) l.sync(dt, realT);
-    this.water.sync(dt, realT);
+    this.water.sync(dt, realT); this.boats.sync(dt, realT); this.spitFx.sync(this.lightK, this.ctx.fire.uniforms.uScale.value);
     this.weather.sync(dt, realT);
     this.debris.sync();
     for (let i = this.bolts.length - 1; i >= 0; i--) {
@@ -223,7 +255,7 @@ export class Disasters {
     this.list.length = 0; this.timers.length = 0; this.events.length = 0;
     for (const l of this.leftovers) l.dispose(); this.leftovers.length = 0;
     for (const b of this.bolts) this.ctx.scene.remove(b.g); this.bolts.length = 0;
-    this.debris.reset(); this.decals.reset(); this.water.reset();
+    this.debris.reset(); this.decals.reset(); this.water.reset(); this.boats.reset();
     this.weather.set('clear', true);
     this.stats = { buildings: 0, hazards: 0 };
     if (this.ctx.outskirts) { this.ctx.outskirts.reset(); this.later(0, () => this.ctx.outskirts.steam(this.ctx.fire)); } // after fire.reset has cleared the pools

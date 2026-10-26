@@ -107,7 +107,8 @@ export class Helicopters {
         b.m.position.set(b.x, b.y, b.z); b.m.rotation.y = Math.atan2(-b.vz, b.vx); b.m.rotation.z = Math.atan2(b.vy, Math.hypot(b.vx, b.vz));
         if (b.y <= 0.5) {
           this.scene.remove(b.m); j.bomb = null;
-          if (j.nuke) { this.fire.nuke(b.x, b.z, j.radius, { cloud: !this.mushroom }); if (this.mushroom) this.mushroom(b.x, b.z, j.radius); this.people.nuke(b.x, b.z, j.radius); if (this.traffic) this.traffic.nuke(b.x, b.z, j.radius); this.events.push({ type: 'nuke', x: b.x, z: b.z }); }
+          if (j.nuke && this.nukeBlast) { this.nukeBlast(b.x, b.z, j.radius); this.events.push({ type: 'nuke', x: b.x, z: b.z }); }
+          else if (j.nuke) { this.fire.nuke(b.x, b.z, j.radius, { cloud: !this.mushroom }); if (this.mushroom) this.mushroom(b.x, b.z, j.radius); this.people.nuke(b.x, b.z, j.radius); if (this.traffic) this.traffic.nuke(b.x, b.z, j.radius); this.events.push({ type: 'nuke', x: b.x, z: b.z }); }
           else { this.fire.blast(b.x, b.z, j.radius); this.people.blast(b.x, b.z, j.radius); }
           if (j.onBlast) j.onBlast(b.x, b.z);
         }

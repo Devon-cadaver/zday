@@ -112,15 +112,22 @@ export class Traffic {
   airStep(car, h) {
     car.vy -= 9.8 * h; car.x += car.vx * h; car.y += car.vy * h; car.z += car.vz * h;
     car.yaw += car.w * h; car.roll += car.rw * h; car.pitch += car.pw * h;
-    const w = this.waterAt ? this.waterAt(car.x, car.z) : -99;
-    if (car.y > Math.max(0, w > 0.5 ? w - 0.8 : -99)) return;
-    car.y = Math.max(0, w > 0.5 ? w - 0.9 : 0);
+    const w = this.waterAt ? this.waterAt(car.x, car.z) : -99, gy = this.groundAt ? this.groundAt(car.x, car.z) : 0;
+    if (car.y > Math.max(gy, w > 0.5 ? w - 0.8 : -99)) return;
+    car.y = Math.max(gy, w > 0.5 ? w - 0.9 : gy);
     car.mode = REST; car.vx = car.vz = car.vy = 0; car.v = 0;
-    car.roll = this.r() < 0.45 ? Math.PI : 0; car.pitch = (this.r() - 0.5) * 0.2;
+    if (gy < -1) car.pitch = Math.max(-1.4, Math.min(1.4, car.pitch)); // nose first at the bottom of a pit
+    else { car.roll = this.r() < 0.45 ? Math.PI : 0; car.pitch = (this.r() - 0.5) * 0.2; }
     if (!car.mission) this.tint(car, '#2a2622');
     if (this.people) this.people.crushNear(car.x, car.z, 2.6);
     if (this.fire && this.r() < 0.35) { this.fire.carFire(car.x, car.z); car.burning = true; if (!car.mission) this.tint(car, '#1a1714'); }
     this.events.push({ type: 'carland', x: car.x, z: car.z });
+  }
+  // over the edge of a pit: it keeps its speed and the nose drops as it falls
+  driveOff(car) {
+    const v = Math.max(car.v, 4), hx = car.hx, hz = car.hz;
+    if (!this.grab(car)) return;
+    car.mode = AIR; car.vx = hx * v; car.vz = hz * v; car.vy = 0.4; car.w = (this.r() - 0.5) * 0.3; car.rw = (this.r() - 0.5) * 0.5; car.pw = -0.9 - this.r() * 0.5;
   }
   burn(car) { // molotov or laser on a moving car
     if (car.mode === DRIVE) this.crash(car, null, 9);
@@ -304,8 +311,9 @@ export class Traffic {
     if (!car.turn) {
       const before = car.s;
       car.s += d;
+      if (car.clearing >= 0 && car.s > HALF_L + 1.5) { this.release(this.nodes[car.clearing], car); car.clearing = -1; } // our tail is out of the last junction
       const node = this.nodes[car.b];
-      if (node.occ >= 0) { const o = this.cars[node.occ]; if (!o || o.mode !== DRIVE || o.b !== car.b || !(o.held || o.turn)) this.release(node, o || { id: node.occ }); }
+      if (node.occ >= 0) { const o = this.cars[node.occ]; if (!o || o.mode !== DRIVE || ((o.b !== car.b || !(o.held || o.turn)) && o.clearing !== car.b)) this.release(node, o || { id: node.occ }); }
       if (car.s >= car.len - STOPLINE && !car.held) {
         if (!car.mission && car.panic <= 0 && this.sirenNear(node)) { car.s = Math.max(before, car.len - STOPLINE); car.v = 0; return; }
         if (car.panic <= 0) {
@@ -328,9 +336,9 @@ export class Traffic {
         const over = (car.t - 1) * car.tlen;
         if (car.resume >= 0) { car.turn = false; car.s = car.resume + over; car.resume = -1; }
         else {
-          this.release(this.nodes[car.b], car);
+          const from = car.b; // keep the junction until the tail has cleared it (a car stopped half out of the box used to get T-boned)
           if (car.mission) car.ri++;
-          this.startSeg(car, car.b, car.next); car.s = over;
+          this.startSeg(car, car.b, car.next); car.s = over; car.clearing = from;
         }
       }
     }
@@ -413,10 +421,17 @@ export class Traffic {
       const gap = this.gapAhead(car, panic ? 12 : 20);
       const stop = panic ? 0.6 : 2.5;
       if (gap < 99) vDes = Math.min(vDes, Math.sqrt(Math.max(0, 2 * brake * (gap - stop))));
-      if (!panic && car.pedGap < 99 && !(car.blocked > 4 && (car.held || car.turn))) vDes = Math.min(vDes, Math.sqrt(Math.max(0, 2 * BRAKE * (car.pedGap - 1.5)))); // after a wait, edge through the crowd
+      if (!panic && car.pedGap < 99) {
+        if ((car.pedWait || 0) < 3) vDes = Math.min(vDes, Math.sqrt(Math.max(0, 2 * BRAKE * (car.pedGap - 1.5))));
+        else vDes = Math.min(vDes, 1.6); // after a wait, edge through the crowd (they step aside, see collisions)
+      }
       if (!panic && !car.turn && !car.mission) {
         const node = this.nodes[car.b], toEnd = car.len - car.s;
-        if (((node.occ >= 0 && node.occ !== car.id) || this.sirenNear(node)) && !car.held && toEnd < 18) vDes = Math.min(vDes, Math.sqrt(Math.max(0, 2 * BRAKE * (toEnd - STOPLINE))));
+        if (!car.held && toEnd < 18) {
+          // brake for the line if we will have to wait there (instead of stopping dead and being rear-ended)
+          if (car.plan == null) car.plan = this.pickNext(car);
+          if ((node.occ >= 0 && node.occ !== car.id) || this.sirenNear(node) || !this.exitClear(car.b, car.plan)) vDes = Math.min(vDes, Math.sqrt(Math.max(0, 2 * BRAKE * (toEnd - STOPLINE))));
+        }
       }
       if (car.mission && !car.turn) {
         // ease through a busy crossing
@@ -429,6 +444,7 @@ export class Traffic {
     this.advance(car, car.v * h);
     this.pose(car);
     if (car.v < 0.3) car.blocked += h; else car.blocked = 0;
+    car.pedWait = car.pedGap < 99 && car.v < 2 ? (car.pedWait || 0) + h : Math.max(0, (car.pedWait || 0) - h * 2);
     if (car.mission && car.blocked > 4 && !car.leaving) {
       const last = car.ri + 2 >= car.route.length;
       const dToStop = last && !car.turn ? Math.abs(this.stopAt(car) - car.s) : 99;
@@ -486,6 +502,17 @@ export class Traffic {
     for (const car of this.cars) {
       if (car.mode === REST || car.mode === PARKED || car.mode === EXT || car.mode === AIR) continue;
       // run over anyone in the footprint
+      if (P && car.mode === DRIVE && car.v > 0.2 && car.v <= 2) { // creeping through a crowd: people step out of the way
+        P.around(car.x, car.z, 3.2, (j) => {
+          if (!P.hittable(j) || P.st[j] === 6) return;
+          const dx = P.x[j] - car.x, dz = P.z[j] - car.z;
+          const lx = dx * car.hx + dz * car.hz, lz = -dx * car.hz + dz * car.hx;
+          if (lx < -HALF_L || lx > HALF_L + 1.2 || Math.abs(lz) > HALF_W + 0.35) return;
+          const side = lz >= 0 ? 1 : -1, push = (HALF_W + 0.4 - Math.abs(lz)) * side;
+          const nx = P.x[j] - car.hz * push, nz = P.z[j] + car.hx * push;
+          if (P.walkable(nx, nz)) { P.x[j] = nx; P.z[j] = nz; }
+        });
+      }
       if (P && car.v > 2) {
         P.around(car.x, car.z, 2.7, (j) => {
           if (!P.hittable(j)) return;

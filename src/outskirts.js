@@ -3,6 +3,7 @@
 // beach with the ocean to the south. Highways run out of the city, and a
 // nuclear power plant stands on the coast with its cooling towers steaming.
 import * as THREE from 'three';
+import { cutGround } from './holes.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const hash2 = (i, j) => { let h = Math.imul(i, 374761393) + Math.imul(j, 668265263); h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967295; };
@@ -87,7 +88,7 @@ export function buildOutskirts(scene, city, opts = {}) {
     col[v * 3] = c.r; col[v * 3 + 1] = c.g; col[v * 3 + 2] = c.b;
   }
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3)); geo.computeVertexNormals();
-  const groundMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 });
+  const groundMat = cutGround(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 })); // pits cut through the land under the city too
   const ground = new THREE.Mesh(geo, groundMat); ground.receiveShadow = true; group.add(ground);
 
   // ---- the ocean
@@ -98,7 +99,7 @@ export function buildOutskirts(scene, city, opts = {}) {
   const sea = new THREE.Mesh(seaGeo, seaMat); sea.position.set(cx, -1.2, shore + S / 4 - 30); group.add(sea);
 
   // ---- highways
-  const roadMat = new THREE.MeshStandardMaterial({ color: '#8a8378', roughness: 0.95, side: THREE.DoubleSide });
+  const roadMat = cutGround(new THREE.MeshStandardMaterial({ color: '#8a8378', roughness: 0.95, side: THREE.DoubleSide }));
   const roadGeos = [];
   for (const r of roads) {
     const L = 1500, n = 75, P = new Float32Array((n + 1) * 2 * 3), idx = [];

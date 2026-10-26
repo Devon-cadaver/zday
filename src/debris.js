@@ -2,10 +2,19 @@
 // shells, cars) that orbit a vortex, fly, float on flood water, rest on the
 // ground and fade. Decals mark scoured ground and earthquake cracks.
 import * as THREE from 'three';
+import { cutGround } from './holes.js';
 
 const G = 9.8;
 const M = { FREE: 0, ORBIT: 1, FLY: 2, REST: 3, FLOAT: 4, LIFT: 5, SINK: 6 };
 export { M as DEBRIS_MODE };
+
+// one step of a fall into a black hole: the spiral tightens and speeds up; returns [x, y, z, distance to the centre]
+export function sinkStep(vt, px, py, pz, h) {
+  const dx = px - vt.x, dz = pz - vt.z, r = Math.hypot(dx, dz);
+  const nr = Math.max(0, r - h * (2.5 + 70 / (r + 3))), a = Math.atan2(dz, dx) + h * (0.8 + 45 / (r + 4));
+  const ny = py + (vt.y - py) * Math.min(1, h * (0.5 + 14 / (r + 6)));
+  return [vt.x + Math.cos(a) * nr, ny, vt.z + Math.sin(a) * nr, Math.hypot(nr, ny - vt.y)];
+}
 
 // how far up the leaning funnel a height is (0 at the ground, 1 at the cloud)
 const leanK = (vt, y) => Math.pow(Math.max(0, Math.min(1, y / vt.H)), 1.5);
@@ -79,6 +88,13 @@ export class Debris {
       if (md === M.ORBIT) {
         const vt = this.vortices[this.vort[i]];
         if (!vt || !vt.alive) { this.mode[i] = M.FLY; this.vy[i] = 2; continue; }
+        if (vt.sink) {
+          const [nx, ny, nz, d] = sinkStep(vt, this.x[i], this.y[i], this.z[i], h);
+          this.x[i] = nx; this.y[i] = ny; this.z[i] = nz;
+          this.rx[i] += this.wx[i] * h * 2; this.ry[i] += this.wy[i] * h * 2; this.rz[i] += this.wz[i] * h * 2;
+          if (d < vt.horizon + 0.4) { this.mode[i] = M.FREE; this.free.push(i); this.sx[i] = 0; }
+          continue;
+        }
         this.t[i] -= h;
         this.y[i] += (this.hy[i] - this.y[i]) * Math.min(1, h * 0.8);
         this.a[i] += h * (2.2 - (this.y[i] / vt.H) * 1.1) * (vt.spin || 1);
@@ -112,7 +128,7 @@ export class Debris {
       const d = this.objs[n], o = d.o; d.t += h;
       if (d.mode === M.LIFT) { // building shell: lifts, spins, is drawn into the funnel and shrinks away
         const k = Math.min(1, d.t / d.dur), vt = this.vortices[d.vort];
-        o.position.y = d.base.y + k * k * d.h * 2.2;
+        o.position.y = vt && vt.sink ? d.base.y + (vt.y - d.base.y) * k * k : d.base.y + k * k * d.h * 2.2; // a black hole draws it to its own height
         o.rotation.y += h * (1.5 + k * 9); o.rotation.z = Math.sin(d.t * 6) * 0.3 * k;
         const sc = 1 - k * 0.94; o.scale.set(d.s0.x * sc, d.s0.y * sc, d.s0.z * sc);
         if (vt && vt.alive) { const f = Math.min(1, h * 1.6), l = leanK(vt, o.position.y); o.position.x += (vt.x + (vt.lx || 0) * l - o.position.x) * f; o.position.z += (vt.z + (vt.lz || 0) * l - o.position.z) * f; }
@@ -124,6 +140,11 @@ export class Debris {
         o.position.x = d.base.x + Math.sin(d.t * 37) * 0.25 * (1 - k); o.position.z = d.base.z + Math.cos(d.t * 31) * 0.25 * (1 - k);
         o.position.y = d.base.y - k * k * d.h * 0.95;
         if (k >= 1) { if (d.onDone) d.onDone(); this.drop(n); continue; }
+      } else if (d.mode === M.ORBIT && this.vortices[d.vort] && this.vortices[d.vort].sink && this.vortices[d.vort].alive) {
+        const vt = this.vortices[d.vort], p = o.position, [nx, ny, nz, dd] = sinkStep(vt, p.x, p.y, p.z, h);
+        p.set(nx, ny, nz); o.rotation.x += d.w.x * h * 2; o.rotation.y += d.w.y * h * 2; o.rotation.z += d.w.z * h * 2;
+        const sc = Math.min(1, dd / 8); o.scale.set(d.s0.x * sc, d.s0.y * sc, d.s0.z * sc);
+        if (dd < vt.horizon + 1) { this.drop(n); continue; }
       } else if (d.mode === M.ORBIT) {
         const vt = this.vortices[d.vort];
         if (!vt || !vt.alive || d.t > d.hold) {
@@ -142,7 +163,7 @@ export class Debris {
         o.rotation.x += d.w.x * h; o.rotation.y += d.w.y * h; o.rotation.z += d.w.z * h;
         const w = wy ? wy(o.position.x, o.position.z) : -99;
         if (w > 0.4 && o.position.y <= w) { d.mode = M.FLOAT; if (this.onSplash) this.onSplash(o.position.x, w, o.position.z, 3); d.v.y = 0; }
-        else if (o.position.y <= 0.2) { o.position.y = 0.2; d.mode = M.REST; d.t = 0; o.rotation.x = Math.random() < 0.5 ? 0 : Math.PI; o.rotation.z = (Math.random() - 0.5) * 0.4; if (d.onLand) d.onLand(o); }
+        else if (o.position.y <= this.groundY(o.position.x, o.position.z)) { o.position.y = this.groundY(o.position.x, o.position.z); d.mode = M.REST; d.t = 0; o.rotation.x = Math.random() < 0.5 ? 0 : Math.PI; o.rotation.z = (Math.random() - 0.5) * 0.4; if (d.onLand) d.onLand(o); }
       } else if (d.mode === M.FLOAT) {
         const w = wy ? wy(o.position.x, o.position.z) : -99;
         const f = Math.exp(-0.3 * h); d.v.x *= f; d.v.z *= f;
@@ -153,6 +174,12 @@ export class Debris {
         if (d.t > d.life) { o.position.y -= h * 0.3; if (d.t > d.life + 4) { this.drop(n); continue; } }
       }
     }
+  }
+
+  // a pit opened under (x, z): whatever was lying within R falls
+  wake(x, z, R) {
+    for (let i = 0; i < this.maxIndex; i++) if (this.mode[i] === M.REST && Math.hypot(this.x[i] - x, this.z[i] - z) < R) { this.mode[i] = M.FLY; this.vx[i] = this.vy[i] = this.vz[i] = 0; }
+    for (const d of this.objs) if (d.mode === M.REST && Math.hypot(d.o.position.x - x, d.o.position.z - z) < R) { d.mode = M.FLY; d.v.set(0, 0, 0); }
   }
 
   drop(n) {
@@ -212,7 +239,7 @@ export class Decals {
   constructor(scene, cap = 700) {
     const quad = new THREE.PlaneGeometry(1, 1); quad.rotateX(-Math.PI / 2);
     const mk = (tex) => {
-      const im = new THREE.InstancedMesh(quad, new THREE.MeshStandardMaterial({ map: tex, transparent: true, depthWrite: false, roughness: 1, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), cap);
+      const im = new THREE.InstancedMesh(quad, cutGround(new THREE.MeshStandardMaterial({ map: tex, transparent: true, depthWrite: false, roughness: 1, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })), cap);
       im.count = 0; im.frustumCulled = false; im.receiveShadow = true; im.renderOrder = 1; scene.add(im); return im;
     };
     this.scour = mk(blobTexture()); this.crack = mk(crackTexture());

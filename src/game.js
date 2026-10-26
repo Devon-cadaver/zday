@@ -99,7 +99,7 @@ const CSS = `
 @media (prefers-reduced-motion: reduce){#zd-toast{transition:none}}
 `;
 
-const UNIT_NAMES = { police: 'Police cruiser', bus: 'Evacuation bus', fire: 'Fire truck', water: 'Water helicopter', rescue: 'Rescue helicopter', apc: 'Army APC', strike: 'Airstrike', nuke: 'Nuke' };
+const UNIT_NAMES = { police: 'Police cruiser', bus: 'Evacuation bus', boat: 'Rescue boat', fire: 'Fire truck', water: 'Water helicopter', rescue: 'Rescue helicopter', apc: 'Army APC', strike: 'Airstrike', nuke: 'Nuke' };
 
 // the city runs on its own behind the menu
 class Idle {
@@ -357,6 +357,7 @@ const START_DROPS = 3;
 class Sandbox {
   constructor(g) {
     this.g = g; this.msgs = SANDBOX_MSGS;
+    if (g.disasters) g.disasters.boats.auto = true; // rescue boats come by themselves here
     this.el = {
       h: g.addPill('zd-h', 'Humans'), i: g.addPill('zd-i', 'Infected'), z: g.addPill('zd-z', 'Zombies'), d: g.addPill('zd-d', 'Dead'),
       clock: g.addPill('', '', 'zd-clock'),
@@ -365,7 +366,9 @@ class Sandbox {
     this.el.n = this.el.drop.querySelector('#zd-n');
     g.followBtn = g.addButton('zd-find', 'Follow', () => g.cycleFollow());
     g.addSpeedButton();
-    this.disBtn = g.addButton('zd-disb', 'Disasters', () => { this.panel.style.bottom = (g.bar.offsetHeight + 8) + 'px'; this.panel.hidden = !this.panel.hidden; this.disBtn.classList.toggle('on', !this.panel.hidden); });
+    this.disBtn = g.addButton('zd-disb', 'Disasters', () => {
+      if (this.pending) { this.pending = null; this.close(); g.toast('Cancelled'); return; } // the button cancels a disaster waiting to be placed
+      this.panel.style.bottom = (g.bar.offsetHeight + 8) + 'px'; this.panel.hidden = !this.panel.hidden; this.disBtn.classList.toggle('on', !this.panel.hidden); });
     g.addButton('zd-reset', 'Reset', () => this.reset());
     g.addButton('zd-menu-btn', 'Menu', () => { location.href = location.pathname; });
     this.buildPanel();
@@ -379,12 +382,16 @@ class Sandbox {
     document.body.appendChild(d); this.panel = d;
     d.querySelectorAll('[data-hz]').forEach(b => { b.onclick = () => {
       const h = b.dataset.hz;
-      if (HAZARDS[h].tap) { this.pending = this.pending === h ? null : h; d.querySelectorAll('[data-hz]').forEach(o => o.classList.toggle('sel', o.dataset.hz === this.pending)); if (this.pending) g.toast('Tap the map where the ' + HAZARDS[h].name.toLowerCase() + ' should strike'); return; }
+      if (HAZARDS[h].tap) { // out of the way so you can see where it goes
+        this.pending = h; d.querySelectorAll('[data-hz]').forEach(o => o.classList.toggle('sel', o.dataset.hz === h));
+        this.panel.hidden = true; this.disBtn.textContent = 'Cancel ' + HAZARDS[h].name.toLowerCase();
+        g.toast('Tap the map where the ' + HAZARDS[h].name.toLowerCase() + ' should strike', 4000); return;
+      }
       g.disasters.start(h); this.close(); if (this.clock < 0) this.clock = 0;
     }; });
     d.querySelectorAll('[data-wx]').forEach(b => { b.onclick = () => { g.disasters.weather.set(b.dataset.wx); g.toast('Weather: ' + WEATHER[b.dataset.wx].name); this.close(); }; });
   }
-  close() { this.panel.hidden = true; this.disBtn.classList.remove('on'); }
+  close() { this.panel.hidden = true; this.disBtn.classList.remove('on'); this.disBtn.textContent = 'Disasters'; }
   tap(x, z) {
     const g = this.g;
     if (this.pending) {

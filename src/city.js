@@ -2,6 +2,7 @@
 // shopfronts, setbacks, balconies, parapets and rooftop clutter, parks,
 // plazas, street trees, lamps and crosswalks.
 import * as THREE from 'three';
+import { cutGround } from './holes.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { rng } from './textures.js';
 
@@ -273,7 +274,7 @@ export function buildCity(tex, opts = {}) {
     const style = fl >= 9 ? (sq < 0.25 ? 1 : sq < 0.7 ? 0 : 2) : (sq < 0.45 ? 0 : sq < 0.72 ? 2 : sq < 0.93 ? 3 : 1);
     const col = lin(pick(WALLS));
     const y0 = CURB;
-    const fk = 'fac' + style, vStart = { [fk]: B.fac[style].v, shop: B.shop.v, roof: B.roof.v };
+    const fk = 'fac' + style, vStart = { [fk]: B.fac[style].v, shop: B.shop.v, roof: B.roof.v, grass: B.grass.v };
     sides(B.shop, b, y0, y0 + GF, toWhite(col, 0.35), { su: 24, sv: GF, v0: y0 });
     const h = y0 + GF + fl * FH;
     sides(B.fac[style], b, y0 + GF, h, col, { su: 12, sv: 12, v0: y0 + GF });
@@ -304,7 +305,7 @@ export function buildCity(tex, opts = {}) {
     }
     const hut = roofStuff({ x0: tr.x0 + 0.35, x1: tr.x1 - 0.35, z0: tr.z0 + 0.35, z1: tr.z1 - 0.35 }, th, col, !interior);
     // gameplay record: street door, roof, vertex ranges (for charring)
-    const ranges = [{ key: fk, v0: vStart[fk], v1: B.fac[style].v }, { key: 'shop', v0: vStart.shop, v1: B.shop.v }, { key: 'roof', v0: vStart.roof, v1: B.roof.v }];
+    const ranges = [{ key: fk, v0: vStart[fk], v1: B.fac[style].v }, { key: 'shop', v0: vStart.shop, v1: B.shop.v }, { key: 'roof', v0: vStart.roof, v1: B.roof.v }, { key: 'grass', v0: vStart.grass, v1: B.grass.v }]; // grass: its roof garden
     const rec = { x0: b.x0, x1: b.x1, z0: b.z0, z1: b.z1, roofY: th, baseY: y0, fl, ranges, door: null,
       roof: { x0: tr.x0 + 0.7, x1: tr.x1 - 0.7, z0: tr.z0 + 0.7, z1: tr.z1 - 0.7 } };
     if (!interior) {
@@ -566,7 +567,7 @@ export function buildCity(tex, opts = {}) {
 
   // ---- meshes
   const group = new THREE.Group();
-  const std = (o) => new THREE.MeshStandardMaterial({ roughness: 0.9, metalness: 0, ...o });
+  const std = (o) => cutGround(new THREE.MeshStandardMaterial({ roughness: 0.9, metalness: 0, ...o })); // open pits cut through all of it
   const mats = {
     fac: tex.facades.map((m, k) => std({ map: m, vertexColors: true, roughness: 0.85, emissiveMap: tex.facadesLit[k], emissive: '#ffffff', emissiveIntensity: 0 })),
     shop: std({ map: tex.shop, vertexColors: true, emissiveMap: tex.shopLit, emissive: '#ffffff', emissiveIntensity: 0 }),
@@ -583,7 +584,7 @@ export function buildCity(tex, opts = {}) {
     group.add(m);
   };
   B.fac.forEach((bk, k) => add(bk, mats.fac[k], true, 'fac' + k));
-  add(B.shop, mats.shop, true, 'shop'); add(B.roof, mats.roof, true, 'roof'); add(B.walk, mats.walk, false); add(B.grass, mats.grass, false);
+  add(B.shop, mats.shop, true, 'shop'); add(B.roof, mats.roof, true, 'roof'); add(B.walk, mats.walk, false); add(B.grass, mats.grass, false, 'grass');
   if (slabGeos.length) { const m = new THREE.Mesh(mergeGeometries(slabGeos), mats.walk); m.receiveShadow = true; m.matrixAutoUpdate = false; group.add(m); }
   const colorize = (g, c) => { const n = g.attributes.position.count, a = new Float32Array(n * 3); for (let v = 0; v < n; v++) a.set(c, v * 3); g.setAttribute('color', new THREE.BufferAttribute(a, 3)); return g; };
   const curbMat = std({ color: '#e2d8c6' });

@@ -354,7 +354,7 @@ export class Tsunami {
             this.damaged.add(kb); // first contact: it bursts up the facade, then the building gets one roll
             this.burst(b, px, pz, k);
             if (b.top - b.baseY < this.Hw * 0.75 && Math.random() < 0.45) D.destroyBuilding(kb, 'collapse', { dir: Math.atan2(d.y, d.x) });
-            else { city.char(kb, 0.84); if (fire.bFire[kb] === 1) fire.extinguish(kb); }
+            else { city.char(kb, 0.84); if (fire.bFire[kb] === 1) fire.extinguish(kb); D.blowWindows(kb, d.x, d.y, 1); } // the far side's windows burst out
           });
         }
       }

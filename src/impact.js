@@ -1,86 +1,145 @@
-// Holes in the ground and what makes them. Hole draws a pit as a flat disc
-// whose shader casts the view ray down into an imaginary shaft (walls with
-// rock strata, a floor of mud or glowing melt), so it has real depth from any
-// angle. Meteor: a warning, a fireball across the sky, then an impact that
-// flattens the blocks around it, flings cars and debris, sets the district on
-// fire and leaves a smoking crater. Sinkhole: rumbling and cracks, then the
-// street gives way and swallows people, cars and whole buildings.
+// Holes in the ground and what makes them. Hole is a real pit: the ground is
+// cut away over it (holes.js) and a lathed wall with rock strata and a floor of
+// mud or glowing melt line it, so whatever falls in is seen going down. A lip of
+// torn ground rings it. Meteor: a warning, a fireball across the sky, then an
+// impact that flattens the blocks around it, flings cars and debris, sets the
+// district on fire and leaves a smoking crater. Sinkhole: rumbling and cracks,
+// then the street gives way and swallows people, cars and whole buildings.
 import * as THREE from 'three';
 import { NOISE } from './water.js';
 import { Mushroom } from './nuke.js';
+import { addHole, setHole, removeHole } from './holes.js';
 
-const HOLE_VS = /* glsl */`
+const PIT_VS = /* glsl */`
 varying vec3 vW;
 void main() { vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`;
-const HOLE_FS = /* glsl */`
-uniform vec3 uC, uWall, uFloor, uRimCol, uFogColor; uniform float uR, uDepth, uRim, uGlow, uLight, uFogDensity, uTime;
+const FOG = /* glsl */`col = mix(col, uFogColor, (1.0 - exp(-pow(length(cameraPosition - vW) * uFogDensity, 2.0))) * 0.8);`;
+// the torn lip around the opening
+const LIP_FS = /* glsl */`
+uniform vec3 uC, uRimCol, uFogColor; uniform float uR, uRim, uGlow, uLight, uFogDensity;
 varying vec3 vW;
 ${NOISE}
 void main() {
-  vec2 d = vW.xz - uC.xz; float r = length(d);
-  if (r > uR * uRim) discard;
-  vec3 col; float a = 1.0, dist = length(cameraPosition - vW);
-  if (r > uR) { // the lip: torn ground and rubble thinning out
-    float k = (r - uR) / (uR * (uRim - 1.0)), n = fbm(vW.xz * 0.3);
-    a = 1.0 - smoothstep(0.25, 1.0, k + (n - 0.5) * 0.7);
-    col = uRimCol * (0.55 + 0.7 * n) * uLight;
-    col += vec3(2.4, 0.7, 0.12) * uGlow * 0.6 * smoothstep(0.62, 0.8, fbm(vW.xz * 0.5)) * (1.0 - k);
-  } else {
-    vec3 V = normalize(vW - cameraPosition);
-    vec2 v = V.xz; float A = max(dot(v, v), 1e-5), B = dot(d, v), C = dot(d, d) - uR * uR;
-    float tw = (-B + sqrt(max(0.0, B * B - A * C))) / A, tf = uDepth / max(-V.y, 1e-3);
-    if (tw < tf) { // a wall
-      vec3 p = vW + V * tw; float dep = uC.y - p.y, ang = atan(p.z - uC.z, p.x - uC.x);
-      float rock = fbm(vec2(ang * uR * 0.3, dep * 0.7)), strata = rock * 0.7 + 0.3 * sin(dep * 2.3 + rock * 4.0);
-      col = uWall * (0.5 + 0.7 * strata) * mix(1.0, 0.18, smoothstep(0.0, uDepth, dep)) * uLight;
-      col += vec3(2.4, 0.7, 0.12) * uGlow * smoothstep(uDepth * 0.45, uDepth, dep) * (0.4 + strata);
-    } else { // the floor
-      vec3 p = vW + V * tf; float n = fbm(p.xz * 0.22 + uTime * 0.03);
-      col = uFloor * (0.45 + 0.6 * n) * 0.3 * uLight;
-      col += vec3(2.8, 0.9, 0.18) * uGlow * smoothstep(0.42, 0.72, n);
-    }
-  }
-  col = mix(col, uFogColor, (1.0 - exp(-pow(dist * uFogDensity, 2.0))) * 0.8);
+  float r = length(vW.xz - uC.xz);
+  if (r > uR * uRim || r < uR) discard;
+  float k = (r - uR) / (uR * (uRim - 1.0)), n = fbm(vW.xz * 0.3);
+  float a = 1.0 - smoothstep(0.25, 1.0, k + (n - 0.5) * 0.7);
+  vec3 col = uRimCol * (0.55 + 0.7 * n) * uLight;
+  col += vec3(2.4, 0.7, 0.12) * uGlow * 0.6 * smoothstep(0.62, 0.8, fbm(vW.xz * 0.5)) * (1.0 - k);
+  ${FOG}
   gl_FragColor = vec4(col, a);
 }`;
+// the shaft wall: rock strata, darker the deeper it goes, hot at the bottom of a fresh crater
+const WALL_FS = /* glsl */`
+uniform vec3 uC, uWall, uFogColor; uniform float uR, uDepth, uGlow, uLight, uFogDensity;
+varying vec3 vW;
+${NOISE}
+void main() {
+  float dep = clamp(uC.y - vW.y, 0.0, uDepth * 1.2), ang = atan(vW.z - uC.z, vW.x - uC.x);
+  float rock = fbm(vec2(ang * max(uR, 4.0) * 0.3, dep * 0.7)), strata = rock * 0.7 + 0.3 * sin(dep * 2.3 + rock * 4.0);
+  vec3 col = uWall * (0.5 + 0.7 * strata) * mix(1.0, 0.16, smoothstep(0.0, uDepth, dep)) * uLight;
+  col += vec3(2.4, 0.7, 0.12) * uGlow * smoothstep(uDepth * 0.45, uDepth, dep) * (0.4 + strata);
+  ${FOG}
+  gl_FragColor = vec4(col, 1.0);
+}`;
+const FLOOR_FS = /* glsl */`
+uniform vec3 uFloor, uFogColor; uniform float uGlow, uLight, uFogDensity, uTime;
+varying vec3 vW;
+${NOISE}
+void main() {
+  float n = fbm(vW.xz * 0.22 + uTime * 0.03);
+  vec3 col = uFloor * (0.45 + 0.6 * n) * 0.3 * uLight;
+  col += vec3(2.8, 0.9, 0.18) * uGlow * smoothstep(0.42, 0.72, n);
+  ${FOG}
+  gl_FragColor = vec4(col, 1.0);
+}`;
+// wall profiles, unit radius and depth from the rim down: a steep shaft or a crater bowl
+const PROFILE = {
+  shaft: [[1.02, 0], [0.99, -0.06], [0.95, -0.3], [0.92, -0.62], [0.9, -1]],
+  bowl: [[1.02, 0], [0.93, -0.25], [0.78, -0.55], [0.55, -0.82], [0.32, -1]],
+};
+const TOP = 0.28; // the wall starts just above the curbs
 
 // a pit; lives in D.leftovers until the world is reset
 export class Hole {
   constructor(D, x, z, o = {}) {
     this.D = D; this.x = x; this.z = z; this.R = o.R ?? 10; this.glow = o.glow ?? 0; this.cool = o.cool ?? 0;
-    const rim = o.rim ?? 1.35, geo = new THREE.CircleGeometry(rim, 72); geo.rotateX(-Math.PI / 2);
-    this.mat = new THREE.ShaderMaterial({ vertexShader: HOLE_VS, fragmentShader: HOLE_FS, transparent: true, depthWrite: false,
-      uniforms: { uC: { value: new THREE.Vector3(x, 0.23, z) }, uR: { value: this.R }, uDepth: { value: o.depth ?? this.R * 0.7 }, uRim: { value: rim }, uGlow: { value: this.glow },
-        uLight: { value: 1 }, uFogDensity: { value: 0.0006 }, uTime: { value: 0 }, uFogColor: { value: new THREE.Color() },
-        uWall: { value: new THREE.Color(o.wall ?? '#6a5848') }, uFloor: { value: new THREE.Color(o.floor ?? '#3a3026') }, uRimCol: { value: new THREE.Color(o.rimCol ?? '#7a6650') } } });
-    this.mesh = new THREE.Mesh(geo, this.mat); this.mesh.position.set(x, 0.23, z); this.mesh.scale.setScalar(Math.max(0.01, this.R)); this.mesh.renderOrder = 1;
-    D.ctx.scene.add(this.mesh);
+    this.depth = o.depth ?? this.R * 0.7; this.shape = o.shape ?? 'bowl'; this.fb = PROFILE[this.shape][4][0];
+    const rim = o.rim ?? 1.35, scene = D.ctx.scene;
+    const common = { uC: { value: new THREE.Vector3(x, TOP, z) }, uR: { value: this.R }, uDepth: { value: this.depth }, uGlow: { value: this.glow }, uLight: { value: 1 }, uFogDensity: { value: 0.0006 }, uFogColor: { value: new THREE.Color() } };
+    const lipGeo = new THREE.CircleGeometry(rim, 72); lipGeo.rotateX(-Math.PI / 2);
+    this.lipMat = new THREE.ShaderMaterial({ vertexShader: PIT_VS, fragmentShader: LIP_FS, transparent: true, depthWrite: false,
+      uniforms: { ...common, uRim: { value: rim }, uRimCol: { value: new THREE.Color(o.rimCol ?? '#7a6650') } } });
+    this.lip = new THREE.Mesh(lipGeo, this.lipMat); this.lip.position.set(x, 0.23, z); this.lip.renderOrder = 1;
+    this.wallMat = new THREE.ShaderMaterial({ vertexShader: PIT_VS, fragmentShader: WALL_FS, side: THREE.DoubleSide, uniforms: { ...common, uWall: { value: new THREE.Color(o.wall ?? '#6a5848') } } });
+    this.wall = new THREE.Mesh(new THREE.LatheGeometry(PROFILE[this.shape].map(([r, y]) => new THREE.Vector2(r, y)).reverse(), 56), this.wallMat);
+    this.floorMat = new THREE.ShaderMaterial({ vertexShader: PIT_VS, fragmentShader: FLOOR_FS, uniforms: { ...common, uTime: { value: 0 }, uFloor: { value: new THREE.Color(o.floor ?? '#3a3026') } } });
+    const fg = new THREE.CircleGeometry(1, 48); fg.rotateX(-Math.PI / 2);
+    this.floor = new THREE.Mesh(fg, this.floorMat);
+    for (const m of [this.wall, this.floor]) { m.position.set(x, TOP, z); m.receiveShadow = false; }
+    scene.add(this.lip, this.wall, this.floor);
+    this.cutY = 1.2; this.slot = addHole(this);
+    this.setR(this.R);
     D.leftovers.push(this);
   }
   poi() { return this.age < 90 ? { x: this.x, z: this.z, danger: this.R + 6, range: this.R * 7 + 60 } : null; } // people gather to stare at it for a while
-  setR(R) { this.R = R; this.mesh.scale.setScalar(Math.max(0.01, R)); this.mat.uniforms.uR.value = R; }
+  setR(R) {
+    this.R = R; const s = Math.max(0.01, R);
+    this.lip.scale.setScalar(s); this.wall.scale.set(s, this.depth, s);
+    this.floor.scale.set(s * this.fb, 1, s * this.fb); this.floor.position.y = TOP - this.depth + 0.02;
+    this.lipMat.uniforms.uR.value = R; this.wallMat.uniforms.uR.value = R;
+    setHole(this.slot, R);
+    this.D.debris.wake(this.x, this.z, R); // what was lying on the ground drops in
+  }
+  // the height of the pit's surface at (x, z), or null outside it
+  floorAt(x, z) {
+    const r = Math.hypot(x - this.x, z - this.z) / Math.max(0.01, this.R);
+    if (r >= 1) return null;
+    return TOP - this.depth * Math.min(1, (1 - r) / (1 - this.fb));
+  }
   update(h) {
     this.age = (this.age || 0) + h;
     if (this.cool && this.glow > 0.12) this.glow = Math.max(0.12, this.glow - h * this.cool);
-    if ((this.swT = (this.swT ?? 0) - h) <= 0 && this.R > 2) { this.swT = 0.4; swallow(this.D, this.x, this.z, this.R * 0.92, true); } // anything that wanders in later falls too
+    if ((this.swT = (this.swT ?? 0) - h) <= 0 && this.R > 2) { this.swT = 0.4; swallow(this.D, this.x, this.z, this.R * 0.97, true); } // anything that wanders in later falls too
   }
   sync(dt, realT) {
-    const u = this.mat.uniforms, sc = this.D.ctx.scene;
-    u.uGlow.value = this.glow; u.uLight.value = this.D.lightK; u.uTime.value = realT;
-    u.uFogColor.value.copy(sc.background); u.uFogDensity.value = sc.fog ? sc.fog.density : 0.0006;
+    const sc = this.D.ctx.scene;
+    for (const m of [this.lipMat, this.wallMat, this.floorMat]) {
+      const u = m.uniforms; u.uGlow.value = this.glow; u.uLight.value = this.D.lightK;
+      u.uFogColor.value.copy(sc.background); u.uFogDensity.value = sc.fog ? sc.fog.density : 0.0006;
+    }
+    this.floorMat.uniforms.uTime.value = realT;
   }
-  dispose() { this.D.ctx.scene.remove(this.mesh); this.mesh.geometry.dispose(); this.mat.dispose(); }
+  dispose() {
+    removeHole(this.slot);
+    this.D.ctx.scene.remove(this.lip, this.wall, this.floor);
+    for (const m of [this.lip, this.wall, this.floor]) { m.geometry.dispose(); m.material.dispose(); }
+  }
 }
 
-// everything within R of (x, z) goes down the hole
+// everything within R of (x, z) goes over the edge and down the hole
 export function swallow(D, x, z, R, moversOnly = false) {
   const { people, traffic, city } = D.ctx;
-  people.around(x, z, R, (j) => people.fallIn(j));
-  for (let i = 0; i < people.active; i++) if ((people.st[i] === 19 || people.st[i] === 20) && Math.hypot(people.x[i] - x, people.z[i] - z) < R && people.y[i] < 3) people.fallIn(i);
-  traffic.near(x, z, R + 3, (car) => { if (!car.gone && Math.hypot(car.x - x, car.z - z) < R) { if (car.mission && car.onLost && car.mode === 0) car.onLost(car); traffic.remove(car); D.emit({ type: 'carfall', x: car.x, z: car.z }); } });
+  people.around(x, z, R, (j) => {
+    const s = people.st[j];
+    if (s === 8) { const f = D.holeFloor(people.x[j], people.z[j]); if (f != null && people.y[j] > f + 0.5) { people.y[j] = f; people.dirty[j] = 3; } return; } // the dead drop to the bottom
+    if (s === 10 || s === 17 || s === 19 || s === 20) return;
+    const dx = x - people.x[j], dz = z - people.z[j], d = Math.hypot(dx, dz) || 1, v = 0.8 + Math.random() * 1.6;
+    people.fling(j, dx / d * v, 0.4 + Math.random() * 0.8, dz / d * v); // they slip in and fall
+  });
+  traffic.near(x, z, R + 3, (car) => {
+    if (car.gone || car.mode === 4 || car.mode === 5 || Math.hypot(car.x - x, car.z - z) >= R) return;
+    const f = D.holeFloor(car.x, car.z); if (f != null && car.y < f + 1) return; // already down there
+    if (car.mode === 0) { traffic.driveOff(car); D.emit({ type: 'carfall', x: car.x, z: car.z }); } // a moving car sails off the edge
+    else traffic.fling(car, 0, 0.3, 0); // wrecks and parked units tip in
+  });
+  for (const pc of traffic.parkedNear(x, z, R)) {
+    traffic.takeParked(pc);
+    const m = new THREE.Mesh(traffic.geometryOf(pc.type), D.carMat(pc.hex)); m.castShadow = true; m.position.set(pc.x, 0.3, pc.z); m.rotation.y = pc.rot;
+    D.debris.addObject(m, 'fly', { v: [(x - pc.x) * 0.05, 0.4, (z - pc.z) * 0.05] });
+  }
   if (moversOnly) return;
-  for (const pc of traffic.parkedNear(x, z, R)) traffic.takeParked(pc);
-  city.takeStreetNear(x, z, R);
+  for (const it of city.takeStreetNear(x, z, R)) D.debris.add(it.x, it.y, it.z, it.s * 0.8, it.s * 0.6, it.s * 0.8, it.kind === 'tree' ? it.col : '#4a4540', 'fly', { v: [(x - it.x) * 0.05, 0.5, (z - it.z) * 0.05] });
 }
 
 export class Meteor {
@@ -179,7 +238,7 @@ export class Sinkhole {
       return;
     }
     const k = Math.min(1, (this.t - this.rumble) / this.grow), R = this.Rmax * (1 - Math.pow(1 - k, 2.2));
-    if (!this.hole) this.hole = new Hole(D, this.x, this.z, { R: 0.5, depth: this.Rmax * 1.4, rim: 1.3, wall: '#6e5a46', floor: '#4a3c2a', rimCol: '#7a6650' });
+    if (!this.hole) this.hole = new Hole(D, this.x, this.z, { R: 0.5, depth: this.Rmax * 1.4, rim: 1.3, shape: 'shaft', wall: '#6e5a46', floor: '#4a3c2a', rimCol: '#7a6650' });
     this.hole.setR(R);
     D.shake(0.3 * (1 - k) + 0.05);
     swallow(this.D, this.x, this.z, R);

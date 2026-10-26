@@ -124,23 +124,125 @@ export class Mushroom {
 }
 
 // the destruction of a nuclear blast on the ground at (x, z), radius R (none of it counts against the player)
-export function nuclearDamage(D, x, z, R) {
-  const { people, traffic, city, fire } = D.ctx;
-  D.flash(1.7); D.shake(2.8);
-  fire.nuke(x, z, R, { cloud: false });
-  people.nuke(x, z, R, false);
-  traffic.nuke(x, z, R);
-  city.buildingsNear(x, z, R * 0.4, (k, d, b) => D.destroyBuilding(k, 'collapse', { dir: Math.atan2((b.z0 + b.z1) / 2 - z, (b.x0 + b.x1) / 2 - x) }));
-  for (const it of city.takeStreetNear(x, z, R * 0.9)) { const dx = it.x - x, dz = it.z - z, d = Math.hypot(dx, dz) || 1; D.debris.add(it.x, it.y, it.z, it.s * 0.9, it.s * 0.6, it.s * 0.9, '#2a2420', 'fly', { v: [dx / d * 28, 6 + Math.random() * 8, dz / d * 28] }); }
-  for (const pc of traffic.parkedNear(x, z, R * 0.8)) traffic.burnParked(pc);
-  new Mushroom(D, x, z, R);
+const WALL_VS = /* glsl */`
+varying vec2 vUv;
+void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+const WALL_FS = /* glsl */`
+uniform float uTime, uK;
+varying vec2 vUv;
+${NOISE}
+void main() {
+  float n = fbm(vec2(vUv.x * 70.0, vUv.y * 2.5 - uTime * 1.4)), h = vUv.y;
+  float a = (1.0 - smoothstep(0.25 + n * 0.55, 0.98, h)) * uK * (0.5 + 0.5 * n);
+  vec3 col = mix(vec3(2.4, 1.0, 0.3), vec3(0.62, 0.42, 0.26), smoothstep(0.0, 0.55, h + (n - 0.5) * 0.4)); // fire at the foot, dust above
+  gl_FragColor = vec4(col, a);
+}`;
+
+// The blast itself, after Sean's reference (the nuclear dream in T2): a flash that washes the city white
+// and then orange, a wall of fire and dust racing out across it, buildings blown apart in its path, cars
+// and trees hurled outwards, windows blown in further out, and everyone near the centre turned to ash
+// statues that crumble away in the wind. Survivors at the edge are irradiated and turn radioactive later.
+export class NukeBlast {
+  constructor(D, x, z, R, o = {}) {
+    this.type = 'nukeblast'; this.D = D; this.x = x; this.z = z; this.R = R; this.t = 0; this.f = 0; this.alive = true;
+    this.speed = R / 3.4; this.byPlayer = !!o.byPlayer; this.ash = []; this.heat = 1;
+    const { fire, scene } = D.ctx;
+    D.flash(1.3); D.shake(3); // a blink of white, then the orange heat wash (post.js uHeat) carries it
+    fire.nuke(x, z, R * 0.9, { cloud: false });
+    new Mushroom(D, x, z, R * 0.7);
+    this.mat = new THREE.ShaderMaterial({ vertexShader: WALL_VS, fragmentShader: WALL_FS, transparent: true, depthWrite: false, side: THREE.DoubleSide, uniforms: { uTime: { value: 0 }, uK: { value: 1 } } });
+    this.wall = new THREE.Mesh(new THREE.CylinderGeometry(1, 1.12, 1, 160, 1, true).translate(0, 0.5, 0), this.mat);
+    this.wall.position.set(x, 0, z); this.wall.renderOrder = 7; this.wall.frustumCulled = false; scene.add(this.wall);
+    D.emit({ type: 'nukeflash', x, z });
+  }
+  poi() { return { x: this.x, z: this.z, danger: this.R * 1.3, range: 2500 }; }
+
+  update(h) {
+    const D = this.D, { people } = D.ctx;
+    this.t += h;
+    const f0 = this.f, end = this.R * 1.25;
+    if (f0 < end) { this.f = Math.min(end, f0 + this.speed * h * (1.4 - 0.8 * f0 / end)); this.sweep(f0, this.f); D.shake(1.2 * (1 - f0 / end)); }
+    this.heat = this.t < 1.2 ? 1 : Math.max(0, 1 - (this.t - 1.2) / 8);
+    for (let k = this.ash.length - 1; k >= 0; k--) {
+      const a = this.ash[k];
+      if (this.t < a.at) continue;
+      this.ash.splice(k, 1);
+      if (people.st[a.j] !== 23) continue; // something else got to them first
+      const px = people.x[a.j], py = people.y[a.j], pz = people.z[a.j];
+      people.crumble(a.j, this.byPlayer);
+      if (D.debris.free.length > 60) for (let n = 0; n < 3; n++) { const s = 0.12 + Math.random() * 0.22; D.debris.add(px, py + 0.4 + Math.random() * 1.2, pz, s, s * 0.7, s, Math.random() < 0.5 ? 0x7a756e : 0x5e5a54, 'fly', { v: [a.dx * (8 + Math.random() * 10), 1 + Math.random() * 3, a.dz * (8 + Math.random() * 10)] }); }
+      if ((this.dustN = (this.dustN || 0) + 1) % 7 === 0) D.ctx.fire.dustCloud(px, pz, 2.5, 3);
+    }
+    if (this.t > 14 && !this.ash.length) this.alive = false;
+  }
+
+  // everything the front crossed this step, between radius r0 and r1
+  sweep(r0, r1) {
+    const D = this.D, { people, traffic, city, fire } = D.ctx, x = this.x, z = this.z, R = this.R;
+    city.buildingsNear(x, z, r1, (k, d, b) => {
+      const cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2, bd = Math.hypot(cx - x, cz - z);
+      if (bd < r0 || bd >= r1) return;
+      const a = Math.atan2(cz - z, cx - x), ox = Math.cos(a), oz = Math.sin(a), hgt = b.top - b.baseY;
+      if (bd < R * 0.5 || (bd < R * 0.72 && hgt < 22 && Math.random() < 0.45)) { // blown apart
+        if (D.destroyBuilding(k, 'collapse', { dir: a })) for (let n = 0; n < 8; n++) { const s = 0.8 + Math.random() * 2; D.debris.add(cx, b.baseY + Math.random() * hgt, cz, s, s * 0.6, s, Math.random() < 0.6 ? 0x6a5e52 : 0x3a332c, 'fly', { v: [ox * (18 + Math.random() * 22), 4 + Math.random() * 10, oz * (18 + Math.random() * 22)] }); }
+      } else if (bd < R) { city.char(k, 0.5 + 0.3 * bd / R); D.blowWindows(k, ox, oz, 1.3); if (Math.random() < 0.55) fire.igniteBuilding(k); }
+      else { city.char(k, 0.85); D.blowWindows(k, ox, oz, 0.7); }
+    });
+    const r02 = r0 * r0, r12 = r1 * r1;
+    for (let j = 0; j < people.active; j++) {
+      const s = people.st[j];
+      if (s === 8 || s === 17) continue;
+      const dx = people.x[j] - x, dz = people.z[j] - z, d2 = dx * dx + dz * dz;
+      if (d2 < r02 || d2 >= r12) continue;
+      const d = Math.sqrt(d2) || 1, ox = dx / d, oz = dz / d;
+      if (s === 10) { if (d < R * 0.5) people.crumble(j, this.byPlayer); continue; } // indoors: only the inner ring is lost with the buildings
+      if (d < R * 0.72) { people.ashen(j); this.ash.push({ j, at: this.t + 0.3 + Math.random() * 1.7, dx: ox, dz: oz }); } // ash where they stood
+      else if (d < R) {
+        if (Math.random() < 0.15 + 0.8 * (1 - (d - R * 0.72) / (R * 0.28))) {
+          const wasZ = s === 6, civ = people.kind[j] === 0;
+          people.kill(j, ox * 14, oz * 14, 'burn');
+          if (this.byPlayer) { if (wasZ) { people.stats.disasterZ--; people.stats.nukedZ++; } else if (civ) { people.stats.disasterCiv--; people.stats.nukedCiv++; } }
+        }
+      } else if (people.isPrey(j) && people.kind[j] === 0 && Math.random() < 0.12) { people.inf[j] = 1; people.zrad[j] = 1; people.inc[j] = people.inc0[j] = 10 + Math.random() * 25; people.dirty[j] = 1; } // a dose of radiation
+    }
+    traffic.near(x, z, r1, (car) => {
+      if (car.gone || car.mode === 4 || car.mode === 5) return;
+      const dx = car.x - x, dz = car.z - z, d = Math.hypot(dx, dz) || 1; if (d < r0 || d >= r1) return;
+      const p = Math.max(0, 1 - d / (R * 1.25));
+      traffic.fling(car, dx / d * (6 + 34 * p), 3 + 12 * p, dz / d * (6 + 34 * p)); car.ignite = Math.random() < 0.6;
+      if (!car.mission) traffic.tint(car, '#16130f');
+    });
+    for (const pc of traffic.parkedNear(x, z, r1)) {
+      const dx = pc.x - x, dz = pc.z - z, d = Math.hypot(dx, dz) || 1; if (d < r0) continue;
+      traffic.takeParked(pc);
+      if (D.debris.objs.length > 140) continue;
+      const p = Math.max(0, 1 - d / (R * 1.25)), m = new THREE.Mesh(traffic.geometryOf(pc.type), D.carMat('#1a1714')); m.castShadow = true; m.position.set(pc.x, 0.3, pc.z); m.rotation.y = pc.rot;
+      D.debris.addObject(m, 'fly', { v: [dx / d * (8 + 26 * p), 3 + 10 * p, dz / d * (8 + 26 * p)] });
+    }
+    for (const it of city.takeStreetNear(x, z, Math.min(r1, R * 1.1))) { const dx = it.x - x, dz = it.z - z, d = Math.hypot(dx, dz) || 1; D.debris.add(it.x, it.y, it.z, it.s * 0.9, it.s * 0.6, it.s * 0.9, '#2a2420', 'fly', { v: [dx / d * 26, 5 + Math.random() * 8, dz / d * 26] }); }
+  }
+
+  sync(dt, realT) {
+    const D = this.D, end = this.R * 1.25, k = Math.max(0, 1 - this.f / end);
+    this.wall.scale.set(Math.max(1, this.f), 8 + 22 * k, Math.max(1, this.f));
+    this.mat.uniforms.uTime.value = realT; this.mat.uniforms.uK.value = this.f >= end ? Math.max(0, this.mat.uniforms.uK.value - dt * 0.8) : 0.35 + 0.65 * k;
+    D.ctx.post.opts.heat = Math.max(D.ctx.post.opts.heat || 0, this.heat);
+  }
+  dispose() { this.D.ctx.scene.remove(this.wall); this.wall.geometry.dispose(); this.mat.dispose(); this.D.ctx.post.opts.heat = 0; }
+}
+
+// a nuclear detonation at (x, z): the blast above, as an event of its own
+export function nuclearDamage(D, x, z, R, o = {}) {
+  const ev = new NukeBlast(D, x, z, R, o);
+  D.list.push(ev);
+  return ev;
 }
 
 export class NuclearStrike {
   constructor(D, x, z, o = {}) {
     this.type = 'nuclear'; this.D = D; this.x = x; this.z = z; this.t = 0; this.alive = true; this.phase = 'warn';
-    this.R = o.size ?? 130; this.warnT = o.warn ?? 20;
-    const a = Math.random() * Math.PI * 2; this.from = new THREE.Vector3(x + Math.cos(a) * 2200, 1400, z + Math.sin(a) * 2200); this.to = new THREE.Vector3(x, 0, z);
+    this.R = o.size ?? 280; this.warnT = o.warn ?? 20;
+    const a = Math.random() * Math.PI * 2; this.from = new THREE.Vector3(x + Math.cos(a) * 900, 1300, z + Math.sin(a) * 900); this.to = new THREE.Vector3(x, 60, z); // it bursts in the air above the target
     D.ctx.people.alarm(30);
     D.emit({ type: 'warn', hazard: 'nuclear', x, z, r: this.R, exact: true, text: 'Air raid sirens! A nuclear missile is inbound to the ' + D.district(x, z) + ' district. ' + Math.round(this.warnT) + ' seconds to impact' });
   }
@@ -148,19 +250,26 @@ export class NuclearStrike {
     const D = this.D, fire = D.ctx.fire;
     this.t += h;
     if (this.phase === 'warn') {
-      if (this.t > this.warnT - 2.5) {
+      if (this.t > this.warnT - 5) {
         this.phase = 'fall'; this.ft = 0;
-        this.missile = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 9, 8).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#d8d8d0', metalness: 0.4, roughness: 0.4 }));
-        D.ctx.scene.add(this.missile);
+        { // it dives in from just above the near edge of the view, so the whole plunge is on screen
+          const cam = D.ctx.camera.position, fx = this.x - cam.x, fz = this.z - cam.z, fl = Math.hypot(fx, fz) || 1;
+          this.from.set(cam.x + fx * 0.5, cam.y * 0.68, cam.z + fz * 0.5); this.to.set(this.x, 60, this.z);
+        }
+        this.missile = new THREE.Group();
+        this.missile.add(new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 12, 10).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#d8d8d0', metalness: 0.4, roughness: 0.4 })));
+        this.missile.add(new THREE.Mesh(new THREE.ConeGeometry(1.2, 3.5, 10).rotateX(Math.PI / 2).translate(0, 0, 7.7), new THREE.MeshStandardMaterial({ color: '#3a3a36', roughness: 0.5 })));
+        this.missile.add(new THREE.Mesh(new THREE.SphereGeometry(2.2, 10, 8).translate(0, 0, -7.5), new THREE.MeshBasicMaterial({ color: new THREE.Color(7, 3.5, 1.2), fog: false })));
+        this.missile.scale.setScalar(2.2); D.ctx.scene.add(this.missile);
       }
       return;
     }
     if (this.phase === 'fall') {
-      this.ft += h; const k = Math.min(1, this.ft / 2.5), p = this.from.clone().lerp(this.to, k);
+      this.ft += h; const k = Math.min(1, this.ft / 5), p = this.from.clone().lerp(this.to, k * k * (3 - 2 * k) * 0.25 + k * 0.75);
       this.missile.position.copy(p); this.missile.lookAt(this.to);
       if (Math.random() < 0.9) { const r = fire.smoke.alloc(2, p.x, p.y, p.z, 1.5, 1.5, 1.6, fire.uniforms.uTime.value); fire.later(2, () => fire.smoke.end(r, fire.uniforms.uTime.value)); fire.later(12, () => fire.smoke.release(r)); }
       fire.burst(p.x, p.y, p.z, 3, 2.2);
-      if (k >= 1) { D.ctx.scene.remove(this.missile); this.missile.geometry.dispose(); this.missile.material.dispose(); this.missile = null; nuclearDamage(D, this.x, this.z, this.R); this.phase = 'after'; this.at = 0; D.emit({ type: 'detonation', x: this.x, z: this.z, text: 'Detonation. The ' + D.district(this.x, this.z) + ' district is gone' }); }
+      if (k >= 1) { D.ctx.scene.remove(this.missile); this.missile.traverse(m => { if (m.geometry) { m.geometry.dispose(); m.material.dispose(); } }); this.missile = null; nuclearDamage(D, this.x, this.z, this.R); this.phase = 'after'; this.at = 0; D.emit({ type: 'detonation', x: this.x, z: this.z, text: 'Detonation. The ' + D.district(this.x, this.z) + ' district is gone' }); }
       return;
     }
     if ((this.at += h) > 3) this.alive = false;
@@ -190,7 +299,7 @@ export class Meltdown {
     this.type = 'meltdown'; this.D = D; this.t = 0; this.phase = 'warn'; this.said = 0; this.steamT = 0; this.alive = true;
     const O = D.ctx.outskirts;
     if (!O || !O.plant.group.visible) { this.alive = false; return; } // no plant (or it has already gone up)
-    this.plant = O.plant; this.x = O.plant.reactor.x; this.z = O.plant.reactor.z; this.R = opts.size ?? 170; this.warnT = opts.warn ?? 32;
+    this.plant = O.plant; this.x = O.plant.reactor.x; this.z = O.plant.reactor.z; this.R = opts.size ?? 230; this.warnT = opts.warn ?? 32;
     D.ctx.people.alarm(35);
     D.emit({ type: 'warn', hazard: 'meltdown', x: this.x, z: this.z, r: this.R, exact: true, text: 'Reactor overload at the nuclear power plant! The core is overheating' });
   }
@@ -211,7 +320,7 @@ export class Meltdown {
     f.k = Math.min(1, f.t / 6) * Math.max(0, Math.min(1, (f.life - f.t) / 15));
     if ((f.doseT -= h) <= 0) {
       f.doseT = 1;
-      people.around(f.x, f.z, f.R * 0.85, (j) => { const s = people.st[j]; if ((s === 0 || s === 1 || s === 2 || s === 3 || s === 9 || s === 24) && people.kind[j] === 0 && Math.random() < 0.012 * f.k) people.kill(j, 0, 0, 'rad'); });
+      people.around(f.x, f.z, f.R * 0.85, (j) => { const s = people.st[j]; if ((s === 0 || s === 1 || s === 2 || s === 3 || s === 9 || s === 24) && people.kind[j] === 0 && Math.random() < 0.02 * f.k) { if (Math.random() < 0.45) people.kill(j, 0, 0, 'rad'); else if (!people.inf[j]) { people.inf[j] = 1; people.zrad[j] = 1; people.inc[j] = people.inc0[j] = 12 + Math.random() * 20; people.dirty[j] = 1; } } }); // the rest of the dosed turn radioactive later
     }
     if (f.t > f.life) this.alive = false;
   }
