@@ -877,7 +877,7 @@ export function buildCity(tex, opts = {}) {
   rubble.setColorAt(0, new THREE.Color()); group.add(rubble);
   let rubN = 0;
   const addRubble = (k, charred = 0.75) => {
-    const b = buildings[k], w = b.x1 - b.x0, d = b.z1 - b.z0, area = w * d;
+    const b = buildings[k], w = b.x1 - b.x0, d = b.z1 - b.z0, area = w * d, rub0 = rubN;
     const n = Math.min(90, Math.max(10, Math.round(area / 5)));
     const wc = b.wallCol, hgt = Math.min(8, 1.5 + (b.top - b.baseY) * 0.12);
     // a few big slabs make the core of the heap
@@ -902,6 +902,24 @@ export function buildCity(tex, opts = {}) {
       rubble.setColorAt(rubN, col); rubN++;
     }
     rubble.count = rubN; rubble.instanceMatrix.needsUpdate = true; rubble.instanceColor.needsUpdate = true;
+    (b.rub || (b.rub = [])).push([rub0, rubN]);
+  };
+  const clearRubble = (k) => {
+    const b = buildings[k]; if (!b.rub) return;
+    for (const [a, z] of b.rub) for (let i = a; i < z; i++) rubble.setMatrixAt(i, zeroM);
+    b.rub = null; rubble.instanceMatrix.needsUpdate = true;
+  };
+  // a rebuilt building: its walls, roof, colours and rooftop trees and tanks back as they were
+  const restoreBuilding = (k) => {
+    const b = buildings[k];
+    for (const rg of b.ranges) {
+      const m = meshes[rg.key]; if (!m || rg.v1 <= rg.v0) continue;
+      const pos = m.geometry.attributes.position, col = m.geometry.attributes.color;
+      pos.array.set(m.userData.origPos.subarray(rg.v0 * 3, rg.v1 * 3), rg.v0 * 3); pos.addUpdateRange(rg.v0 * 3, (rg.v1 - rg.v0) * 3); pos.needsUpdate = true;
+      col.array.set(m.userData.orig.subarray(rg.v0 * 3, rg.v1 * 3), rg.v0 * 3); col.addUpdateRange(rg.v0 * 3, (rg.v1 - rg.v0) * 3); col.needsUpdate = true;
+    }
+    for (const [im, i] of bInst[k]) { im.instanceMatrix.array.set(im.userData.orig.subarray(i * 16, i * 16 + 16), i * 16); im.instanceMatrix.needsUpdate = true; }
+    clearRubble(k); dead[k] = 0;
   };
   const hidden = [];
   // street trees and lamps within R are ripped out; returns what was taken
@@ -925,7 +943,7 @@ export function buildCity(tex, opts = {}) {
     }
     for (const im of instMeshes) { im.instanceMatrix.array.set(im.userData.orig); im.instanceMatrix.needsUpdate = true; }
     for (const it of hidden) it.alive = true; hidden.length = 0;
-    dead.fill(0); rubN = 0; rubble.count = 0;
+    dead.fill(0); rubN = 0; rubble.count = 0; for (const b of buildings) b.rub = null;
   };
 
   // darken one building's vertex colours (fire damage); uncharAll restores
@@ -943,7 +961,7 @@ export function buildCity(tex, opts = {}) {
 
   return {
     buildings, char, uncharAll, lamps, mats,
-    dead, buildingsNear, hideBuilding, extractBuilding, addRubble, takeStreetNear, restoreAll,
+    dead, buildingsNear, hideBuilding, extractBuilding, addRubble, clearRubble, restoreBuilding, takeStreetNear, restoreAll,
     group, sx, sz, NB, parked, crowds, walkBlocks, open, layout, nid,
     bounds: { x0: sx[0], x1: sx[NB], z0: sz[0], z1: sz[NB] },
     stats: { crowns: crowns.length, tanks: tanks.length, parked: parked.length, verts: Object.values(B).flat().reduce((a, b) => a + b.v, 0) },

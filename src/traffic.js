@@ -16,8 +16,9 @@ const DRIVE = 0, WRECK = 1, REST = 2, PARKED = 3, EXT = 4, AIR = 5;
 export const CAR_MODE = { DRIVE, WRECK, REST, PARKED, EXT, AIR };
 const MISSION_CAP = 24;
 const MISSION_KINDS = { police: { geo: () => cruiserGeometry(), cap: 12, cruise: 14 }, fire: { geo: () => VEHICLES.fire_truck.build(), cap: 8, cruise: 11 }, apc: { geo: () => VEHICLES.stryker.build(), cap: 6, cruise: 12, tough: true }, bus: { geo: () => VEHICLES.bus.build(), cap: 8, cruise: 10 },
-  chaser: { geo: () => VEHICLES.storm_chaser.build(), cap: 6, cruise: 15 }, tank: { geo: () => VEHICLES.abrams.build(), cap: 6, cruise: 9, tough: true } };
-const tough = (car) => car.kind === 'apc' || car.kind === 'tank'; // drive through traffic, park right at the crossing
+  chaser: { geo: () => VEHICLES.storm_chaser.build(), cap: 6, cruise: 15 }, tank: { geo: () => VEHICLES.abrams.build(), cap: 6, cruise: 9, tough: true },
+  build: { geo: () => VEHICLES.crane_truck.build(), cap: 8, cruise: 10 }, hazmat: { geo: () => VEHICLES.hazmat_truck.build(), cap: 4, cruise: 11 }, medic: { geo: () => VEHICLES.ambulance.build(), cap: 6, cruise: 13 }, jail: { geo: () => VEHICLES.police_bus.build(), cap: 4, cruise: 11 } };
+const tough = (car) => car.kind === 'apc' || car.kind === 'tank' || car.kind === 'build' || car.kind === 'hazmat'; // drive through traffic and wrecks, park right at the crossing
 const STOPLINE = 3.4; // car centre stops this far before the lane end
 
 const CAR_COLS = ['#f2efe8', '#f2efe8', '#f2efe8', '#e8e6e0', '#b8b8b4', '#9a9a98', '#2a2a2c', '#8c2a22', '#2f4566', '#d8c9a8', '#e0b030', '#5b6b4a'];
@@ -587,8 +588,6 @@ export class Traffic {
     for (const kind in this.missionMeshes) {
       const im = this.missionMeshes[kind]; if (!im.count) continue;
       im.instanceMatrix.needsUpdate = true;
-      const lit = this.missions.some(c => c.kind === kind && c.mode === DRIVE);
-      this.missionMats[kind].emissive.setHex(!lit ? 0x000000 : Math.floor(realT * 5) % 2 ? 0x3a0404 : 0x04083a);
     }
   }
 

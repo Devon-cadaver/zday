@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { ST } from './people.js';
 import { HAZARD_LEVEL, WEATHER_LEVEL } from './profile.js';
 import { WEATHER, threatName } from './disasters.js';
+import { Site, Camp, Hazmat } from './rebuild.js';
 
 export const UNITS = [
   { id: 'police', name: 'Police', cost: 50, cd: 20, alert: 0 },
@@ -12,6 +13,9 @@ export const UNITS = [
   { id: 'boat', name: 'Rescue boat', cost: 80, cd: 20, alert: 0 }, // only once the streets flood
   { id: 'chaser', name: 'Storm chaser', cost: 60, cd: 25, alert: 0 }, // spots tornadoes and aliens: calls in seeders, jets and tanks
   { id: 'seeder', name: 'Cloud seeder', cost: 100, cd: 30, alert: 0 }, // weakens tornadoes, breaks up storms
+  { id: 'build', name: 'Construction', cost: 100, cd: 20, alert: 0 }, // rebuilds a fallen building
+  { id: 'camp', name: 'Medical camp', cost: 120, cd: 40, alert: 0 }, // shelters people nearby until the rebuilding is done
+  { id: 'hazmat', name: 'Hazmat team', cost: 120, cd: 30, alert: 0 }, // clears radiation so building can start, decontaminates people
   { id: 'fire', name: 'Fire truck', cost: 80, cd: 30, alert: 2 },
   { id: 'water', name: 'Water heli', cost: 150, cd: 60, alert: 2 },
   { id: 'rescue', name: 'Rescue heli', cost: 120, cd: 45, alert: 2 },
@@ -57,10 +61,11 @@ export class Commander {
     this.el.alertPill = this.el.alert.parentElement;
     this.pr = g.profile; this.diff = this.pr.difficulty();
     this.cards = {};
+    const row = document.createElement('div'); row.className = 'zd-cards'; g.bar.appendChild(row);
     for (const u of UNITS) {
       if (!this.pr.unlocked(u.id)) continue;
       const b = g.addButton('zd-card-' + u.id, '<span class="nm">' + u.name + '</span><span class="cost">' + u.cost + ' pts</span><span class="cd"></span>', () => this.select(u.id), 'zd-card' + (u.once ? ' zd-nuke' : ''));
-      this.cards[u.id] = { btn: b, cd: b.querySelector('.cd'), u };
+      row.appendChild(b); this.cards[u.id] = { btn: b, cd: b.querySelector('.cd'), u };
     }
     g.addSpeedButton();
     g.addButton('zd-restart', 'Restart', () => this.start());
@@ -93,6 +98,9 @@ export class Commander {
     this.diff = this.pr.difficulty();
     p.incubate = this.diff.incubate.slice(); p.runnerBoost = this.diff.runners; p.markInfected = this.pr.has('drone');
     if (g.helis) g.helis.doubleDrop = this.pr.has('doubledrop');
+    for (const o of [...(this.works || []), ...(this.camps || []), ...(this.hazmats || [])]) o.dispose();
+    this.works = []; this.camps = []; this.hazmats = []; this.buildTo = new Set();
+    this.rebuiltN = 0; this.crews = 0; this.campsSent = 0; this.sheltered = 0; this.hazSent = 0; this.cleanups = 0; this.jailBuses = 0;
     g.resetWorld(); g.setSpeed(1);
     this.t = 0; this.rp = START_RP; this.earned = 0; this.alert = 0; this.blocksInf = 0; this.fires = 0; this.ended = false;
     this.sel = null; this.cool = {}; for (const u of UNITS) this.cool[u.id] = 0;
@@ -180,7 +188,7 @@ export class Commander {
     if (id === 'boat' && !this.g.disasters.boats.flooded) { this.g.toast('Rescue boats need flooded streets'); return; }
     for (const o of Object.values(this.cards)) o.btn.classList.remove('sel');
     this.sel = id; c.btn.classList.add('sel');
-    this.g.toast('Tap the map where the ' + c.u.name.toLowerCase() + ' should go');
+    this.g.toast(id === 'build' ? 'Tap a fallen building to rebuild it' : id === 'camp' ? 'Tap where the medical camp should go' : id === 'hazmat' ? 'Tap the area to decontaminate' : 'Tap the map where the ' + c.u.name.toLowerCase() + ' should go');
   }
 
   tap(x, z) {
@@ -198,6 +206,113 @@ export class Commander {
     else if (id === 'boat') this.sendBoat(x, z);
     else if (id === 'chaser') this.sendChaser(x, z);
     else if (id === 'seeder') this.sendSeeder(x, z, true);
+    else if (id === 'build') this.sendBuild(x, z);
+    else if (id === 'camp') this.sendCamp(x, z);
+    else if (id === 'hazmat') this.sendHazmat(x, z);
+  }
+
+  // a construction crew to the nearest fallen building: it clears the rubble and builds it back up
+  sendBuild(x, z) {
+    const g = this.g, D = g.disasters, city = g.city;
+    let best = -1, bd = 90;
+    for (let k = 0; k < city.buildings.length; k++) {
+      if (!city.dead[k] || this.buildTo.has(k) || this.works.some(w => w.k === k && w.alive)) continue;
+      const b = city.buildings[k], d = Math.hypot(Math.max(b.x0 - x, 0, x - b.x1), Math.max(b.z0 - z, 0, z - b.z1));
+      if (d < bd) { bd = d; best = k; }
+    }
+    if (best < 0) { g.toast('No fallen buildings near there to rebuild'); return; }
+    const b = city.buildings[best], cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2;
+    if (D.holeFloor(cx, cz) != null) { g.toast('The ground under that one is gone. Nothing can be built there'); return; }
+    if (D.zones.at(cx, cz)) { g.toast('That ruin is inside a radiation zone. Send a hazmat team to clear it first', 4000); return; }
+    const to = b.door || [cx, cz];
+    this.buildTo.add(best);
+    const car = g.traffic.dispatchTo(to[0], to[1], { kind: 'build',
+      onArrive: (ax, az, truck) => { this.buildTo.delete(best); if (!city.dead[best]) { g.traffic.depart(truck); return; } this.works.push(new Site(D, best, { car: truck, onDone: (s) => this.rebuilt(s) })); g.toast('Construction crew at work in the ' + this.district(cx, cz) + ': clearing the rubble first'); },
+      onLost: () => { this.buildTo.delete(best); this.lost++; g.toast('A construction truck was wrecked on the way'); } });
+    if (!car) { this.buildTo.delete(best); g.toast('No road to that spot'); return; }
+    this.spend('build'); this.crews++;
+    g.toast('Construction crew rolling, about ' + Math.ceil(car.eta) + ' s out');
+  }
+  rebuilt(s) {
+    const g = this.g; this.rebuiltN++; this.rp += 60; this.earned += 60;
+    g.toast('A building in the ' + this.district(s.cx, s.cz) + ' is rebuilt', 3000);
+    if (s.car && !s.car.gone) g.traffic.depart(s.car);
+  }
+  // a medical camp: tents go up and people from the streets around are brought in and kept safe
+  sendCamp(x, z) {
+    const g = this.g, w = this.campSpot(x, z) || g.people.snapWalkable(x, z, 30);
+    if (!w) { g.toast('No open ground there for a camp'); return; }
+    if (this.camps.some(c => c.alive && Math.hypot(c.x - w[0], c.z - w[1]) < 40)) { g.toast('There is already a medical camp there'); return; }
+    const car = g.traffic.dispatchTo(w[0], w[1], { kind: 'medic',
+      onArrive: (ax, az, amb) => { const c = new Camp(g.disasters, w[0], w[1], { minT: 90 }); c.car = amb; this.camps.push(c); g.toast('Medical camp open in the ' + this.district(w[0], w[1]) + '. People nearby are being brought in'); },
+      onLost: () => { this.lost++; g.toast('The ambulance was wrecked on the way'); } });
+    if (!car) { g.toast('No road to that spot'); return; }
+    this.spend('camp'); this.campsSent++;
+    g.toast('Ambulance on its way to set up a camp, about ' + Math.ceil(car.eta) + ' s out');
+  }
+  // open ground for the tents near (x, z): walkable with nothing built within 10 m, a park or a square rather than a road
+  campSpot(x, z) {
+    const p = this.g.people, city = this.g.city; let best = null, bd = 1e9;
+    for (let r = 0; r <= 60; r += 5) for (let a = 0; a < 6.28; a += r ? 5 / r : 7) {
+      const px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r; if (!p.walkable(px, pz)) continue;
+      let clear = true; city.buildingsNear(px, pz, 10, () => { clear = false; }); if (!clear) continue;
+      const d = r + (p.onRoad(px, pz) ? 25 : 0); if (d < bd) { bd = d; best = [px, pz]; }
+    }
+    return best;
+  }
+  // a hazmat clean-up where the truck parks: radiation, people with a dose, burning wrecks
+  sendHazmat(x, z) {
+    const g = this.g;
+    const car = g.traffic.dispatchTo(x, z, { kind: 'hazmat',
+      onArrive: (ax, az, truck) => { this.hazmats.push(new Hazmat(g.disasters, ax, az, { onDone: (hz) => this.cleaned(hz, truck) })); g.toast('Hazmat team suiting up in the ' + this.district(ax, az)); },
+      onLost: () => { this.lost++; g.toast('The hazmat truck was wrecked on the way'); } });
+    if (!car) { g.toast('No road to that spot'); return; }
+    this.spend('hazmat'); this.hazSent++;
+    g.toast('Hazmat team rolling, about ' + Math.ceil(car.eta) + ' s out');
+  }
+  cleaned(hz, truck) {
+    const g = this.g, bonus = 40 + hz.cleaned * 2; this.rp += bonus; this.earned += bonus; this.cleanups++;
+    g.toast(hz.zones ? 'Hazmat: radiation cleared here. Construction can start' : hz.cleaned ? 'Hazmat: ' + hz.cleaned + ' people decontaminated' : 'Hazmat: the area is clean', 3500);
+    if (truck && !truck.gone) g.traffic.depart(truck);
+  }
+  // work sites, camps and clean-ups; a camp closes once no rebuilding is going on near it and it is safe
+  worksTick(sdt) {
+    const g = this.g, p = g.people;
+    for (const w of this.works) w.update(sdt);
+    for (const hz of this.hazmats) hz.update(sdt);
+    for (const c of this.camps) {
+      if (!c.alive) continue;
+      c.update(sdt);
+      const busy = this.buildTo.size > 0 || this.works.some(w => w.alive && Math.hypot(w.cx - c.x, w.cz - c.z) < 320);
+      if (c.t > c.minT && !busy && p.zombiesNear(c.x, c.z, 70) === 0) {
+        const n = c.close(); this.sheltered += Math.max(c.peak, n); this.rp += 2 * n; this.earned += 2 * n;
+        g.toast(n ? 'Rebuilding done: the medical camp is sending ' + n + ' people home' : 'The medical camp is packing up', 3500);
+        if (c.car && !c.car.gone) g.traffic.depart(c.car);
+      }
+    }
+    this.works = this.works.filter(w => w.alive); this.hazmats = this.hazmats.filter(h => h.alive); this.camps = this.camps.filter(c => c.alive);
+  }
+  // rioters in custody: a police bus comes for them and takes them out of the area
+  custodyTick() {
+    const g = this.g, p = g.people;
+    for (const c of p.custody) {
+      if (c.done) continue;
+      if (c.bus) {
+        const bus = c.bus; if (bus.gone || bus.mode !== 3 || bus.leaving) continue;
+        bus.loadT = (bus.loadT || 0) + 1; let boarding = 0;
+        for (let i = 0; i < p.active; i++) if (p.st[i] === ST.BOARD && p.bt[i] === bus.id) boarding++;
+        if ((!boarding && bus.loadT > 2) || bus.loadT > 35) { p.releaseBus(bus.id); g.traffic.depart(bus); c.done = true; }
+        continue;
+      }
+      const n = p.heldBy(c.id);
+      if (!n) { c.done = true; continue; }
+      if (n < 4 && p.time - c.t < 20) continue; // wait a little for a bus load
+      const car = g.traffic.dispatchTo(c.x, c.z, { kind: 'jail',
+        onArrive: (ax, az, bus) => { bus.loadT = 0; bus.loaded = 0; const k = p.custodyToBus(c.id, ax, az, bus.id); g.toast('Police bus loading ' + k + ' arrested rioters in the ' + this.district(ax, az)); },
+        onLost: (bus) => { p.releaseBus(bus.id); c.done = true; },
+        onGone: (bus) => { g.toast('Police bus away with ' + (bus.loaded || 0) + ' rioters', 3000); } });
+      if (car) { c.bus = car; this.jailBuses++; if (this.jailBuses === 1) g.toast('A police bus is on its way to take the arrested rioters away', 3500); }
+    }
   }
 
   sendPolice(x, z) {
@@ -466,7 +581,8 @@ export class Commander {
     const bz = p.stats.bombed; if (bz > this.bombed0) { this.rp += bz - this.bombed0; this.earned += bz - this.bombed0; this.bombed0 = bz; }
     const bc = p.stats.bombedCiv; if (bc > this.bombedCiv0) { this.rp -= 5 * (bc - this.bombedCiv0); this.earned -= 5 * (bc - this.bombedCiv0); this.bombedCiv0 = bc; g.toast('Your airstrike killed ' + bc + ' civilians so far', 3500); }
     this.busTick(sdt);
-    if ((this.chaseT -= sdt) <= 0) { this.chaseT = 1; this.chaserTick(); }
+    if ((this.chaseT -= sdt) <= 0) { this.chaseT = 1; this.chaserTick(); this.custodyTick(); }
+    this.worksTick(sdt);
     if (this.tracers) for (let i = this.tracers.length - 1; i >= 0; i--) { const tr = this.tracers[i]; if ((tr.t -= sdt) <= 0) { this.g.disasters.ctx.scene.remove(tr.m); this.tracers.splice(i, 1); } }
     const bu = p.stats.bused; if (bu > this.bused0) { this.rp += 3 * (bu - this.bused0); this.earned += 3 * (bu - this.bused0); this.bused0 = bu; }
     const nc = p.stats.nukedCiv; if (nc > this.nukedCiv0) { this.rp -= 5 * (nc - this.nukedCiv0); this.earned -= 5 * (nc - this.nukedCiv0); this.nukedCiv0 = nc; g.toast('The nuke killed ' + nc + ' civilians', 5000); }
@@ -543,7 +659,8 @@ export class Commander {
       ...(this.weather !== 'clear' ? [['Weather', WEATHER[this.weather].name]] : []),
       ['Incidents', this.hit.map(threatName).join(', ') || 'none'],
       ...(this.hit.some(h => h !== 'zombies') ? [['Killed by disasters', (s.disasterCiv + s.drowned).toLocaleString()]] : []),
-      ...(s.arrests ? [['Rioters arrested', s.arrests]] : []),
+      ...(s.arrests ? [['Rioters arrested / taken away', s.arrests + ' / ' + s.jailed]] : []),
+      ...(this.crews || this.campsSent || this.hazSent ? [['Buildings rebuilt', this.rebuiltN], ['Sheltered in camps / bites treated', this.sheltered + ' / ' + s.treated], ['Hazmat clean-ups', this.cleanups]] : []),
       ...(this.hit.includes('aliens') ? [['Saucers / tripods downed', this.saucers + ' / ' + (this.tripods || 0)], ['Aliens killed', s.aliensKilled], ['Abducted', s.abducted]] : []),
       ['Time', Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0')],
     ];

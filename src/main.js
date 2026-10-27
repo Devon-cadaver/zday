@@ -12,6 +12,7 @@ import { Daylight } from './daylight.js';
 import { Helicopters } from './aircraft.js';
 import { Disasters } from './disasters.js';
 import { buildOutskirts } from './outskirts.js';
+import { Sirens } from './sirens.js';
 
 const P = new URLSearchParams(location.search);
 const coarse = matchMedia('(pointer: coarse)').matches;
@@ -123,6 +124,7 @@ function frame() {
     jx = (Math.random() - 0.5) * k; jy = (Math.random() - 0.5) * k * 0.5; jz = (Math.random() - 0.5) * k;
     camera.position.x += jx; camera.position.y += jy; camera.position.z += jz;
   }
+  sirens.update(time);
   post.render(scene, camera, focus, time);
   camera.position.x -= jx; camera.position.y -= jy; camera.position.z -= jz;
 
@@ -134,6 +136,8 @@ requestAnimationFrame(frame);
 
 helis.mushroom = (x, z, R) => disasters.mushroom(x, z, R); // the commander's nuke gets the full mushroom cloud
 helis.nukeBlast = (x, z, R) => disasters.nukeBlast(x, z, R, { byPlayer: true }); // the commander's own nuke
+const sirens = new Sirens(scene, { traffic, helis, boats: disasters.boats, daylight, fire }); // flashing lights on every rescue unit
+disasters.sirens = sirens;
 const game = new Game({ people, traffic, fire, city, camera, controls, renderer, mode, daylight, helis, post, disasters });
 
-window.__z = { THREE, scene, camera, controls, renderer, post, city, traffic, people, fire, game, daylight, helis, disasters, outskirts, sun, hemi, setView, buildMs, info: () => renderer.info.render };
+window.__z = { THREE, scene, camera, controls, renderer, post, city, traffic, people, fire, game, daylight, helis, disasters, outskirts, sirens, sun, hemi, setView, buildMs, info: () => renderer.info.render };

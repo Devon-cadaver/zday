@@ -17,6 +17,7 @@ import { BlackHole } from './blackhole.js';
 import { Boats } from './boats.js';
 import { Mushroom, NuclearStrike, Meltdown, nuclearDamage } from './nuke.js';
 import { Villains } from './villains.js';
+import { Zones } from './rebuild.js';
 
 export const threatName = (h) => (h === 'zombies' ? 'Zombie outbreak' : HAZARDS[h].name);
 
@@ -68,6 +69,7 @@ export class Disasters {
     this.weather = new Weather({ ...ctx, disasters: this });
     this.water = new WaterSurface(this);
     this.boats = new Boats(this); // rescue boats in floods and tsunamis
+    this.zones = new Zones(this); // radiation left behind: nothing is rebuilt inside it until hazmat clears it
     this.spitFx = new Splash(scene, 500); this.spitFx.mat.uniforms.uColor.value.setRGB(0.5, 0.95, 0.18); // spitter acid
     people.poi = (x, z) => this.poiAt(x, z); // onlookers watch (and film) whatever is happening near them
     // things falling into flood water or the sea throw up a splash
@@ -106,6 +108,7 @@ export class Disasters {
   }
   mushroom(x, z, R) { return new Mushroom(this, x, z, R); }
   nukeBlast(x, z, R, o = {}) { return nuclearDamage(this, x, z, R, o); }
+  contaminate(x, z, R) { return this.zones.add(x, z, R); }
   // the widest a held sinkhole or black hole can get: a pit covering about ten city blocks
   get maxHoleR() { const c = this.ctx.city, B = c.bounds; return (B.x1 - B.x0) / c.NB * 1.78; }
   inHole(x, z) { return this.holeFloor(x, z) != null; }
@@ -249,7 +252,7 @@ export class Disasters {
     for (const e of this.list) e.sync(dt, realT);
     for (const l of this.leftovers) l.sync(dt, realT);
     this.water.sync(dt, realT); this.boats.sync(dt, realT); this.spitFx.sync(this.lightK, this.ctx.fire.uniforms.uScale.value);
-    this.weather.sync(dt, realT);
+    this.weather.sync(dt, realT); this.zones.sync(realT);
     this.debris.sync();
     for (let i = this.bolts.length - 1; i >= 0; i--) {
       const b = this.bolts[i]; b.t -= dt; b.g.visible = Math.random() < 0.82;
@@ -261,7 +264,7 @@ export class Disasters {
     this.list.length = 0; this.timers.length = 0; this.events.length = 0;
     for (const l of this.leftovers) l.dispose(); this.leftovers.length = 0;
     for (const b of this.bolts) this.ctx.scene.remove(b.g); this.bolts.length = 0;
-    this.debris.reset(); this.decals.reset(); this.water.reset(); this.boats.reset();
+    this.debris.reset(); this.decals.reset(); this.water.reset(); this.boats.reset(); this.zones.reset();
     this.weather.set('clear', true);
     this.stats = { buildings: 0, hazards: 0 };
     if (this.ctx.outskirts) { this.ctx.outskirts.reset(); this.later(0, () => this.ctx.outskirts.steam(this.ctx.fire)); } // after fire.reset has cleared the pools

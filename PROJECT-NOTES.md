@@ -248,6 +248,15 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 - Weaver: six arms, drops on a thread onto a roof, swings roof to roof on arcs kept clear of roofs; web balls make ground webs (shader disc + guy lines) that stick people (people.web: FROZEN fx 7, silk look) and cars (car.frozen + car.webbed) for 45 s; acid at stuck cars only (car.eaten, dark rust tint).
 - Sandbox: Super villains in the Disasters menu (tap to place); they leave after 200 s. Be The Disaster: Super villains (k 1, level 3), Switch button cycles who you control (VillainsCtl in be-more.js). A random-play run scored about 20k.
 
+## Rebuilding, camps, hazmat, siren lights, riot buses
+- Commander units (rebuild.js): Construction (L1, 100 pts) drives a crane truck to the nearest ruin within 90 m of the tap, clears rubble 6 s (city.clearRubble), raises green netting floor by floor with a tower crane (16 + 1.6 s per floor), then city.restoreBuilding(k) puts the building back exactly (fire.bFire reset so it counts intact). Refused inside radiation zones or holes. +60 pts.
+- Medical camp (L2, 120 pts): ambulance; tents on open ground (campSpot: walkable, no building within 10 m, avoid roads); people.callToCamp pulls up to 60 civilians within 70 m into new state HELD (fx 0), bitten early are treated (stats.treated). Closes after 90 s once no construction is going on within 320 m and no zombies within 70 m; people.releaseHeld sends them home.
+- Hazmat (L3, 120 pts): hazmat truck, decon tent, yellow/black cordon R 70, 20 s: scrubs people with a radiation dose (zrad + inf), foams fires (fire.quench), then D.zones.clean. Radiation zones (Zones in rebuild.js, D.contaminate) come from NukeBlast (0.9R) and meltdown fallout; drawn as pale green dashed rings.
+- build and hazmat trucks are tough (push through wrecks) so they reach nuked areas.
+- Riots: arrest() puts rioters in custody (HELD fx 1) at a holding point; Commander custodyTick sends a police bus (kind jail) once 4 are held or 20 s pass; custodyToBus walks them aboard; stats.jailed. No bus in 90 s: released (people step).
+- Sirens (sirens.js): flashing light bars on every mission vehicle, boats, heli beacons, plus beacons at sites, camps and cordons. Additive points (bigger halos at night) and coloured street light pools at night. The old whole-vehicle red/blue emissive flash is gone.
+- Commander unit cards now sit in one horizontally scrolling row (.zd-cards).
+
 ## Next
 - Sean tests v1.3 on his phone; tune from his notes. Candidates: Be The Disaster score scales and ranks once real scores come in, the saucer size at close zoom, how often zombie outbreaks turn up in Commander, incident pacing, card bar height on the phone.
 

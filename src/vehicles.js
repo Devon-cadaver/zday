@@ -184,6 +184,20 @@ V.b52 = { name: 'B-52 Stratofortress', section: 'Aircraft', build: () => jetGrou
   cyl(0.3, 0.3, 1.4, 1.4, 1.25, -2.4, '#5e666c', 'x', 8), cyl(0.3, 0.3, 1.4, 0.6, 1.25, -3.6, '#5e666c', 'x', 8), cyl(0.3, 0.3, 1.4, 1.4, 1.25, 2.4, '#5e666c', 'x', 8), cyl(0.3, 0.3, 1.4, 0.6, 1.25, 3.6, '#5e666c', 'x', 8),
   cyl(0.3, 0.3, 1.4, -0.3, 1.25, -5.0, '#5e666c', 'x', 8), cyl(0.3, 0.3, 1.4, -1.0, 1.25, -6.2, '#5e666c', 'x', 8), cyl(0.3, 0.3, 1.4, -0.3, 1.25, 5.0, '#5e666c', 'x', 8), cyl(0.3, 0.3, 1.4, -1.0, 1.25, 6.2, '#5e666c', 'x', 8),
   box(1.0, 2.6, 0.14, -4.6, 2.9, 0, '#8d939a'), box(1.2, 0.1, 4.0, -4.6, 1.7, 0, '#8d939a')]) };
+// the rebuilding crews: a construction truck with a loader crane and a load of timber, and the hazmat unit's box truck
+V.crane_truck = { name: 'Construction truck', section: 'Fire and rescue', build: () => {
+  const Y = '#e8b020', p = [box(7.0, 0.5, 2.3, 0, 0.75, 0, DARK), box(2.0, 1.7, 2.4, 2.4, 1.75, 0, Y), box(0.9, 0.7, 2.3, 3.0, 2.15, 0, GLASS), box(4.4, 0.35, 2.4, -1.1, 1.15, 0, '#6a6660'),
+    box(3.4, 0.5, 1.9, -1.5, 1.58, 0, '#b07a40'), box(3.4, 0.08, 1.95, -1.5, 1.86, 0, '#8a5a2c'), cyl(0.3, 0.35, 0.8, 0.85, 1.7, 0, Y, 'y', 8), box(3.6, 0.3, 0.3, -0.7, 2.35, 0.55, Y, 0, -0.18),
+    box(0.4, 0.16, 1.4, 2.4, 2.68, 0, '#ffb020'), box(7.02, 0.12, 2.42, 0, 1.0, 0, '#2a2a2a')];
+  wheels(p, [2.4, -1.2, -2.5], 1.08, 0.5, 0.4); lights(p, 3.45, -3.5, 1.0, 0.8); return merge(p); } };
+V.hazmat_truck = { name: 'Hazmat unit', section: 'Fire and rescue', build: () => {
+  const p = [box(7.2, 0.5, 2.3, 0, 0.75, 0, DARK), box(2.0, 1.6, 2.4, 2.6, 1.6, 0, '#f4f4f0'), box(0.8, 0.6, 2.3, 3.2, 1.95, 0, GLASS), box(5.2, 2.5, 2.5, -1.15, 2.05, 0, '#f4f4f0'),
+    box(5.22, 0.32, 2.52, -1.15, 1.55, 0, '#f2b000'), box(5.22, 0.1, 2.52, -1.15, 1.34, 0, '#1c1c1c'), box(2.02, 0.32, 2.42, 2.6, 1.2, 0, '#f2b000'), box(0.9, 0.9, 0.06, -1.2, 2.45, 1.26, '#f2b000', Math.PI / 4),
+    box(0.4, 0.16, 0.5, 2.6, 2.48, -0.32, '#ffb020'), box(0.4, 0.16, 0.5, 2.6, 2.48, 0.32, '#ff2a1a'), box(0.3, 0.1, 1.3, 2.6, 2.44, 0, '#dcdcdc')];
+  wheels(p, [2.6, -1.4, -2.6], 1.08, 0.5, 0.4); lights(p, 3.6, -3.75, 1.0, 0.8); return merge(p); } };
+// police transport for the people arrested at a riot
+V.police_bus = { name: 'Police bus', section: 'Police', build: () => { const p = [box(9.4, 0.5, 2.3, 0, 0.6, 0, DARK), box(10.0, 2.3, 2.5, 0, 1.95, 0, '#1d2440'), box(10.02, 0.6, 2.52, 0, 2.4, 0, GLASS), box(0.3, 1.4, 2.4, 4.9, 1.9, 0, GLASS), box(10.0, 0.3, 2.52, 0, 1.35, 0, '#f4f4f0'),
+  ...lightbar(4.4, 3.16)]; for (let x = -4; x <= 3; x += 1.4) p.push(box(0.06, 0.6, 2.54, x, 2.4, 0, '#1d2440')); wheels(p, [3.2, -2.8], 1.15, 0.5, 0.4); lights(p, 5.0, -5.0, 0.9, 0.85, 0.4); return merge(p); } };
 V.bus = { name: 'City bus', section: 'Civilian', build: () => { const p = [box(9.4, 0.5, 2.3, 0, 0.6, 0, DARK), box(10.0, 2.3, 2.5, 0, 1.95, 0, '#e8e2d6'), box(10.02, 0.8, 2.52, 0, 2.3, 0, GLASS), box(0.3, 1.4, 2.4, 4.9, 1.9, 0, GLASS), box(10.0, 0.25, 2.52, 0, 1.35, 0, '#2f6b4f')]; wheels(p, [3.2, -2.8], 1.15, 0.5, 0.4); lights(p, 5.0, -5.0, 0.9, 0.85, 0.4); return merge(p); } };
 for (const [id, t] of Object.entries(CAR_TYPES)) V['car_' + id] = { name: id[0].toUpperCase() + id.slice(1), section: 'Civilian', build: t.build, tint: true };
 export const VEHICLES = V;

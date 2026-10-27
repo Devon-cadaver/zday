@@ -32,6 +32,10 @@ const CSS = `
 #zd-drop .n{background:#a6ff4d;color:#1d2a0e;border-radius:6px;padding:3px 6px;font-variant-numeric:tabular-nums}
 #zd-drop.empty{background:rgba(28,20,12,.72);border-color:rgba(255,236,200,.18);opacity:.7}
 #zd-find.on{border-color:#a6ff4d;color:#a6ff4d}
+.zd-cards{display:flex;gap:6px;overflow-x:auto;flex:1 1 100%;max-width:100%;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding:2px 0}
+.zd-cards::-webkit-scrollbar{display:none}
+.zd-cards > :first-child{margin-left:auto}.zd-cards > :last-child{margin-right:auto}
+.zd-cards .zd-card{flex:none}
 .zd-card{display:flex;flex-direction:column;gap:4px;align-items:center;min-width:62px;padding:8px 7px 7px;text-transform:none;letter-spacing:.02em}
 .zd-card .nm{font-size:11px;white-space:nowrap}
 .zd-card .cost{font-size:11px;color:#7be0ff;font-variant-numeric:tabular-nums}
@@ -104,7 +108,7 @@ const CSS = `
 @media (prefers-reduced-motion: reduce){#zd-toast{transition:none}}
 `;
 
-const UNIT_NAMES = { police: 'Police cruiser', bus: 'Evacuation bus', chaser: 'Storm chaser', seeder: 'Cloud seeder', boat: 'Rescue boat', fire: 'Fire truck', water: 'Water helicopter', rescue: 'Rescue helicopter', apc: 'Army APC', strike: 'Airstrike', nuke: 'Nuke' };
+const UNIT_NAMES = { build: 'Construction crew', camp: 'Medical camp', hazmat: 'Hazmat team', police: 'Police cruiser', bus: 'Evacuation bus', chaser: 'Storm chaser', seeder: 'Cloud seeder', boat: 'Rescue boat', fire: 'Fire truck', water: 'Water helicopter', rescue: 'Rescue helicopter', apc: 'Army APC', strike: 'Airstrike', nuke: 'Nuke' };
 
 // the city runs on its own behind the menu
 class Idle {

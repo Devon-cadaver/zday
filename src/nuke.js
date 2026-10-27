@@ -146,6 +146,7 @@ export class NukeBlast {
   constructor(D, x, z, R, o = {}) {
     this.type = 'nukeblast'; this.D = D; this.x = x; this.z = z; this.R = R; this.t = 0; this.f = 0; this.alive = true;
     this.speed = R / 3.4; this.byPlayer = !!o.byPlayer; this.ash = []; this.heat = 1;
+    if (D.contaminate) D.contaminate(x, z, R * 0.9); // the ground stays hot until a hazmat team clears it
     const { fire, scene } = D.ctx;
     D.flash(o.bigFlash ? 1.8 : 1.3); D.shake(3); // a blink of white, then the orange heat wash (post.js uHeat) carries it
     fire.nuke(x, z, R * 0.9, { cloud: false });
@@ -321,6 +322,7 @@ export class Meltdown {
     f.k = Math.min(1, f.t / 6) * Math.max(0, Math.min(1, (f.life - f.t) / 15));
     if ((f.doseT -= h) <= 0) {
       f.doseT = 1;
+      if (f.k > 0.3 && (this.zoneT = (this.zoneT ?? 0) - 1) <= 0 && this.D.contaminate) { this.zoneT = 8; this.D.contaminate(f.x, f.z, f.R * 0.6); } // fallout settles where the cloud passes
       people.around(f.x, f.z, f.R * 0.85, (j) => { const s = people.st[j]; if ((s === 0 || s === 1 || s === 2 || s === 3 || s === 9 || s === 24) && people.kind[j] === 0 && Math.random() < 0.02 * f.k) { if (Math.random() < 0.45) people.kill(j, 0, 0, 'rad'); else if (!people.inf[j]) { people.inf[j] = 1; people.zrad[j] = 1; people.inc[j] = people.inc0[j] = 12 + Math.random() * 20; people.dirty[j] = 1; } } }); // the rest of the dosed turn radioactive later
     }
     if (f.t > f.life) this.alive = false;
