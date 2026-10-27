@@ -716,10 +716,13 @@ export function buildCity(tex, opts = {}) {
   // ---- meshes
   const group = new THREE.Group();
   const std = (o) => cutGround(new THREE.MeshStandardMaterial({ roughness: 0.9, metalness: 0, ...o })); // open pits cut through all of it
+  // walls darken towards the street: grime and the shade of the pavement, baked into the shading (it costs nothing)
+  const walls = (m) => { const prev = m.onBeforeCompile; m.onBeforeCompile = (sh, r) => { prev(sh, r); sh.fragmentShader = sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.rgb *= 0.74 + 0.26 * smoothstep(0.2, 6.0, vHoleW.y);'); }; return m; };
+  const nrm = (k) => new THREE.Vector2(k, k);
   const mats = {
-    fac: tex.facades.map((m, k) => std({ map: m, vertexColors: true, roughness: 0.85, emissiveMap: tex.facadesLit[k], emissive: '#ffffff', emissiveIntensity: 0 })),
-    shop: std({ map: tex.shop, vertexColors: true, emissiveMap: tex.shopLit, emissive: '#ffffff', emissiveIntensity: 0 }),
-    roof: std({ map: tex.roof, vertexColors: true }),
+    fac: tex.facades.map((m, k) => walls(std({ map: m, normalMap: tex.facadeRelief[k], normalScale: nrm(1.6), vertexColors: true, roughness: 0.85, emissiveMap: tex.facadesLit[k], emissive: '#ffffff', emissiveIntensity: 0 }))),
+    shop: walls(std({ map: tex.shop, normalMap: tex.shopRelief, normalScale: nrm(1.6), vertexColors: true, emissiveMap: tex.shopLit, emissive: '#ffffff', emissiveIntensity: 0 })),
+    roof: std({ map: tex.roof, normalMap: tex.roofRelief, normalScale: nrm(1.5), vertexColors: true }),
     walk: std({ map: tex.sidewalk, vertexColors: true }),
     grass: std({ map: tex.grass, vertexColors: true, roughness: 1 }),
   };

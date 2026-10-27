@@ -245,15 +245,34 @@ function grass(r) {
   return c;
 }
 
+// relief read off the painting itself, as a normal map: what is painted dark (glass, gaps, shadow lines) sits back and
+// what is painted light (sills, trims, ledges, mortar) stands out - surface detail for one texture lookup, no geometry
+function relief(src, k, renderer) {
+  const w = src.width, h = src.height, d = src.getContext('2d').getImageData(0, 0, w, h).data, H = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) H[i] = (d[i * 4] * 0.3 + d[i * 4 + 1] * 0.59 + d[i * 4 + 2] * 0.11) / 255;
+  const [c, g] = mk(w, h), img = g.createImageData(w, h), o = img.data;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x, l = H[y * w + (x + w - 1) % w], rr = H[y * w + (x + 1) % w], up = H[((y + h - 1) % h) * w + x], dn = H[((y + 1) % h) * w + x];
+    const nx = (l - rr) * k, ny = (dn - up) * k, inv = 1 / Math.sqrt(nx * nx + ny * ny + 1); // canvas rows run down, the texture's v up
+    o[i * 4] = (nx * inv * 0.5 + 0.5) * 255; o[i * 4 + 1] = (ny * inv * 0.5 + 0.5) * 255; o[i * 4 + 2] = (inv * 0.5 + 0.5) * 255; o[i * 4 + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  return t;
+}
+
 export function makeTextures(renderer, seed = 7) {
   const r = rng(seed);
-  const fac = [0, 1, 2, 3].map(s => facade(s, r)), sh = shop(r);
+  const fac = [0, 1, 2, 3].map(s => facade(s, r)), sh = shop(r), rf = roof(r);
   return {
+    facadeRelief: fac.map(c => relief(c, 2.2, renderer)),
+    shopRelief: relief(sh, 2.2, renderer),
+    roofRelief: relief(rf, 3.0, renderer),
     facades: fac.map(c => finish(c, renderer)),
     facadesLit: fac.map(c => finish(c.lit, renderer)),
     shop: finish(sh, renderer),
     shopLit: finish(sh.lit, renderer),
-    roof: finish(roof(r), renderer),
+    roof: finish(rf, renderer),
     asphalt: finish(asphalt(r), renderer),
     sidewalk: finish(sidewalk(r), renderer),
     grass: finish(grass(r), renderer),
