@@ -1,4 +1,6 @@
-// Commander profile: XP, level, unlocks and upgrades, saved in localStorage.
+// Commander profile: XP, level, unlocks and upgrades, how far along the road of
+// towns each mode has got, saved in localStorage.
+import { PATH } from './places.js';
 const KEY = 'zday_profile';
 
 // cumulative XP needed to reach each level (index = level - 1)
@@ -47,6 +49,18 @@ export class Profile {
     this.data.upgrades[id] = 1; this.data.spent += u.cost; this.save();
     return true;
   }
+  // the road of towns (PATH), for 'commander' and 'be': how far it has opened (an index), where it was played last, and
+  // the town to go to next time (the last one played, else the furthest open)
+  reach(mode) { return Math.min((this.data.path || {})[mode] || 0, PATH.length - 1); }
+  town(mode) { const last = (this.data.last || {})[mode], i = PATH.indexOf(last); return i >= 0 && i <= this.reach(mode) ? last : PATH[this.reach(mode)]; }
+  played(mode, key) { if (PATH.indexOf(key) < 0) return; (this.data.last || (this.data.last = {}))[mode] = key; this.save(); }
+  // won in the furthest open town: the next one opens; returns its key (null if nothing new opened)
+  clear(mode, key) {
+    const i = PATH.indexOf(key); if (i < 0 || i !== this.reach(mode) || i + 1 >= PATH.length) return null;
+    (this.data.path || (this.data.path = {}))[mode] = i + 1; this.save();
+    return PATH[i + 1];
+  }
+
   // settle a round; returns { xp, levelUp, level }
   addRound(score, stars) {
     const before = this.level;

@@ -158,6 +158,8 @@ const game = new Game({ people, traffic, fire, city, camera, controls, renderer,
 const searchlights = new Searchlights(scene, { game, traffic, helis, city, daylight }); // beams at night on the trouble
 game.audio = new Audio(camera, controls); // sound: switched on by the first tap
 const globe = game.globe = new Globe(renderer); let globeWas = false; // the world from orbit: the big city and the towns
+globe.statusFor = () => game.townStatus(game.modeName); // Commander and Be The Disaster: towns further down the road are locked
+if (!game.menu.hidden) { globe.backdrop(); game.dockSide(); } // the menu sits over the planet
 // what this place remembers: the buildings that came down here last time (Sandbox; Commander starts each round fresh)
 const sandbox = () => game.mode && game.mode.kind === 'sandbox';
 for (const k of damageOf(placeKey())) if (city.buildings[k] && !city.dead[k]) { people.clearBuilding(k, 'spare'); city.hideBuilding(k); city.addRubble(k, 0.75); }

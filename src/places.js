@@ -13,14 +13,19 @@ export const PLACES = {
   pines: { name: 'Pine Hollow', blurb: 'A small old brick town by the forest', blocks: 5, seed: 9090, maxFloors: 5, tall: 0, landmarks: [], centers: 1, diag: false, tint: { brick: 16, stone: 4, brown: 4 }, people: 0.2, cars: 0.18, land: 'forest' },
 };
 
+// the road through the world in Commander and Be The Disaster: the smallest town first, up to the big city. Win in a
+// place and the next one opens
+export const PATH = ['mesa', 'pines', 'dust', 'lakeside', 'harbor', 'bayview', 'metro'];
+
 export function placeKey() {
   let k = new URLSearchParams(location.search).get('place');
   if (!k) try { k = localStorage.getItem('zday_place'); } catch (e) { /* no storage */ }
   return k && PLACES[k] ? k : 'metro';
 }
-// go to another place: the page is built again around it (in the mode given, or to the menu)
-export function travel(key, mode) {
+// go to another place: the page is built again around it (in the mode given, or to the menu; more settings in extra)
+export function travel(key, mode, extra) {
   try { localStorage.setItem('zday_place', key); } catch (e) { /* no storage */ }
   const P = new URLSearchParams(location.search); P.set('place', key); if (mode) P.set('mode', mode); else P.delete('mode');
+  if (extra) for (const k in extra) P.set(k, extra[k]);
   location.search = P.toString();
 }

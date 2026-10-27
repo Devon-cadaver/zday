@@ -7,10 +7,12 @@
 // painted from noise on a sphere, so it has no seams and no poles pinching.
 // Places that have taken damage smoke; meteors leave craters; the meteor button
 // sends one down wherever you tap, and a direct hit on a town flies you down to
-// watch it land.
+// watch it land. It is also the main menu's backdrop (turning slowly, the road
+// through the towns drawn on it), where Sandbox picks its place and Commander and
+// Be The Disaster turn to their next town and fly down to it.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { PLACES, placeKey, travel } from './places.js';
+import { PLACES, PATH, placeKey, travel } from './places.js';
 import { damageOf, craters, addCrater, sendMeteor } from './world.js';
 import { sideButton } from './ui.js';
 
@@ -77,6 +79,7 @@ const toVec = (lat, lon, r = R) => new THREE.Vector3(Math.cos(lat) * Math.cos(lo
 export class Globe {
   constructor(renderer) {
     this.renderer = renderer; this.active = false; this.built = false; this.t = 0; this.fly = null;
+    this.state = 'game'; this.status = null; this.arrive = null; this.shift = 0; this.shiftTo = 0; // game: opened from a place; menu: behind the menu; pick: choose a place; path: on the way to one
     this.button();
   }
   button() {
@@ -101,6 +104,7 @@ export class Globe {
     const sp = new Float32Array(1500 * 3); for (let i = 0; i < 1500; i++) { const v = new THREE.Vector3().randomDirection().multiplyScalar(150 + Math.random() * 80); sp.set([v.x, v.y, v.z], i * 3); }
     const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(sp, 3)); scene.add(new THREE.Points(sg, new THREE.PointsMaterial({ color: '#cfd8ff', size: 0.6, sizeAttenuation: true })));
     this.placeTowns();
+    this.buildRoad();
     this.decorate();
     this.labels();
     this.controls = new OrbitControls(cam, this.renderer.domElement); this.controls.enablePan = false; this.controls.enableDamping = true; this.controls.dampingFactor = 0.08;
@@ -147,6 +151,17 @@ export class Globe {
     this.scene.add(im);
     this.here = new THREE.Mesh(new THREE.RingGeometry(0.62, 0.7, 48), new THREE.MeshBasicMaterial({ color: '#ffe08a', transparent: true, side: THREE.DoubleSide, depthWrite: false })); // a ring round where you are
     const hs = this.spots[placeKey()], hp = toVec(hs[0], hs[1], R * 1.003); this.here.position.copy(hp); this.here.lookAt(hp.clone().multiplyScalar(2)); this.scene.add(this.here);
+  }
+  // the road through the towns (PATH), along the surface from each to the next
+  buildRoad() {
+    const pts = [];
+    for (let i = 0; i + 1 < PATH.length; i++) {
+      const a = toVec(...this.spots[PATH[i]], 1).normalize(), b = toVec(...this.spots[PATH[i + 1]], 1).normalize(), ang = a.angleTo(b), n = Math.max(4, Math.ceil(ang * 40));
+      for (let k = i ? 1 : 0; k <= n; k++) { const t = k / n, s = Math.sin(ang); pts.push(a.clone().multiplyScalar(Math.sin((1 - t) * ang) / s).addScaledVector(b, Math.sin(t * ang) / s).multiplyScalar(R * 1.004)); }
+    }
+    const curve = new THREE.CatmullRomCurve3(pts);
+    this.road = new THREE.Mesh(new THREE.TubeGeometry(curve, pts.length * 2, 0.017, 5, false), new THREE.MeshBasicMaterial({ color: '#ffd27a', transparent: true, opacity: 0.6, depthWrite: false }));
+    this.road.visible = false; this.scene.add(this.road);
   }
   // the marks the world carries: craters (glowing a while when fresh), smoke over places that have taken damage
   decorate() {
@@ -199,8 +214,19 @@ export class Globe {
     for (const key in PLACES) {
       const d = document.createElement('button'); d.type = 'button'; d.className = 'zd-place'; d.textContent = PLACES[key].name + (key === placeKey() ? ' · here' : '');
       d.style.cssText = 'position:fixed;left:0;top:0;z-index:41;transform:translate(-50%,-150%);padding:5px 10px;border-radius:12px;border:1px solid rgba(255,255,255,0.25);background:rgba(18,16,14,0.78);color:#f6eedc;font:600 12px system-ui,sans-serif;white-space:nowrap;cursor:pointer;display:none';
-      d.onclick = (e) => { e.stopPropagation(); this.go(key); };
+      d.onclick = (e) => { e.stopPropagation(); if (this.state !== 'menu') this.go(key); };
       document.body.appendChild(d); this.tags[key] = d;
+    }
+  }
+  // what each label says: the name (with the road's number, a tick for the towns won and a lock on those not open yet
+  // in Commander and Be The Disaster), dimmed when locked; behind the menu they are only names
+  relabel() {
+    for (const key in this.tags) {
+      const d = this.tags[key], s = this.status && this.state !== 'menu' ? this.status(key) : null;
+      d.textContent = (s ? s.text : PLACES[key].name) + (this.state === 'game' && key === placeKey() ? ' · here' : '');
+      d.style.opacity = s && s.locked ? '0.55' : this.state === 'menu' ? '0.85' : '1';
+      d.style.pointerEvents = this.state === 'menu' ? 'none' : '';
+      d.style.fontSize = this.state === 'menu' ? '11px' : '12px'; d.style.zIndex = this.state === 'menu' ? '5' : '41'; // under the menu card
     }
   }
   ui() {
@@ -222,14 +248,16 @@ export class Globe {
     });
     const back = this.backBtn = document.createElement('button'); back.type = 'button'; back.className = 'zd-btn'; back.textContent = 'Back to ' + PLACES[placeKey()].name;
     back.style.cssText = 'position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:41;display:none';
-    back.onclick = (e) => { e.stopPropagation(); this.go(placeKey()); };
+    back.onclick = (e) => { e.stopPropagation(); if (this.state === 'pick' && this.onBack) this.onBack(); else this.go(placeKey()); };
     document.body.appendChild(u); document.body.appendChild(back);
   }
   // up from where you are: the game waits, the camera pulls back off the city out to the whole planet
   open() {
     if (this.active) return;
     if (!this.built) this.build();
-    this.active = true; this.fly = null;
+    this.active = true; this.fly = null; this.state = 'game'; this.arrive = null; this.shiftTo = 0;
+    this.status = this.statusFor ? this.statusFor() : null; this.road.visible = !!this.status; this.here.visible = true; this.relabel();
+    this.uiEl.firstChild.textContent = 'THE WORLD'; this.say('Spin it, tap a town to go there'); this.backBtn.textContent = 'Back to ' + PLACES[placeKey()].name;
     const [lat, lon] = this.spots[placeKey()], p = toVec(lat, lon, 1).normalize();
     this.cam.position.copy(p).multiplyScalar(R * 1.15); this.cam.lookAt(0, 0, 0); this.controls.target.set(0, 0, 0); this.controls.update();
     this.rise = { t: 0, from: R * 1.15, to: R * 3.2, dir: p.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), 0.25).add(new THREE.Vector3(0, 0.25, 0)).normalize() };
@@ -239,14 +267,46 @@ export class Globe {
     if (this.onOpen) this.onOpen();
   }
   close() {
-    this.active = false; this.controls.enabled = false; this.toggleHud(true);
+    this.active = false; this.controls.enabled = false; this.controls.autoRotate = false; this.state = 'game'; this.arrive = null; this.turn = null; this.toggleHud(true);
+    this.shift = this.shiftTo = 0; this.cam.clearViewOffset(); document.body.classList.remove('zd-globe-on');
     this.uiEl.style.display = 'none'; this.backBtn.style.display = 'none'; this.metBtn.style.display = 'none'; this.armed = false; for (const k in this.tags) this.tags[k].style.display = 'none';
     if (this.onArrive) this.onArrive();
+  }
+  // behind the main menu: the planet turning slowly, the places on it and the road between them
+  backdrop() {
+    if (!this.built) this.build();
+    const was = this.active;
+    this.active = true; this.state = 'menu'; this.status = null; this.arrive = null; this.fly = this.rise = this.turn = null; this.armed = false;
+    this.uiEl.style.display = 'none'; this.backBtn.style.display = 'none'; this.metBtn.style.display = 'none';
+    this.here.visible = false; this.road.visible = true; this.relabel();
+    if (!was) { // looking at the middle of the road, from a little above
+      const c = new THREE.Vector3(); for (const k of PATH) c.add(toVec(...this.spots[k], 1).normalize());
+      const [lat, lon] = toLatLon(c); this.cam.position.copy(toVec(Math.min(1.1, lat + 0.35), lon, this.fit())); this.cam.lookAt(0, 0, 0); this.controls.target.set(0, 0, 0);
+    }
+    this.controls.maxDistance = Math.max(R * 5, this.fit() * 1.15);
+    this.controls.enabled = true; this.controls.autoRotate = true; this.controls.autoRotateSpeed = 0.45; this.controls.update();
+    this.shiftTo = innerHeight > innerWidth ? 0.14 : 0.08; // the planet sits above the menu
+    document.body.classList.add('zd-globe-on');
+  }
+  // far enough back that the whole planet fits across the screen (a phone held upright sees a narrow slice)
+  fit() { const half = Math.min(16, Math.atan(Math.tan(16 * Math.PI / 180) * innerWidth / innerHeight) * 180 / Math.PI) * Math.PI / 180; return Math.max(R * 3.2, R / Math.sin(half * 0.97)); }
+  // from the menu: pick a place (Sandbox: opts.arrive(key) once flown down; opts.back for the Back button), or head for
+  // one (opts.key: turn to it, then fly down). opts.status labels the places (and locks some), opts.road shows the road
+  choose(opts) {
+    if (!this.built) this.build();
+    this.active = true; this.state = opts.key ? 'path' : 'pick'; this.status = opts.status || null; this.arrive = opts.arrive; this.onBack = opts.back;
+    this.controls.autoRotate = false; this.controls.enabled = !opts.key; this.shiftTo = 0; this.road.visible = !!opts.road; this.relabel();
+    this.uiEl.firstChild.textContent = opts.title || ''; this.say(opts.sub || ''); this.uiEl.style.display = '';
+    this.metBtn.style.display = 'none'; this.backBtn.textContent = 'Back'; this.backBtn.style.display = opts.back ? '' : 'none';
+    if (opts.key) this.turn = { t: 0, key: opts.key, r: Math.min(this.cam.position.length(), R * 3), to: toVec(...this.spots[opts.key], 1).normalize() };
   }
   toggleHud(on) { for (const el of document.querySelectorAll('#zd-top, #zd-bar, #zd-dis, #zd-call, #zd-toast, #zd-end, #zd-menu')) el.style.visibility = on ? '' : 'hidden'; }
   // down to a place: fly in over it; back where you were, the city is still there; anywhere else is built afresh
   go(key) {
     if (this.fly) return;
+    const s = this.status && this.status(key);
+    if (s && s.locked) { this.say(s.why || 'That town is not open yet'); return; }
+    this.turn = null;
     const [lat, lon] = this.spots[key];
     this.fly = { t: 0, key, from: this.cam.position.clone(), to: toVec(lat, lon, R * 1.12) };
     this.controls.enabled = false;
@@ -269,12 +329,21 @@ export class Globe {
     if (this.rise) { // pulling back off the city
       const R0 = this.rise; R0.t += dt; const k = Math.min(1, R0.t / 1.6), e = 1 - Math.pow(1 - k, 3), r = R0.from + (R0.to - R0.from) * e;
       const dir = this.cam.position.clone().normalize().lerp(R0.dir, Math.min(1, dt * 1.2)).normalize(); this.cam.position.copy(dir.multiplyScalar(r)); this.cam.lookAt(0, 0, 0);
-      if (k >= 1) this.rise = null;
+      if (k >= 1) { this.rise = null; if (this.after) { const a = this.after; this.after = null; this.go(a); } } // on to the next town
     } else if (this.fly) { // flying down to a place
       const F = this.fly; F.t += dt; const k = Math.min(1, F.t / 1.4), e = k * k * (3 - 2 * k);
       const a = F.from.clone().normalize(), b = F.to.clone().normalize(), dir = a.lerp(b, e).normalize(), r = F.from.length() + (F.to.length() - F.from.length()) * e;
       this.cam.position.copy(dir.multiplyScalar(r)); this.cam.lookAt(0, 0, 0);
-      if (k >= 1) { const key = F.key; this.fly = null; if (key === placeKey()) this.close(); else { this.uiEl.innerHTML = 'TRAVELLING TO ' + PLACES[key].name.toUpperCase(); travel(key, new URLSearchParams(location.search).get('mode') || 'sandbox'); } }
+      if (k >= 1) {
+        const key = F.key; this.fly = null;
+        if (this.arrive) { const a = this.arrive; if (key !== placeKey()) this.travelling(key); a(key); }
+        else if (key === placeKey()) this.close();
+        else { this.travelling(key); travel(key, new URLSearchParams(location.search).get('mode') || 'sandbox'); }
+      }
+    } else if (this.turn) { // turning the planet to the next town, then down to it
+      const T = this.turn; T.t += dt; const k = Math.min(1, T.t / 1.3), dir = this.cam.position.clone().normalize().lerp(T.to, Math.min(1, dt * 3.2)).normalize();
+      this.cam.position.copy(dir.multiplyScalar(this.cam.position.length() + (T.r - this.cam.position.length()) * Math.min(1, dt * 3))); this.cam.lookAt(0, 0, 0);
+      if (k >= 1) { this.turn = null; this.go(T.key); }
     } else this.controls.update();
     // labels over the places on the side facing you
     const v = new THREE.Vector3(), camDir = this.cam.position.clone().normalize();
@@ -283,7 +352,10 @@ export class Globe {
       if (p.clone().normalize().dot(camDir) < 0.25 || this.fly || this.rise) { el.style.display = 'none'; continue; }
       v.copy(p).project(this.cam); el.style.display = ''; el.style.left = ((v.x + 1) / 2 * innerWidth) + 'px'; el.style.top = ((1 - v.y) / 2 * innerHeight) + 'px';
     }
+    this.shift += (this.shiftTo - this.shift) * Math.min(1, dt * 3);
+    if (this.shift > 0.002) this.cam.setViewOffset(innerWidth, innerHeight, 0, this.shift * innerHeight, innerWidth, innerHeight); else if (this.cam.view && this.cam.view.enabled) this.cam.clearViewOffset();
     this.renderer.setRenderTarget(null); this.renderer.render(this.scene, this.cam);
   }
+  travelling(key) { this.uiEl.firstChild.textContent = 'TRAVELLING TO ' + PLACES[key].name.toUpperCase(); this.say(''); this.uiEl.style.display = ''; this.backBtn.style.display = 'none'; }
   resize() { if (this.cam) { this.cam.aspect = innerWidth / innerHeight; this.cam.updateProjectionMatrix(); } }
 }

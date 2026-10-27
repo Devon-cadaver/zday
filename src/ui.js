@@ -8,7 +8,11 @@ const CSS = `
 .zd-side-btn:active{transform:translateY(1px)}
 #zd-sound{order:1}#zd-music{order:2}#zd-globe{order:3}
 body.zd-panel #zd-side{display:none}
-body.zd-menu-on #zd-side{top:calc(10px + env(safe-area-inset-top));transform:none;flex-direction:row}
+body.zd-menu-on #zd-side{display:none}
+body.zd-menu-on #zd-menu #zd-side{display:flex;position:static;transform:none;flex-direction:row}
+#zd-menu #zd-globe{display:none}
+body.zd-globe-on #zd-globe{display:none}
+body.zd-globe-on #zd-side{top:calc(12px + env(safe-area-inset-top));transform:none}
 `;
 let side = null;
 // a round button in the right-hand column

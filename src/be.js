@@ -11,6 +11,7 @@ import { saucerMesh, beamMesh } from './aliens.js';
 import { ST, KIND } from './people.js';
 import { roofTop } from './tripod.js';
 import { Gauge, SIZED } from './gauge.js';
+import { PLACES, PATH, placeKey } from './places.js';
 import { ZombiesCtl, RiotCtl, FloodCtl, VolcanoCtl, DustCtl, BlizzardCtl, SolarCtl, NukeCtl, ReactorCtl, RoamingHoleCtl, TripodCtl, VillainsCtl, WormCtl, KaijuCtl } from './be-more.js';
 
 const RUN = 180;
@@ -285,7 +286,7 @@ export class BeTheDisaster {
 
   start() {
     const g = this.g, D = g.disasters, B = g.city.bounds, p = g.people, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2;
-    this.end.hidden = true; this.ended = false;
+    this.end.hidden = true; this.ended = false; g.profile.played('be', placeKey()); // where you left off
     if (this.gauge) this.gauge.cancel();
     g.resetWorld(); g.setSpeed(1); D.boats.auto = false; // nobody comes to the rescue
     this.t = 0; this.score = 0; this.tick = 0;
@@ -368,16 +369,20 @@ export class BeTheDisaster {
     let rank = 'F'; for (const [s, r] of RANKS) if (this.score >= s) rank = r;
     const r = g.profile.addBe(this.kind, this.score), best = (g.profile.data.beBest || {})[this.kind] || 0;
     const lines = [['Buildings destroyed', G.b], ['Victims', (G.dead + G.abd).toLocaleString()], ['Cars wrecked', G.cars], ['Fires started', G.fires]];
+    // the road: wreck enough of this town (a score of 30 a building) and the next one opens
+    const here = placeKey(), at = PATH.indexOf(here), goal = 30 * g.city.buildings.length, opened = this.score >= goal ? g.profile.clear('be', here) : null;
+    const nextKey = PATH[at + 1], nextOpen = at >= 0 && nextKey && at + 1 <= g.profile.reach('be');
+    const road = at < 0 ? '' : opened ? '<div class="lvl">New town open: ' + PLACES[opened].name + '</div>' : nextKey && !nextOpen ? '<div class="xp">Score ' + goal.toLocaleString() + ' here to open ' + PLACES[nextKey].name + '</div>' : '';
     if (G.abd) lines.splice(2, 0, ['Beamed up', G.abd.toLocaleString()]);
     if (G.zom) lines.splice(2, 0, ['Zombies made', G.zom.toLocaleString()]);
-    this.end.innerHTML = '<div class="box"><h2>' + BE[this.kind].name + '</h2><div>Rank ' + rank + (r.best ? ' · new best!' : ' · best ' + best.toLocaleString()) + '</div>' +
+    g.endScreen(this.end, '<h2>' + BE[this.kind].name + '</h2><div>Rank ' + rank + (r.best ? ' · new best!' : ' · best ' + best.toLocaleString()) + '</div>' +
       '<div class="stars" style="letter-spacing:0">' + rank + '</div>' +
-      lines.map(l => '<div class="line"><span>' + l[0] + '</span><b>' + l[1] + '</b></div>').join('') +
       '<div class="score">Score ' + this.score.toLocaleString() + '</div>' +
-      '<div class="xp">+' + r.xp.toLocaleString() + ' XP' + (r.levelUp ? ' · level up! Level ' + r.level : '') + '</div>' +
-      '<div class="row2"><button class="zd-btn" type="button" id="zd-again">Again</button><button class="zd-btn" type="button" id="zd-other">Other disaster</button></div></div>';
+      '<div class="xp">+' + r.xp.toLocaleString() + ' XP' + (r.levelUp ? ' · level up! Level ' + r.level : '') + '</div>' + road, lines,
+      (nextOpen ? '<button class="zd-btn go" type="button" id="zd-next">On to ' + PLACES[nextKey].name + '</button>' : '') + '<button class="zd-btn' + (nextOpen ? '' : ' go') + '" type="button" id="zd-again">Again</button><button class="zd-btn" type="button" id="zd-other">Other disaster</button>');
     this.end.querySelector('#zd-again').onclick = () => this.start();
     this.end.querySelector('#zd-other').onclick = () => { location.href = location.pathname + '?mode=be'; };
+    if (nextOpen) this.end.querySelector('#zd-next').onclick = () => g.journey(nextKey);
     setTimeout(() => { if (this.ended) this.end.hidden = false; }, 2500);
   }
 }

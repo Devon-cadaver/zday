@@ -7,6 +7,7 @@ import { HAZARD_LEVEL, WEATHER_LEVEL } from './profile.js';
 import { WEATHER, threatName } from './disasters.js';
 import { Site, Camp, Hazmat } from './rebuild.js';
 import { seedEffect, campSpot, custodyBuses } from './response.js';
+import { PLACES, PATH, placeKey } from './places.js';
 
 export const UNITS = [
   { id: 'police', name: 'Police', cost: 50, cd: 20, alert: 0 },
@@ -103,7 +104,7 @@ export class Commander {
   // ---------- round
   start() {
     const g = this.g, p = g.people;
-    this.end.hidden = true;
+    this.end.hidden = true; this.pr.played('commander', placeKey()); // where you left off
     this.diff = this.pr.difficulty();
     p.incubate = this.diff.incubate.slice(); p.runnerBoost = this.diff.runners; p.markInfected = this.pr.has('drone');
     if (g.helis) g.helis.doubleDrop = this.pr.has('doubledrop');
@@ -693,15 +694,17 @@ export class Commander {
       ['Time', Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0')],
     ];
     const r = this.pr.addRound(score, stars);
+    const here = placeKey(), at = PATH.indexOf(here), opened = stars >= 2 ? this.pr.clear('commander', here) : null, nextKey = PATH[at + 1], nextOpen = at >= 0 && nextKey && at + 1 <= this.pr.reach('commander');
+    const road = at < 0 ? '' : opened ? '<div class="lvl">New town open: ' + PLACES[opened].name + '</div>' : nextKey && !nextOpen ? '<div class="xp">Win with two stars to open ' + PLACES[nextKey].name + '</div>' : '';
     const xpLine = '<div class="xp">+' + r.xp.toLocaleString() + ' XP · level ' + r.level + (this.pr.nextXp ? ' · ' + (this.pr.nextXp - this.pr.xp).toLocaleString() + ' to next' : '') + '</div>' +
       (r.levelUp ? '<div class="lvl">Level up! Commander level ' + r.level + this.g.nextUnlockText(r.level) + '</div>' : '');
-    this.end.innerHTML = '<div class="box"><h2>' + title + '</h2><div>' + sub + '</div>' +
+    g.endScreen(this.end, '<h2>' + title + '</h2><div>' + sub + '</div>' +
       '<div class="stars">' + '★'.repeat(stars) + '<span>' + '★'.repeat(3 - stars) + '</span></div>' +
-      lines.map(l => '<div class="line"><span>' + l[0] + '</span><b>' + l[1] + '</b></div>').join('') +
-      '<div class="score">Score ' + score.toLocaleString() + '</div>' + xpLine +
-      '<div class="row2"><button class="zd-btn" type="button" id="zd-again">Play again</button><button class="zd-btn" type="button" id="zd-tomenu" style="background:rgba(28,20,12,.9);border-color:rgba(255,236,200,.25)">Menu</button></div></div>';
+      '<div class="score">Score ' + score.toLocaleString() + '</div>' + xpLine + road, lines,
+      (nextOpen ? '<button class="zd-btn go" type="button" id="zd-next">On to ' + PLACES[nextKey].name + '</button>' : '') + '<button class="zd-btn' + (nextOpen ? '' : ' go') + '" type="button" id="zd-again">Play again</button><button class="zd-btn" type="button" id="zd-tomenu" style="background:rgba(28,20,12,.9);border-color:rgba(255,236,200,.25)">Menu</button>');
     this.end.querySelector('#zd-again').onclick = () => { if (r.levelUp) { location.href = location.pathname + '?mode=commander'; return; } this.start(); };
     this.end.querySelector('#zd-tomenu').onclick = () => { location.href = location.pathname; };
+    if (nextOpen) this.end.querySelector('#zd-next').onclick = () => this.g.journey(nextKey);
     this.end.hidden = false;
     g.setSpeed(1);
   }

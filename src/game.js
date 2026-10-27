@@ -10,7 +10,7 @@ import { BeTheDisaster, BE } from './be.js';
 import { Gauge, SIZED } from './gauge.js';
 import { Responders } from './response.js';
 import { curvedHit } from './curve.js';
-import { PLACES, placeKey, travel } from './places.js';
+import { PLACES, PATH, placeKey, travel } from './places.js';
 import { dragScroll } from './ui.js';
 
 const CSS = `
@@ -80,33 +80,53 @@ const CSS = `
 #zd-call .t{flex:1;min-width:0}
 #zd-call .zd-btn{padding:8px 12px;background:rgba(200,60,40,.9);border-color:rgba(255,160,130,.5);min-width:0}
 #zd-fps{position:fixed;right:max(8px, env(safe-area-inset-right));bottom:calc(var(--zd-bar-h, 64px) + 4px);font:10px system-ui,sans-serif;color:#f6ead2;opacity:.45;pointer-events:none}
-#zd-end{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(14,10,6,.78);z-index:5;
+#zd-end{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(14,10,6,.78);z-index:35;
   padding:max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));box-sizing:border-box;font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;color:#f6ead2}
 #zd-end[hidden]{display:none}
-#zd-end .box{background:rgba(32,24,14,.95);border:1px solid rgba(255,236,200,.18);border-radius:14px;padding:22px 22px 18px;max-width:360px;width:100%;text-align:center}
+#zd-end .box{background:rgba(32,24,14,.95);border:1px solid rgba(255,236,200,.18);border-radius:14px;padding:20px 18px 16px;max-width:360px;width:100%;text-align:center;
+  max-height:100%;overflow-y:auto;box-sizing:border-box}
+#zd-end .stats{margin-top:14px;font-size:13px}
+#zd-end .stats .line{padding:4px 0}
 #zd-end h2{margin:0 0 4px;font-size:24px;letter-spacing:.02em}
 #zd-end .stars{font-size:30px;letter-spacing:6px;color:#ffc233;margin:4px 0 10px}
 #zd-end .stars span{opacity:.25}
 #zd-end .line{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-top:1px solid rgba(255,236,200,.1);font-variant-numeric:tabular-nums}
 #zd-end .line b{color:#fff4e0}
 #zd-end .score{font-size:20px;margin:12px 0 4px;color:#7be0ff}
-#zd-end .zd-btn{margin-top:12px;background:rgba(70,98,34,.9);border-color:rgba(166,255,77,.5);padding:13px 22px;font-size:13px}
-#zd-menu{position:fixed;inset:0;z-index:6;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 40%,rgba(20,14,8,.55),rgba(14,10,6,.86));
-  padding:max(16px, env(safe-area-inset-left));font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;color:#f6ead2}
+#zd-end .zd-btn{margin-top:12px;background:rgba(28,20,12,.9);border-color:rgba(255,236,200,.25);padding:13px 22px;font-size:13px}
+#zd-menu{position:fixed;inset:0;z-index:6;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;box-sizing:border-box;pointer-events:none;
+  background:linear-gradient(180deg,rgba(5,7,13,.5) 0,rgba(5,7,13,0) 24%,rgba(5,7,13,0) 55%,rgba(5,7,13,.55) 100%);transition:opacity .35s;
+  padding:max(14px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;color:#f6ead2}
+#zd-menu > *{pointer-events:auto}
 #zd-menu[hidden]{display:none}
-body.zd-menu-on #zd-menu{padding-top:calc(60px + env(safe-area-inset-top))}
-#zd-menu .box{width:100%;max-width:380px;background:rgba(32,24,14,.92);border:1px solid rgba(255,236,200,.18);border-radius:16px;text-align:center;max-height:100%;display:flex;flex-direction:column;overflow:hidden}
-#zd-menu .mbody{overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:22px 20px 18px;min-height:0;flex:1 1 auto}
+#zd-menu.gone{opacity:0}
+#zd-menu.gone .box{transform:translateY(60px)}
+#zd-menu .mtitle{position:absolute;left:0;right:0;top:max(18px, env(safe-area-inset-top));text-align:center;pointer-events:none}
+#zd-menu .mtitle .tag{margin:6px 0 0;text-shadow:0 1px 8px rgba(0,0,0,.7)}
+#zd-menu .box{width:100%;max-width:420px;background:rgba(24,18,12,.86);border:1px solid rgba(255,236,200,.16);border-radius:16px;text-align:center;max-height:calc(100% - 96px);
+  display:flex;flex-direction:column;overflow:hidden;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:transform .35s}
+#zd-menu .mbody{overflow-y:auto;overscroll-behavior:contain;padding:14px 14px 12px;min-height:0;flex:1 1 auto}
+#zd-menu .modes{display:flex;gap:8px;margin-top:12px}
+#zd-menu .zd-btn.mode{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:5px;padding:12px 4px 10px;text-transform:none;letter-spacing:.02em;font-size:13px}
+#zd-menu .mode svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#zd-menu .mode b{font-size:13px;line-height:1.15}
+#zd-menu .mode span{font-size:10.5px;line-height:1.2;font-weight:600;opacity:.75}
+#zd-menu .mrow{display:flex;gap:8px;align-items:center;margin-top:10px}
+#zd-menu .mrow .zd-btn{flex:1 1 0;min-width:0;padding:11px 6px;font-size:11px;text-decoration:none;display:block}
+#zd-menu .mside{flex:none;display:flex}
 #zd-menu .mhead{display:flex;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid rgba(255,236,200,.14);flex:none;background:rgba(24,18,10,.6)}
 #zd-menu .mhead .zd-btn{padding:9px 12px;font-size:12px;min-width:0;flex:none}
 #zd-menu .mhead .mt{flex:1;text-align:left;font-weight:800;font-size:15px;letter-spacing:.14em;text-transform:uppercase;color:#fff4e0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#zd-menu h1{margin:0;font-size:30px;line-height:1.05;letter-spacing:.12em;color:#fff4e0}
+#zd-menu h1{margin:0;font-size:27px;line-height:1.05;letter-spacing:.14em;color:#fff4e0;text-shadow:0 2px 14px rgba(0,0,0,.7)}
 #zd-menu .tag{font-size:12px;letter-spacing:.12em;text-transform:uppercase;opacity:.7;margin:2px 0 14px}
 #zd-menu .rank{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;margin:0 0 6px}
 #zd-menu .rank b{font-size:16px;color:#a6ff4d}
 #zd-menu .bar{height:8px;border-radius:4px;background:rgba(255,236,200,.12);overflow:hidden;margin:0 0 4px}
 #zd-menu .bar i{display:block;height:100%;background:linear-gradient(90deg,#7be0ff,#a6ff4d)}
 #zd-menu .next{font-size:11px;opacity:.7;margin:0 0 16px}
+#zd-menu .rank.sm{font-size:12px;margin:0 2px 6px}#zd-menu .rank.sm b{font-size:14px}
+#zd-menu .bar.sm{height:6px;margin:0 2px}
 #zd-menu .btns{display:flex;flex-direction:column;gap:9px}
 #zd-menu .zd-btn{padding:14px 16px;font-size:14px}
 #zd-menu .zd-btn.main{background:rgba(70,98,34,.9);border-color:rgba(166,255,77,.5)}
@@ -126,7 +146,8 @@ body.zd-menu-on #zd-menu{padding-top:calc(60px + env(safe-area-inset-top))}
 #zd-menu .foot{font-size:11px;opacity:.55;margin:12px 0 0}
 #zd-end .xp{font-size:13px;color:#7be0ff;margin:4px 0 0}
 #zd-end .lvl{font-size:15px;color:#a6ff4d;font-weight:700;margin:6px 0 0}
-#zd-end .row2{display:flex;gap:8px;justify-content:center}
+#zd-end .row2{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+#zd-end .zd-btn.go{background:rgba(70,98,34,.95);border-color:#a6ff4d}
 #zd-dis{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--zd-bar-h, 64px) + 8px);width:min(calc(100vw - 16px),440px);box-sizing:border-box;
   display:flex;flex-direction:column;overflow:hidden;background:rgba(28,20,12,.93);border:1px solid rgba(255,236,200,.16);border-radius:14px;z-index:3;
   font:600 11px/1.2 system-ui,-apple-system,"Segoe UI",sans-serif;color:#f6ead2}
@@ -173,6 +194,12 @@ const ICON = {
   'zd-swap': svg('<path d="M4 8h14l-3.5-3.5M20 16H6l3.5 3.5"/>'),
 };
 ICON['zd-restart'] = ICON['zd-reset'];
+// the three ways to play, on the menu
+const MICON = {
+  commander: svg('<path d="M7 18v-6a5 5 0 0 1 10 0v6"/><path d="M5 21h14M12 3v2M4.2 6.2l1.4 1.4M19.8 6.2l-1.4 1.4"/>'),
+  be: svg('<path d="M3 5h18M5.5 9h13M8 13h9M10 17h5.5M11.5 21h2"/>'),
+  sandbox: svg('<rect x="3" y="12" width="8" height="8" rx="1.2"/><rect x="13" y="12" width="8" height="8" rx="1.2"/><rect x="8" y="3" width="8" height="8" rx="1.2"/>'),
+};
 const EXTRA = new Set(['zd-help']); // shown above the bar only when they are wanted
 
 // the city runs on its own behind the menu
@@ -197,6 +224,7 @@ export class Game {
     this.bindInput();
     this.menu = document.createElement('div'); this.menu.id = 'zd-menu'; this.menu.hidden = true;
     document.body.appendChild(this.menu);
+    this.modeName = mode;
     if (mode === 'sandbox') this.mode = new Sandbox(this);
     else if (mode === 'commander') this.mode = new Commander(this);
     else if (mode === 'be' || mode === 'storm') { // ?mode=be&kind=lava starts that disaster, ?mode=be alone opens the picker
@@ -207,7 +235,7 @@ export class Game {
   }
 
   startMode(which, kind) {
-    this.menu.hidden = true; document.body.classList.remove('zd-menu-on');
+    this.menu.hidden = true; this.menuOff(); this.modeName = which;
     this.top.innerHTML = ''; this.bar.innerHTML = ''; this.followChip = this.stopBtn = null;
     this.mode = which === 'sandbox' ? new Sandbox(this) : which === 'be' ? new BeTheDisaster(this, kind) : new Commander(this);
   }
@@ -223,20 +251,19 @@ export class Game {
     if (panel === 'travel') { // the places in the world: the big city and the towns
       const here = placeKey();
       body = top('Travel') + '<div class="btns">' + Object.keys(PLACES).map(k => '<button class="zd-btn' + (k === here ? ' main' : '') + '" type="button" data-place="' + k + '">' + PLACES[k].name + (k === here ? ' · you are here' : '') + '<div style="font-size:11px;opacity:0.7;margin-top:2px">' + PLACES[k].blurb + '</div></button>').join('') + '</div>';
-    } else if (panel === 'main') {
-      const beOpen = Object.keys(BE).filter(k => lvl >= BE_LEVEL[k]).length;
-      body = '<h1>MY TINY<br>DISASTER</h1><div class="tag">Save the city, or be the disaster</div>' + rank +
-        '<div class="btns"><button class="zd-btn main" type="button" data-go="commander">Play · Commander</button>' +
-        '<button class="zd-btn" type="button" data-go="unlocks">Units and upgrades' + (pr.bank >= 3000 && UPGRADES.some(u => pr.canBuy(u.id)) ? ' · upgrade available' : '') + '</button>' +
-        '<button class="zd-btn" type="button" data-go="be">Be The Disaster · ' + beOpen + ' of ' + Object.keys(BE).length + ' unlocked</button>' +
-        '<button class="zd-btn dim" type="button" data-go="sandbox">Sandbox · drop zombies and disasters</button>' +
-        '<button class="zd-btn dim" type="button" data-go="travel">Travel · ' + PLACES[placeKey()].name + '</button>' +
-        '<a class="zd-btn dim" href="showcase.html" style="text-decoration:none;display:block">Roster · every model</a></div>' +
+    } else if (panel === 'main') { // over the globe: the three ways to play, each saying where it goes
+      const town = (m) => { const k = pr.town(m); return 'Level ' + (PATH.indexOf(k) + 1) + ' · ' + PLACES[k].name; };
+      body = '<div class="rank sm"><span>Commander level <b>' + lvl + '</b></span><span>' + pr.xp.toLocaleString() + (next ? ' / ' + next.toLocaleString() : '') + ' XP</span></div>' +
+        '<div class="bar sm"><i style="width:' + Math.round(pr.progress * 100) + '%"></i></div>' +
+        '<div class="modes"><button class="zd-btn mode main" type="button" data-play="commander">' + MICON.commander + '<b>Commander</b><span>' + town('commander') + '</span></button>' +
+        '<button class="zd-btn mode" type="button" data-go="be">' + MICON.be + '<b>Be the Disaster</b><span>' + town('be') + '</span></button>' +
+        '<button class="zd-btn mode" type="button" data-play="sandbox">' + MICON.sandbox + '<b>Sandbox</b><span>Pick any city</span></button></div>' +
+        '<div class="mrow"><button class="zd-btn" type="button" data-go="unlocks">Units' + (pr.bank >= 3000 && UPGRADES.some(u => pr.canBuy(u.id)) ? ' \u2022' : '') + '</button><a class="zd-btn" href="showcase.html">Roster</a><div class="mside"></div></div>' +
         '<div class="foot">' + pr.data.rounds + ' rounds played · best score ' + pr.data.best.toLocaleString() + ' · ' + pr.data.stars + ' stars' + (pr.ok ? '' : ' · progress is not being saved on this device') + '</div>';
     } else if (panel === 'be') {
       const bests = pr.data.beBest || {};
       head = top('Be The Disaster');
-      body = '<div class="tag">One finger drives it, two fingers move the camera</div>' + rank +
+      body = '<div class="tag">' + Object.keys(BE).filter(k => lvl >= BE_LEVEL[k]).length + ' of ' + Object.keys(BE).length + ' open · one finger drives it, two move the camera</div>' + rank +
         '<div class="list">' + Object.keys(BE).sort((a, b) => BE_LEVEL[a] - BE_LEVEL[b]).map(k => {
           const ok = lvl >= BE_LEVEL[k];
           return '<div class="row' + (ok ? '' : ' locked') + '"><div><div class="n">' + BE[k].name + '</div><div class="d">' + (ok ? BE[k].hint + (bests[k] ? ' · best ' + bests[k].toLocaleString() : '') : 'Unlocks at commander level ' + BE_LEVEL[k]) + '</div></div>' +
@@ -259,13 +286,49 @@ export class Game {
         '<div class="tag" style="margin-top:16px">Threats</div><div class="list">' + Object.keys(HAZARD_LEVEL).map(h => '<div class="row' + (lvl >= HAZARD_LEVEL[h] ? '' : ' locked') + '"><div><div class="n">' + threatName(h) + '</div><div class="d">' + (THREAT_HINT[h] ? THREAT_HINT[h] + ' · ' : '') + (lvl >= HAZARD_LEVEL[h] ? 'Can strike during a round' : 'Starts at level ' + HAZARD_LEVEL[h]) + '</div></div><span class="s">L' + HAZARD_LEVEL[h] + '</span></div>').join('') + '</div>' +
         '<div class="btns back"><button class="zd-btn" type="button" data-go="main">Back</button></div>';
     }
-    this.menu.innerHTML = '<div class="box">' + head + '<div class="mbody">' + body + '</div></div>';
-    this.menu.hidden = false; document.body.classList.add('zd-menu-on');
+    this.menu.innerHTML = '<div class="mtitle"><h1>MY TINY<br>DISASTER</h1><div class="tag">Save the city, or be the disaster</div></div><div class="box">' + head + '<div class="mbody">' + body + '</div></div>';
+    clearTimeout(this._gone); this.menu.classList.remove('gone'); this.menu.hidden = false; document.body.classList.add('zd-menu-on');
+    this.dockSide();
+    if (this.globe) this.globe.backdrop();
     dragScroll(this.menu.querySelector('.mbody'), 'y');
-    this.menu.querySelectorAll('[data-go]').forEach(b => { b.onclick = () => { const go = b.dataset.go; if (go === 'commander' || go === 'sandbox') this.startMode(go); else this.showMenu(go); }; });
+    this.menu.querySelectorAll('[data-go]').forEach(b => { b.onclick = () => this.showMenu(b.dataset.go); });
+    this.menu.querySelectorAll('[data-play]').forEach(b => { b.onclick = () => this.playMode(b.dataset.play); });
     this.menu.querySelectorAll('[data-place]').forEach(b => { b.onclick = () => travel(b.dataset.place); });
-    this.menu.querySelectorAll('[data-be]').forEach(b => { b.onclick = () => this.startMode('be', b.dataset.be); });
+    this.menu.querySelectorAll('[data-be]').forEach(b => { b.onclick = () => this.playMode('be', b.dataset.be); });
     this.menu.querySelectorAll('[data-buy]').forEach(b => { b.onclick = () => { if (pr.buy(b.dataset.buy)) { this.toast('Upgrade bought'); this.showMenu('unlocks'); } }; });
+  }
+
+  // the sound and music buttons sit in the menu card (made after the menu at the start: main.js calls this again)
+  dockSide() { const side = document.getElementById('zd-side'), slot = this.menu.querySelector('.mside'); if (side) (slot || document.body).appendChild(side); }
+  // the end of a round: the result and the buttons at the top, the figures under them (scrolling on a small screen)
+  endScreen(el, head, lines, buttons) {
+    el.innerHTML = '<div class="box">' + head + '<div class="row2">' + buttons + '</div><div class="stats">' + lines.map(l => '<div class="line"><span>' + l[0] + '</span><b>' + l[1] + '</b></div>').join('') + '</div></div>';
+    dragScroll(el.querySelector('.box'), 'y');
+  }
+  menuOff() { document.body.classList.remove('zd-menu-on'); const side = document.getElementById('zd-side'); if (side && side.parentNode !== document.body) document.body.appendChild(side); }
+  // from the menu: Commander and Be The Disaster head for the town where you left off (the first town the first time),
+  // Sandbox lets you pick any place on the globe; the menu drops away first
+  playMode(which, kind) {
+    const G = this.globe;
+    if (!G || !G.active) { this.startMode(which, kind); return; }
+    this.menu.classList.add('gone'); clearTimeout(this._gone); this._gone = setTimeout(() => { this.menu.hidden = true; this.menu.classList.remove('gone'); }, 350);
+    this.menuOff();
+    const arrive = (key) => { if (key === placeKey()) { G.close(); this.startMode(which, kind); } else travel(key, which, kind ? { kind } : null); };
+    if (which === 'sandbox') { G.choose({ title: 'SANDBOX', sub: 'Pick a city: tap it to play there', arrive, back: () => this.showMenu() }); return; }
+    const key = this.profile.town(which);
+    G.choose({ title: (which === 'be' ? 'BE THE DISASTER' : 'COMMANDER') + ' \u00B7 LEVEL ' + (PATH.indexOf(key) + 1), sub: PLACES[key].name, key, road: true, status: this.townStatus(which), arrive });
+  }
+  // how a place stands on the road for a mode (Commander, Be The Disaster): its number, won, open or locked
+  townStatus(mode) {
+    if (mode !== 'commander' && mode !== 'be') return null;
+    const reach = this.profile.reach(mode), why = 'Win in ' + PLACES[PATH[reach]].name + ' to open the next town';
+    return (key) => { const i = PATH.indexOf(key); return { text: (i + 1) + ' \u00B7 ' + PLACES[key].name + (i < reach ? ' \u2713' : i > reach ? ' \uD83D\uDD12' : ''), locked: i > reach || i < 0, why }; };
+  }
+  // on to another town: up from this one to the globe, then down to it (the page is built again there, same mode)
+  journey(key) {
+    const end = document.getElementById('zd-end'); if (end) end.hidden = true;
+    if (!this.globe) { travel(key, this.modeName); return; }
+    this.globe.open(); this.globe.after = key;
   }
 
   nextUnlockText(level) {
