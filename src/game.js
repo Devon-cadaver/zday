@@ -139,7 +139,7 @@ export class Game {
     this.flash = 0; this.shake = 0;
     if (disasters) disasters.ctx.game = this;
     this.pendingFires = []; this.simT = 0; this.realT = 0; this.acc = 0; this.speed = 1; this.follow = -1; this.seen = {};
-    people.fire = fire; traffic.people = people; traffic.fire = fire;
+    people.fire = fire; traffic.people = people; traffic.fire = fire; people.traffic = traffic;
     people.onOverrun = (k, why) => { if (Math.random() < (why === 'breach' ? 0.25 : 0.3)) this.pendingFires.push({ k, t: this.simT + 3 + Math.random() * 8 }); };
     this.profile = new Profile();
     this.buildUI();
@@ -378,6 +378,9 @@ const SANDBOX_MSGS = {
   breach: 'The horde piled up and reached a rooftop!',
   fire: 'A building has caught fire',
   jump: 'Survivors are jumping from a burning roof',
+  pray: 'People are kneeling in the street to pray',
+  fightback: 'Some people are fighting back with whatever they can find',
+  stolen: 'Someone hotwired a parked car and sped off',
 };
 const START_DROPS = 3;
 

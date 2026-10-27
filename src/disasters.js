@@ -261,6 +261,7 @@ export class Disasters {
     for (const l of this.leftovers) l.sync(dt, realT);
     this.water.sync(dt, realT); this.boats.sync(dt, realT); this.spitFx.sync(this.lightK, this.ctx.fire.uniforms.uScale.value);
     this.weather.sync(dt, realT); this.zones.sync(realT);
+    const sir = this.sirens; if (sir) { sir.beacons = sir.beacons.filter(b => !b.candle); for (const c of this.ctx.people.circles) sir.beacons.push({ x: c.x, y: 0.35, z: c.z, c: [2.2, 1.3, 0.45], kind: 'steady', candle: true, pool: 3.5 }); } // candles in the prayer circles
     this.debris.sync();
     for (let i = this.bolts.length - 1; i >= 0; i--) {
       const b = this.bolts[i]; b.t -= dt; b.g.visible = Math.random() < 0.82;

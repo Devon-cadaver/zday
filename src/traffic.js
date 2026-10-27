@@ -97,6 +97,25 @@ export class Traffic {
   // parked cars within R (alive ones); take() hides one
   parkedNear(x, z, R) { const out = []; for (const pc of this.parkedList) if (pc.alive && Math.abs(pc.x - x) < R && Math.abs(pc.z - z) < R && Math.hypot(pc.x - x, pc.z - z) < R) out.push(pc); return out; }
   takeParked(pc) { pc.alive = false; this._zero = this._zero || new THREE.Matrix4().makeScale(0, 0, 0); pc.im.setMatrixAt(pc.k, this._zero); pc.im.instanceMatrix.needsUpdate = true; }
+  // someone running from danger takes a parked car: it pulls out from where it stood and races off away from (fx, fz)
+  // (a moving car of the same model, from well away where nobody is looking, takes its place on the street)
+  hotwire(pc, fx, fz) {
+    if (!pc.alive) return null;
+    let car = null, far = 150;
+    for (const c of this.cars) { if (c.mission || c.gone || c.mode !== DRIVE || c.type !== pc.type || c.frozen || c.webbed) continue; const d = Math.hypot(c.x - pc.x, c.z - pc.z); if (d > far) { far = d; car = c; } }
+    if (!car) return null;
+    let best = 14, sa = -1, sb = -1, st = 0; // the street it is parked on
+    this.nodes.forEach((A, a) => { for (const b of A.nb) { const B = this.nodes[b], dx = B.x - A.x, dz = B.z - A.z, L2 = dx * dx + dz * dz; const t = Math.max(0.15, Math.min(0.85, ((pc.x - A.x) * dx + (pc.z - A.z) * dz) / L2)); const d = Math.hypot(A.x + dx * t - pc.x, A.z + dz * t - pc.z); if (d < best) { best = d; sa = a; sb = b; st = t; } } });
+    if (sa < 0) return null;
+    const A = this.nodes[sa], B = this.nodes[sb];
+    if ((B.x - A.x) * (fx - pc.x) + (B.z - A.z) * (fz - pc.z) > 0) { const k = sa; sa = sb; sb = k; st = 1 - st; } // pull away from the danger
+    const node = this.nodes[car.b]; if (node) this.release(node, car); if (car.clearing >= 0) { this.release(this.nodes[car.clearing], car); car.clearing = -1; }
+    this.takeParked(pc);
+    this.startSeg(car, sa, sb); car.s = Math.max(0, Math.min(car.len - 1, st * Math.hypot(B.x - A.x, B.z - A.z) - this.nodes[sa].inset));
+    car.v = 3; car.resume = -1; car.blocked = 0; car.panic = 30; car.zx = fx; car.zz = fz; car.colHex = pc.hex; car.burning = false;
+    this.tint(car, pc.hex); this.pose(car);
+    return car;
+  }
   burnParked(pc) { pc.im.setColorAt(pc.k, this._c.set('#1a1714')); pc.im.instanceColor.needsUpdate = true; pc.burnt = true; }
   geometryOf(type) { return this.typeMeshes[type].geometry; }
 

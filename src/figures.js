@@ -102,7 +102,7 @@ if (vZed.w > 1.5) totalEmissiveRadiance += vec3(2.4, 0.75, 0.12) * (0.35 + 0.65 
 export function figureMaterial() {
   const uTime = { value: 0 }, uGlow = { value: 0.3 };
   const mat = new THREE.MeshStandardMaterial({ roughness: 0.9 });
-  mat.customProgramCacheKey = () => 'zday-figure-kit-2';
+  mat.customProgramCacheKey = () => 'zday-figure-kit-3';
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = uTime; sh.uniforms.uGlow = uGlow;
     sh.vertexShader = sh.vertexShader
@@ -154,6 +154,8 @@ vec3 rotZ(vec3 p, float py, float a) {
     bool crawl = (an == 8.0);
     bool armsOut = (an == 3.0 || an == 5.0 || an == 6.0 || an == 7.0 || an == 9.0);
     bool zombie = (an == 3.0 || an == 5.0 || an == 9.0);
+    bool kneel = (an == 10.0), swing = (an == 11.0);
+    float chop = swing ? max(0.0, sin(uTime * 7.0 + ph)) : 0.0; // the weapon comes down hard, then back up
     // gait: stride rate, hip swing, knee fold in the swing, arm swing, elbow bend, bounce, forward lean
     float freq = 0.0, hipA = 0.0, kneeA = 0.0, armA = 0.0, el0 = 0.12, elA = 0.0, bob = 0.0, lean = 0.0;
     if (an == 1.0 || an == 7.0) { freq = 6.0; hipA = 0.4; kneeA = 0.8; armA = 0.42; el0 = 0.22; elA = 0.35; bob = 0.035; lean = 0.04; }
@@ -166,6 +168,8 @@ vec3 rotZ(vec3 p, float py, float a) {
     if (leg) {
       float hip, knee;
       if (crawl) { hip = sideA ? 0.9 : 0.7; knee = -0.35; }
+      else if (kneel) { hip = 0.0; knee = -1.57; } // thighs straight down, shins flat on the ground behind
+      else if (swing) { hip = sideA ? 0.28 : -0.22; knee = -0.25; } // feet planted wide
       else {
         hip = sn * hipA;
         // the knee folds just after toe-off and straightens for the heel strike
@@ -176,6 +180,8 @@ vec3 rotZ(vec3 p, float py, float a) {
     } else if (arm) {
       float sh, el;
       if (crawl) { float cz = sin(uTime * 4.0 + ph) * 0.5; sh = sideA ? 1.9 + cz : 1.9 - cz; el = 0.0; }
+      else if (kneel) { sh = 0.45; el = 1.95; } // hands together in front of the face
+      else if (swing) { sh = 2.5 - 2.1 * chop; el = 0.25 + 0.3 * chop; }
       else if (armsOut) { sh = (sideA ? 1.35 : 1.2) + (zombie ? (sideA ? sin(uTime * 2.0 + ph) : cos(uTime * 2.3 + ph)) * 0.15 : 0.0); el = zombie ? 0.3 : 0.06; }
       else { sh = -sn * armA; el = el0 + elA * max(0.0, -sn); } // arms swing against the legs, elbows bend more on the forward swing
       if (limb >= 8.0) transformed = rotZ(transformed, ${ELBOW}, el);
@@ -183,6 +189,9 @@ vec3 rotZ(vec3 p, float py, float a) {
     }
     else if (limb == 5.0 && zombie) transformed = rotZ(transformed, ${NECK}, 0.35);
     else if (limb == 5.0 && crawl) transformed = rotZ(transformed, ${NECK}, -0.9);
+    else if (limb == 5.0 && kneel) transformed = rotZ(transformed, ${NECK}, 0.45); // head bowed
+    if (swing && !leg) transformed = rotZ(transformed, ${HIP}, -0.25 * chop); // putting their weight behind it
+    if (kneel) transformed.y -= ${KNEE};
     if (lean > 0.0 && !leg) transformed = rotZ(transformed, ${HIP}, -lean); // lean into a run
     if (freq > 0.0) transformed.y += (abs(cos(phs)) - 0.5) * bob; // highest as each leg passes under the body
     transformed *= aKit.w;

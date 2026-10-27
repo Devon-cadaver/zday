@@ -51,6 +51,9 @@ const MSGS = {
   nuke: 'Nuclear detonation. The district is gone',
   arrest: 'Officers are arresting rioters',
   aliendrop: 'Armed aliens are on the ground! Soldiers and police will engage them',
+  pray: 'Some people have stopped to pray in the street',
+  fightback: 'Civilians are fighting back with whatever they can find',
+  stolen: 'Someone hotwired a parked car and fled',
 };
 
 export class Commander {

@@ -282,6 +282,10 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 - Shared with Commander: seedEffect, campSpot, custodyBuses.
 - Fixes found on the way: mission vehicles that leave free their mesh slot (they used to cap each kind per round, 24 dispatches total); a departing mission stuck 8 s counts as gone; Sandbox units drive off once their job is done; people.setupBuildings sets b.t for every building with a door (small burning buildings crashed firemanStep).
 
+## Emergent behaviour (people.js)
+- Each civilian has a temperament (people.trait, hashed from the index so looks are unchanged): fighters (builders and off-duty cops 45%, else 7%), drivers (business 18%, else 6%), faithful (homeless 30%, else 8%). panic() calls react() first: fighters stand their ground against zombies (FIGHT, hand item shown, overhead chop anim 11, 35% kill or knockdown per swing, run if 4+ zombies close); drivers run to the nearest unclaimed parked car (STEAL) and traffic.hotwire() swaps in a same-model moving car from 150 m+ away that pulls out and races off away from the danger; the faithful kneel (PRAY, anim 10) in a prayer circle within 40 m (golden-angle slots) or start one, and others join a circle of 3+ (15%). Prayers keep praying through most panics, get up when no zombies within 30 m and no disaster near. Candles glow in each circle (sirens beacon). Toasts: pray, fightback, stolen.
+- Pathing: a fleeing person who hits a wall now steers to the nearest open heading (steer(), 9 headings tried nearest first, 2.5 m and 5 m clear) instead of a random one; stuck fleeing ~1.5%.
+
 ## Next
 - Sean tests v1.3 on his phone; tune from his notes. Candidates: Be The Disaster score scales and ranks once real scores come in, the saucer size at close zoom, how often zombie outbreaks turn up in Commander, incident pacing, card bar height on the phone.
 

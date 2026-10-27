@@ -13,13 +13,16 @@ import { HALF, RW, SW, CURB } from './city.js';
 import { rng } from './textures.js';
 import { figureGeometry, figureMaterial, figureAttributes, rollArchetype, OFFICER_LOOK, FIREFIGHTER_LOOK, SOLDIER_LOOK, ALIEN_LOOK, ZTYPES, rollZombieType, ZSKIN, FLAG, HAT, RADIOACTIVE } from './figures.js';
 
-export const ST = { WALK: 0, IDLE: 1, FLEE: 2, RETURN: 3, GRABBED: 4, TURNING: 5, ZOMBIE: 6, FALLING: 7, DEAD: 8, SEEK: 9, INSIDE: 10, ROOF: 11, PILE: 12, CLIMB: 13, JUMP: 14, COP: 15, FIREMAN: 16, EVAC: 17, BOARD: 18, EXT: 19, AIR: 20, RIOT: 21, ALIEN: 22, FROZEN: 23, FILM: 24, HELD: 25 };
+export const ST = { WALK: 0, IDLE: 1, FLEE: 2, RETURN: 3, GRABBED: 4, TURNING: 5, ZOMBIE: 6, FALLING: 7, DEAD: 8, SEEK: 9, INSIDE: 10, ROOF: 11, PILE: 12, CLIMB: 13, JUMP: 14, COP: 15, FIREMAN: 16, EVAC: 17, BOARD: 18, EXT: 19, AIR: 20, RIOT: 21, ALIEN: 22, FROZEN: 23, FILM: 24, HELD: 25, PRAY: 26, FIGHT: 27, STEAL: 28 };
+// how someone takes danger when it comes: most run or hide, some fight back, some go for a car, some kneel and pray
+export const TRAIT = { NONE: 0, FIGHTER: 1, DRIVER: 2, FAITHFUL: 3 };
 export const KIND = { CIVILIAN: 0, OFFICER: 1, FIREFIGHTER: 2, SOLDIER: 3, ALIEN: 4 };
 export { ZTYPES };
 
 const INCUBATE = [10, 18];
 const RUN = [2.4, 3.2];
 const SCREAM_R = 12, SCREAM_P = 0.65;
+const STEER = [0.45, -0.45, 0.9, -0.9, 1.57, -1.57, 2.36, -2.36, 3.14]; // tried in this order, nearest the wanted heading first
 const CELL = 6, RES = 0.5, RCELL = 25;
 const UNIT_CAP = 320;
 const G = 9.8;
@@ -27,16 +30,16 @@ const pileH = (n) => 1.7 * Math.sqrt(n) + 0.5;
 const pileR = (n) => pileH(n) * 0.65 + 1.0;
 
 const S = ST;
-const CIV = new Uint8Array(32); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.ROOF, S.COP, S.FIREMAN, S.BOARD, S.RIOT, S.FILM].forEach(s => { CIV[s] = 1; });
-const INHASH = new Uint8Array(32); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.ROOF, S.COP, S.FIREMAN, S.BOARD, S.RIOT, S.GRABBED, S.TURNING, S.ZOMBIE, S.ALIEN, S.FROZEN, S.FILM, S.HELD].forEach(s => { INHASH[s] = 1; });
-const HITTABLE = new Uint8Array(32); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.COP, S.FIREMAN, S.BOARD, S.RIOT, S.GRABBED, S.TURNING, S.ZOMBIE, S.ALIEN, S.FROZEN, S.FILM, S.HELD].forEach(s => { HITTABLE[s] = 1; });
+const CIV = new Uint8Array(32); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.ROOF, S.COP, S.FIREMAN, S.BOARD, S.RIOT, S.FILM, S.PRAY, S.FIGHT, S.STEAL].forEach(s => { CIV[s] = 1; });
+const INHASH = new Uint8Array(32); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.ROOF, S.COP, S.FIREMAN, S.BOARD, S.RIOT, S.GRABBED, S.TURNING, S.ZOMBIE, S.ALIEN, S.FROZEN, S.FILM, S.HELD, S.PRAY, S.FIGHT, S.STEAL].forEach(s => { INHASH[s] = 1; });
+const HITTABLE = new Uint8Array(32); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.COP, S.FIREMAN, S.BOARD, S.RIOT, S.GRABBED, S.TURNING, S.ZOMBIE, S.ALIEN, S.FROZEN, S.FILM, S.HELD, S.PRAY, S.FIGHT, S.STEAL].forEach(s => { HITTABLE[s] = 1; });
 export const HOSTILE = new Uint8Array(32); HOSTILE[S.ZOMBIE] = 1; HOSTILE[S.ALIEN] = 1;
-const GRABBABLE = new Uint8Array(32); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.ROOF, S.COP, S.FIREMAN, S.BOARD, S.RIOT, S.GRABBED, S.TURNING, S.ZOMBIE, S.ALIEN, S.PILE, S.CLIMB, S.FALLING, S.JUMP, S.FROZEN, S.FILM, S.HELD].forEach(s => { GRABBABLE[s] = 1; });
+const GRABBABLE = new Uint8Array(32); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.ROOF, S.COP, S.FIREMAN, S.BOARD, S.RIOT, S.GRABBED, S.TURNING, S.ZOMBIE, S.ALIEN, S.PILE, S.CLIMB, S.FALLING, S.JUMP, S.FROZEN, S.FILM, S.HELD, S.PRAY, S.FIGHT, S.STEAL].forEach(s => { GRABBABLE[s] = 1; });
 const DISASTER_CAUSE = new Set(['fling', 'crush', 'drown', 'zap', 'bolt', 'freeze', 'burn', 'impact', 'rad']);
 const ZSTATE = new Uint8Array(32); [S.ZOMBIE, S.TURNING, S.PILE, S.CLIMB, S.FALLING].forEach(s => { ZSTATE[s] = 1; });
 const ANIM = new Float32Array(32);
 ANIM[S.WALK] = 1; ANIM[S.FLEE] = 2; ANIM[S.RETURN] = 1; ANIM[S.TURNING] = 5; ANIM[S.ZOMBIE] = 3; ANIM[S.FALLING] = 5;
-ANIM[S.DEAD] = 4; ANIM[S.SEEK] = 2; ANIM[S.PILE] = 5; ANIM[S.CLIMB] = 5; ANIM[S.JUMP] = 2; ANIM[S.BOARD] = 2; ANIM[S.EXT] = 2; ANIM[S.AIR] = 2; ANIM[S.RIOT] = 1; ANIM[S.ALIEN] = 7; ANIM[S.HELD] = 0;
+ANIM[S.DEAD] = 4; ANIM[S.SEEK] = 2; ANIM[S.PILE] = 5; ANIM[S.CLIMB] = 5; ANIM[S.JUMP] = 2; ANIM[S.BOARD] = 2; ANIM[S.EXT] = 2; ANIM[S.AIR] = 2; ANIM[S.RIOT] = 1; ANIM[S.ALIEN] = 7; ANIM[S.HELD] = 0; ANIM[S.PRAY] = 10; ANIM[S.FIGHT] = 7; ANIM[S.STEAL] = 2;
 
 // a tangle of bodies: limbs and torsos in zombie greens, rags and shadow
 function bodiesTexture() {
@@ -103,7 +106,7 @@ export class People {
     this.zrad = new Uint8Array(N); this.spitT = new Float32Array(N); this.specT = 0; // irradiated (turns radioactive); a spitter's cooldown
     this.blk = new Int16Array(N); this.lvl = new Int16Array(N); this.bt = new Int16Array(N);
     this.target = new Int32Array(N);
-    this.base = new Array(N);
+    this.base = new Array(N); this.trait = new Uint8Array(N);
 
     const B = city.bounds;
     this.hx0 = B.x0 - HALF; this.hz0 = B.z0 - HALF;
@@ -308,12 +311,15 @@ export class People {
       this.st[i] = S.IDLE; this.x[i] = c[0]; this.z[i] = c[2]; this.y[i] = c[1];
       this.spd[i] = 0.9 + r() * 0.7; this.lat[i] = (r() - 0.5) * 2.2;
     }
-    this.dirty.fill(0); this.lvl.fill(-1); this.bt.fill(-1); this.fx.fill(0); this.inf.fill(0); this.target.fill(-1); this.t1.fill(0); this.kind.fill(0); this.zt.fill(0); this.hp.fill(1); this.zrad.fill(0); this.spitT.fill(0); this.custody = []; this.custodyN = 0;
+    this.dirty.fill(0); this.lvl.fill(-1); this.bt.fill(-1); this.fx.fill(0); this.inf.fill(0); this.target.fill(-1); this.t1.fill(0); this.kind.fill(0); this.zt.fill(0); this.hp.fill(1); this.zrad.fill(0); this.spitT.fill(0); this.custody = []; this.custodyN = 0; this.circles = []; this.circleN = 0;
     for (let i = 0; i < this.N; i++) {
       this.think[i] = r() * 0.4;
       const a = r() * Math.PI * 2; this.hx[i] = Math.cos(a); this.hz[i] = Math.sin(a);
-      this.base[i] = rollArchetype(r).roll(r);
+      const A = rollArchetype(r); this.base[i] = A.roll(r);
       this.setLook(i, this.base[i]);
+      // temperament, from a hash of the index so the crowd looks the same as before: builders and off-duty cops fight, business types grab a car, the homeless pray
+      const q = (((i + 1) * 2654435761) >>> 0) / 4294967296, fight = A.id === 'construction' || A.id === 'offduty' ? 0.45 : 0.07, drive = A.id === 'business' ? 0.18 : 0.06, pray = A.id === 'homeless' ? 0.3 : 0.08;
+      this.trait[i] = q < fight ? TRAIT.FIGHTER : q < fight + drive ? TRAIT.DRIVER : q < fight + drive + pray ? TRAIT.FAITHFUL : TRAIT.NONE;
     }
     for (const a of [this.bIn, this.bRoof, this.bRoofAll, this.bPile, this.bBreach, this.bBarr, this.bHad, this.bOver, this.bEmpty]) a.fill(0);
     this.active = this.nHuman;
@@ -321,7 +327,7 @@ export class People {
     this.bloodN = 0; this.blood.count = 0;
     this.time = 0; this.bldT = 0; this.firstRoof = false;
     this.stats = { humans: this.nHuman, infected: 0, zombies: 0, dead: 0, roof: 0, bites: 0, runover: 0, shot: 0, officers: 0, rescued: 0, bombed: 0, bombedCiv: 0, bused: 0, nukedCiv: 0, nukedZ: 0,
-      disasterCiv: 0, disasterZ: 0, drowned: 0, abducted: 0, aliens: 0, aliensKilled: 0, rioters: 0, arrests: 0, jailed: 0, treated: 0 };
+      disasterCiv: 0, disasterZ: 0, drowned: 0, abducted: 0, aliens: 0, aliensKilled: 0, rioters: 0, arrests: 0, jailed: 0, treated: 0, prayed: 0, fought: 0, stole: 0 };
     this.wz.fill(0); this.wet.fill(0); this.cuff.fill(0); this.watch.fill(0); this.waterAt = null; this.alarmT = 0; this.speedK = 1; this.mobs = [];
     this.events = [];
     this.flashList.length = 0; this.grenades.length = 0; this.grenadeCd = 0;
@@ -438,6 +444,8 @@ export class People {
   panic(j, fromX, fromZ, threat) {
     if (!this.isCivilian(j)) return;
     const s = this.st[j];
+    if (s === S.FIGHT || s === S.STEAL || (s === S.PRAY && this.r() < 0.8)) return; // they made their choice (most who pray keep praying)
+    if (s !== S.FLEE && s !== S.PRAY && this.lvl[j] === -1 && this.kind[j] === KIND.CIVILIAN && !this.inf[j] && this.react(j, fromX, fromZ, threat)) return;
     if (s === S.SEEK || s === S.COP || s === S.BOARD) return;
     if (s === S.RIOT && !(threat >= 0 && HOSTILE[this.st[threat]])) return; // rioters only scatter for the undead
     if (s === S.FIREMAN) { this.st[j] = S.FLEE; this.tx[j] = 2.8; this.t1[j] = 3 + this.r() * 2; this.target[j] = threat; this.bt[j] = -1; const d0 = Math.hypot(this.x[j] - fromX, this.z[j] - fromZ) || 1; this.hx[j] = (this.x[j] - fromX) / d0; this.hz[j] = (this.z[j] - fromZ) / d0; return; }
@@ -452,6 +460,99 @@ export class People {
     this.st[j] = S.FLEE; this.t1[j] = 4 + this.r() * 4; this.target[j] = threat;
   }
 
+  // run, fight, take a car or pray: what this person does when danger comes (false: run or hide as usual)
+  react(j, fromX, fromZ, threat) {
+    const x = this.x[j], z = this.z[j], t = this.trait[j], zombie = threat >= 0 && this.st[threat] === S.ZOMBIE;
+    if (t === TRAIT.FIGHTER && zombie && this.zombiesNear(x, z, 12) <= 3) { // standing their ground with whatever they can grab
+      this.st[j] = S.FIGHT; this.target[j] = threat; this.t1[j] = 6; this.wt[j] = 0.4; this.think[j] = 0; this.fx[j] = 0;
+      const A = this.fa.arrays; A.kit[j * 4 + 1] = (A.kit[j * 4 + 1] | 0) | FLAG.ITEM; this.lookDirty = true;
+      if (!this.saidFight) { this.saidFight = true; this.events.push({ type: 'fightback', x, z }); }
+      return true;
+    }
+    if (t === TRAIT.DRIVER && this.traffic) { // the nearest parked car nobody else is going for
+      const L = this.traffic.parkedList; let best = 30 * 30, bi = -1;
+      for (let k = 0; k < L.length; k++) { const pc = L[k]; if (!pc.alive || pc.claimed || pc.burnt) continue; const d2 = (pc.x - x) ** 2 + (pc.z - z) ** 2; if (d2 < best) { best = d2; bi = k; } }
+      if (bi >= 0) { L[bi].claimed = true; this.st[j] = S.STEAL; this.bt[j] = bi; this.t1[j] = 20; this.px[j] = fromX; this.pz[j] = fromZ; this.wt[j] = RUN[0] + this.r() * (RUN[1] - RUN[0]); return true; }
+    }
+    const circle = this.circles.find(c => Math.hypot(c.x - x, c.z - z) < 40 && c.n < 16);
+    if (t === TRAIT.FAITHFUL || (circle && circle.n >= 3 && this.r() < 0.15)) { this.pray(j, circle); return true; } // and some just join the people praying
+    return false;
+  }
+  // down on their knees: in the circle nearby, or starting one here
+  pray(j, c) {
+    const x = this.x[j], z = this.z[j];
+    if (!c) { c = { id: this.circleN++ % 30000, x, z, n: 0, slots: 0 }; this.circles.push(c); if (!this.saidPray) { this.saidPray = true; this.events.push({ type: 'pray', x, z }); } }
+    const m = c.slots++, a = m * 2.39996, R = 1.4 + Math.min(14, c.slots) * 0.16; // spread round the ring as they arrive
+    let px = c.x + Math.cos(a) * R, pz = c.z + Math.sin(a) * R;
+    if (!this.walkable(px, pz)) { const p = this.snapWalkable(px, pz, 4); if (p) { px = p[0]; pz = p[1]; } else { px = x; pz = z; } }
+    this.st[j] = S.PRAY; this.bt[j] = c.id; this.tx[j] = px; this.tz[j] = pz; this.fx[j] = 0; this.t1[j] = 15; this.think[j] = 1; c.n++; this.stats.prayed++;
+  }
+  prayStep(i, h) {
+    this.t1[i] -= h;
+    if (this.fx[i] === 0) { // getting to their place in the circle
+      const dx = this.tx[i] - this.x[i], dz = this.tz[i] - this.z[i], d = Math.hypot(dx, dz);
+      if (d > 0.3 && this.t1[i] > 5) { this.hx[i] = dx / d; this.hz[i] = dz / d; if (!this.move(i, dx / d, dz / d, Math.min(d, 2.4 * h))) this.t1[i] = 0; return; }
+      this.fx[i] = 1; this.t1[i] = 12 + this.r() * 10;
+    }
+    const c = this.circles.find(q => q.id === this.bt[i]); if (c) this.face(i, c.x, c.z);
+    if ((this.think[i] -= h) > 0) return;
+    this.think[i] = 1;
+    const p = this.poi && this.poi(this.x[i], this.z[i]), danger = this.zombiesNear(this.x[i], this.z[i], 30) > 0 || (p && Math.hypot(p.x - this.x[i], p.z - this.z[i]) < Math.max(40, p.danger * 1.5));
+    if (danger) this.t1[i] = Math.max(this.t1[i], 6);
+    else if (this.t1[i] <= 0) { if (c) c.n--; this.bt[i] = -1; this.fx[i] = 0; this.startReturn(i); } // all quiet again: up off their knees
+  }
+  // going for the nearest zombie, swinging whatever they found; outnumbered, they run after all
+  fightStep(i, h) {
+    const x = this.x[i], z = this.z[i];
+    let tg = this.target[i];
+    this.t1[i] -= h; this.wt[i] -= h;
+    if ((this.think[i] -= h) <= 0) {
+      this.think[i] = 0.4;
+      if (tg < 0 || this.st[tg] !== S.ZOMBIE || this.lvl[tg] !== -1 || Math.hypot(this.x[tg] - x, this.z[tg] - z) > 16) {
+        tg = -1; let best = 14 * 14; this.around(x, z, 14, (j, d2) => { if (this.st[j] === S.ZOMBIE && d2 < best) { best = d2; tg = j; } }); this.target[i] = tg;
+      }
+      if (this.zombiesNear(x, z, 7) >= 4 && this.r() < 0.5) { this.endFight(i); this.st[i] = S.IDLE; this.panic(i, tg >= 0 ? this.x[tg] : x + 1, tg >= 0 ? this.z[tg] : z, tg); return; }
+      if (tg >= 0) this.t1[i] = 6; else if (this.t1[i] <= 0) { this.endFight(i); this.startReturn(i); return; }
+    }
+    if (tg < 0) { this.fx[i] = 0; return; }
+    const dx = this.x[tg] - x, dz = this.z[tg] - z, d = Math.hypot(dx, dz) || 0.01;
+    this.hx[i] = dx / d; this.hz[i] = dz / d;
+    if (d > 1.4) { this.fx[i] = 0; if (!this.move(i, dx / d, dz / d, 2.6 * h)) this.target[i] = -1; return; }
+    this.fx[i] = 1;
+    if (this.wt[i] > 0) return;
+    this.wt[i] = 0.8 + this.r() * 0.4;
+    if (this.r() < 0.35) { this.kill(tg, dx / d * 3, dz / d * 3, 'melee'); this.stats.fought++; this.target[i] = -1; }
+    else if (this.fx[tg] !== 2) { this.fx[tg] = 2; this.t1[tg] = 1.4 + this.r(); this.move(tg, dx / d, dz / d, 0.8); } // knocked flat
+  }
+  endFight(i) { this.target[i] = -1; this.fx[i] = 0; this.setLook(i, this.base[i]); }
+  // running for a parked car: once there it is hotwired and away
+  stealStep(i, h) {
+    const T = this.traffic, pc = T ? T.parkedList[this.bt[i]] : null;
+    this.t1[i] -= h;
+    if (!pc || !pc.alive || pc.burnt || this.t1[i] <= 0) { if (pc) pc.claimed = false; this.st[i] = S.IDLE; this.bt[i] = -1; this.panic(i, this.px[i], this.pz[i], -1); return; }
+    const dx = pc.x - this.x[i], dz = pc.z - this.z[i], d = Math.hypot(dx, dz);
+    if (d < 2.4) {
+      const car = T.hotwire(pc, this.px[i], this.pz[i]); pc.claimed = false;
+      if (car) { this.st[i] = S.EVAC; this.lvl[i] = -1; this.stats.stole++; this.events.push({ type: 'stolen', i, x: pc.x, z: pc.z }); }
+      else { this.st[i] = S.IDLE; this.bt[i] = -1; this.panic(i, this.px[i], this.pz[i], -1); }
+      return;
+    }
+    this.hx[i] = dx / d; this.hz[i] = dz / d;
+    if (!this.move(i, dx / d, dz / d, this.wt[i] * h)) this.steer(i, dx / d, dz / d) && this.move(i, this.hx[i], this.hz[i], this.wt[i] * h);
+  }
+  // the open way nearest to heading (ax, az): headings either side tried in turn, each clear for a few metres
+  steer(i, ax, az) {
+    const x = this.x[i], z = this.z[i], base = Math.atan2(az, ax);
+    for (const off of STEER) { const a = base + off, cx = Math.cos(a), cz = Math.sin(a); if (this.walkable(x + cx * 2.5, z + cz * 2.5) && this.walkable(x + cx * 5, z + cz * 5)) { this.hx[i] = cx; this.hz[i] = cz; return true; } }
+    return this.randomCardinal(i);
+  }
+  // prayer circles nobody is kneeling in any more go
+  circleTick() {
+    if (!this.circles.length) return;
+    const n = new Map(); for (let i = 0; i < this.active; i++) if (this.st[i] === S.PRAY) n.set(this.bt[i], (n.get(this.bt[i]) || 0) + 1);
+    for (const c of this.circles) c.n = n.get(c.id) || 0;
+    this.circles = this.circles.filter(c => c.n > 0);
+  }
   wantsRoof(j) {
     if (this.kind[j] !== KIND.CIVILIAN) return false;
     if (this.alarmT > 0) return this.r() < 0.85;
@@ -802,6 +903,9 @@ export class People {
         case S.FIREMAN: this.firemanStep(i, h); break;
         case S.BOARD: this.boardStep(i, h); break;
         case S.HELD: this.heldStep(i, h); break;
+        case S.PRAY: this.prayStep(i, h); break;
+        case S.FIGHT: this.fightStep(i, h); break;
+        case S.STEAL: this.stealStep(i, h); break;
         case S.GRABBED:
           if ((this.t1[i] -= h) <= 0) {
             this.inf[i] = 1;
@@ -848,7 +952,7 @@ export class People {
     if ((this.watchT -= h) <= 0) { this.watchT = 0.25; this.watchScan(); }
     this.bldT += h;
     if (this.bldT >= 1) {
-      this.buildingTick(this.bldT); this.bldT = 0;
+      this.buildingTick(this.bldT); this.bldT = 0; this.circleTick();
       for (const c of this.custody) if (!c.bus && !c.done && this.time - c.t > 90) { this.releaseHeld(c.id); c.done = true; } // no bus ever came: let off with a warning
     }
     for (const d of this.dust) {
@@ -875,7 +979,7 @@ export class People {
         const n = Math.hypot(this.hx[i], this.hz[i]) || 1; this.hx[i] /= n; this.hz[i] /= n;
       }
     }
-    if (!this.move(i, this.hx[i], this.hz[i], this.tx[i] * h)) this.randomCardinal(i);
+    if (!this.move(i, this.hx[i], this.hz[i], this.tx[i] * h)) this.steer(i, this.hx[i], this.hz[i]);
     if ((this.t1[i] -= h) <= 0) {
       if (this.kind[i] === KIND.OFFICER) { this.st[i] = S.COP; this.fx[i] = 0; this.target[i] = -1; }
       else if (this.kind[i] === KIND.FIREFIGHTER) { this.st[i] = S.FIREMAN; this.fx[i] = 0; this.target[i] = -1; this.bt[i] = -1; }
@@ -1665,6 +1769,8 @@ export class People {
       else if (s === S.ROOF) an = this.t1[i] > 0 || this.fx[i] === 2 ? 2 : this.fx[i] === 1 ? 1 : this.fx[i] === 3 ? 6 : 0;
       else if (s === S.FILM) { an = this.films(i) ? 6 : 0; film++; }
       else if (s === S.HELD) an = this.t1[i] > 0 ? (this.t1[i] > 5 ? 2 : 1) : 0;
+      else if (s === S.PRAY) an = this.fx[i] ? 10 : 2;
+      else if (s === S.FIGHT) an = this.fx[i] ? 11 : this.target[i] >= 0 ? 2 : 7;
       else if (s === S.COP) an = this.fx[i] === 1 ? 7 : this.fx[i] === 2 ? 6 : 0;
       else if (s === S.FIREMAN) an = this.fx[i] === 1 ? 1 : this.fx[i] === 2 ? 6 : 0;
       // rotation Ry(yaw) * Rz(tilt), column major
