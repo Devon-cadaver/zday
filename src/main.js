@@ -65,6 +65,7 @@ sun.castShadow = true;
 sun.shadow.mapSize.set(low ? 2048 : 4096, low ? 2048 : 4096);
 const sc = sun.shadow.camera;
 sc.left = -300; sc.right = 300; sc.top = 300; sc.bottom = -300; sc.near = 10; sc.far = 1600;
+sc.layers.enable(1); // layer 1: low-detail stand-ins that only cast shadows (people, tree crowns)
 sun.shadow.bias = -0.0003;
 sun.shadow.normalBias = 0.35;
 scene.add(sun, sun.target);
@@ -97,6 +98,7 @@ addEventListener('resize', () => {
 });
 
 const clock = new THREE.Clock();
+renderer.shadowMap.autoUpdate = false; let shadowAt = -1; const camAt = new THREE.Vector3();
 let frames = 0, fpsT = 0, fps = 0, time = 0;
 const B = city.bounds, M = 10;
 
@@ -114,7 +116,9 @@ function frame() {
   outskirts.update(time, scene, sun, disasters.lightK, disasters.sunK);
   sun.position.copy(tg).addScaledVector(sunDir, 700);
   sun.target.position.copy(tg);
-  const focus = camera.position.distanceTo(tg);
+  // the shadow map only needs redrawing when the world has moved (a simulation step) or the view has
+  if (game.simT !== shadowAt || !camAt.equals(camera.position)) { renderer.shadowMap.needsUpdate = true; shadowAt = game.simT; camAt.copy(camera.position); }
+  const focus = camera.position.distanceTo(game.focusAt || tg); // whatever Follow is on stays in focus
   const nearZ = Math.max(10, focus * 0.2); // the near plane follows the zoom: far more depth precision, so flat rooftop details don't flicker on phones
   if (Math.abs(camera.near - nearZ) > 0.5) { camera.near = nearZ; camera.updateProjectionMatrix(); }
   // camera shake (quakes, blasts, the tsunami): a jolt for this frame only

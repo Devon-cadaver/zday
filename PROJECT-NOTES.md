@@ -286,6 +286,16 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 - Each civilian has a temperament (people.trait, hashed from the index so looks are unchanged): fighters (builders and off-duty cops 45%, else 7%), drivers (business 18%, else 6%), faithful (homeless 30%, else 8%). panic() calls react() first: fighters stand their ground against zombies (FIGHT, hand item shown, overhead chop anim 11, 35% kill or knockdown per swing, run if 4+ zombies close); drivers run to the nearest unclaimed parked car (STEAL) and traffic.hotwire() swaps in a same-model moving car from 150 m+ away that pulls out and races off away from the danger; the faithful kneel (PRAY, anim 10) in a prayer circle within 40 m (golden-angle slots) or start one, and others join a circle of 3+ (15%). Prayers keep praying through most panics, get up when no zombies within 30 m and no disaster near. Candles glow in each circle (sirens beacon). Toasts: pray, fightback, stolen.
 - Pathing: a fleeing person who hits a wall now steers to the nearest open heading (steer(), 9 headings tried nearest first, 2.5 m and 5 m clear) instead of a random one; stuck fleeing ~1.5%.
 
+## Frame rate (no visual change)
+- Measured busy scene at q=high: 15.6M triangles a frame, most of it 9.8k figures (236 tris) and 7.7k tree crowns (480 tris) drawn twice (main + shadow). Now: people cast shadow through a 12-tri box stand-in on layer 1 sharing the instance matrix (the depth pass never posed the figure anyway); tree crowns cast through an 80-tri ball; crowns, trunks, tanks, lamps and road stripes are split into 160 m tiles so the camera and shadow camera cull them (city.js instTiled, at(k) maps item -> [tile mesh, index]). Result 6.9M triangles a frame (main 5.4M + shadow 1.5M), draw calls about 190.
+- Shadow map redraws only when the sim stepped or the camera moved (renderer.shadowMap.autoUpdate false, main.js); traffic.sync and people.sync run only on frames with a sim step (positions only change then; limb animation is shader time). CPU per frame 2.3 ms -> 1.3 ms.
+- shadow camera layers enable(1) is required for the stand-ins.
+
+## Follow, hero timing
+- Sandbox Follow steps through villains, heroes, tripods and saucers (game.subjects), then zombies; the button shows the name; the camera keeps it centred (ground point under the view ray) and game.focusAt makes the depth of field focus on it (main.js), so it stays sharp and the background blurs.
+- Heroes never arrive (or start on villains) within 20 s of villains arriving (Heroes.holds); an incoming meteor or missile overrides. Applies in every mode.
+- Be The Disaster villains: heroes are signalled 8 s in (arrive at 20 s), opts.brief makes them leave 6 s after the last villain is beaten, and they return 30 s after leaving; Villains opts.persist respawns a beaten villain 15 s later (respawn(i), KINDS). Fixed: Nova could never set a returned building down; Blur standing still in a bubble was never trapped.
+
 ## Next
 - Sean tests v1.3 on his phone; tune from his notes. Candidates: Be The Disaster score scales and ranks once real scores come in, the saucer size at close zoom, how often zombie outbreaks turn up in Commander, incident pacing, card bar height on the phone.
 

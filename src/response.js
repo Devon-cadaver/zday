@@ -165,11 +165,11 @@ export class Responders {
       this.send('hazmat', q.x, q.z, (ax, az, truck) => this.hazmats.push(new Hazmat(D, ax, az, { onDone: () => { if (!truck.gone) g.traffic.depart(truck); } })));
     }
   }
-  // once the disasters are over: crews to what fell (four sites at a time), a medical camp by the work
+  // once the disasters are over: crews to what fell (six sites at a time), a medical camp by the work
   rebuild() {
     const g = this.g, D = g.disasters, city = g.city, p = g.people, c = g.controls.target;
     if (D.list.some(e => e.alive && e.type !== 'heroes')) return;
-    if (this.works.length + this.buildTo.size < 4) {
+    if (this.works.length + this.buildTo.size < 6) {
       let best = -1, bd = 1e9;
       for (let k = 0; k < city.buildings.length; k++) {
         if (!city.dead[k] || this.buildTo.has(k) || this.works.some(w => w.k === k) || (this.noRoute.get(k) || 0) > this.t) continue;

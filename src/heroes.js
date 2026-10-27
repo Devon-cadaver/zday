@@ -132,7 +132,7 @@ class Hero {
   update(h) {
     this.t += h; this.cd = Math.max(0, this.cd - h); this.punchT = Math.max(0, this.punchT - h); this.castT = Math.max(0, this.castT - h);
     if (this.state === 'gone') return;
-    if (this.state === 'wait') { if ((this.waitT -= h) <= 0) { this.state = 'fly'; this.rig.root.visible = true; } return; }
+    if (this.state === 'wait') { this.waitT -= h; if (this.waitT <= 0 && this.H.hold <= 0) { this.state = 'fly'; this.rig.root.visible = true; } return; }
     if (this.state === 'leave') { this.fly(this.x, UP + 50, this.z, h, 60); if (this.y > UP) this.state = 'gone'; return; }
     const J = this.job;
     if (!J) { this.idle(h); return; }
@@ -176,7 +176,7 @@ class Hero {
     const hd = Math.hypot(tx - this.x, tz - this.z), clear = Math.max(30, roofTop(city, this.x, this.z, J.half + 8).top + 2) - HANDS;
     this.fly(tx, hd > 6 ? clear : (b ? b.baseY : 0) - HANDS + 0.5, tz, h, 28);
     J.shell.position.set(this.x, this.y + HANDS - J.base, this.z); J.shell.rotation.set(0, J.shell.rotation.y * 0.95, 0);
-    if (hd < 2 && this.y + HANDS - J.base < 1.5) {
+    if (hd < 2 && this.y < this.D.ctx.people.groundY(tx, tz) + 1.5) { // low enough: set it down where it stood
       this.D.ctx.scene.remove(J.shell); J.shell.traverse((m) => { if (m.geometry) m.geometry.dispose(); });
       if (b && city.dead[J.k]) { city.restoreBuilding(J.k); const f = this.D.ctx.fire; if (f.bFire) { f.bFire[J.k] = 0; if (f.soaked) f.soaked[J.k] = 0; } }
       this.D.emit({ type: 'heroreturn', text: this.name + ' put the building back where it belongs!' });
@@ -280,9 +280,16 @@ export function heroModel(name) {
 
 export class Heroes {
   constructor(D, x, z, o = {}) {
-    this.type = 'heroes'; this.D = D; this.scene = D.ctx.scene; this.alive = true; this.t = 0; this.idleT = 0; this.thinkT = 0; this.bubbles = []; this.chunks = [];
+    this.type = 'heroes'; this.D = D; this.scene = D.ctx.scene; this.alive = true; this.t = 0; this.idleT = 0; this.thinkT = 0; this.bubbles = []; this.chunks = []; this.hold = 0; this.vHold = 0; this.brief = !!o.brief;
+    this.holds();
     const c = D.ctx.controls.target; this.signal(x ?? c.x, z ?? c.z);
     this.who = [new Hero(this, 'Dragonfly', { wings: true }), new Hero(this, 'Nova', { slim: true, longHair: true, delay: 0.4 }), new Hero(this, 'Tempo', { glow: true, delay: 0.8 })];
+  }
+  // the villains get 20 s to themselves before the heroes arrive or start on them (an incoming meteor or missile brings the heroes at once)
+  holds() {
+    let young = 0; for (const e of this.D.list) if (e.type === 'villains' && e.alive) young = Math.max(young, 20 - e.t);
+    const incoming = this.D.list.some(e => (e.type === 'meteor' || e.type === 'nuclear') && e.alive && (e.phase === 'warn' || e.phase === 'fall'));
+    this.vHold = Math.max(0, young); this.hold = incoming ? 0 : this.vHold;
   }
   // light the signal (again): the heroes come to it
   signal(x, z) {
@@ -290,7 +297,8 @@ export class Heroes {
     this.sig = new Signal(this.D, x, z); this.home = { x: this.sig.lx, z: this.sig.lz, k: this.sig.k };
     this.idleT = 0; this.leaving = false;
     if (this.who) for (const h of this.who) if (h.state === 'leave' || h.state === 'gone') { h.state = 'fly'; h.rig.root.visible = true; h.x = this.sig.sx; h.y = this.sig.sy; h.z = this.sig.sz; }
-    this.D.emit({ type: 'herosignal', text: 'The hero signal is lit! Dragonfly, Nova and Tempo are on their way' });
+    if (this.holds) this.holds();
+    this.D.emit({ type: 'herosignal', text: 'The hero signal is lit! Dragonfly, Nova and Tempo are on their way' + (this.hold > 1 ? ', about ' + Math.ceil(this.hold + 2) + ' s out' : '') });
   }
   bubble(x, y, z, R, life, track) { const b = new Bubble(this, x, y, z, R, life, track); this.bubbles.push(b); return b; }
   // a meteor too big to carry: it breaks into glowing pieces that fly off into space
@@ -323,7 +331,7 @@ export class Heroes {
       e.slowed = true; tempo.castT = 0.6; this.bubble(p.x, p.y, p.z, Math.max(14, (e.R || 10) * 0.6), 9, () => (e.alive && e.phase === 'fall' && e.OBJ ? e.OBJ.position : null));
     }
     const V = D.list.find(e => e.type === 'villains' && e.alive);
-    if (V) {
+    if (V && this.vHold <= 0) {
       const find = (n) => V.who.find(v => v.name === n && !v.gone && !v.beaten);
       const wv = find('Weaver'), ty = find('Tyrant'), bl = find('Blur');
       if (wv || (V.who.find(v => v.name === 'Weaver') || {}).webs?.some(w => w.alive)) work++;
@@ -344,7 +352,7 @@ export class Heroes {
     return work;
   }
   update(h) {
-    this.t += h;
+    this.t += h; this.holds();
     if (this.sig && this.sig.alive) this.sig.update(h);
     for (const b of this.bubbles) b.update(h); this.bubbles = this.bubbles.filter(b => b.alive);
     for (let i = this.chunks.length - 1; i >= 0; i--) {
@@ -354,7 +362,7 @@ export class Heroes {
     }
     if ((this.thinkT -= h) <= 0) { this.thinkT = 0.3; const work = this.assign() + this.who.filter(w => w.job).length; this.idleT = work ? 0 : this.idleT + 0.3; }
     for (const hero of this.who) hero.update(h);
-    if (!this.leaving && this.idleT > 40 && this.t > 20) { this.leaving = true; for (const hero of this.who) if (hero.state !== 'gone') hero.state = hero.state === 'wait' ? 'gone' : 'leave'; this.D.emit({ type: 'heroesleave', text: 'All clear. The heroes are flying off' }); }
+    if (!this.leaving && this.idleT > (this.brief ? 6 : 40) && this.t > 20) { this.leaving = true; for (const hero of this.who) if (hero.state !== 'gone') hero.state = hero.state === 'wait' ? 'gone' : 'leave'; this.D.emit({ type: 'heroesleave', text: 'All clear. The heroes are flying off' }); }
     if (this.leaving && this.who.every(w => w.state === 'gone')) this.alive = false;
   }
   sync(dt) { for (const hero of this.who) hero.sync(dt); }

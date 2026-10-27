@@ -776,43 +776,60 @@ export function buildCity(tex, opts = {}) {
     group.add(im);
     return im;
   };
-  const crownIM = inst(crownGeometry(), std({ vertexColors: true, roughness: 1 }), crowns, (c) => {
+  // the same, split into tiles across the city so the camera (and the shadow camera) only draws the tiles it can see;
+  // at(k) is where item k ended up: [its tile's mesh, its index there]. Each tile also gets a low-detail stand-in drawn only into the shadow map
+  const TILE = 160;
+  const instTiled = (geo, mat, list, fn, cast = true, shadowGeo = null) => {
+    const mats = list.map((it, k) => { fn(it, k); return m4.clone(); }); // in list order: fn draws random numbers, the city must come out the same
+    const tiles = new Map(), at = new Array(list.length);
+    list.forEach((it, k) => { const key = Math.floor(it.x / TILE) + ',' + Math.floor(it.z / TILE); let t = tiles.get(key); if (!t) tiles.set(key, (t = [])); at[k] = [t, t.length]; t.push(k); });
+    const meshes = [];
+    for (const idx of tiles.values()) {
+      const im = new THREE.InstancedMesh(geo, mat, idx.length); im.count = idx.length;
+      idx.forEach((k, j) => { im.setMatrixAt(j, mats[k]); if (list[k].col) im.setColorAt(j, col.set(list[k].col)); });
+      im.castShadow = cast && !shadowGeo; im.receiveShadow = true; im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
+      im.computeBoundingSphere(); group.add(im); meshes.push(im); idx.im = im;
+      if (cast && shadowGeo) { const sh = new THREE.InstancedMesh(shadowGeo, mat, idx.length); sh.instanceMatrix = im.instanceMatrix; sh.count = idx.length; sh.castShadow = true; sh.layers.set(1); sh.boundingSphere = im.boundingSphere; group.add(sh); }
+    }
+    return { meshes, at: (k) => [at[k][0].im, at[k][1]] };
+  };
+  const crownT = instTiled(crownGeometry(), std({ vertexColors: true, roughness: 1 }), crowns, (c) => {
     e.set(0, r() * Math.PI * 2, 0); q.setFromEuler(e);
     m4.compose(p.set(c.x, c.y, c.z), q, s.set(c.s, c.s * (0.8 + r() * 0.3), c.s));
-  });
+  }, true, new THREE.IcosahedronGeometry(1.05, 1).translate(0.05, 0.25, 0)); // its shadow: one lumpy ball instead of six
   const trunkG = new THREE.CylinderGeometry(0.12, 0.2, 1, 5); trunkG.translate(0, 0.5, 0);
-  const trunkIM = inst(trunkG, std({ color: '#5a4430' }), trunks, (t) => { q.identity(); m4.compose(p.set(t.x, t.y, t.z), q, s.set(t.s, t.h + 0.6, t.s)); });
+  const trunkT = instTiled(trunkG, std({ color: '#5a4430' }), trunks, (t) => { q.identity(); m4.compose(p.set(t.x, t.y, t.z), q, s.set(t.s, t.h + 0.6, t.s)); });
   const tankG = new THREE.CylinderGeometry(1, 1, 1, 10); tankG.translate(0, 0.5, 0);
   tanks.forEach(t => { t.col = t.dark ? '#3a3632' : '#e9e4da'; });
-  const tankIM = inst(tankG, std({ color: '#ffffff', roughness: 0.6 }), tanks, (t) => { q.identity(); m4.compose(p.set(t.x, t.y, t.z), q, s.set(t.r, t.h, t.r)); });
+  const tankT = instTiled(tankG, std({ color: '#ffffff', roughness: 0.6 }), tanks, (t) => { q.identity(); m4.compose(p.set(t.x, t.y, t.z), q, s.set(t.r, t.h, t.r)); });
   const lampG = mergeGeometries([
     new THREE.CylinderGeometry(0.07, 0.1, 6.5, 4).translate(0, 3.25, 0),
     new THREE.BoxGeometry(1.4, 0.12, 0.25).translate(0.65, 6.45, 0),
   ]);
-  const lampIM = inst(lampG, std({ color: '#4a4540' }), lamps, (l) => {
+  const lampT = instTiled(lampG, std({ color: '#4a4540' }), lamps, (l) => {
     e.set(0, Math.atan2(-l.arm[1], l.arm[0]), 0); q.setFromEuler(e);
     m4.compose(p.set(l.x, CURB, l.z), q, s.set(1, 1, 1));
   });
   const stripeG = new THREE.PlaneGeometry(1, 1); stripeG.rotateX(-Math.PI / 2);
-  inst(stripeG, std({ color: '#f3ede0', polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), stripes, (st) => {
+  instTiled(stripeG, std({ color: '#f3ede0', polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), stripes, (st) => {
     q.identity(); m4.compose(p.set(st.x, 0.02, st.z), q, s.set(st.w, 1, st.d));
   }, false);
 
   // ---------- destruction: buildings can be hidden, lifted out as a separate shell, and replaced by rubble
-  const instMeshes = [crownIM, trunkIM, tankIM, lampIM];
+  const instMeshes = [...crownT.meshes, ...trunkT.meshes, ...tankT.meshes, ...lampT.meshes];
   for (const im of instMeshes) im.userData.orig = im.instanceMatrix.array.slice();
   const bInst = buildings.map(() => []);
-  crowns.forEach((c, k) => { if (c.b >= 0) bInst[c.b].push([crownIM, k]); });
-  trunks.forEach((t, k) => { if (t.b >= 0) bInst[t.b].push([trunkIM, k]); });
-  tanks.forEach((t, k) => { if (t.b >= 0) bInst[t.b].push([tankIM, k]); });
+  crowns.forEach((c, k) => { if (c.b >= 0) bInst[c.b].push(crownT.at(k)); });
+  trunks.forEach((t, k) => { if (t.b >= 0) bInst[t.b].push(trunkT.at(k)); });
+  tanks.forEach((t, k) => { if (t.b >= 0) bInst[t.b].push(tankT.at(k)); });
   // street furniture grid (street and park trees, lamps) so storms can rip them out
   const SG = 20, streetGrid = new Map();
   const sgAdd = (x, z, item) => { const key = Math.floor(x / SG) + ',' + Math.floor(z / SG); let a = streetGrid.get(key); if (!a) streetGrid.set(key, (a = [])); a.push(item); };
-  crowns.forEach((c, k) => { if (c.b < 0) sgAdd(c.x, c.z, { kind: 'tree', x: c.x, z: c.z, y: c.y, s: c.s, ims: [[crownIM, k]], col: c.col, alive: true }); });
+  crowns.forEach((c, k) => { if (c.b < 0) sgAdd(c.x, c.z, { kind: 'tree', x: c.x, z: c.z, y: c.y, s: c.s, ims: [crownT.at(k)], col: c.col, alive: true }); });
   // pair trunks with the crown at the same spot
   { const byPos = new Map(); for (const a of streetGrid.values()) for (const it of a) byPos.set(it.x.toFixed(2) + ',' + it.z.toFixed(2), it);
-    trunks.forEach((t, k) => { if (t.b >= 0) return; const it = byPos.get(t.x.toFixed(2) + ',' + t.z.toFixed(2)); if (it) it.ims.push([trunkIM, k]); }); }
-  lamps.forEach((l, k) => sgAdd(l.x, l.z, { kind: 'lamp', x: l.x, z: l.z, y: CURB, s: 1, ims: [[lampIM, k]], col: '#4a4540', alive: true }));
+    trunks.forEach((t, k) => { if (t.b >= 0) return; const it = byPos.get(t.x.toFixed(2) + ',' + t.z.toFixed(2)); if (it) it.ims.push(trunkT.at(k)); }); }
+  lamps.forEach((l, k) => sgAdd(l.x, l.z, { kind: 'lamp', x: l.x, z: l.z, y: CURB, s: 1, ims: [lampT.at(k)], col: '#4a4540', alive: true }));
   const zeroM = new THREE.Matrix4().makeScale(0, 0, 0);
   const dead = new Uint8Array(buildings.length);
   const center = (b) => [(b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2];

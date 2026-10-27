@@ -224,6 +224,7 @@ class Blur extends Villain {
   update(h) {
     this.t += h;
     if (this.state === 'gone') return;
+    if (this.D.slowAt(this.x, 2, this.z) < 1) this.trapped += h; // caught in a time bubble, running or standing
     if (this.state === 'rest') {
       this.speed = 0;
       if ((this.restT -= h) <= 0 && !this.player) this.go(this.pick());
@@ -237,7 +238,7 @@ class Blur extends Villain {
       return;
     }
     this.speed = Math.min(this.leaving ? 80 : 62, this.speed + h * 240, d * 5 + 8);
-    const slow = this.D.slowAt(this.x, 2, this.z); if (slow < 1) this.trapped += h; // caught in a time bubble
+    const slow = this.D.slowAt(this.x, 2, this.z);
     const ux = dx / d, uz = dz / d, step = Math.min(d, this.speed * h * slow);
     this.face(ux, uz, h, 30); this.ph += h * slow * (5 + this.speed * 0.45);
     for (let done = 0; done < step;) { const s = Math.min(1.2, step - done); this.x += ux * s; this.z += uz * s; done += s; this.tear(ux, uz); this.trail.push(this.x, this.y, this.z, this.V.t); }
@@ -768,9 +769,11 @@ class Weaver extends Villain {
   dispose() { super.dispose(); this.V.scene.remove(this.line); for (const w of this.webs) { w.release(); w.dispose(); } this.webs.length = 0; }
 }
 
+const KINDS = { Blur, Tyrant, Weaver };
+
 export class Villains {
   constructor(D, x, z, o = {}) {
-    this.type = 'villains'; this.D = D; this.scene = D.ctx.scene; this.alive = true; this.t = 0; this.life = o.life ?? 200;
+    this.type = 'villains'; this.D = D; this.scene = D.ctx.scene; this.alive = true; this.t = 0; this.life = o.life ?? 200; this.persist = !!o.persist;
     this.goo = new Splash(this.scene, 700); this.goo.mat.uniforms.uColor.value.setRGB(0.75, 0.08, 0.04); this.goo.mat.blending = THREE.NormalBlending; // red acid
     this.silk = new Splash(this.scene, 300); this.silk.mat.uniforms.uColor.value.setRGB(0.95, 0.94, 0.9); this.silk.mat.blending = THREE.NormalBlending;
     this.shots = []; this._c = new THREE.Color(); this._white = new THREE.Color('#f4f2ec');
@@ -781,7 +784,13 @@ export class Villains {
     if (!o.quiet) D.emit({ type: 'warn', hazard: 'villains', x, z, r: 60, text: 'Super villains are attacking the ' + D.district(x, z) + ' district! Blur, Tyrant and Weaver' });
   }
   // a hero has beaten one of them: they give up and leave the city
-  beat(v, by) { if (v.beaten || v.gone) return; v.beaten = true; v.leave(); this.D.emit({ type: 'villainbeaten', x: v.x, z: v.z, text: by + ' beat ' + v.name + '! ' + v.name + ' is fleeing the city' }); }
+  beat(v, by) { if (v.beaten || v.gone) return; v.beaten = true; v.leave(); this.D.emit({ type: 'villainbeaten', x: v.x, z: v.z, text: by + ' beat ' + v.name + '! ' + v.name + (this.persist ? ' will be back in 15 seconds' : ' is fleeing the city') }); }
+  // a beaten villain back for more, somewhere near the middle of the view
+  respawn(i) {
+    const old = this.who[i], c = this.D.ctx.controls.target, B = this.D.ctx.city.bounds, x = clamp(c.x + (Math.random() - 0.5) * 120, B.x0 + 40, B.x1 - 40), z = clamp(c.z + (Math.random() - 0.5) * 120, B.z0 + 40, B.z1 - 40);
+    const nv = new KINDS[old.name](this, x, z); nv.setPlayer(old.player); old.dispose(); this.who[i] = nv;
+    this.D.emit({ type: 'villainback', text: nv.name + ' is back!' });
+  }
   near(x, z) { const { camera, controls } = this.D.ctx, c = controls.target; return Math.hypot(x - c.x, z - c.z) < camera.position.distanceTo(c) * 1.2; }
   tintWeb(c) { this._c.set(c.colHex).lerp(this._white, 0.7); this.D.ctx.traffic.tint(c, '#' + this._c.getHexString()); }
   // set a car alight where it is (it stops dead rather than careering on)
@@ -817,7 +826,8 @@ export class Villains {
     for (const v of this.who) v.update(h);
     this.shotStep(h); this.goo.update(h); this.silk.update(h);
     if (!this.leaving && this.t > this.life) { this.leaving = true; for (const v of this.who) v.leave(); this.D.emit({ type: 'villainsleave', text: 'The super villains are leaving the city' }); }
-    if (this.who.every(v => v.gone && !(v.flying && v.flying.length))) this.alive = false;
+    if (this.persist) this.who.forEach((v, i) => { if (v.gone && !(v.flying && v.flying.length) && (v.goneT = (v.goneT || 0) + h) > 15) this.respawn(i); });
+    else if (this.who.every(v => v.gone && !(v.flying && v.flying.length))) this.alive = false;
   }
   sync(dt, realT) {
     for (const v of this.who) v.sync(dt, realT);

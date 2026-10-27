@@ -242,7 +242,7 @@ export class TripodCtl {
 // Super villains: you control one at a time (the Switch button changes who); the other two carry on by themselves
 export class VillainsCtl {
   constructor(be, x, z) {
-    this.be = be; this.ev = be.D.start('villains', x, z, { life: Infinity, quiet: true }); this.i = 0;
+    this.be = be; this.ev = be.D.start('villains', x, z, { life: Infinity, quiet: true, persist: true }); this.i = 0; this.away = 22;
     const old = document.getElementById('zd-swap'); if (old) old.remove();
     this.btn = be.g.addButton('zd-swap', 'Switch', () => this.swap());
     this.take(0);
@@ -251,8 +251,14 @@ export class VillainsCtl {
   get who() { return this.ev.who[this.i]; }
   take(i) { this.i = i % this.ev.who.length; this.ev.who.forEach((v, k) => v.setPlayer(k === this.i)); this.be.g.toast('You are ' + this.who.name + ': ' + this.who.hint, 4500); }
   swap() { this.up(); this.take(this.i + 1); }
-  down(x, z) { this.who.pDown(x, z); } move(x, z) { this.who.pMove(x, z); } up() { this.who.pUp(); }
-  update() {}
+  down(x, z) { const v = this.who; if (v.beaten || v.gone) { this.be.g.toast(v.name + ' was beaten and will be back soon. Switch to another villain'); return; } v.pDown(x, z); }
+  move(x, z) { const v = this.who; if (!v.beaten && !v.gone) v.pMove(x, z); } up() { const v = this.who; if (!v.beaten && !v.gone) v.pUp(); }
+  // the heroes answer the signal (they arrive 20 s after you do at the earliest), beat what they can, fly off, and come back 30 s later
+  update(h) {
+    const D = this.be.D, on = D.list.some(e => e.type === 'heroes' && e.alive);
+    this.away = on ? 0 : this.away + h;
+    if (this.away >= 30) { this.away = 0; const v = this.who; D.start('heroes', v.x, v.z, { brief: true }); }
+  }
   dispose() { if (this.btn) this.btn.remove(); }
   follow() { const v = this.who; return v.gone ? null : [v.x, v.z]; }
   label() { return this.who.name; }

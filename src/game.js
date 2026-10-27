@@ -138,6 +138,7 @@ export class Game {
     Object.assign(this, { people, traffic, fire, city, camera, controls, renderer, daylight, helis, post, disasters });
     this.flash = 0; this.shake = 0;
     if (disasters) disasters.ctx.game = this;
+    this.followSub = null; this.focusAt = null; this._off = new THREE.Vector3(); this._fp = new THREE.Vector3();
     this.pendingFires = []; this.simT = 0; this.realT = 0; this.acc = 0; this.speed = 1; this.follow = -1; this.seen = {};
     people.fire = fire; traffic.people = people; traffic.fire = fire; people.traffic = traffic;
     people.onOverrun = (k, why) => { if (Math.random() < (why === 'breach' ? 0.25 : 0.3)) this.pendingFires.push({ k, t: this.simT + 3 + Math.random() * 8 }); };
@@ -271,7 +272,7 @@ export class Game {
     };
     dom.addEventListener('pointerup', up);
     dom.addEventListener('pointercancel', up);
-    this.controls.addEventListener('start', () => { this.zoomTo = 0; if (this.follow >= 0) this.setFollow(-1); });
+    this.controls.addEventListener('start', () => { this.zoomTo = 0; if (this.follow >= 0 || this.followSub) this.setFollow(-1); });
     this.ray = new THREE.Raycaster(); this.plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   }
 
@@ -299,12 +300,35 @@ export class Game {
   }
 
   setFollow(i) {
-    this.follow = i;
+    this.follow = i; this.followSub = null;
     if (this.followBtn) { this.followBtn.classList.toggle('on', i >= 0); this.followBtn.textContent = i >= 0 ? 'Following' : 'Follow'; }
   }
 
+  // villains, heroes and alien machines on the map, in that order: what Follow steps through
+  subjects() {
+    const out = [], D = this.disasters; if (!D) return out;
+    for (const e of D.list) if (e.alive && e.type === 'villains') for (const v of e.who) out.push({ obj: v, name: v.name, pos: () => (v.gone ? null : [v.x, v.y + 2.5, v.z]) });
+    for (const e of D.list) if (e.alive && e.type === 'heroes') for (const h of e.who) out.push({ obj: h, name: h.name, pos: () => (h.state === 'fly' ? [h.x, h.y + 2.5, h.z] : null) });
+    for (const e of D.list) if (e.alive && e.type === 'aliens') {
+      e.tripods.forEach((t, k) => out.push({ obj: t, name: 'Tripod ' + (k + 1), pos: () => (t.state === 'walk' || t.state === 'drop' ? [t.x, t.y, t.z] : null) }));
+      e.saucers.forEach((s, k) => out.push({ obj: s, name: 'Saucer ' + (k + 1), pos: () => (s.state === 'cruise' || s.state === 'act' ? [s.x, s.y, s.z] : null) }));
+    }
+    return out.filter(s => s.pos());
+  }
+  followSubject(s) {
+    this.follow = -1; this.followSub = s;
+    if (this.followBtn) { this.followBtn.classList.add('on'); this.followBtn.textContent = s.name; }
+    if (this.camera.position.distanceTo(this.controls.target) > 330) this.zoomTo = 280;
+  }
   cycleFollow() {
-    const p = this.people, tg = this.controls.target;
+    const p = this.people, tg = this.controls.target, subs = this.subjects();
+    if (subs.length) { // each press: the next of them, then the zombies (if any), then round again
+      let k = this.followSub ? subs.findIndex(s => s.obj === this.followSub.obj) + 1 : 0;
+      if (this.follow >= 0) k = 0;
+      if (k >= subs.length && !(p.stats.zombies > 0)) k = 0;
+      if (k < subs.length) { this.followSubject(subs[k]); return; }
+      this.followSub = null;
+    }
     let i = -1;
     if (this.follow >= 0) { i = p.nearestZombie(p.x[this.follow], p.z[this.follow], this.follow); if (i < 0) i = this.follow; }
     else i = p.nearestZombie(tg.x, tg.z);
@@ -317,7 +341,9 @@ export class Game {
     const p = this.people, h = 1 / 30;
     const sdt = dt * this.speed;
     this.acc = Math.min(this.acc + sdt, h * 12);
+    let stepped = false;
     while (this.acc >= h) {
+      stepped = true;
       p.step(h); this.traffic.step(h); if (this.helis) this.helis.update(h); if (this.disasters) this.disasters.update(h); this.acc -= h; this.simT += h;
       for (const e of p.events) if (e.type === 'bite') this.traffic.panicNear(e.x, e.z, 20);
       this.mode.afterStep && this.mode.afterStep(h);
@@ -327,11 +353,11 @@ export class Game {
     }
     this.realT += dt;
     p.uTime.value = this.realT;
-    this.traffic.sync(this.realT);
+    if (stepped) this.traffic.sync(this.realT); // cars and people only move on a step (30 a second): no need to rebuild their matrices on the frames between
     if (this.helis) this.helis.sync(dt * this.speed);
     if (this.daylight) { this.daylight.set(this.mode.phase ? this.mode.phase() : 0); if (this.disasters) { this.disasters.weather.apply(dt); this.disasters.afterLight(); } this.daylight.update(); }
     this.fire.update(sdt, this.realT, this.camera, this.renderer);
-    p.sync();
+    if (stepped || p.lookDirty) p.sync();
     if (this.disasters) this.disasters.sync(dt * this.speed, this.realT);
 
     if (this.follow >= 0) {
@@ -341,6 +367,18 @@ export class Game {
         const tg = this.controls.target, k = 1 - Math.exp(-dt * 3);
         const dx = (p.x[f] - tg.x) * k, dz = (p.z[f] - tg.z) * k;
         tg.x += dx; tg.z += dz; this.camera.position.x += dx; this.camera.position.z += dz;
+      }
+    }
+    this.focusAt = null;
+    if (this.followSub) {
+      const q = this.followSub.pos();
+      if (!q) { const subs = this.subjects(); if (subs.length) this.followSubject(subs[0]); else this.setFollow(-1); } // it is gone: on to the next
+      else {
+        const tg = this.controls.target, off = this._off.copy(this.camera.position).sub(tg), u = off.y > 1 ? q[1] / off.y : 0;
+        const gx = q[0] - off.x * u, gz = q[2] - off.z * u, k = 1 - Math.exp(-dt * 6); // the ground point that puts it in the middle of the view
+        const dx = (gx - tg.x) * k, dz = (gz - tg.z) * k;
+        tg.x += dx; tg.z += dz; this.camera.position.x += dx; this.camera.position.z += dz;
+        this.focusAt = this._fp.set(q[0], q[1], q[2]); // the depth of field is focused on it, so it stays sharp and what is behind it blurs
       }
     }
     if (this.zoomTo) {

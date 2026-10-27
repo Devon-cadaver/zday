@@ -122,8 +122,12 @@ export class People {
     const fm = figureMaterial();
     this.uTime = fm.uTime; this.uGlow = fm.uGlow;
     this.mesh = new THREE.InstancedMesh(geo, fm.mat, N);
-    this.mesh.castShadow = true; this.mesh.receiveShadow = true; this.mesh.frustumCulled = false;
+    this.mesh.castShadow = false; this.mesh.receiveShadow = true; this.mesh.frustumCulled = false;
     parent.add(this.mesh);
+    // their shadows: a slim block per person in the same place, drawn only into the shadow map (the shadow pass never ran the figure's posing anyway)
+    this.shadow = new THREE.InstancedMesh(new THREE.BoxGeometry(0.3, 1.7, 0.44).translate(0, 0.85, 0), fm.mat, N);
+    this.shadow.instanceMatrix = this.mesh.instanceMatrix; this.shadow.castShadow = true; this.shadow.frustumCulled = false; this.shadow.layers.set(1); this.shadow.count = 0;
+    parent.add(this.shadow);
 
     const bloodG = new THREE.CircleGeometry(1, 12); bloodG.rotateX(-Math.PI / 2);
     this.bloodMax = 1500;
@@ -1801,7 +1805,7 @@ export class People {
         this.setLook(i, { ...b, skin: this._c }); colDirty = true; this.dirty[i] = 0;
       }
     }
-    this.mesh.count = this.active;
+    this.mesh.count = this.shadow.count = this.active;
     this.mesh.instanceMatrix.needsUpdate = true;
     this.fa.attrs.anim.needsUpdate = true;
     if (colDirty) { this.fa.dirty(); this.lookDirty = false; }
