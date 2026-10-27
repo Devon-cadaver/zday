@@ -13,6 +13,8 @@ import { ST } from './people.js';
 import { roofTop } from './tripod.js';
 import { tossStep } from './brawl.js';
 import { Body, sweepTubes } from './flesh.js';
+import { sfx } from './audio.js';
+import { heroesWin } from './heroes.js';
 
 const S = 2.2; // a villain stands a bit over twice as tall as a person, so you can pick them out from above
 const NEAR = 330; // closer than this to the camera, a figure has its smooth body
@@ -285,7 +287,7 @@ class Blur extends Villain {
   }
   // thrown down hard he sees stars for a moment (long enough for a hero to get hold of him again), and the next bubble holds him
   landed() { this.state = 'rest'; this.restT = this.dazed = 1.4; this.speed = 0; this.inB = -1; this.stuck = 0; this.freeT = 0; }
-  go(p) { const B = this.D.ctx.city.bounds; this.goal = [clamp(p[0], B.x0 + 15, B.x1 - 15), clamp(p[1], B.z0 + 15, B.z1 - 15)]; this.state = 'dash'; this.dazed = 0; }
+  go(p) { const B = this.D.ctx.city.bounds; if (this.state !== 'dash') sfx('whoosh', this.x, 2, this.z); this.goal = [clamp(p[0], B.x0 + 15, B.x1 - 15), clamp(p[1], B.z0 + 15, B.z1 - 15)]; this.state = 'dash'; this.dazed = 0; }
   leave() { const B = this.D.ctx.city.bounds, a = Math.random() * 6.28; this.goal = [(B.x0 + B.x1) / 2 + Math.cos(a) * 1400, (B.z0 + B.z1) / 2 + Math.sin(a) * 1400]; this.state = 'dash'; this.leaving = true; }
   update(h) {
     this.t += h;
@@ -376,7 +378,7 @@ class Tyrant extends Villain {
   landed() { this.state = 'stand'; this.standT = 1.2; this.vx = this.vy = this.vz = 0; }
   dropHeld() { const H = this.held; if (!H) return; if (H.car) { H.car.soft = true; this.D.ctx.traffic.fling(H.car, 0, -1, 0); } else this.flying.push({ shell: H.shell, k: H.k, x: H.shell.position.x, y: H.shell.position.y + H.base, z: H.shell.position.z, vx: 0, vy: 0, vz: 0, w: 0.3, w2: 0.1, half: H.half, hgt: H.hgt, base: H.base, hex: H.hex }); this.held = null; this.plan = null; this.wind = 0; }
   // the laser eyes on something in the air (a car thrown at him); done() once it is cut through
-  zap(car, done) { if (this.ray || this.state !== 'fly' || this.held) return false; this.ray = { car, done, t: 0, dur: 0.45, ex: car.x, ey: car.y || 0, ez: car.z }; return true; }
+  zap(car, done) { if (this.ray || this.state !== 'fly' || this.held) return false; this.ray = { car, done, t: 0, dur: 0.45, ex: car.x, ey: car.y || 0, ez: car.z }; sfx('laser', this.x, this.y + 4, this.z, { gain: 0.8, rate: 1.2 }); return true; }
   flyY() {
     const city = this.D.ctx.city;
     if (this.held && this.held.shell) { const r = this.held.half + 8; return Math.max(24, roofTop(city, this.x, this.z, r).top + 1.5, roofTop(city, this.x + this.vx * 1.5, this.z + this.vz * 1.5, r).top + 1.5); } // the building overhead clears the roofs below, and those just ahead
@@ -593,6 +595,7 @@ class Tyrant extends Villain {
     } else { let c = null; traffic.near(this.x, this.z, 70, (o) => { if (!c && !o.gone && o.mode === DRIVE) c = o; }); if (!c) return; x0 = c.x; z0 = c.z; }
     const a = Math.random() * 6.28, L = short ? 5 : 12 + Math.random() * 12;
     this.ray = { x0: x0 - Math.cos(a) * L / 2, z0: z0 - Math.sin(a) * L / 2, x1: x0 + Math.cos(a) * L / 2, z1: z0 + Math.sin(a) * L / 2, y0, t: 0, dur: short ? 0.5 : 1.6, hitT: 0, charred: new Set(), ex: x0, ey: y0, ez: z0 };
+    sfx('laser', this.x, this.y + 4, this.z, { rate: short ? 1.15 : 1 });
   }
   rayStep(h) {
     const R = this.ray; if (!R) return;
@@ -833,7 +836,7 @@ class Weaver extends Villain {
     this.V.shoot('web', this.x, hy, this.z, x, this.ground(x, z) + 0.3, z, T, (tx, tz) => this.addWeb(tx, tz));
   }
   addWeb(x, z) {
-    this.webs.push(new Web(this.V, x, z, 6.5 + Math.random() * 2.5));
+    this.webs.push(new Web(this.V, x, z, 6.5 + Math.random() * 2.5)); sfx('web', x, 3, z);
     if (this.webs.length > 7) { const o = this.webs.shift(); o.release(); o.dispose(); }
   }
   // acid at the nearest stuck car
@@ -897,7 +900,14 @@ export class Villains {
     if (!o.quiet) D.emit({ type: 'warn', hazard: 'villains', x, z, r: 60, text: 'Super villains are attacking the ' + D.district(x, z) + ' district! Blur, Tyrant and Weaver' });
   }
   // a hero has beaten one of them: they give up and leave the city
-  beat(v, by) { if (v.beaten || v.gone) return; v.beaten = true; v.leave(); this.D.emit({ type: 'villainbeaten', x: v.x, z: v.z, text: by + ' beat ' + v.name + '! ' + v.name + (this.persist ? ' will be back in 15 seconds' : ' is fleeing the city') }); }
+  beat(v, by) {
+    if (v.beaten || v.gone) return;
+    if (by && !heroesWin(v)) { // too strong for them: it shrugs off the last blow and the heroes fall back
+      v.hp = Math.max(v.hp, 390);
+      if (!v.heroLost) { v.heroLost = true; this.D.emit({ type: 'herolost', x: v.x, z: v.z, text: v.name + ' was too strong for ' + by + '! The heroes are falling back' }); }
+      return;
+    }
+    v.beaten = true; v.leave(); this.D.emit({ type: 'villainbeaten', x: v.x, z: v.z, text: by + ' beat ' + v.name + '! ' + v.name + (this.persist ? ' will be back in 15 seconds' : ' is fleeing the city') }); }
   // a beaten villain back for more, somewhere near the middle of the view
   respawn(i) {
     const old = this.who[i], c = this.D.ctx.controls.target, B = this.D.ctx.city.bounds, x = clamp(c.x + (Math.random() - 0.5) * 120, B.x0 + 40, B.x1 - 40), z = clamp(c.z + (Math.random() - 0.5) * 120, B.z0 + 40, B.z1 - 40);

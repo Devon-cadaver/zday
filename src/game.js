@@ -572,6 +572,7 @@ class Sandbox {
       h: g.addPill('zd-h', 'Humans'), i: g.addPill('zd-i', 'Infected'), z: g.addPill('zd-z', 'Zombies'), d: g.addPill('zd-d', 'Dead'),
       clock: g.addPill('', '', 'zd-clock'),
     };
+    this.helpBtn = g.addButton('zd-help', 'Call heroes', () => this.callHeroes()); this.helpBtn.hidden = true; // only while there is something they could stop
     g.followBtn = g.addButton('zd-find', 'Bad guys', () => g.cycleFollow());
     g.goodBtn = g.addButton('zd-good', 'Good guys', () => g.cycleGood());
     g.stopBtn = g.addButton('zd-stop', '&#x2715;', () => g.setFollow(-1)); g.stopBtn.hidden = true; g.stopBtn.title = 'Stop following'; g.stopBtn.setAttribute('aria-label', 'Stop following');
@@ -665,9 +666,32 @@ class Sandbox {
     this.g.toast('City reset. Open Disasters to drop zombies or unleash a disaster');
   }
   phase() { return (Math.max(0, this.clock) / 600) % 1; }
+  // something the heroes could stop (or help with): super villains, the kaiju or the worm, a meteor or a missile on its way, a tsunami
+  threat() {
+    const D = this.g.disasters; if (!D) return null;
+    for (const e of D.list) {
+      if (!e.alive) continue;
+      if (e.type === 'villains') { const v = e.who.find(w => !w.gone && !w.beaten && !w.heroLost); if (v) return { x: v.x, z: v.z, name: 'the villains' }; }
+      if (((e.type === 'kaiju' && e.state !== 'leave') || (e.type === 'worm' && e.phase !== 'leave' && e.phase !== 'gone')) && !e.heroLost) return { x: e.x, z: e.z, name: 'the ' + (e.type === 'kaiju' ? 'monster' : 'worm') };
+      if ((e.type === 'meteor' || e.type === 'nuclear') && (e.phase === 'warn' || e.phase === 'fall') && !e.heroLost) return { x: e.x, z: e.z, name: 'the ' + (e.type === 'meteor' ? 'meteor' : 'missile') };
+      if (e.type === 'tsunami' && e.phase !== 'recede') { const c = this.g.controls.target; return { x: c.x, z: c.z, name: 'the wave' }; }
+    }
+    return null;
+  }
+  // light the hero signal over the trouble. Not called in time, the disaster runs its course
+  callHeroes() {
+    const g = this.g, t = this.threat(), c = g.controls.target;
+    g.disasters.start('heroes', t ? t.x : c.x, t ? t.z : c.z);
+    if (this.clock < 0) this.clock = 0;
+  }
   update(sdt, dt) {
     this.gauge.update(dt || 0);
     this.auto.update(sdt);
+    { // the Call heroes button: there (and flashing) while there is something for them and they are not already here
+      const D = this.g.disasters, here = D && D.list.some(e => e.type === 'heroes' && e.alive && !e.leaving), t = !here && this.threat();
+      if (t && this.helpBtn.hidden) this.g.toast('Call the heroes to stop ' + t.name + ', or let it happen', 3500);
+      this.helpBtn.hidden = !t; if (t) this.helpBtn.classList.toggle('on', Math.floor(this.g.realT * 2.5) % 2 === 0);
+    }
     if (this.gauge.active) { const g = this.g, R = SIZED[this.gauge.kind].ring(this.gauge.v), d = g.camera.position.distanceTo(g.controls.target), want = Math.min(g.controls.maxDistance || 1200, R * 3); if (want > d + 5) g.zoomTo = want; } // pull back to keep the ring in view
     const s = this.g.people.stats;
     if (this.clock >= 0) this.clock += sdt;

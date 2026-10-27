@@ -11,6 +11,7 @@
 // not), panned by where they are on screen. Loops - the city's hum, wind, rushing
 // water, fire, rain, rotor blades, a siren - fade in and out with what is near.
 import * as THREE from 'three';
+import { Music, levelIcon } from './music.js';
 
 const SR = 24000;
 let seed = 7;
@@ -98,29 +99,84 @@ function glass(size) {
   for (let k = 0; k < [22, 70][size]; k++) { const t = [0.3, 0.45][size] + rnd() * (L - 0.6); ping(x, t, 3000 + rnd() * 6000, 0.008 + rnd() * 0.03, 0.18 * (1.1 - t / L)); } // pieces landing
   return norm(x, 0.9);
 }
-// a car crash: the hit, the crumple of sheet metal, glass, a scrape
+// a car crash: the bang of two tonnes meeting (a broadband slap over a low thud), sheet metal tearing and folding (dense,
+// gritty noise that falls off fast), the windscreen going, then bits of plastic and trim clattering down
 function crash() {
-  const L = 1.7, x = len(L);
-  thump(x, 0, 85, 42, 0.04, 0.09, 1.3);
-  const hit = biquad(noise(Math.ceil(0.12 * SR)), 'lp', 500); env(hit, 0.001, 0.035); add(x, hit, 0, 1.4);
-  const modes = []; for (let m = 0; m < 22; m++) modes.push([170 * Math.pow(16, rnd()), 0.025 + rnd() * 0.11]); // inharmonic panel modes, 170 Hz to 2.7 kHz, damped (crumpled, not a bell)
-  for (let s = 0; s < 14; s++) { const t = Math.pow(rnd(), 1.8) * 0.26, a = 0.3 * (1 - t * 2.5); for (const [f, d] of modes) ping(x, t, f * (1 + (rnd() - 0.5) * 0.08), d, a * rnd()); } // struck again and again as it folds, never quite the same note
-  for (let k = 0; k < 70; k++) { const t = Math.pow(rnd(), 1.6) * 0.34; grain(x, t, 0.006 + rnd() * 0.022, 600 + rnd() * 3800, 1.4, 0.6 * (1 - t * 2)); } // plastic and metal crumpling
-  add(x, glass(0), 0.012, 0.45); // a window and a headlamp going
-  const scr = biquad(noise(Math.ceil(0.9 * SR), 'pink'), 'bp', 1300, 1.6); // a scrape down the road
-  for (let i = 0; i < scr.length; i++) { const t = i / SR; scr[i] *= (0.4 + 0.6 * rnd()) * Math.min(1, t / 0.05) * Math.exp(-t / 0.28); }
-  add(x, scr, 0.14, 0.9);
-  return norm(clip(x, 1.4), 0.95);
+  const L = 1.8, x = len(L);
+  thump(x, 0, 95, 45, 0.03, 0.08, 1.2);
+  const slap = biquad(noise(Math.ceil(0.04 * SR)), 'lp', 3500); env(slap, 0.0003, 0.012); add(x, slap, 0, 1.6);
+  const body = biquad(noise(Math.ceil(0.3 * SR), 'brown'), 'lp', 700); env(body, 0.001, 0.06); add(x, body, 0, 2.6);
+  const crum = biquad(noise(Math.ceil(0.55 * SR)), 'bp', 1700, 0.55); let blk = 0, g = 0; // crumpling: the noise chopped into a jagged run of little tears
+  for (let i = 0; i < crum.length; i++) { if (i >= blk) { blk = i + Math.ceil((0.002 + rnd() * 0.006) * SR); g = Math.pow(rnd(), 2); } const t = i / SR; crum[i] *= g * Math.exp(-t / 0.13); }
+  add(x, crum, 0.004, 1.5);
+  for (let s = 0; s < 4; s++) { const t = rnd() * 0.08; for (let m = 0; m < 6; m++) ping(x, t, 500 + rnd() * 3000, 0.008 + rnd() * 0.025, 0.12); } // a hard metallic edge, gone at once
+  add(x, glass(0), 0.008, 0.6); // the windscreen and a headlamp
+  for (let k = 0; k < 18; k++) { const t = 0.15 + rnd() * 1.1; grain(x, t, 0.01 + rnd() * 0.02, 800 + rnd() * 2400, 1.2, 0.3 * (1.3 - t)); } // trim and plastic clattering down
+  for (let k = 0; k < 3; k++) thump(x, 0.25 + rnd() * 0.7, 150, 80, 0.01, 0.025, 0.25); // heavier parts landing
+  return norm(clip(x, 2), 0.95);
 }
-// a building coming down: a deep crack, the roar of it falling, concrete grinding, glass, chunks landing
+// a building coming down: a deep cracking bang as the first floors go, then floor after floor pancaking onto the next, a
+// roar that swells and closes down, concrete breaking up into rubble, glass, and debris trickling down after
 function collapse() {
-  const L = 5, x = len(L);
-  thump(x, 0, 70, 30, 0.2, 0.6, 1.2);
-  const roar = sweep(noise(x.length, 'brown'), (t) => 140 + 260 * Math.exp(-t / 1.5)); env(roar, 0.35, 1.7); add(x, roar, 0, 4);
-  for (let k = 0; k < 90; k++) { const t = rnd() * 3.4; grain(x, t, 0.02 + rnd() * 0.08, 250 + rnd() * 1200, 1, 0.5 * Math.exp(-t / 2)); } // concrete grinding
-  for (let k = 0; k < 22; k++) { const t = 0.4 + rnd() * 3.4; thump(x, t, 120 + rnd() * 60, 50, 0.03, 0.07, 0.5 * Math.exp(-t / 2.5)); } // chunks hitting the street
-  add(x, glass(1), 0.08, 0.35);
-  return norm(clip(x, 1.5), 0.92);
+  const L = 5.5, x = len(L);
+  thump(x, 0, 60, 28, 0.25, 0.7, 1.3);
+  const crack = biquad(noise(Math.ceil(0.1 * SR)), 'bp', 900, 0.5); env(crack, 0.002, 0.035); add(x, crack, 0, 1.3);
+  const roar = sweep(noise(x.length, 'brown'), (t) => 220 + 700 * Math.exp(-t / 1.4)), bumps = [];
+  for (let k = 0; k < 6; k++) bumps.push([0.3 + k * (0.3 + rnd() * 0.25), 0.35 + rnd() * 0.3]);
+  for (let i = 0; i < roar.length; i++) { const t = i / SR; let a = 0.35; for (const [c, w] of bumps) a += Math.exp(-(((t - c) / w) ** 2)); roar[i] *= a * Math.min(1, t / 0.2) * Math.exp(-t / 1.8); }
+  add(x, roar, 0, 3);
+  for (const [c] of bumps) { thump(x, c, 85, 35, 0.06, 0.18, 0.7); const hit = biquad(noise(Math.ceil(0.4 * SR)), 'lp', 1200); env(hit, 0.002, 0.12); add(x, hit, c, 1.1); } // floor onto floor
+  for (let k = 0; k < 160; k++) { const t = Math.pow(rnd(), 1.3) * 4.2; grain(x, t, 0.004 + rnd() * 0.02, 900 + rnd() * 3500, 1.2, 0.35 * Math.exp(-t / 1.6)); } // concrete breaking into rubble
+  add(x, glass(1), 0.12, 0.4);
+  for (let k = 0; k < 60; k++) { const t = 2.5 + rnd() * 2.8; grain(x, t, 0.003 + rnd() * 0.008, 1500 + rnd() * 3500, 1.5, 0.08); } // grit trickling down
+  return norm(clip(x, 1.6), 0.92);
+}
+// a beam weapon: a buzzing, sizzling hum with a whine over it (Tyrant's eyes, a tripod's heat ray)
+function laser() {
+  const L = 1.9, x = len(L), buzz = len(L); let ph = 0, ph2 = 0;
+  for (let i = 0; i < x.length; i++) { const t = i / SR; ph += 2 * Math.PI * (92 + Math.sin(t * 31) * 4) / SR; buzz[i] = ((ph / (2 * Math.PI)) % 1) * 2 - 1; }
+  biquad(buzz, 'bp', 1100, 0.5); add(x, buzz, 0, 1.4);
+  for (let i = 0; i < x.length; i++) { const t = i / SR; ph2 += 2 * Math.PI * (2350 + Math.sin(t * 9) * 70) / SR; x[i] += Math.sin(ph2) * 0.22; }
+  const siz = biquad(noise(x.length), 'hp', 3000); for (let i = 0; i < siz.length; i++) siz[i] *= rnd() < 0.08 ? 1 : 0.25; add(x, siz, 0, 0.45); // sizzling where it burns
+  for (let i = 0; i < x.length; i++) { const t = i / SR; x[i] *= Math.min(1, t / 0.05) * Math.min(1, (L - t) / 0.25); }
+  return norm(clip(x, 2.5), 0.8);
+}
+// a web shot: a sharp thwip and the strand twanging
+function web() { const x = len(0.4), n = sweep(noise(x.length), (t) => 900 + 9000 * Math.min(1, t / 0.08)); biquad(n, 'hp', 700); env(n, 0.004, 0.05); add(x, n, 0, 1.4); ping(x, 0.03, 720, 0.05, 0.35); ping(x, 0.03, 1450, 0.03, 0.15); return norm(x, 0.7); }
+// a rush of air: Blur tearing past
+function whoosh() {
+  const L = 1.0, x = len(L), bell = (t) => Math.exp(-(((t - 0.38) / 0.17) ** 2));
+  const n = sweep(noise(x.length, 'pink'), (t) => 250 + 3200 * bell(t)); biquad(n, 'hp', 180); for (let i = 0; i < n.length; i++) n[i] *= bell(i / SR); add(x, n, 0, 2);
+  const r = biquad(noise(x.length, 'brown'), 'lp', 140); for (let i = 0; i < r.length; i++) r[i] *= bell(i / SR); add(x, r, 0, 1.5);
+  return norm(x, 0.75);
+}
+// a time bubble forming: a falling, chorused tone, a soft swell and a shimmer
+function warp() {
+  const L = 1.5, x = len(L); let a = 0, b = 0;
+  for (let i = 0; i < x.length; i++) { const t = i / SR, f = 180 + 950 * Math.exp(-t / 0.35); a += 2 * Math.PI * f * 1.015 / SR; b += 2 * Math.PI * f * 0.985 / SR; x[i] = (Math.sin(a) + Math.sin(b)) * Math.min(1, t / 0.04) * Math.exp(-t / 0.55) * 0.5; }
+  const sw = biquad(noise(x.length), 'bp', 2200, 0.8); for (let i = 0; i < sw.length; i++) { const t = i / SR; sw[i] *= Math.min(1, t / 0.35) * Math.exp(-Math.max(0, t - 0.35) / 0.25); } add(x, sw, 0, 0.5);
+  for (let k = 0; k < 24; k++) ping(x, rnd() * 1.1, 3000 + rnd() * 4000, 0.04 + rnd() * 0.1, 0.06);
+  return norm(x, 0.6);
+}
+// a monster's roar: a growling voice through vowel formants, ragged with breath and overdriven
+function roar(deep) {
+  const L = 2.8, x = len(L), src = len(L); let ph = 0;
+  for (let i = 0; i < src.length; i++) {
+    const t = i / SR, rise = Math.sin(Math.min(1, t / 2.4) * Math.PI), f0 = (deep ? 40 : 56) * (0.85 + 0.35 * rise) + white() * 3;
+    ph += 2 * Math.PI * f0 / SR; src[i] = (((ph / (2 * Math.PI)) % 1) * 2 - 1) * 0.7 + white() * 0.35;
+    src[i] *= Math.min(1, t / 0.25) * Math.min(1, (L - t) / 0.8);
+  }
+  for (const [f, q, g] of [[deep ? 420 : 560, 2, 1], [deep ? 950 : 1150, 2.5, 0.55], [2400, 3, 0.25]]) add(x, biquad(Float32Array.from(src), 'bp', f, q), 0, g * 3);
+  sweep(x, (t) => 900 + 2600 * Math.sin(Math.min(1, t / 2.4) * Math.PI)); // the mouth opening and closing
+  add(x, biquad(Float32Array.from(src), 'lp', 160), 0, 0.8); // the chest of it
+  return norm(clip(x, 3), 0.9);
+}
+// a tripod's horn: a deep brass blast that swells and dies away
+function horn() {
+  const L = 3.4, x = len(L); let a = 0, b = 0;
+  for (let i = 0; i < x.length; i++) { const t = i / SR, f = 52 * (1 + 0.04 * Math.min(1, t / 0.5)) * (1 + (t > 1 ? Math.sin(t * 31) * 0.006 : 0)); a += 2 * Math.PI * f / SR; b += 2 * Math.PI * f * 1.5 / SR; x[i] = ((((a / (2 * Math.PI)) % 1) * 2 - 1) + (((b / (2 * Math.PI)) % 1) * 2 - 1) * 0.6) * Math.min(1, t / 0.3) * Math.min(1, (L - t) / 0.9); }
+  sweep(x, (t) => 200 + 1500 * Math.sin(Math.min(1, t / 3) * Math.PI)); // the brass opening up
+  return norm(clip(x, 2), 0.85);
 }
 // a gunshot in a street: the crack, the body of it, then the buildings throwing it back
 function shot(rifle) {
@@ -164,21 +220,27 @@ function thud() { const x = len(0.4); thump(x, 0, 110, 50, 0.02, 0.06, 1); const
 function loop(sec, fn) { const x = len(sec + 0.5); fn(x); return loopify(x, 0.5); }
 const LOOPS = {
   city: () => loop(6, (x) => { add(x, biquad(noise(x.length, 'brown'), 'lp', 160), 0, 1); add(x, biquad(noise(x.length, 'pink'), 'hp', 2500), 0, 0.05); norm(x, 0.5); }), // traffic far off, the hum of the place
-  wind: () => loop(6, (x) => { const w = biquad(noise(x.length, 'pink'), 'bp', 420, 0.5), r = biquad(noise(x.length, 'brown'), 'lp', 180); for (let i = 0; i < x.length; i++) { const t = i / SR; x[i] = w[i] * (0.6 + 0.4 * Math.sin(t * 2 * Math.PI / 3 + Math.sin(t * 2.1))) * 1.4 + r[i] * 2.2; } norm(x, 0.8); }),
+  wind: () => loop(6, (x) => { const w = biquad(biquad(noise(x.length, 'pink'), 'bp', 300, 0.8), 'lp', 900), r = biquad(noise(x.length, 'brown'), 'lp', 160); for (let i = 0; i < x.length; i++) { const t = i / SR; x[i] = w[i] * (0.55 + 0.45 * Math.sin(t * 2 * Math.PI / 3 + Math.sin(t * 2.1))) * 1.2 + r[i] * 2.6; } norm(x, 0.7); }), // gusting, more rumble than hiss
   water: () => loop(5, (x) => { add(x, biquad(noise(x.length, 'pink'), 'bp', 850, 0.45), 0, 2); add(x, biquad(noise(x.length, 'brown'), 'lp', 220), 0, 2.5); norm(x, 0.8); }),
   fire: () => loop(5, (x) => { add(x, biquad(noise(x.length, 'brown'), 'lp', 300), 0, 2); for (let k = 0; k < 140; k++) grain(x, rnd() * 4.9, 0.004 + rnd() * 0.01, 1500 + rnd() * 4000, 1.5, 0.3 + rnd() * 0.5); norm(x, 0.75); }),
-  rain: () => loop(4, (x) => { add(x, biquad(noise(x.length, 'pink'), 'hp', 1400), 0, 1); for (let k = 0; k < 500; k++) grain(x, rnd() * 3.9, 0.003, 2500 + rnd() * 5000, 2, 0.15); norm(x, 0.6); }),
+  rain: () => loop(4, (x) => { add(x, biquad(biquad(noise(x.length, 'pink'), 'lp', 3800), 'hp', 600), 0, 1); add(x, biquad(noise(x.length, 'brown'), 'lp', 260), 0, 0.8); for (let k = 0; k < 260; k++) grain(x, rnd() * 3.9, 0.004, 1400 + rnd() * 2600, 1.5, 0.08); norm(x, 0.5); }), // a soft patter over the hush of it
   rotor: () => loop(2, (x) => { for (let b = 0; b < 2 * 17; b++) { const t = b / 17; thump(x, t, 95, 60, 0.01, 0.03, 0.8); grain(x, t, 0.04, 260, 0.8, 0.7, 'lp'); } let ph = 0; for (let i = 0; i < x.length; i++) { ph += 2 * Math.PI * 1650 / SR; x[i] += Math.sin(ph) * 0.03; } norm(x, 0.8); }),
 };
 // what to render, in the order it is wanted most, and how many variations
 const ONE = [['crash', crash, 3], ['glass', () => glass(0), 3], ['glassBig', () => glass(1), 2], ['boom', () => boom(0), 2], ['boomBig', () => boom(1), 2], ['shot', () => shot(false), 2], ['rifle', () => shot(true), 2],
-  ['collapse', collapse, 2], ['thunder', thunder, 2], ['nuke', () => boom(2), 1], ['whoomph', whoomph, 2], ['splash', () => splash(0), 1], ['splashBig', () => splash(1), 1], ['zap', zap, 2], ['thud', thud, 2]];
+  ['collapse', collapse, 2], ['thunder', thunder, 2], ['nuke', () => boom(2), 1], ['whoomph', whoomph, 2], ['splash', () => splash(0), 1], ['splashBig', () => splash(1), 1], ['zap', zap, 2], ['thud', thud, 2],
+  ['laser', laser, 2], ['web', web, 2], ['whoosh', whoosh, 2], ['warp', warp, 1], ['roar', () => roar(false), 1], ['roarDeep', () => roar(true), 1], ['horn', horn, 1]];
 // how far each carries (m; full volume closer than this), how loud, the least time between two, the most at once
-const REACH = { boom: 700, boomBig: 1300, nuke: 4000, crash: 340, glass: 260, glassBig: 420, collapse: 900, shot: 380, rifle: 520, thunder: 3000, whoomph: 300, splash: 400, splashBig: 1200, zap: 260, thud: 200 };
-const VOL = { boom: 0.9, boomBig: 1, nuke: 1, crash: 0.75, glass: 0.55, glassBig: 0.6, collapse: 0.85, shot: 0.45, rifle: 0.5, thunder: 0.8, whoomph: 0.5, splash: 0.6, splashBig: 0.8, zap: 0.35, thud: 0.5 };
-const GAP = { nuke: 2, thunder: 0.4, splashBig: 1, glass: 0.07, glassBig: 0.12, crash: 0.1, collapse: 0.3, shot: 0.04, rifle: 0.05, boom: 0.08, boomBig: 0.12, thud: 0.06, zap: 0.05, whoomph: 0.2 };
-const CAP = { shot: 5, rifle: 5, glass: 4, crash: 4, collapse: 3, zap: 3 };
+const REACH = { boom: 700, boomBig: 1300, nuke: 4000, crash: 340, glass: 260, glassBig: 420, collapse: 900, shot: 380, rifle: 520, thunder: 3000, whoomph: 300, splash: 400, splashBig: 1200, zap: 260, thud: 200,
+  laser: 420, web: 220, whoosh: 260, warp: 320, roar: 1600, roarDeep: 1600, horn: 2200 };
+const VOL = { boom: 0.9, boomBig: 1, nuke: 1, crash: 0.75, glass: 0.55, glassBig: 0.6, collapse: 0.85, shot: 0.45, rifle: 0.5, thunder: 0.8, whoomph: 0.5, splash: 0.6, splashBig: 0.8, zap: 0.35, thud: 0.5,
+  laser: 0.5, web: 0.45, whoosh: 0.55, warp: 0.5, roar: 0.9, roarDeep: 0.9, horn: 0.75 };
+const GAP = { nuke: 2, thunder: 0.4, splashBig: 1, glass: 0.07, glassBig: 0.12, crash: 0.1, collapse: 0.3, shot: 0.04, rifle: 0.05, boom: 0.08, boomBig: 0.12, thud: 0.06, zap: 0.05, whoomph: 0.2,
+  laser: 0.3, web: 0.15, whoosh: 0.5, warp: 0.4, roar: 1.5, roarDeep: 1.5, horn: 3 };
+const CAP = { shot: 5, rifle: 5, glass: 4, crash: 4, collapse: 3, zap: 3, laser: 3 };
+const DUCK = { nuke: 0.85, boomBig: 0.45, collapse: 0.3, roar: 0.35, roarDeep: 0.35 }; // the music dips under these
 const MAXV = 22;
+const LEVELS = [0, 0.3, 0.55, 0.85]; // the sound button: off, quiet, medium, loud
 
 let AUDIO = null;
 // play a sound at a place in the world (the game's code calls this; it does nothing while sound is off)
@@ -188,28 +250,35 @@ export class Audio {
   constructor(camera, controls) {
     AUDIO = this; this.camera = camera; this.controls = controls;
     this.ctx = null; this.bufs = {}; this.loops = {}; this.last = {}; this.live = {}; this.voices = 0; this.t = 0; this._v = new THREE.Vector3();
-    let off = false; try { off = localStorage.getItem('zday_sound') === 'off'; } catch (e) { /* no storage */ }
-    this.muted = off;
+    let lv = 3; try { const s = localStorage.getItem('zday_sound'); lv = s === 'off' ? 0 : s == null || s === 'on' ? 3 : +s; } catch (e) { /* no storage */ }
+    this.level = Number.isFinite(lv) ? Math.max(0, Math.min(3, lv)) : 3; this.muted = this.level === 0;
+    this.music = new Music(); // the songs, with their own button and volume
     this.button();
-    const go = () => this.unlock(); // browsers only allow sound after a tap
+    const go = () => { this.unlock(); if (this.music) this.music.prime(); }; // browsers only allow sound after a tap
     for (const ev of ['pointerdown', 'touchend', 'keydown']) window.addEventListener(ev, go, { passive: true });
-    document.addEventListener('visibilitychange', () => { if (!this.ctx) return; if (document.hidden) this.ctx.suspend(); else if (!this.muted) this.ctx.resume(); });
+    document.addEventListener('visibilitychange', () => { if (!this.ctx) return; if (document.hidden) this.ctx.suspend(); else if (!this.muted || this.music.level) this.ctx.resume(); });
   }
   button() {
     const b = this.btn = document.createElement('button'); b.type = 'button'; b.id = 'zd-sound'; b.title = 'Sound';
     b.style.cssText = 'position:fixed;right:10px;top:42%;z-index:30;opacity:0.85;width:38px;height:38px;border-radius:19px;border:1px solid rgba(255,255,255,0.15);background:rgba(20,18,16,0.72);color:#f2ead8;font-size:17px;line-height:36px;padding:0;cursor:pointer';
-    const show = () => { b.textContent = this.muted ? '🔇' : '🔊'; };
-    b.onclick = (e) => { e.stopPropagation(); this.muted = !this.muted; show(); try { localStorage.setItem('zday_sound', this.muted ? 'off' : 'on'); } catch (er) { /* no storage */ } if (this.ctx) { this.master.gain.setTargetAtTime(this.muted ? 0 : 0.85, this.ctx.currentTime, 0.05); if (!this.muted) this.ctx.resume(); } else this.unlock(); };
+    b.style.lineHeight = '1'; b.style.fontSize = '16px';
+    const show = () => { b.innerHTML = levelIcon('🔊', this.level); };
+    b.onclick = (e) => { // loud, medium, quiet, off, loud...
+      e.stopPropagation(); this.level = (this.level + 3) % 4; this.muted = this.level === 0; show();
+      try { localStorage.setItem('zday_sound', String(this.level)); } catch (er) { /* no storage */ }
+      if (this.ctx) { this.master.gain.setTargetAtTime(LEVELS[this.level], this.ctx.currentTime, 0.05); if (!this.muted) this.ctx.resume(); } else this.unlock();
+    };
     show(); document.body.appendChild(b);
   }
   unlock() {
-    if (this.ctx) { if (this.ctx.state !== 'running' && !this.muted && !document.hidden) this.ctx.resume(); return; }
+    if (this.ctx) { if (this.ctx.state !== 'running' && (!this.muted || this.music.level) && !document.hidden) this.ctx.resume(); return; }
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
     try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) { /* older Safari */ } // play even with the phone's silent switch on
     const c = this.ctx = new AC();
     this.comp = c.createDynamicsCompressor(); this.comp.threshold.value = -16; this.comp.ratio.value = 4; this.comp.attack.value = 0.004; this.comp.release.value = 0.25;
-    this.master = c.createGain(); this.master.gain.value = this.muted ? 0 : 0.85;
+    this.master = c.createGain(); this.master.gain.value = LEVELS[this.level];
     this.bus = c.createGain(); this.bus.connect(this.comp); this.comp.connect(this.master); this.master.connect(c.destination);
+    if (this.music) this.music.attach(c, c.destination); // not through the effects' volume: each has its own button
     // render the sounds a few at a time so the first tap does not stall a frame
     const jobs = [];
     for (const [name, fn, n] of ONE) for (let k = 0; k < n; k++) jobs.push(() => { seed = 1000 + jobs.length * 7919 + k * 104729; (this.bufs[name] || (this.bufs[name] = [])).push(this.toBuf(fn())); });
@@ -245,6 +314,7 @@ export class Audio {
     this.voices++; this.live[name] = (this.live[name] || 0) + 1;
     src.onended = () => { this.voices--; this.live[name]--; src.disconnect(); f.disconnect(); gn.disconnect(); if (p) p.disconnect(); };
     src.start(now + (o.delay || 0));
+    if (DUCK[name] && this.music) this.music.duck(DUCK[name] * Math.min(1, P.g * 1.5));
   }
   // what happened in the world this frame (people, traffic, fire, helicopters and disasters all post events)
   event(e) {
@@ -266,7 +336,8 @@ export class Audio {
       case 'fire': case 'gasfire': this.play('whoomph', x, 5, z); break;
       case 'waterdrop': this.play('splash', x, 10, z); break;
       case 'tsunamihit': this.play('splashBig', x, 6, z); this.play('collapse', x, 0, z, { rate: 0.6, gain: 0.7 }); break;
-      case 'tripodland': this.play('collapse', x, 0, z, { rate: 0.7 }); break;
+      case 'tripodland': this.play('collapse', x, 0, z, { rate: 0.7 }); this.play('horn', x, 40, z, { delay: 1.5 }); break;
+      case 'wormup': this.play('roarDeep', x, 10, z, { rate: 0.8 }); this.play('collapse', x, 0, z, { gain: 0.8 }); break;
       default: break;
     }
   }
@@ -280,12 +351,12 @@ export class Audio {
       if (!e.alive || !e.poi) continue;
       const p = e.poi(tg.x, tg.z); if (!p) continue;
       const near = Math.max(0, 1 - Math.hypot(p.x - tg.x, p.z - tg.z) / 700);
-      if (e.type === 'tornado' || e.type === 'haboob' || e.type === 'coldwave' || e.type === 'blackhole') want.wind = Math.max(want.wind, 0.25 + 0.75 * near);
+      if (e.type === 'tornado' || e.type === 'haboob' || e.type === 'coldwave' || e.type === 'blackhole') want.wind = Math.max(want.wind, 0.12 + 0.43 * near);
       if (e.type === 'tsunami' && e.phase === 'wave') want.water = Math.max(want.water, 0.3 + 0.7 * near);
     }
     if (W && W.active) want.water = Math.max(want.water, 0.25);
-    if (D && (D.weather.type === 'dust' || D.weather.type === 'sand')) want.wind = Math.max(want.wind, 0.3);
-    if (D && (D.weather.type === 'rain' || D.weather.type === 'storm')) want.rain = D.weather.type === 'storm' ? 0.7 : 0.45;
+    if (D && (D.weather.type === 'dust' || D.weather.type === 'sand')) want.wind = Math.max(want.wind, 0.15);
+    if (D && (D.weather.type === 'rain' || D.weather.type === 'storm')) want.rain = D.weather.type === 'storm' ? 0.3 : 0.18;
     if (g.fire) want.fire = Math.min(0.8, g.fire.firesWithin(tg.x, tg.z, 160).length * 0.2) * (0.5 + 0.5 * zoom);
     if (g.helis) { let best = 1e9, hl = null; for (const h of g.helis.list) { const d = Math.hypot(h.x - cam.x, h.y - cam.y, h.z - cam.z); if (d < best) { best = d; hl = h; } } if (hl) { want.rotor = Math.min(0.8, 220 / best); pan.rotor = this.place(hl.x, hl.y, hl.z, 1).pan; } }
     for (const name in this.loops) {
@@ -293,12 +364,13 @@ export class Audio {
       if (L.p && pan[name] != null) L.p.pan.setTargetAtTime(pan[name], now, 0.2);
     }
     this.siren(g, now);
+    if (this.music) this.music.update(0.1, g);
   }
   // the nearest rescue unit on its way somewhere: a wailing siren (a live oscillator, made when wanted)
   siren(g, now) {
     let best = 1e9, car = null; const cam = this.camera.position;
-    for (const m of g.traffic.missions) { if (m.gone || m.mode !== 0 || m.leaving) continue; const d = Math.hypot(m.x - cam.x, m.z - cam.z, cam.y); if (d < best) { best = d; car = m; } }
-    const want = car ? Math.min(0.22, 90 / best) : 0;
+    for (const m of g.traffic.missions) { if (m.gone || m.mode !== 0 || m.leaving) continue; const d = Math.hypot(m.x - cam.x, m.z - cam.z, cam.y - 2); if (d < best) { best = d; car = m; } }
+    const want = car ? 0.09 * Math.max(0, Math.min(1, 1 - (best - 110) / 230)) : 0; // only close by: gone by 340 m
     if (want > 0.01 && !this.sir) {
       const c = this.ctx, o = c.createOscillator(), lfo = c.createOscillator(), dep = c.createGain(), f = c.createBiquadFilter(), gn = c.createGain(), p = c.createStereoPanner ? c.createStereoPanner() : null;
       o.type = 'sawtooth'; o.frequency.value = 900; lfo.type = 'triangle'; lfo.frequency.value = 0.23; dep.gain.value = 420; lfo.connect(dep); dep.connect(o.frequency);

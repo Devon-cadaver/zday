@@ -16,9 +16,12 @@ import { tossStep, toss } from './brawl.js';
 const up = (v) => v && !v.gone && !v.beaten;
 import { roofTop } from './tripod.js';
 import { ST } from './people.js';
+import { sfx } from './audio.js';
 const _hv = new THREE.Vector3();
 
 const UP = 520; // carried this high, a meteor or a warhead is gone into space
+const ODDS = 0.66; // how often the heroes win, rolled once for each villain, monster, meteor or missile
+export function heroesWin(o) { if (o.heroWin === undefined) o.heroWin = Math.random() < ODDS; return o.heroWin; }
 const HANDS = 4.9;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
@@ -94,7 +97,7 @@ void main() {
 class Bubble {
   constructor(H, x, y, z, R, life, track = null) {
     this.H = H; this.b = { x, y, z, R: 0.1 }; this.R = R; this.life = life; this.t = 0; this.track = track; this.alive = true;
-    H.D.bubbles.push(this.b);
+    H.D.bubbles.push(this.b); sfx('warp', x, y, z);
     this.mesh = new THREE.Mesh(kit().sphere, new THREE.ShaderMaterial({ vertexShader: BUB_VS, fragmentShader: BUB_FS, transparent: true, depthWrite: false, side: THREE.DoubleSide, uniforms: { uOp: { value: 0 }, uTime: { value: 0 } } }));
     this.mesh.renderOrder = 6; this.mesh.frustumCulled = false; H.scene.add(this.mesh);
   }
@@ -174,11 +177,18 @@ class Hero {
     if (e.phase === 'warn') { this.fly(e.x, 110, e.z, h, 60); return; }
     const o = e.OBJ; if (!o) { this.job = null; return; }
     const p = o.position, d = this.fly(p.x, p.y, p.z, h, 90, 30);
+    if (d < 8 + (e.R || 0) * 0.2 && !heroesWin(e)) { this.lost(e, 'the ' + (e.type === 'nuclear' ? 'nuclear missile' : 'meteor')); return; } // too much for them: it comes down
     if (d < 8 + (e.R || 0) * 0.2 && e.seize()) {
       this.job = { kind: 'carry', e };
       if (e.type === 'meteor' && e.R >= 40) this.H.smash(e, this); // too big to carry whole: broken up first
       this.D.emit({ type: 'herocatch', text: this.name + ' caught the ' + (e.type === 'nuclear' ? 'nuclear missile' : 'meteor') + '!' });
     }
+  }
+  // beaten: knocked flying, and none of them tries again
+  lost(o, what) {
+    o.heroLost = true; this.job = null;
+    toss(this, (Math.random() - 0.5) * 40, 12, (Math.random() - 0.5) * 40);
+    this.D.emit({ type: 'herolost', text: this.name + " couldn't stop " + what + '!' });
   }
   doCarry(h, J) {
     const e = J.e, o = e.OBJ; if (!o) { this.job = null; return; }
@@ -211,7 +221,7 @@ class Hero {
   // Nova and Tyrant: she goes for anything he has thrown first, then for him
   doFight(h, J) {
     const ty = J.v, V = J.V;
-    if (ty.gone || ty.beaten) { this.job = null; return; }
+    if (ty.gone || ty.beaten || ty.heroLost) { this.job = null; return; }
     const shell = ty.flying.find(f => f.shell && !f.caught);
     if (shell) {
       const d = this.fly(shell.x, shell.y + 2, shell.z, h, 70, 20);
@@ -226,14 +236,14 @@ class Hero {
       if (r < 0.5 && !ty.gripped && !ty.tossed && this.D.brawl.drag(this, ty)) { this.cd = 3; return; } // or by the throat, down the street
       this.cd = 1.1; this.punchT = 0.35;
       const dx = ty.x - this.x, dz = ty.z - this.z, dl = Math.hypot(dx, dz) || 1;
-      ty.hp -= 25; ty.vx += dx / dl * 22; ty.vz += dz / dl * 22; ty.vy += 8; ty.ray = null; ty.wind = 0;
+      ty.hp -= 25; ty.vx += dx / dl * 22; ty.vz += dz / dl * 22; ty.vy += 8; ty.ray = null; ty.wind = 0; sfx('thud', ty.x, ty.y + 2, ty.z, { gain: 1.2 });
       this.D.ctx.fire.burst(ty.x, ty.y + 3, ty.z, 14, 2); if (V.near(ty.x, ty.z)) this.D.shake(0.25);
       if (ty.held) { // he lets go of whatever he was holding
         const Hh = ty.held; ty.held = null; ty.plan = null;
         if (Hh.car) { Hh.car.soft = true; this.D.ctx.traffic.fling(Hh.car, dx / dl * 3, 1, dz / dl * 3); }
         else { this.job = { kind: 'return', shell: Hh.shell, k: Hh.k, base: Hh.base, half: Hh.half }; return; }
       }
-      if (ty.hp <= 0) { V.beat(ty, 'Nova'); this.job = null; }
+      if (ty.hp <= 0) { V.beat(ty, 'Nova'); if (ty.heroLost) toss(this, -dx / dl * 30, 10, -dz / dl * 30); this.job = null; }
     }
   }
   // Dragonfly and Weaver: every web cut first, then him
@@ -245,24 +255,24 @@ class Hero {
       if (d < 5) { web.release(); this.D.ctx.fire.burst(web.x, 1, web.z, 10, 1.4); if (!this.H.saidWeb) { this.H.saidWeb = true; this.D.emit({ type: 'heroweb', text: 'Dragonfly is cutting people free of the webs' }); } }
       return;
     }
-    if (!wv || wv.gone || wv.beaten) { this.job = null; return; }
+    if (!wv || wv.gone || wv.beaten || wv.heroLost) { this.job = null; return; }
     if (Math.hypot(wv.x - this.x, wv.z - this.z) > 28 && (this.carT = (this.carT ?? 3) - h) <= 0) { this.carT = 6; if (this.fetch(wv, J)) return; }
     const d = this.fly(wv.x, wv.y + 2, wv.z, h, 65, 20);
     if (d < 4.5 && this.cd <= 0) {
       const r = Math.random();
       if (r < 0.3 && !wv.gripped && !wv.tossed) { this.cd = 2; this.D.brawl.grab(this, wv); return; }
       if (r < 0.5 && !wv.gripped && !wv.tossed && this.D.brawl.drag(this, wv)) { this.cd = 3; return; }
-      this.cd = 1.3; this.punchT = 0.35; wv.hp -= 34;
+      this.cd = 1.3; this.punchT = 0.35; wv.hp -= 34; sfx('thud', wv.x, wv.y + 2, wv.z, { gain: 1.2 });
       this.D.ctx.fire.burst(wv.x, wv.y + 3, wv.z, 12, 1.6);
       if (wv.state === 'perch') wv.hop(true);
-      if (wv.hp <= 0) { V.beat(wv, 'Dragonfly'); this.job = null; }
+      if (wv.hp <= 0) { V.beat(wv, 'Dragonfly'); if (wv.heroLost) toss(this, (Math.random() - 0.5) * 50, 10, (Math.random() - 0.5) * 50); this.job = null; }
     }
   }
   // Blur held in a time bubble, or seeing stars after a throw, can be caught: in close at full speed (a hero's own
   // time runs on inside the bubble) to get hold of him before he vibrates free. true while going for him
   catchBlur(h, bl, range) {
     const held = !(bl.freeT > 0) && this.D.slowAt(bl.x, 2, bl.z) < 1;
-    if (!(held || bl.dazed > 0) || bl.tossed || bl.gripped || bl.gone || bl.beaten) return false;
+    if (!(held || bl.dazed > 0) || bl.tossed || bl.gripped || bl.gone || bl.beaten || bl.heroLost) return false;
     if (Math.hypot(bl.x - this.x, bl.z - this.z) > range) return false;
     const d = this.fly(bl.x, (bl.y || 0) + 2, bl.z, h, 90, 30);
     if (d < 5 && this.gcd <= 0) {
@@ -279,7 +289,7 @@ class Hero {
   // Tempo and Blur: a bubble where he is going, then in to catch him while he crawls; held in time long enough (24 s in all), he gives up
   doSlow(h, J) {
     const bl = J.v, V = J.V;
-    if (bl.gone || bl.beaten) { this.job = null; return; }
+    if (bl.gone || bl.beaten || bl.heroLost) { this.job = null; return; }
     if (bl.trapped > 24) { V.beat(bl, 'Tempo'); this.job = null; return; }
     if (this.catchBlur(h, bl, 120)) return;
     if (bl.trapped > 0.6 && (this.carT = (this.carT ?? 1) - h) <= 0) { this.carT = 6; if (this.fetch(bl, J)) return; } // he is stuck in the bubble: a car at him
@@ -295,7 +305,7 @@ class Hero {
   // the others, once their own villain is dealt with: shadow Blur, ready to catch him the moment a bubble holds him
   doBlur(h, J) {
     const bl = J.v;
-    if (!up(bl)) { this.job = null; return; }
+    if (!up(bl) || bl.heroLost) { this.job = null; return; }
     if (this.catchBlur(h, bl, 220)) return;
     const d = Math.hypot(bl.x - this.x, bl.z - this.z) || 1;
     this.fly(bl.x - (bl.x - this.x) / d * 35, this.cruiseY(bl.x, bl.z), bl.z - (bl.z - this.z) / d * 35, h, 70);
@@ -304,7 +314,7 @@ class Hero {
   // and they go for its heads (the worm's only when it is above ground)
   doMonster(h, J) {
     const m = J.m, kj = m.type === 'kaiju';
-    if (!m.alive || (kj ? m.state === 'leave' : m.phase === 'leave' || m.phase === 'gone')) { this.job = null; return; }
+    if (!m.alive || m.heroLost || (kj ? m.state === 'leave' : m.phase === 'leave' || m.phase === 'gone')) { this.job = null; return; }
     if (!J.slow && this.name === 'Tempo' && this.cd <= 0) J.slow = true; // between bubbles he was at its heads with the others
     if (J.slow) {
       const at = () => (m.alive ? (kj ? { x: m.x, y: 30, z: m.z } : { x: m.x, y: Math.max(4, m.y), z: m.z }) : null), p = at();
@@ -334,7 +344,8 @@ class Hero {
     if (d < 6 && this.cd <= 0) {
       this.cd = this.name === 'Nova' ? 1.2 : 1.6; this.punchT = 0.35;
       const dx = this.x - tx, dz = this.z - tz, dl = Math.hypot(dx, dz) || 1;
-      m.damage((this.name === 'Nova' ? 12 : 6) * (kj ? 0.7 : 1), this.name); this.D.ctx.fire.burst(tx, ty, tz, 14, 2.5);
+      m.damage((this.name === 'Nova' ? 12 : 6) * (kj ? 0.7 : 1), this.name); this.D.ctx.fire.burst(tx, ty, tz, 14, 2.5); sfx('thud', tx, ty, tz, { gain: 1.4, rate: 0.8 });
+      if (m.heroLost) { toss(this, dx / dl * 45, 16, dz / dl * 45); this.job = null; return; } // swatted away
       this.vx = dx / dl * 25; this.vz = dz / dl * 25; this.vy = 6; // knocked back off it
       this.D.shake(0.15);
     }
@@ -474,7 +485,7 @@ export class Heroes {
     const D = this.D, [dragon, nova, tempo] = this.who, live = this.who.filter(h => h.state === 'fly');
     let work = 0;
     for (const e of D.list) {
-      if ((e.type !== 'meteor' && e.type !== 'nuclear') || !e.alive || (e.phase !== 'warn' && e.phase !== 'fall')) continue;
+      if ((e.type !== 'meteor' && e.type !== 'nuclear') || !e.alive || e.heroLost || (e.phase !== 'warn' && e.phase !== 'fall')) continue;
       work++;
       if (live.some(h => h.job && h.job.e === e)) continue;
       const free = live.filter(h => !h.busy); if (!free.length) break;
@@ -490,7 +501,7 @@ export class Heroes {
     }
     const V = D.list.find(e => e.type === 'villains' && e.alive);
     if (V && this.vHold <= 0) {
-      const find = (n) => V.who.find(v => v.name === n && !v.gone && !v.beaten);
+      const find = (n) => V.who.find(v => v.name === n && !v.gone && !v.beaten && !v.heroLost);
       const wv = find('Weaver'), ty = find('Tyrant'), bl = find('Blur');
       if (wv || (V.who.find(v => v.name === 'Weaver') || {}).webs?.some(w => w.alive)) work++;
       if (ty || bl) work++;
@@ -500,7 +511,7 @@ export class Heroes {
       if (bl) for (const hr of [nova, dragon]) if (hr.state === 'fly' && !hr.job) hr.job = { kind: 'blur', v: bl, V }; // free of their own: help catch Blur
     }
     // the giant monsters: whoever is free goes at it
-    const M = D.list.find(e => e.alive && ((e.type === 'kaiju' && e.state !== 'leave') || (e.type === 'worm' && e.phase !== 'leave' && e.phase !== 'gone')));
+    const M = D.list.find(e => e.alive && !e.heroLost && ((e.type === 'kaiju' && e.state !== 'leave') || (e.type === 'worm' && e.phase !== 'leave' && e.phase !== 'gone')));
     if (M) {
       work++;
       if (nova.state === 'fly' && !nova.job) nova.job = { kind: 'monster', m: M };

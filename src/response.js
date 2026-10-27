@@ -58,7 +58,7 @@ export function custodyBuses(g, district, onSent) {
 
 export class Responders {
   constructor(g) {
-    this.g = g; this.on = true; this.t = 0; this.tick = 0;
+    this.g = g; this.on = true; this.t = 0; this.tick = 0; this.autoHeroes = false; // the heroes come when you call them (Sandbox: Call heroes)
     this.works = []; this.camps = []; this.hazmats = []; this.buildTo = new Set(); this.fell = new Map(); this.noRoute = new Map(); this.fireTo = new Map(); this.cool = {}; this.units = [];
   }
   reset() {
@@ -164,7 +164,7 @@ export class Responders {
     }
     // super villains, the giant worm and the kaiju, incoming meteors and missiles: the hero signal (the kaiju has the
     // city to itself for a quarter of a minute first)
-    if (!D.list.some(e => e.type === 'heroes' && e.alive && !e.leaving)) {
+    if (this.autoHeroes && !D.list.some(e => e.type === 'heroes' && e.alive && !e.leaving)) {
       const th = D.list.find(e => e.alive && (e.type === 'villains' || (e.type === 'kaiju' && e.state !== 'leave' && e.t > 15) || (e.type === 'tsunami' && e.phase !== 'recede') || (e.type === 'flood' && p.stats.afloat > 20) || (e.type === 'worm' && e.phase !== 'leave' && e.phase !== 'gone') || ((e.type === 'meteor' || e.type === 'nuclear') && (e.phase === 'warn' || e.phase === 'fall'))));
       if (th && this.ready('heroes', 20)) { const v = th.who ? th.who.find(w => !w.gone) : null; D.start('heroes', v ? v.x : th.x, v ? v.z : th.z); }
     }

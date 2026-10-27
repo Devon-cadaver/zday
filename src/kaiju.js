@@ -15,6 +15,8 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { Body, hideMaterial, sstep } from './flesh.js';
 import { ST } from './people.js';
+import { sfx } from './audio.js';
+import { heroesWin } from './heroes.js';
 
 const THIGH = 12, SHIN = 10, META = 7, UPPER = 18, FORE = 17, NECK = 4.4, LEAN = 0.95, SPEED = 5.5, STRIDE = 20, TP = 12, TAU = Math.PI * 2;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -267,7 +269,9 @@ export class Kaiju {
   }
   steer(x, z) { const B = this.D.ctx.city.bounds; this.goal = [clamp(x, B.x0 + 30, B.x1 - 30), clamp(z, B.z0 + 30, B.z1 - 30)]; }
   damage(n, by) {
-    if (this.state === 'leave') return; this.hp -= n; if (!by) this.D.ctx.fire.burst(this.x, 30, this.z, 20, 4);
+    if (this.state === 'leave' || (by && this.heroLost)) return;
+    if (by && this.hp - n <= 0 && !heroesWin(this)) { this.heroLost = true; this.hp = Math.max(this.hp, 300); this.act = { kind: 'roar', t: 0 }; sfx('roar', this.x, 45, this.z, { delay: 0.35 }); this.D.emit({ type: 'herolost', x: this.x, z: this.z, text: 'The monster swatted the heroes away! They cannot stop it' }); return; }
+    this.hp -= n; if (!by) this.D.ctx.fire.burst(this.x, 30, this.z, 20, 4);
     if (by && !this.saidHero) { this.saidHero = true; this.D.emit({ type: 'kaijuhero', text: by + ' is fighting the monster!' }); }
     if (this.hp <= 0) this.retreat(by ? 'The heroes drove the monster off! It is retreating out of the city' : 'The monster is hurt and retreating out of the city!');
   }
@@ -283,7 +287,7 @@ export class Kaiju {
   // pick something to do next: grab a car, swipe a building, roar
   choose() {
     const { traffic, city } = this.D.ctx;
-    if ((this.roarT -= 4) <= 0) { this.roarT = 14 + Math.random() * 8; this.act = { kind: 'roar', t: 0 }; return; } // about every third thing it does
+    if ((this.roarT -= 4) <= 0) { this.roarT = 14 + Math.random() * 8; this.act = { kind: 'roar', t: 0 }; sfx('roar', this.x, 45, this.z, { delay: 0.35 }); sfx('roarDeep', this.x, 45, this.z, { delay: 0.6, gain: 0.7 }); return; } // about every third thing it does (two heads, two voices)
     let car = null; traffic.near(this.x + Math.cos(this.yaw) * 14, this.z + Math.sin(this.yaw) * 14, 26, (c) => { if (!car && !c.gone && c.mode === 0 && !c.mission) car = c; });
     if (car && Math.random() < 0.6) { this.act = { kind: 'car', car, t: 0, arm: Math.random() < 0.5 ? 0 : 1 }; return; }
     let bk = -1; city.buildingsNear(this.x + Math.cos(this.yaw) * 16, this.z + Math.sin(this.yaw) * 16, 14, (k) => { if (bk < 0) bk = k; });

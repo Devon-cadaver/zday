@@ -11,6 +11,7 @@ import { beamMesh } from './aliens.js';
 import { Splash, NOISE } from './water.js';
 import { ST, KIND } from './people.js';
 import { Body } from './flesh.js';
+import { sfx } from './audio.js';
 
 const HEAD_Y = 40, MAX_Y = 80, HIP_R = 4, STANCE = 17, SEG = 18, TENT = 6;
 const STURDY = 26;
@@ -233,6 +234,7 @@ export class Tripod {
       this.tx = Math.max(B.x0 + 30, Math.min(B.x1 - 30, bx)); this.tz = Math.max(B.z0 + 30, Math.min(B.z1 - 30, bz));
     }
     if (!this.ray && (this.rayT -= h) <= 0) { this.rayT = 3 + Math.random() * 3; this.fireAt(); }
+    if ((this.hornT = (this.hornT ?? 6 + Math.random() * 10) - h) <= 0) { this.hornT = 22 + Math.random() * 18; sfx('horn', this.x, this.y, this.z); }
     if (!this.tb && (this.beamT -= h) <= 0) { this.beamT = 7 + Math.random() * 5; const p = this.crowd(30); if (p) this.beamAt(p[0], p[1]); }
   }
   crowd(R) {
@@ -257,6 +259,7 @@ export class Tripod {
     }
     const a = Math.random() * 6.28, L = 14 + Math.random() * 14;
     this.ray = { x0: x0 - Math.cos(a) * L / 2, z0: z0 - Math.sin(a) * L / 2, x1: x0 + Math.cos(a) * L / 2, z1: z0 + Math.sin(a) * L / 2, y0, t: 0, dur: 1.8, hitT: 0 };
+    sfx('laser', this.x, this.y, this.z, { rate: 0.7, reach: 1.6 });
   }
   rayStep(h) {
     const R = this.ray; if (!R) return;

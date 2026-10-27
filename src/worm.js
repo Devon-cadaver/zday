@@ -9,6 +9,7 @@ import { Hole, swallow } from './impact.js';
 import { cutGround } from './holes.js';
 import { scaly } from './skins.js';
 import { hideMaterial, sstep as ss } from './flesh.js';
+import { heroesWin } from './heroes.js';
 // the worm's hide: pale, so the sand and dark bands painted on it in vertex colour show through; creased pale flesh on the belly
 const SANDHIDE = { key: 'worm', dry: 0.28, scales: [[226, 214, 192], [212, 198, 174], [234, 224, 204], [200, 186, 160], [220, 206, 182]], gap: [120, 96, 72], base: [214, 190, 160], light: [232, 214, 188], bruise: [176, 146, 120], vein: [168, 128, 110], small: [222, 208, 184] };
 
@@ -156,7 +157,10 @@ export class Worm {
   steer(x, z) { const B = this.D.ctx.city.bounds; this.goal = [clamp(x, B.x0 + 30, B.x1 - 30), clamp(z, B.z0 + 30, B.z1 - 30)]; }
   // up out of the ground now
   // hurt (by the heroes): enough and it dives deep and leaves once it is back underground
-  damage(n, by) { if (this.phase === 'leave' || this.phase === 'gone') return; this.hp -= n; if (by && !this.saidHero) { this.saidHero = true; this.D.emit({ type: 'wormhero', text: by + ' is fighting the worm!' }); } }
+  damage(n, by) {
+    if (this.phase === 'leave' || this.phase === 'gone' || (by && this.heroLost)) return;
+    if (by && this.hp - n <= 0 && !heroesWin(this)) { this.heroLost = true; this.hp = Math.max(this.hp, 250); this.D.emit({ type: 'herolost', x: this.x, z: this.z, text: 'The worm is too much for the heroes! They are falling back' }); return; }
+    this.hp -= n; if (by && !this.saidHero) { this.saidHero = true; this.D.emit({ type: 'wormhero', text: by + ' is fighting the worm!' }); } }
   breach() { if (this.phase !== 'tunnel') return false; this.phase = 'arc'; this.arcT = 0; return true; }
   newGoal() {
     const { people, city } = this.D.ctx, B = city.bounds; let best = -1;
