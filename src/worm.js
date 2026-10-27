@@ -57,14 +57,17 @@ function fillTube(g, S, t) {
     if (i === 0 && Math.abs(ty) > 0.9) { nx = 1; ny = 0; nz = 0; } // the frame is carried down the body, kept square to it, so the skin never twists
     const dt = nx * tx + ny * ty + nz * tz; nx -= tx * dt; ny -= ty * dt; nz -= tz * dt; const nl = Math.hypot(nx, ny, nz) || 1; nx /= nl; ny /= nl; nz /= nl;
     const bx = ty * nz - tz * ny, by = tz * nx - tx * nz, bz = tx * ny - ty * nx;
-    const u = s.d / LEN, r = R0 * (1 - 0.62 * Math.pow(u, 1.3)) * (1 + 0.03 * Math.cos(s.d * 2.4)) * (1 + 0.045 * Math.sin(t * 3 - s.d * 0.25)); // tapering to the tail, gently ringed, a slow ripple running down it
+    const u = s.d / LEN, tip = u > 0.86 ? Math.sqrt(Math.max(0, 1 - Math.pow((u - 0.86) / 0.14, 2))) : 1, neck = 1 + 0.08 * Math.exp(-Math.pow((s.d - 9) / 6, 2));
+    const ring = 1 + 0.055 * Math.pow(0.5 + 0.5 * Math.cos(s.d * Math.PI * 2 / 2.6), 4); // a crisp raised ring every 2.6 m, like a real worm's segments
+    const r = R0 * (1 - 0.42 * Math.pow(u, 1.2)) * tip * neck * (tip > 0.2 ? ring : 1) * (1 + 0.045 * Math.sin(t * 3 - s.d * 0.25)); // down to a closed tail tip, a slow ripple running down it
     const ph = (s.d % 12) / 12, dark = sstep(0.58, 0.7, ph) * (1 - sstep(0.9, 1, ph)); // the dark bands, soft-edged
     for (let j = 0; j <= RING; j++) {
       const th = j / RING * Math.PI * 2, c = Math.cos(th), sn = Math.sin(th), ox = nx * c + bx * sn, oy = ny * c + by * sn, oz = nz * c + bz * sn, k = i * (RING + 1) + j;
       Pp[k * 3] = s.x + ox * r; Pp[k * 3 + 1] = s.y + oy * r; Pp[k * 3 + 2] = s.z + oz * r;
       N[k * 3] = ox; N[k * 3 + 1] = oy; N[k * 3 + 2] = oz; U[k * 2] = j / RING; U[k * 2 + 1] = s.d / 9;
-      const belly = sstep(0.2, 0.75, -oy) * (1 - dark) * 0.7;
-      C[k * 3] = SAND.r + (DARK.r - SAND.r) * dark + (BELLY.r - SAND.r) * belly; C[k * 3 + 1] = SAND.g + (DARK.g - SAND.g) * dark + (BELLY.g - SAND.g) * belly; C[k * 3 + 2] = SAND.b + (DARK.b - SAND.b) * dark + (BELLY.b - SAND.b) * belly;
+      const belly = sstep(0.2, 0.75, -oy) * (1 - dark) * 0.7, back = sstep(0.55, 0.95, oy) * 0.45 * (1 - dark), groove = 0.14 * Math.pow(0.5 - 0.5 * Math.cos(s.d * Math.PI * 2 / 2.6), 6);
+      const dk = Math.min(1, dark + back), sh = 1 - groove;
+      C[k * 3] = (SAND.r + (DARK.r - SAND.r) * dk + (BELLY.r - SAND.r) * belly) * sh; C[k * 3 + 1] = (SAND.g + (DARK.g - SAND.g) * dk + (BELLY.g - SAND.g) * belly) * sh; C[k * 3 + 2] = (SAND.b + (DARK.b - SAND.b) * dk + (BELLY.b - SAND.b) * belly) * sh;
     }
   }
   g.setDrawRange(0, (n - 1) * RING * 6);
@@ -75,7 +78,7 @@ function spine(path, out) {
   out.length = 0; let i = path.length - 1, acc = 0, want = 0;
   if (i < 0) return out;
   out.push({ x: path[i].x, y: path[i].y, z: path[i].z, d: 0 }); want = STEP;
-  while (i > 0 && want <= LEN) {
+  while (i > 0 && want <= LEN + 1e-6) {
     const a = path[i], b = path[i - 1], L = Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
     if (acc + L >= want) { const f = (want - acc) / (L || 1); out.push({ x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, z: a.z + (b.z - a.z) * f, d: want }); want += STEP; continue; }
     acc += L; i--;
@@ -87,7 +90,8 @@ function spine(path, out) {
 function headMesh() {
   const p = parts(), g = new THREE.Group();
   const add = (geo, mat, parent = g) => { const m = new THREE.Mesh(geo, mat); m.castShadow = true; parent.add(m); return m; };
-  add(new THREE.CylinderGeometry(1.0, 1.0, 1.4, RING, 1, true).translate(0, -0.7, 0), p.scales);
+  const flare = [[1.0, -1.6], [1.0, -1.1], [1.06, -0.6], [1.14, -0.2], [1.17, 0.05], [1.1, 0.16], [0.98, 0.12]].map(([r, y]) => new THREE.Vector2(r, y));
+  add(new THREE.LatheGeometry(flare, RING * 2), p.scales); // the collar flares from the body out to a thick lip
   add(new THREE.CylinderGeometry(0.93, 0.45, 2.4, 22, 1, true).translate(0, -1.2, 0), p.throatMat);
   const ring = new THREE.InstancedMesh(p.tooth, p.toothMat, 2 * 20), m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), one = new THREE.Vector3(1, 1, 1);
   for (let row = 0; row < 2; row++) for (let i = 0; i < 20; i++) { // rings of teeth down the throat, pointing in
@@ -131,7 +135,8 @@ export class Worm {
     this.goal = [clamp(x, B.x0 + 40, B.x1 - 40), clamp(z, B.z0 + 40, B.z1 - 40)];
     this.x = clamp(this.goal[0] - Math.cos(a) * 70, B.x0 + 20, B.x1 - 20); this.z = clamp(this.goal[1] - Math.sin(a) * 70, B.z0 + 20, B.z1 - 20); this.y = SHALLOW;
     this.yaw = Math.atan2(this.goal[1] - this.z, this.goal[0] - this.x); this.phase = 'tunnel'; this.arcT = 0; this.vy = 0;
-    this.path = [{ x: this.x, y: this.y, z: this.z }]; this.shook = new Set(); this.holes = 0;
+    this.path = []; for (let k = LEN + 18; k >= 0; k--) this.path.push({ x: this.x - Math.cos(this.yaw) * k, y: this.y - Math.min(6, k * 0.05), z: this.z - Math.sin(this.yaw) * k }); // the whole body from the start, trailing back underground
+    this.shook = new Set(); this.holes = 0;
     const p = parts(), scene = D.ctx.scene;
     this.body = new THREE.Mesh(tubeGeometry(), p.skin); this.body.castShadow = true; this.body.frustumCulled = false; this.spine = [];
     this.head = headMesh(); this.head.scale.setScalar(R0); this.open = 0.2; scene.add(this.body, this.head);

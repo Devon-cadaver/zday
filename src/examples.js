@@ -83,9 +83,10 @@ function saucer() {
   return g;
 }
 function worm() {
-  const g = new THREE.Group(); ground(g, 30, '#b9a882'); blocks(g, 20, 5, [3, 8]);
-  for (const x of [-25]) add(g, new THREE.CircleGeometry(6, 24).rotateX(-Math.PI / 2), std('#22180f'), x, 0.02, 0); // the pits it came out of and went back into
-  g.add(wormModel()); return g;
+  const g = new THREE.Group(); ground(g, 34, '#b9a882'); blocks(g, 22, 5, [3, 8]);
+  add(g, new THREE.CylinderGeometry(34, 34, 10, 40), std('#7a6a52', { roughness: 1 }), 0, -5.2, 0); // solid earth under it, so what is underground stays hidden
+  for (const x of [-28]) add(g, new THREE.CircleGeometry(6, 24).rotateX(-Math.PI / 2), std('#22180f'), x, 0.02, 0); // the pits it came out of and went back into
+  const w = wormModel(); w.position.x = -3; g.add(w); return g; // centred, so the head and the arc both sit inside the tile
 }
 function kaiju() { const g = new THREE.Group(); ground(g, 26); blocks(g, 19, 6, [6, 16]); g.add(kaijuModel()); return g; }
 function tripod() { const g = new THREE.Group(); ground(g, 18); blocks(g, 12, 6, [4, 10]); g.add(tripodModel()); return g; }
@@ -180,6 +181,6 @@ export function disasterExamples() {
     ['Tornado', tornado(), 17], ['Earthquake', quake(), 10], ['Flood', flood(), 10], ['Tsunami', tsunami(), 15], ['Sinkhole', sinkhole(), 12],
     ['Meteor', meteor(), 17], ['Volcano', volcano(), 16], ['Lava', lava(), 10], ['Dust storm', haboob(), 16], ['Cold wave', blizzard(), 10],
     ['Solar flare', solar(), 11], ['Alien saucer', saucer(), 13], ['Alien tripod', tripod(), 27], ['Black hole', blackhole(), 12],
-    ['Nuclear attack', nuke(), 19], ['Plant meltdown', meltdown(), 20], ['Giant worm', worm(), 35], ['Kaiju', kaiju(), 52],
+    ['Nuclear attack', nuke(), 19], ['Plant meltdown', meltdown(), 20], ['Giant worm', worm(), 42], ['Kaiju', kaiju(), 52],
   ];
 }

@@ -10,91 +10,117 @@
 import * as THREE from 'three';
 import { scaly } from './skins.js';
 
-const THIGH = 14, SHIN = 15, TORSO = 22, UPPER = 19, FORE = 19, LEAN = 0.95, SPEED = 5.5, STRIDE = 20;
+const THIGH = 12, SHIN = 10, META = 7, TORSO = 22, UPPER = 18, FORE = 18, LEAN = 0.95, SPEED = 5.5, STRIDE = 20;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const ease = (c) => Math.pow(Math.max(0, c), 1.6); // a fold that starts and stops gently
 
 let M = null;
 function mats() {
   if (M) return M;
-  M = { skin: scaly('#b4a898', [3, 3], { rows: 6, cols: 6, bump: 3 }), dark: scaly('#6e655a', [2, 2], { rows: 5, cols: 5, bump: 3 }),
-    pale: scaly('#d6ccb8', [2, 3], { rows: 6, cols: 6, bump: 2 }), mouth: new THREE.MeshStandardMaterial({ color: '#3a1410', roughness: 0.5 }),
-    tooth: new THREE.MeshStandardMaterial({ color: '#e6dcc4', roughness: 0.5 }), eye: new THREE.MeshBasicMaterial({ color: new THREE.Color(1.4, 1.1, 0.6) }) };
+  M = { skin: scaly('#aaa395', [3, 3], { rows: 6, cols: 6, bump: 3.2 }), dark: scaly('#625a50', [2, 2], { rows: 5, cols: 5, bump: 3.5 }),
+    pale: scaly('#d2c9b6', [2, 3], { rows: 7, cols: 7, bump: 2 }), mouth: new THREE.MeshStandardMaterial({ color: '#3a1410', roughness: 0.5 }),
+    tooth: new THREE.MeshStandardMaterial({ color: '#e6dcc4', roughness: 0.45 }), claw: new THREE.MeshStandardMaterial({ color: '#2e2a26', roughness: 0.4 }),
+    eye: new THREE.MeshBasicMaterial({ color: new THREE.Color(1.5, 1.15, 0.55) }) };
   return M;
 }
-// the creature, facing +x, feet at the origin: every joint a pivot with a rounded ball where limb meets limb
+// a limb hanging down from its joint: muscled (thicker through the middle), its top a ball the size of its top end, so limb runs into limb with no seam
+function muscle(r0, r1, len, bulge, mat, parent) {
+  const pts = []; for (let i = 0; i <= 12; i++) { const t = i / 12; pts.push(new THREE.Vector2(r0 + (r1 - r0) * t + bulge * Math.sin(Math.PI * t) * (1 - 0.4 * t), -t * len)); }
+  const m = new THREE.Mesh(new THREE.LatheGeometry(pts.reverse(), 18), mat); m.castShadow = true; parent.add(m);
+  const j = new THREE.Mesh(new THREE.SphereGeometry(r0 * 1.03, 18, 14), mat); j.castShadow = true; parent.add(j);
+  return m;
+}
+// the creature, facing +x, feet at the origin: every joint a pivot
 export function kaijuRig() {
   const m = mats(), root = new THREE.Group();
   const mesh = (g, mat, parent) => { const me = new THREE.Mesh(g, mat); me.castShadow = true; parent.add(me); return me; };
-  const ball = (r, mat, parent, x = 0, y = 0, z = 0, sx = 1, sy = 1, sz = 1) => { const b = mesh(new THREE.SphereGeometry(r, 18, 14), mat, parent); b.position.set(x, y, z); b.scale.set(sx, sy, sz); return b; };
-  // a limb hanging down from its joint: tapered, with a ball at the top the size of its top end
-  const limb = (r0, r1, len, mat, parent) => { mesh(new THREE.CylinderGeometry(r1, r0, len, 18, 3).translate(0, -len / 2, 0), mat, parent); ball(r0 * 1.04, mat, parent); };
+  const ball = (r, mat, parent, x = 0, y = 0, z = 0, sx = 1, sy = 1, sz = 1) => { const q = mesh(new THREE.SphereGeometry(r, 18, 14), mat, parent); q.position.set(x, y, z); q.scale.set(sx, sy, sz); return q; };
+  const cone = (r, h, mat, parent, x, y, z, rz = 0, ry = 0) => { const c = mesh(new THREE.ConeGeometry(r, h, 8), mat, parent); c.position.set(x, y, z); c.rotation.set(0, ry, rz); return c; };
   const piv = (parent, x, y, z) => { const p = new THREE.Group(); p.position.set(x, y, z); parent.add(p); return p; };
-  const hips = piv(root, 0, 26, 0);
-  ball(5.6, m.skin, hips, 0, 0, 0, 1.25, 0.95, 1.15);
+  const hips = piv(root, 0, 27, 0);
+  ball(5.6, m.skin, hips, 0, 0, 0, 1.3, 1.0, 1.2);
+  // legs: thigh, shin and a long ankle bone, standing on its toes like a big cat
   const legs = [-1, 1].map(s => {
-    const hip = piv(hips, 0, 0, s * 5); limb(2.7, 2.1, THIGH, m.skin, hip);
-    const knee = piv(hip, 0, -THIGH, 0); limb(2.15, 1.3, SHIN, m.skin, knee);
-    const foot = piv(knee, 0, -SHIN, 0); ball(1.45, m.skin, foot); ball(1.6, m.dark, foot, 1.8, -0.5, 0, 2.7, 1, 1.6); // ankle, then the long foot
-    for (let c = 0; c < 3; c++) { const cl = mesh(new THREE.ConeGeometry(0.42, 2.2, 8), m.tooth, foot); cl.position.set(5.6, -0.9, (c - 1) * 1.1); cl.rotation.z = -1.45; }
-    return { hip, knee, foot, s };
+    const hip = piv(hips, 0, -0.5, s * 5.2); muscle(2.9, 2.0, THIGH, 0.7, m.skin, hip);
+    const knee = piv(hip, 0, -THIGH, 0); muscle(2.05, 1.25, SHIN, 0.45, m.skin, knee);
+    const ankle = piv(knee, 0, -SHIN, 0); muscle(1.3, 0.95, META, 0.15, m.skin, ankle);
+    const foot = piv(ankle, 0, -META, 0); ball(1.05, m.skin, foot); ball(1, m.dark, foot, 1.6, -0.45, 0, 2.4, 0.85, 1.5);
+    for (let c = 0; c < 3; c++) cone(0.38, 2.0, m.claw, foot, 4.2, -0.8, (c - 1) * 1.0, -1.4);
+    return { hip, knee, ankle, foot, s };
   });
+  // the torso: a ribcage barrel, hunched forward, spines down the back, a pale belly
   const torso = piv(hips, 0, 0, 0); torso.rotation.z = -LEAN;
-  mesh(new THREE.CylinderGeometry(5.4, 4.9, TORSO, 20, 4).translate(0, TORSO / 2, 0), m.skin, torso).scale.z = 1.25;
-  ball(5.45, m.skin, torso, 0, TORSO, 0, 1, 0.9, 1.25); // the shoulders, rounded off
-  ball(1, m.pale, torso, 3.2, TORSO * 0.48, 0, 2.6, TORSO * 0.48, 3.8); // the pale belly
-  for (let i = 0; i < 11; i++) { const sp = mesh(new THREE.ConeGeometry(0.9 - i * 0.03, 3.8 - i * 0.18, 8), m.dark, torso); sp.position.set(-4.7, 1 + i * 2.1, 0); sp.rotation.z = 0.5; } // spines down its back
-  const neck = piv(torso, 0, TORSO, 0); neck.rotation.z = LEAN - 0.35;
-  mesh(new THREE.CylinderGeometry(1.9, 2.7, 9, 16, 2).translate(0, 4.5, 0), m.skin, neck); ball(2.8, m.skin, neck); ball(2.0, m.skin, neck, 0, 9, 0);
-  const head = piv(neck, 0, 9, 0); head.rotation.z = -1.2;
-  ball(1, m.skin, head, 0, 3.4, 0, 2.1, 3.9, 2.4); // the long skull
-  ball(1, m.dark, head, 1.2, 4.8, 0, 0.9, 1.6, 2.2); // brow ridge
-  for (const s of [-1, 1]) { const e = mesh(new THREE.SphereGeometry(0.42, 10, 8), m.eye, head); e.position.set(1.7, 5.0, s * 1.75); }
-  mesh(new THREE.BoxGeometry(0.4, 5.6, 2.4).translate(-1.4, 3.6, 0), m.mouth, head);
-  const jaw = piv(head, -1.0, 0.9, 0); ball(1, m.skin, jaw, -0.9, 3.0, 0, 1.0, 3.1, 1.8);
-  for (let t = 0; t < 7; t++) { const th = mesh(new THREE.ConeGeometry(0.22, 0.9, 6), m.tooth, jaw); th.position.set(-0.1, 1.2 + t * 0.75, (t % 2 ? 1 : -1) * 1.1); th.rotation.z = -1.4; }
+  const prof = [[4.4, -1], [5.4, 3], [6.1, 8], [6.3, 12], [5.9, 16], [4.9, 20], [3.4, 23.2], [2.4, 24]].map(([r, y]) => new THREE.Vector2(r, y));
+  mesh(new THREE.LatheGeometry(prof, 24), m.skin, torso).scale.z = 1.08;
+  ball(1, m.pale, torso, 3.6, 10, 0, 2.6, 9, 4.2); // the pale belly
+  for (let i = 0; i < 12; i++) cone(1.0 - i * 0.04, 4.2 - i * 0.2, m.dark, torso, -5.6 + Math.max(0, i - 8) * 0.6, i * 2.0, 0, 0.55); // spines down its back
+  // two small extra arms folded under the chest
+  const minis = [-1, 1].map(s => { const sh = piv(torso, 4.4, 13, s * 2.6); muscle(0.75, 0.5, 4, 0.12, m.skin, sh); const el = piv(sh, 0, -4, 0); muscle(0.55, 0.35, 3.6, 0.08, m.skin, el); for (let c = 0; c < 2; c++) cone(0.2, 1.1, m.claw, el, 0.2, -3.9, (c - 0.5) * 0.4, 2.8); return { sh, el, s }; });
+  // the neck: three joints, so it curves; the head kept steady at the end of it
+  const neck = []; let np = piv(torso, 0, 23, 0);
+  for (let i = 0; i < 3; i++) { muscle(2.4 - i * 0.25, 2.15 - i * 0.25, 4.6, 0.2, m.skin, np); neck.push(np); np.rotation.z = Math.PI; np = piv(np, 0, -4.6, 0); np.rotation.z = 0; } // built hanging down and flipped to point up
+  const head = np; head.scale.setScalar(1.25); // the skull: long, low brow, a hinged lower jaw, teeth top and bottom
+  ball(1, m.skin, head, 0.2, -3.2, 0, 2.2, 4.8, 2.5); ball(1, m.skin, head, 0.6, -7.2, 0, 1.4, 2.2, 1.7); // skull, snout
+  ball(1, m.dark, head, 1.5, -2.6, 0, 1.0, 2.4, 2.3); // the brow
+  for (const sd of [-1, 1]) { cone(0.5, 2.8, m.dark, head, 1.3, -0.6, sd * 1.3, -0.55, sd * 0.35); const e = mesh(new THREE.SphereGeometry(0.42, 10, 8), m.eye, head); e.position.set(1.0, -4.4, sd * 1.95); } // (head space: -y is the way it faces, +x is up) horns swept back, small bright eyes
+  for (let t = 0; t < 8; t++) cone(0.2, 0.9, m.tooth, head, -1.5, -3.6 - t * 0.55, (t % 2 ? 1 : -1) * 1.1, Math.PI / 2); // upper teeth, pointing down
+  const jaw = piv(head, -1.2, -1.2, 0); ball(1, m.skin, jaw, -0.5, -3.6, 0, 1.0, 3.6, 1.8);
+  for (let t = 0; t < 7; t++) cone(0.18, 0.8, m.tooth, jaw, 0.5, -2.2 - t * 0.6, (t % 2 ? 1 : -1) * 1.0, -Math.PI / 2); // lower teeth, pointing up
+  mesh(new THREE.BoxGeometry(0.5, 6, 2.4).translate(-1.6, -4.4, 0), m.mouth, head);
+  // arms: long enough that the knuckles reach the street, three long clawed fingers
   const arms = [-1, 1].map(s => {
-    const sh = piv(torso, 0, TORSO - 2.5, s * 6.2); ball(2.7, m.skin, sh); limb(2.3, 1.8, UPPER, m.skin, sh);
-    const el = piv(sh, 0, -UPPER, 0); limb(1.85, 1.2, FORE, m.skin, el);
-    const hand = piv(el, 0, -FORE, 0); ball(1.3, m.skin, hand); ball(1, m.dark, hand, 0.4, -1.2, 0, 1.9, 1.3, 1.9);
-    for (let c = 0; c < 3; c++) { const cl = mesh(new THREE.ConeGeometry(0.5, 4.2, 8), m.tooth, hand); cl.position.set(1.7, -2.6, (c - 1) * 1.1); cl.rotation.z = 2.55; }
-    return { sh, el, hand, s };
+    const sh = piv(torso, 0.4, 20.5, s * 6.0); ball(2.4, m.skin, sh); muscle(1.95, 1.25, UPPER, 0.35, m.skin, sh); // long, thin arms
+    const el = piv(sh, 0, -UPPER, 0); muscle(1.35, 0.85, FORE, 0.3, m.skin, el);
+    const hand = piv(el, 0, -FORE, 0); ball(0.95, m.skin, hand); ball(1, m.dark, hand, 0.3, -1.1, 0, 1.7, 1.3, 1.8);
+    const fingers = [];
+    for (let c = 0; c < 3; c++) { const f1 = piv(hand, 0.9, -1.8, (c - 1) * 1.05); muscle(0.42, 0.32, 2.6, 0.05, m.skin, f1); const f2 = piv(f1, 0, -2.6, 0); muscle(0.32, 0.22, 2.2, 0.04, m.skin, f2); cone(0.24, 1.4, m.claw, f2, 0, -2.6, 0, Math.PI); fingers.push(f1, f2); }
+    return { sh, el, hand, fingers, s };
   });
-  const tail = []; let tp = piv(hips, -5.5, 0, 0);
-  for (let i = 0; i < 5; i++) { tp.rotation.z = i ? -0.12 : -1.35; limb(2.5 - i * 0.42, 2.08 - i * 0.42, 8, m.skin, tp); tail.push(tp); tp = piv(tp, 0, -8, 0); }
+  // the tail: eight joints, tapering to a point
+  const tail = []; let tp = piv(hips, -5.8, 0.5, 0);
+  for (let i = 0; i < 8; i++) { const r0 = 2.6 * (1 - i / 8.5), r1 = 2.6 * (1 - (i + 1) / 8.5); muscle(r0, r1, 5, 0.1, m.skin, tp); if (i % 2 === 0) cone(r0 * 0.35, r0 * 1.2, m.dark, tp, -r0 * 0.7, -2.5, 0, 0.6); tail.push(tp); tp = piv(tp, 0, -5, 0); }
+  cone(0.35, 2.2, m.skin, tp, 0, -1.1, 0, Math.PI);
   // every joint the pose sets, for easing from one pose to the next
   const joints = [];
-  for (const L of legs) joints.push([L.hip, 'z'], [L.knee, 'z'], [L.foot, 'z']);
-  for (const A of arms) joints.push([A.sh, 'z'], [A.el, 'z'], [A.hand, 'z']);
-  joints.push([neck, 'z'], [head, 'z'], [jaw, 'z'], [hips, 'x'], [torso, 'y']);
-  for (const t of tail) joints.push([t, 'y']);
-  return { root, hips, legs, torso, neck, head, jaw, arms, tail, joints };
+  for (const L of legs) joints.push([L.hip, 'z'], [L.knee, 'z'], [L.ankle, 'z'], [L.foot, 'z']);
+  for (const A of arms) { joints.push([A.sh, 'z'], [A.el, 'z'], [A.hand, 'z']); for (const fg of A.fingers) joints.push([fg, 'z']); }
+  for (const n of neck) joints.push([n, 'z']);
+  joints.push([head, 'z'], [jaw, 'z'], [hips, 'x'], [torso, 'y']);
+  for (const mm of minis) joints.push([mm.sh, 'z'], [mm.el, 'z']);
+  for (const t of tail) joints.push([t, 'y'], [t, 'z']);
+  return { root, hips, legs, torso, neck, head, jaw, arms, minis, tail, joints };
 }
-// the pose for walk phase ph (ph = null: standing); returns the hip height that puts the standing foot on the ground
-function pose(r, ph, o = {}) {
+// the pose for walk phase ph (ph = null: standing), at time t; returns the hip height that puts the standing foot on the ground
+function pose(r, ph, o = {}, t = 0) {
   let low = 0;
+  const sw = ph == null ? 0 : 1, P = ph ?? 0;
   r.legs.forEach((L, i) => {
-    const p = (ph ?? 0) + i * Math.PI, sw = ph == null ? 0 : 1;
-    const h = 0.12 + 0.42 * Math.sin(p) * sw, k = -0.55 - 0.6 * ease(Math.cos(p)) * sw; // the knee folds as the leg swings through
-    L.hip.rotation.z = h; L.knee.rotation.z = k; L.foot.rotation.z = -(h + k) + 0.15 * ease(-Math.cos(p)) * sw; // the foot rolls off the toes
-    low = Math.max(low, THIGH * Math.cos(h) + SHIN * Math.cos(h + k) + 1.4);
+    const p = P + i * Math.PI, c = Math.cos(p);
+    const a1 = 0.3 + 0.42 * Math.sin(p) * sw, a2 = -0.95 - 0.45 * ease(c) * sw, a3 = 0.75 + 0.35 * ease(c) * sw; // thigh forward, shin back, ankle bone forward again
+    L.hip.rotation.z = a1; L.knee.rotation.z = a2; L.ankle.rotation.z = a3; L.foot.rotation.z = -(a1 + a2 + a3) + 0.2 * ease(-c) * sw; // the foot flat, rolling off the toes
+    low = Math.max(low, THIGH * Math.cos(a1) + SHIN * Math.cos(a1 + a2) + META * Math.cos(a1 + a2 + a3) + 1.3);
   });
   r.arms.forEach((A, i) => {
-    const p = (ph ?? 0) + (1 - i) * Math.PI, sw = ph == null ? 0.2 : 1;
-    let s = LEAN + 0.25 + 0.38 * Math.sin(p) * sw, e = -0.25 - 0.3 * ease(-Math.cos(p)) * sw;
-    if (o.reach && o.reach.arm === i) { s = LEAN + 1.1 * o.reach.k + 0.25 * (1 - o.reach.k); e = -0.2 - 0.3 * o.reach.k; }
-    if (o.lift && o.lift.arm === i) { s = LEAN + 2.6 * o.lift.k; e = -0.6 * o.lift.k; }
-    if (o.swipe && o.swipe.arm === i) { s = LEAN + 2.2 - 3.2 * o.swipe.k; e = -0.3; }
-    A.sh.rotation.z = s; A.el.rotation.z = e; A.hand.rotation.z = -0.3 + 0.2 * Math.sin(p) * sw;
+    const p = P + (1 - i) * Math.PI, sw2 = ph == null ? 0.2 : 1;
+    let s = LEAN + 0.22 + 0.36 * Math.sin(p) * sw2, e = -0.3 - 0.3 * ease(-Math.cos(p)) * sw2, curl = 0.5 + 0.3 * ease(Math.cos(p)) * sw2; // the hand closes as it lifts off
+    if (o.reach && o.reach.arm === i) { s = LEAN + 1.1 * o.reach.k + 0.22 * (1 - o.reach.k); e = -0.2 - 0.3 * o.reach.k; curl = 0.2 + 0.9 * o.reach.k; }
+    if (o.lift && o.lift.arm === i) { s = LEAN + 2.6 * o.lift.k; e = -0.6 * o.lift.k; curl = 1.1; }
+    if (o.swipe && o.swipe.arm === i) { s = LEAN + 2.2 - 3.2 * o.swipe.k; e = -0.3; curl = 0.1; }
+    A.sh.rotation.z = s; A.el.rotation.z = e; A.hand.rotation.z = -0.35 + 0.2 * Math.sin(p) * sw2;
+    A.fingers.forEach((fg, k) => { fg.rotation.z = (k % 2 ? 0.8 : 0.5) * curl; });
   });
-  const roar = o.roar || 0, sway = ph == null ? 0 : 1;
-  r.hips.rotation.x = 0.045 * Math.sin(ph ?? 0) * sway; r.torso.rotation.y = 0.07 * Math.sin((ph ?? 0) + 0.6) * sway; // the body rolls and twists with the stride
-  r.neck.rotation.z = LEAN - 0.35 + roar * 0.6 + 0.04 * Math.sin((ph ?? 0) * 2) * sway; r.head.rotation.z = -1.2 + roar * 0.5; r.jaw.rotation.z = -0.15 - roar * 0.75;
-  r.tail.forEach((t, i) => { if (i) t.rotation.y = Math.sin((ph ?? 0) * 0.5 + i * 0.7) * 0.16; });
+  const roar = o.roar || 0;
+  r.hips.rotation.x = 0.045 * Math.sin(P) * sw; r.torso.rotation.y = 0.07 * Math.sin(P + 0.6) * sw; // the body rolls and twists with the stride
+  // the neck curves up and forward; the head is held level whatever the body does, and rears back to roar
+  const n0 = 0.62 + roar * 0.35 + 0.05 * Math.sin(P * 2) * sw, n1 = -0.18 + roar * 0.15, n2 = -0.22 + 0.04 * Math.sin(P * 2 + 1) * sw;
+  r.neck[0].rotation.z = Math.PI + n0; r.neck[1].rotation.z = n1; r.neck[2].rotation.z = n2;
+  r.head.rotation.z = 1.42 + roar * 0.6 - (-LEAN + Math.PI + n0 + n1 + n2); r.jaw.rotation.z = -(0.06 + roar * 0.85 + 0.06 * Math.max(0, Math.sin(t * 0.7))); // the jaw drops to roar, and hangs a little open now and then
+  r.minis.forEach((mm, i) => { mm.sh.rotation.z = 0.9 + 0.25 * Math.sin(t * 2.3 + i * 1.7); mm.el.rotation.z = -1.2 + 0.3 * Math.sin(t * 3.1 + i); }); // the little arms twitch
+  r.tail.forEach((tl, i) => { tl.rotation.y = Math.sin(t * 1.4 - i * 0.55 + P * 0.5) * (0.06 + i * 0.022); tl.rotation.z = i ? 0.06 : -1.35; }); // a wave running down the tail
   return low;
 }
 // standing, for the roster
-export function kaijuModel() { const r = kaijuRig(); r.hips.position.y = pose(r, 0.8); return r.root; }
+export function kaijuModel() { const r = kaijuRig(); r.hips.position.y = pose(r, 0.8, {}, 0.5); return r.root; }
 
 export class Kaiju {
   constructor(D, x, z, o = {}) {
@@ -203,11 +229,12 @@ export class Kaiju {
   // dt 0: exactly the pose (for working out where a foot lands); otherwise each joint eases towards it
   sync(dt = 0) {
     const r = this.rig, A = this.act, o = {};
+    if (dt > 0) this.st = (this.st || 0) + dt;
     if (A && A.kind === 'roar') o.roar = Math.min(1, A.t * 3) * Math.min(1, (2.6 - A.t) * 2);
     if (A && A.kind === 'swipe') o.swipe = { arm: A.arm, k: Math.min(1, A.t / 0.9) };
     if (A && A.kind === 'car') { if (!A.held) o.reach = { arm: A.arm, k: Math.min(1, A.t / 0.9) }; else o.lift = { arm: A.arm, k: Math.min(1, A.t / 0.8) }; }
     const walking = !A || (A.kind === 'car' && A.held);
-    const hy = pose(r, walking ? this.ph : null, o) + (walking ? 0 : 0.3), exact = !(dt > 0), k = 1 - Math.exp(-dt * 10);
+    const hy = pose(r, walking ? this.ph : null, o, this.st || 0) + (walking ? 0 : 0.3), exact = !(dt > 0), k = 1 - Math.exp(-dt * 10);
     if (!exact) { // the eased pose is kept apart, so working out a footfall does not disturb it
       r.joints.forEach(([j, ax], i) => { const want = j.rotation[ax]; j.rotation[ax] = this.cur[i] = this.cur[i] == null ? want : this.cur[i] + (want - this.cur[i]) * k; });
       this.hy = this.hy == null ? hy : this.hy + (hy - this.hy) * k;
