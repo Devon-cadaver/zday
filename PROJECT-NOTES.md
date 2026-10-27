@@ -268,6 +268,11 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 - Units are listed by unlock level with a one-line description each (UNIT_DESC in game.js); the hero signal row is "Super heroes (hero signal)" (L4).
 - Super villains are a Commander threat from level 5 (HAZARD_LEVEL.villains) with a hint that only the heroes can beat them; each villain beaten is +300 pts.
 
+## Menus, crews, roster
+- Menus fit the visible screen on iPhone: #zd-menu pads by the safe areas, the box is a flex column (max-height 100%) with a pinned header (‹ Back + title) on sub panels and a scrolling .mbody. Be The Disaster list sorted by unlock level.
+- Crew figures (people.spawnCrew, HELD fx 0, kind FIREFIGHTER, dismissed with people.dismiss): construction workers (CREW_LOOK) round the truck at a site, hazmat crew in yellow suits (HAZMAT_LOOK), paramedics (MEDIC_LOOK) at camps. Crew ids: sites 20000+, hazmat 26000+, medics camp id + 10000.
+- Roster (showcase.js) adds firefighter, soldier, the three crews, the heroes (heroModel) and villains (villainModel) with animated capes and wings, a construction site with its crane (siteModel/buildCrane), and both tents. New trucks show up from VEHICLES automatically.
+
 ## Next
 - Sean tests v1.3 on his phone; tune from his notes. Candidates: Be The Disaster score scales and ranks once real scores come in, the saucer size at close zoom, how often zombie outbreaks turn up in Commander, incident pacing, card bar height on the phone.
 

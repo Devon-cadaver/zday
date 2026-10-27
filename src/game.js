@@ -53,7 +53,7 @@ const CSS = `
 #zd-call .zd-btn{padding:8px 12px;background:rgba(200,60,40,.9);border-color:rgba(255,160,130,.5);min-width:0}
 #zd-fps{position:fixed;right:max(8px, env(safe-area-inset-right));bottom:calc(74px + env(safe-area-inset-bottom));font:10px system-ui,sans-serif;color:#f6ead2;opacity:.45;pointer-events:none}
 #zd-end{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(14,10,6,.78);z-index:5;
-  padding:max(16px, env(safe-area-inset-left));font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;color:#f6ead2}
+  padding:max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));box-sizing:border-box;font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;color:#f6ead2}
 #zd-end[hidden]{display:none}
 #zd-end .box{background:rgba(32,24,14,.95);border:1px solid rgba(255,236,200,.18);border-radius:14px;padding:22px 22px 18px;max-width:360px;width:100%;text-align:center}
 #zd-end h2{margin:0 0 4px;font-size:24px;letter-spacing:.02em}
@@ -66,7 +66,11 @@ const CSS = `
 #zd-menu{position:fixed;inset:0;z-index:6;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 40%,rgba(20,14,8,.55),rgba(14,10,6,.86));
   padding:max(16px, env(safe-area-inset-left));font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;color:#f6ead2}
 #zd-menu[hidden]{display:none}
-#zd-menu .box{width:100%;max-width:380px;background:rgba(32,24,14,.92);border:1px solid rgba(255,236,200,.18);border-radius:16px;padding:22px 20px 18px;text-align:center;max-height:calc(100vh - 32px);overflow:auto}
+#zd-menu .box{width:100%;max-width:380px;background:rgba(32,24,14,.92);border:1px solid rgba(255,236,200,.18);border-radius:16px;text-align:center;max-height:100%;display:flex;flex-direction:column;overflow:hidden}
+#zd-menu .mbody{overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:22px 20px 18px;min-height:0;flex:1 1 auto}
+#zd-menu .mhead{display:flex;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid rgba(255,236,200,.14);flex:none;background:rgba(24,18,10,.6)}
+#zd-menu .mhead .zd-btn{padding:9px 12px;font-size:12px;min-width:0;flex:none}
+#zd-menu .mhead .mt{flex:1;text-align:left;font-weight:800;font-size:15px;letter-spacing:.14em;text-transform:uppercase;color:#fff4e0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #zd-menu h1{margin:0;font-size:30px;line-height:1.05;letter-spacing:.12em;color:#fff4e0}
 #zd-menu .tag{font-size:12px;letter-spacing:.12em;text-transform:uppercase;opacity:.7;margin:2px 0 14px}
 #zd-menu .rank{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;margin:0 0 6px}
@@ -159,7 +163,8 @@ export class Game {
     const rank = '<div class="rank"><span>Commander level <b>' + lvl + '</b></span><span>' + pr.xp.toLocaleString() + ' XP' + (next ? ' / ' + next.toLocaleString() : '') + '</span></div>' +
       '<div class="bar"><i style="width:' + Math.round(pr.progress * 100) + '%"></i></div>' +
       '<div class="next">' + (next ? (next - pr.xp).toLocaleString() + ' XP to level ' + (lvl + 1) + this.nextUnlockText(lvl + 1) : 'Maximum level') + '</div>';
-    let body;
+    let body, head = '';
+    const top = (title) => '<div class="mhead"><button class="zd-btn" type="button" data-go="main">\u2039 Back</button><div class="mt">' + title + '</div></div>';
     if (panel === 'main') {
       const beOpen = Object.keys(BE).filter(k => lvl >= BE_LEVEL[k]).length;
       body = '<h1>MY TINY<br>DISASTER</h1><div class="tag">Save the city, or be the disaster</div>' + rank +
@@ -171,8 +176,9 @@ export class Game {
         '<div class="foot">' + pr.data.rounds + ' rounds played · best score ' + pr.data.best.toLocaleString() + ' · ' + pr.data.stars + ' stars' + (pr.ok ? '' : ' · progress is not being saved on this device') + '</div>';
     } else if (panel === 'be') {
       const bests = pr.data.beBest || {};
-      body = '<h1>BE THE<br>DISASTER</h1><div class="tag">One finger drives it, two fingers move the camera</div>' + rank +
-        '<div class="list">' + Object.keys(BE).map(k => {
+      head = top('Be The Disaster');
+      body = '<div class="tag">One finger drives it, two fingers move the camera</div>' + rank +
+        '<div class="list">' + Object.keys(BE).sort((a, b) => BE_LEVEL[a] - BE_LEVEL[b]).map(k => {
           const ok = lvl >= BE_LEVEL[k];
           return '<div class="row' + (ok ? '' : ' locked') + '"><div><div class="n">' + BE[k].name + '</div><div class="d">' + (ok ? BE[k].hint + (bests[k] ? ' · best ' + bests[k].toLocaleString() : '') : 'Unlocks at commander level ' + BE_LEVEL[k]) + '</div></div>' +
             (ok ? '<button class="zd-btn own-go" type="button" data-be="' + k + '">Play</button>' : '<span class="s">L' + BE_LEVEL[k] + '</span>') + '</div>';
@@ -188,12 +194,13 @@ export class Game {
         return '<div class="row' + (locked ? ' locked' : '') + '"><div><div class="n">' + u.name + '</div><div class="d">' + u.desc + '</div></div>' +
           (own ? '<button class="zd-btn own" type="button">Owned</button>' : locked ? '<span class="s">L' + u.level + '</span>' : '<button class="zd-btn" type="button" data-buy="' + u.id + '"' + (can ? '' : ' disabled style="opacity:.5"') + '>' + u.cost.toLocaleString() + ' XP</button>') + '</div>';
       }).join('');
-      body = '<h1>UNLOCKS</h1><div class="tag">' + pr.bank.toLocaleString() + ' XP to spend</div>' + rank +
+      head = top('Units and upgrades');
+      body = '<div class="tag">' + pr.bank.toLocaleString() + ' XP to spend</div>' + rank + '<div class="tag" style="margin-top:14px">Units</div>' +
         '<div class="list">' + units + '</div><div class="tag" style="margin-top:16px">Upgrades</div><div class="list">' + ups + '</div>' +
         '<div class="tag" style="margin-top:16px">Threats</div><div class="list">' + Object.keys(HAZARD_LEVEL).map(h => '<div class="row' + (lvl >= HAZARD_LEVEL[h] ? '' : ' locked') + '"><div><div class="n">' + threatName(h) + '</div><div class="d">' + (THREAT_HINT[h] ? THREAT_HINT[h] + ' · ' : '') + (lvl >= HAZARD_LEVEL[h] ? 'Can strike during a round' : 'Starts at level ' + HAZARD_LEVEL[h]) + '</div></div><span class="s">L' + HAZARD_LEVEL[h] + '</span></div>').join('') + '</div>' +
         '<div class="btns back"><button class="zd-btn" type="button" data-go="main">Back</button></div>';
     }
-    this.menu.innerHTML = '<div class="box">' + body + '</div>';
+    this.menu.innerHTML = '<div class="box">' + head + '<div class="mbody">' + body + '</div></div>';
     this.menu.hidden = false;
     this.menu.querySelectorAll('[data-go]').forEach(b => { b.onclick = () => { const go = b.dataset.go; if (go === 'commander' || go === 'sandbox') this.startMode(go); else this.showMenu(go); }; });
     this.menu.querySelectorAll('[data-be]').forEach(b => { b.onclick = () => this.startMode('be', b.dataset.be); });

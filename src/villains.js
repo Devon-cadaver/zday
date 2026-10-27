@@ -187,6 +187,18 @@ class Villain {
   dispose() { this.V.scene.remove(this.rig.root); this.rig.cape.g.dispose(); }
 }
 
+// a villain on its own for the roster: Blur and Tyrant hands on hips, Weaver crouched with his six arms out
+export function villainModel(name) {
+  const r = rig(name === 'Tyrant' ? { eyes: true } : name === 'Weaver' ? { arms: 6, capeLen: 1.05 } : {}); relax(r);
+  if (name === 'Weaver') {
+    r.hips.position.y = 0.6; r.torso.rotation.x = 0.55; r.head.rotation.x = -0.5; r.legs[0].hip.rotation.set(-1.2, 0, -0.35); r.legs[1].hip.rotation.set(-1.2, 0, 0.35);
+    for (const L of r.legs) L.knee.rotation.x = 2.0;
+    for (const a of r.arms) { a.sh.rotation.set(-0.7 + a.row * 0.55, 0, a.sx * (0.95 + a.row * 0.2)); a.el.rotation.set(-1.0, 0, -a.sx * 0.3); }
+  } else handsOnHips(r);
+  r.root.userData.tick = (dt) => r.cape.update(dt, 0.12, 0.35); r.cape.update(0.1, 0.12, 0.35);
+  return r.root;
+}
+
 // ---------- Blur: faster than anything; straight lines through whatever is in the way
 class Blur extends Villain {
   constructor(V, x, z) {

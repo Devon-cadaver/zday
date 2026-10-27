@@ -1243,6 +1243,20 @@ export class People {
       if (this.wz[i]) { this.st[i] = S.ZOMBIE; this.t1[i] = 0; } else { this.st[i] = S.IDLE; this.setLook(i, this.base[i]); this.dirty[i] = 0; }
     }
   }
+  // a work crew (construction, hazmat, medics): they mill about within R of (x, z) until dismiss(id)
+  spawnCrew(x, z, n, look, id, R = 8) {
+    let made = 0;
+    for (let k = 0; k < n && this.active < this.N; k++) {
+      const a = this.r() * Math.PI * 2, p = this.snapWalkable(x + Math.cos(a) * 3, z + Math.sin(a) * 3, 14); if (!p) continue;
+      const i = this.active++;
+      this.kind[i] = KIND.FIREFIGHTER; this.st[i] = S.IDLE; this.inf[i] = 0; this.zrad[i] = 0; this.wz[i] = 0; this.hp[i] = 1;
+      this.x[i] = p[0]; this.z[i] = p[1]; this.y[i] = this.groundY(p[0], p[1]); this.hx[i] = Math.cos(a); this.hz[i] = Math.sin(a);
+      this.base[i] = look(this.r); this.setLook(i, this.base[i]); this.dirty[i] = 0;
+      this.hold(i, x, z, R, 0, id); made++;
+    }
+    return made;
+  }
+  dismiss(id) { for (let i = 0; i < this.active; i++) if (this.st[i] === S.HELD && this.bt[i] === id) { this.st[i] = S.EVAC; this.lvl[i] = -1; } } // back in the truck
   // held somewhere: fx 0 at a medical camp (milling about inside it), fx 1 in police custody (waiting, hands cuffed, for the bus)
   hold(i, x, z, R, fx, id) {
     const s = this.st[i];

@@ -2,7 +2,10 @@
 // fixed canvas with a scissor viewport per tile (so a phone needs one WebGL
 // context, not sixty).
 import * as THREE from 'three';
-import { figureGeometry, figureMaterial, figureAttributes, ARCHETYPES, OFFICER_LOOK, ZTYPES, FLAG } from './figures.js';
+import { figureGeometry, figureMaterial, figureAttributes, ARCHETYPES, OFFICER_LOOK, FIREFIGHTER_LOOK, SOLDIER_LOOK, CREW_LOOK, HAZMAT_LOOK, MEDIC_LOOK, ZTYPES, FLAG } from './figures.js';
+import { heroModel } from './heroes.js';
+import { villainModel } from './villains.js';
+import { siteModel, tentModel } from './rebuild.js';
 import { VEHICLES, buildVehicle } from './vehicles.js';
 import { rng } from './textures.js';
 
@@ -60,6 +63,17 @@ function add(section, name, obj, fit) {
 for (const a of ARCHETYPES) add('Civilians', a.name, figure(a.roll(r), 1), 1.9);
 add('Civilians', 'Infected', figure({ ...ARCHETYPES[0].roll(r), skin: new THREE.Color('#8fae5a') }, 2), 1.9);
 add('Responders', 'Police officer', figure(OFFICER_LOOK(r), 6), 1.9);
+add('Responders', 'Firefighter', figure(FIREFIGHTER_LOOK(r), 1), 1.9);
+add('Responders', 'Soldier', figure(SOLDIER_LOOK(r), 7), 1.9);
+add('Responders', 'Construction crew', figure(CREW_LOOK(r), 1), 1.9);
+add('Responders', 'Hazmat crew', figure(HAZMAT_LOOK(r), 1), 1.9);
+add('Responders', 'Paramedic', figure(MEDIC_LOOK(r), 0), 1.9);
+// ---------- heroes, villains and the rebuilding
+for (const n of ['Dragonfly', 'Nova', 'Tempo']) add('Super heroes', n, heroModel(n), 4.8);
+for (const n of ['Blur', 'Tyrant', 'Weaver']) add('Super villains', n, villainModel(n), 4.8);
+add('Rebuilding', 'Construction site', siteModel(), 30);
+add('Rebuilding', 'Medical tent', tentModel(false), 3.4);
+add('Rebuilding', 'Hazmat decon tent', tentModel(true), 3.4);
 for (const [k, Z] of ZTYPES.entries()) {
   const base = ARCHETYPES[k % 3 === 0 ? 0 : k % 3 === 1 ? 4 : 2].roll(r);
   const L = Z.look(base); L.scale = Z.scale || 1; L.torso = Z.torso || 1;
@@ -94,6 +108,7 @@ function frame() {
     if (rc.bottom < 0 || rc.top > H || rc.right < 0 || rc.left > innerWidth) continue;
     t.rot += dt * 0.5;
     t.pivot.rotation.y = t.rot;
+    if (t.obj.userData.tick) t.obj.userData.tick(dt);
     if (t.obj.userData.rotor) { t.obj.userData.rotor.rotation.y += dt * 18; t.obj.position.y = 0.4 + Math.sin(t.rot * 2) * 0.08; }
     const w = rc.width, h = rc.height, left = rc.left, bottom = H - rc.bottom;
     t.cam.aspect = w / h; t.cam.updateProjectionMatrix();

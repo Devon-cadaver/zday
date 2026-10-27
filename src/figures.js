@@ -253,6 +253,10 @@ export function rollArchetype(r) {
 export const ALIEN_LOOK = () => ({ shirt: C('#b8c2cc'), pants: C('#8f9aa6'), skin: C('#9fb59a'), hat: 0, flags: FLAG.BALD, accent2: C('#5a6a7a'), scale: 0.88, torso: 0.85 });
 export const SOLDIER_LOOK = (r) => ({ shirt: C('#4a5a3a'), pants: C('#3e4a30'), skin: pick(r, SKINS), hat: HAT.HARD, accent: C('#3a4a30'), flags: FLAG.VEST | FLAG.PACK, accent2: C('#2f3a26') });
 export const FIREFIGHTER_LOOK = (r) => ({ shirt: C('#c9a24a'), pants: C('#b8903c'), skin: pick(r, SKINS), hat: HAT.HARD, accent: C('#f2c300'), flags: FLAG.VEST, accent2: C('#e8e23a') });
+// the rebuilding crews: construction workers in hard hats and orange vests, hazmat in yellow suits with the hood up and an air tank, paramedics in green
+export const CREW_LOOK = (r) => ({ shirt: pick(r, [C('#3b4a6b'), C('#6b6b70'), C('#9a6a3a')]), pants: pick(r, [C('#3b4a6b'), C('#3a3530')]), skin: pick(r, SKINS), hat: HAT.HARD, accent: C('#f2c300'), flags: FLAG.VEST, accent2: C('#ff7a1a') });
+export const HAZMAT_LOOK = (r) => ({ shirt: C('#e8cf2a'), pants: C('#e8cf2a'), skin: pick(r, SKINS), hat: HAT.HOOD, accent: C('#e0c420'), flags: FLAG.PACK | FLAG.BALD, accent2: C('#3a3a3a') });
+export const MEDIC_LOOK = (r) => ({ shirt: C('#2f7a64'), pants: C('#2f7a64'), skin: pick(r, SKINS), hat: 0, flags: FLAG.ITEM, accent2: C('#c0392b') });
 export const OFFICER_LOOK = (r) => ({ shirt: C('#22305e'), pants: C('#1b2240'), skin: pick(r, SKINS), hat: HAT.CAP, accent: C('#1b2240'), flags: FLAG.VEST, accent2: C('#1b2240') });
 
 // Zombie types, from Sean's sheet: the classic walkers, runners and crawlers, the specials, and the

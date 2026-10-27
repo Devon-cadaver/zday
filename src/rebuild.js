@@ -9,7 +9,9 @@
 // clean up people who took a dose before they turn, and foam down burning wrecks.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { AMBER, RED, WHITE } from './sirens.js';
+import { AMBER, RED } from './sirens.js';
+import { CREW_LOOK, HAZMAT_LOOK, MEDIC_LOOK } from './figures.js';
+let CREW_N = 0;
 
 // ---------- shared pieces
 const paint = (g, hex) => { const c = new THREE.Color(hex), n = g.attributes.position.count, a = new Float32Array(n * 3); for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); return g; };
@@ -44,6 +46,29 @@ function kit() {
   };
   return K;
 }
+// a tower crane: mast, slewing jib with its counterweight, trolley, cable and a load of timber on the hook
+export function buildCrane(H, L) {
+  const K = kit(), crane = new THREE.Group();
+  const part = (geo, mat, sx, sy, sz, x, y, z, parent) => { const m = new THREE.Mesh(geo, mat); m.scale.set(sx, sy, sz); m.position.set(x, y, z); m.castShadow = true; parent.add(m); return m; };
+  part(K.unit, K.yellow, 1.3, H, 1.3, 0, H / 2, 0, crane);
+  const slew = new THREE.Group(); slew.position.y = H; crane.add(slew);
+  part(K.unit, K.yellow, L, 0.9, 0.9, L / 2, 0.45, 0, slew); part(K.unit, K.yellow, 8, 0.8, 0.8, -4, 0.4, 0, slew);
+  part(K.unit, K.grey, 2.2, 1.6, 1.5, -7.2, 0.2, 0, slew); part(K.unit, K.yellow, 1.5, 1.5, 1.5, 1.2, -0.9, 1.1, slew); part(K.unit, K.yellow, 0.4, 4.2, 0.4, 0, 2.5, 0, slew);
+  const trolley = part(K.unit, K.grey, 0.9, 0.4, 1.0, L * 0.6, -0.2, 0, slew);
+  const cable = new THREE.Mesh(K.line, K.cable); trolley.add(cable);
+  const hook = new THREE.Mesh(K.load, K.vc); hook.castShadow = true; trolley.add(hook);
+  return { crane, slew, trolley, cable, hook };
+}
+// roster pieces: a site part-way up, and the two kinds of tent
+export function siteModel() {
+  const K = kit(), g = new THREE.Group(), w = 12, d = 10, fh = 3.4, ring = floorRing(w + 0.6, d + 0.6, fh);
+  for (let i = 0; i < 4; i++) { const m = new THREE.Mesh(ring, K.net); m.position.y = i * fh; m.castShadow = true; g.add(m); }
+  const deck = new THREE.Mesh(K.unit, K.deck); deck.scale.set(w - 0.2, 0.35, d - 0.2); deck.position.y = 4 * fh + 0.18; g.add(deck);
+  const c = buildCrane(26, 15); c.crane.position.set(-w / 2 + 1.6, 0, -d / 2 + 1.6); c.slew.rotation.y = 0.7; c.cable.scale.y = 8; c.hook.position.y = -8; g.add(c.crane);
+  g.userData.tick = (dt) => { c.slew.rotation.y += dt * 0.25; };
+  return g;
+}
+export function tentModel(decon) { const K = kit(), m = new THREE.Mesh(decon ? K.decon : K.medTent, K.vc); m.castShadow = true; return m; }
 // four walls of netting one floor high, centred on the origin, bottom at 0; the texture repeats every 4 m
 function floorRing(w, d, h) {
   const pos = [], uv = [], nrm = [], idx = [];
@@ -112,17 +137,9 @@ export class Site {
     this.deck = new THREE.Mesh(K.unit, K.deck); this.deck.scale.set(w - 0.2, 0.35, d - 0.2); this.deck.position.y = 0.2; this.deck.receiveShadow = true; this.g.add(this.deck);
     this.fh = fh;
     // the tower crane at one corner: mast, slewing jib, counterweight, trolley and hook
-    const H = Math.max(22, hgt + 10), mx = -w / 2 + 1.6, mz = -d / 2 + 1.6;
-    this.crane = new THREE.Group(); this.crane.position.set(mx, 0, mz); this.g.add(this.crane);
-    const part = (geo, mat, sx, sy, sz, x, y, z, parent) => { const m = new THREE.Mesh(geo, mat); m.scale.set(sx, sy, sz); m.position.set(x, y, z); m.castShadow = true; parent.add(m); return m; };
-    part(K.unit, K.yellow, 1.3, H, 1.3, 0, H / 2, 0, this.crane);
-    this.slew = new THREE.Group(); this.slew.position.y = H; this.slew.rotation.y = Math.random() * 6.28; this.crane.add(this.slew);
-    const L = Math.min(26, Math.max(14, Math.hypot(w, d) * 0.9));
-    part(K.unit, K.yellow, L, 0.9, 0.9, L / 2, 0.45, 0, this.slew); part(K.unit, K.yellow, 8, 0.8, 0.8, -4, 0.4, 0, this.slew);
-    part(K.unit, K.grey, 2.2, 1.6, 1.5, -7.2, 0.2, 0, this.slew); part(K.unit, K.yellow, 1.5, 1.5, 1.5, 1.2, -0.9, 1.1, this.slew); part(K.unit, K.yellow, 0.4, 4.2, 0.4, 0, 2.5, 0, this.slew);
-    this.trolley = part(K.unit, K.grey, 0.9, 0.4, 1.0, L * 0.6, -0.2, 0, this.slew);
-    this.cable = new THREE.Mesh(K.line, K.cable); this.trolley.add(this.cable);
-    this.hook = new THREE.Mesh(K.load, K.vc); this.hook.castShadow = true; this.trolley.add(this.hook);
+    const H = Math.max(22, hgt + 10), mx = -w / 2 + 1.6, mz = -d / 2 + 1.6, L = Math.min(26, Math.max(14, Math.hypot(w, d) * 0.9));
+    const cr = buildCrane(H, L); this.crane = cr.crane; this.crane.position.set(mx, 0, mz); this.g.add(this.crane);
+    this.slew = cr.slew; this.slew.rotation.y = Math.random() * 6.28; this.trolley = cr.trolley; this.cable = cr.cable; this.hook = cr.hook;
     this.L = L; this.H = H; this.aimA = this.slew.rotation.y; this.aimR = L * 0.6;
     // flashing amber at the corners of the site, a red light on top of the crane
     const sir = D.sirens, hw = w / 2 + 1.2, hd = d / 2 + 1.2;
@@ -130,6 +147,8 @@ export class Site {
     this.beacons.push({ x: cx + mx, y: b.baseY + H + 4.8, z: cz + mz, c: RED, rate: 0.8, phase: 0, kind: 'blink' });
     if (sir) sir.beacons.push(...this.beacons);
     D.ctx.fire.dustCloud(cx, cz, Math.max(w, d) * 0.5, 6);
+    this.crewId = 20000 + (CREW_N++ % 5000); const at = this.car ? [this.car.x, this.car.z] : [cx, cz]; // the work crew, round their truck at the edge of the site
+    D.ctx.people.spawnCrew(at[0], at[1], 4, CREW_LOOK, this.crewId, 8);
   }
   get progress() { return this.phase === 'clear' ? 0 : this.phase === 'build' ? Math.min(1, this.t / this.buildT) : 1; }
   update(h) {
@@ -165,7 +184,7 @@ export class Site {
   dispose() {
     if (!this.alive) return;
     this.alive = false;
-    const D = this.D; D.ctx.scene.remove(this.g); for (const g of this.geos) g.dispose();
+    const D = this.D; D.ctx.scene.remove(this.g); for (const g of this.geos) g.dispose(); D.ctx.people.dismiss(this.crewId);
     if (D.sirens) D.sirens.beacons = D.sirens.beacons.filter(bc => !this.beacons.includes(bc));
   }
 }
@@ -181,6 +200,7 @@ export class Camp {
     const c = new THREE.Mesh(K.medTent, K.vc); c.scale.set(1.3, 1.2, 1.3); c.castShadow = true; this.g.add(c);
     this.beacons = [{ x, y: this.g.position.y + 3.9, z, c: RED, rate: 0.9, kind: 'blink', pool: 9 }];
     if (D.sirens) D.sirens.beacons.push(...this.beacons);
+    this.crewId = this.id + 10000; D.ctx.people.spawnCrew(x, z, 3, MEDIC_LOOK, this.crewId, 5); // paramedics
   }
   get held() { return this.D.ctx.people.heldBy(this.id); }
   update(h) {
@@ -201,7 +221,7 @@ export class Camp {
   }
   dispose() {
     if (!this.alive) return;
-    this.alive = false; this.D.ctx.scene.remove(this.g);
+    this.alive = false; this.D.ctx.scene.remove(this.g); this.D.ctx.people.dismiss(this.crewId);
     if (this.D.sirens) this.D.sirens.beacons = this.D.sirens.beacons.filter(bc => !this.beacons.includes(bc));
   }
 }
@@ -215,6 +235,7 @@ export class Hazmat {
     this.cordon = ring(scene, this.R, [0.95, 0.75, 0.1], [0.08, 0.08, 0.08], 0.0); this.cordon.position.set(x, 0.36, z);
     this.beacons = [0, 1, 2, 3].map(i => { const a = i * Math.PI / 2 + 0.6; return { x: x + Math.cos(a) * this.R, y: 1.4, z: z + Math.sin(a) * this.R, c: AMBER, rate: 1.2, phase: i * 0.3, kind: 'flash', pool: 8 }; });
     if (D.sirens) D.sirens.beacons.push(...this.beacons);
+    this.crewId = 26000 + (CREW_N++ % 3000); D.ctx.people.spawnCrew(x, z, 4, HAZMAT_LOOK, this.crewId, 9); // the crew in yellow suits
   }
   update(h) {
     if (!this.alive) return;
@@ -232,7 +253,7 @@ export class Hazmat {
   }
   dispose() {
     if (!this.alive) return;
-    this.alive = false; const sc = this.D.ctx.scene; sc.remove(this.tent); dropMesh(sc, this.cordon);
+    this.alive = false; const sc = this.D.ctx.scene; sc.remove(this.tent); dropMesh(sc, this.cordon); this.D.ctx.people.dismiss(this.crewId);
     if (this.D.sirens) this.D.sirens.beacons = this.D.sirens.beacons.filter(bc => !this.beacons.includes(bc));
   }
 }
