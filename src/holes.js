@@ -5,7 +5,7 @@
 // surface is cut away).
 import * as THREE from 'three';
 
-export const MAX_HOLES = 8;
+export const MAX_HOLES = 24; // the worm leaves two pits every time it surfaces
 const holes = Array.from({ length: MAX_HOLES }, () => new THREE.Vector4(0, 0, -1, 0));
 const uHoles = { value: holes };
 const owners = new Array(MAX_HOLES).fill(null);

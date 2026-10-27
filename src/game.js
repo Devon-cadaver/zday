@@ -309,6 +309,9 @@ export class Game {
     const out = [], D = this.disasters; if (!D) return out;
     for (const e of D.list) if (e.alive && e.type === 'villains') for (const v of e.who) out.push({ obj: v, name: v.name, pos: () => (v.gone ? null : [v.x, v.y + 2.5, v.z]) });
     for (const e of D.list) if (e.alive && e.type === 'heroes') for (const h of e.who) out.push({ obj: h, name: h.name, pos: () => (h.state === 'fly' ? [h.x, h.y + 2.5, h.z] : null) });
+    for (const e of D.list) if (e.alive && e.type === 'kaiju') out.push({ obj: e, name: 'Kaiju', pos: () => (e.alive ? [e.x, 30, e.z] : null) });
+    for (const e of D.list) if (e.alive && e.type === 'worm') out.push({ obj: e, name: 'Worm', pos: () => (e.alive && e.phase !== 'gone' ? [e.x, Math.max(0, e.y), e.z] : null) });
+    for (const e of D.list) if (e.alive && e.type === 'riot' && e.mob) out.push({ obj: e, name: 'Riot', pos: () => (e.alive ? [e.mob.x, 1.5, e.mob.z] : null) });
     for (const e of D.list) if (e.alive && e.type === 'aliens') {
       e.tripods.forEach((t, k) => out.push({ obj: t, name: 'Tripod ' + (k + 1), pos: () => (t.state === 'walk' || t.state === 'drop' ? [t.x, t.y, t.z] : null) }));
       e.saucers.forEach((s, k) => out.push({ obj: s, name: 'Saucer ' + (k + 1), pos: () => (s.state === 'cruise' || s.state === 'act' ? [s.x, s.y, s.z] : null) }));

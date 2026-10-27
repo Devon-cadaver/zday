@@ -11,7 +11,7 @@ import { saucerMesh, beamMesh } from './aliens.js';
 import { ST, KIND } from './people.js';
 import { roofTop } from './tripod.js';
 import { Gauge, SIZED } from './gauge.js';
-import { ZombiesCtl, RiotCtl, FloodCtl, VolcanoCtl, DustCtl, BlizzardCtl, SolarCtl, NukeCtl, ReactorCtl, RoamingHoleCtl, TripodCtl, VillainsCtl } from './be-more.js';
+import { ZombiesCtl, RiotCtl, FloodCtl, VolcanoCtl, DustCtl, BlizzardCtl, SolarCtl, NukeCtl, ReactorCtl, RoamingHoleCtl, TripodCtl, VillainsCtl, WormCtl, KaijuCtl } from './be-more.js';
 
 const RUN = 180;
 const RANKS = [[0, 'F'], [8000, 'D'], [20000, 'C'], [40000, 'B'], [65000, 'A'], [95000, 'S']];
@@ -34,6 +34,8 @@ export const BE = {
   blackhole: { name: 'Black hole', k: 1.4, hint: 'Drag to move the black hole. It grows with everything it swallows' },
   nuclear: { name: 'Nuclear strike', k: 0.2, hint: 'Hold to set the yield, let go to launch. Three warheads, another every minute' },
   meltdown: { name: 'Meltdown', k: 1.4, zom: true, hint: 'Hold to overload the reactor until it blows, then drag to steer the fallout over the city' },
+  worm: { name: 'Giant worm', k: 1.3, hint: 'Drag to steer it under the streets. Let go and it bursts out of the ground there' },
+  kaiju: { name: 'Kaiju', k: 0.9, hint: 'Drag to walk it. Tap a car to throw it, tap a building to swipe it, tap open ground to roar' },
   villains: { name: 'Super villains', k: 1, hint: 'Play as Blur, Tyrant or Weaver; Switch changes who. Blur runs where you drag, Tyrant grabs and throws what you tap, Weaver webs the street' },
 };
 
@@ -309,6 +311,8 @@ export class BeTheDisaster {
     else if (k === 'meteor') { this.ctl = new MeteorCtl(this); g.lookAt(cx, cz, 520); }
     else if (k === 'lava') { this.ctl = new LavaCtl(this); g.lookAt(cx, cz, 420); }
     else if (k === 'tsunami') { this.ctl = new TsunamiCtl(this); g.lookAt(cx, B.z1 - 120, 520); }
+    else if (k === 'worm') { this.ctl = new WormCtl(this, cx, cz); g.lookAt(cx, cz, 440); }
+    else if (k === 'kaiju') { this.ctl = new KaijuCtl(this, cx, cz); g.lookAt(cx, cz, 480); }
     else if (k === 'villains') { this.ctl = new VillainsCtl(this, cx, cz); g.lookAt(cx, cz, 380); }
     this.base = this.measure();
     g.toast('Be The Disaster: ' + BE[k].name + '. ' + BE[k].hint, 6000);

@@ -147,6 +147,8 @@ export class Responders {
         if (helis && this.ready('seed', 16)) { const x = e.tw.x, z = e.tw.z; helis.seed(x, z, { onSeed: (sx, sz) => { const r = seedEffect(D, sx, sz); if (r.hit) g.toast('Cloud seeding: the tornado is losing strength', 3000); } }); }
         if (this.out('chaser') < 1 && this.ready('chaser', 60)) this.send('chaser', e.tw.x, e.tw.z);
       }
+      // the kaiju: airstrikes until it turns back
+      if (e.type === 'kaiju' && e.state !== 'leave' && helis && this.ready('kaiju', 9)) helis.strike(e.x, e.z, { radius: 25 });
       // aliens: airstrikes on walking tripods and low saucers
       if (e.type === 'aliens' && helis && this.ready('strike', 12)) {
         const t = (e.tripods || []).find(q => q.state === 'walk') || (e.saucers || []).find(s => (s.state === 'cruise' || s.state === 'act') && s.y < 80);

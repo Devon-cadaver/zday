@@ -492,7 +492,7 @@ export class Commander {
     if (e.type === 'villainbeaten') { this.villainsBeaten++; this.rp += 300; this.earned += 300; }
     if (e.type === 'warn') {
       if (e.hazard === 'villains' && !this.ended) setTimeout(() => this.g.toast(this.cards.heroes ? 'Only the super heroes can beat them: use the Hero signal' : 'Police cannot stop them. Hold out until they leave', 4500), 4500);
-      this.alertFloor = Math.max(this.alertFloor, e.hazard === 'aliens' || e.hazard === 'volcano' || e.hazard === 'meteor' || e.hazard === 'nuclear' || e.hazard === 'meltdown' || e.hazard === 'blackhole' ? 3 : e.hazard === 'riot' ? 1 : 2); // disasters open up the units you need
+      this.alertFloor = Math.max(this.alertFloor, e.hazard === 'aliens' || e.hazard === 'volcano' || e.hazard === 'meteor' || e.hazard === 'nuclear' || e.hazard === 'meltdown' || e.hazard === 'blackhole' || e.hazard === 'kaiju' || e.hazard === 'worm' ? 3 : e.hazard === 'riot' ? 1 : 2); // disasters open up the units you need
       if (e.x != null && !this.ended) { this.report(e.x, e.z, e.text, e.r || 60, e.exact); return true; }
     }
   }

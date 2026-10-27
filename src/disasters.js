@@ -19,6 +19,9 @@ import { Mushroom, NuclearStrike, Meltdown, nuclearDamage } from './nuke.js';
 import { Villains } from './villains.js';
 import { Zones } from './rebuild.js';
 import { Heroes } from './heroes.js';
+import { Brawl } from './brawl.js';
+import { Worm } from './worm.js';
+import { Kaiju } from './kaiju.js';
 
 export const threatName = (h) => (h === 'zombies' ? 'Zombie outbreak' : HAZARDS[h].name);
 
@@ -39,6 +42,8 @@ export const HAZARDS = {
   meltdown: { name: 'Plant meltdown', tap: false },
   blackhole: { name: 'Black hole', tap: true },
   villains: { name: 'Super villains', tap: true },
+  worm: { name: 'Giant worm', tap: true },
+  kaiju: { name: 'Kaiju', tap: true },
 };
 // called by the hero signal rather than picked as a disaster
 export const HELPERS = { heroes: { name: 'Hero signal' } };
@@ -74,7 +79,8 @@ export class Disasters {
     this.weather = new Weather({ ...ctx, disasters: this });
     this.water = new WaterSurface(this);
     this.boats = new Boats(this); // rescue boats in floods and tsunamis
-    this.zones = new Zones(this); // radiation left behind: nothing is rebuilt inside it until hazmat clears it
+    this.zones = new Zones(this);
+    this.brawl = new Brawl(this); // heroes and villains throwing cars and each other // radiation left behind: nothing is rebuilt inside it until hazmat clears it
     this.spitFx = new Splash(scene, 500); this.spitFx.mat.uniforms.uColor.value.setRGB(0.5, 0.95, 0.18); // spitter acid
     people.poi = (x, z) => this.poiAt(x, z); // onlookers watch (and film) whatever is happening near them
     // things falling into flood water or the sea throw up a splash
@@ -154,6 +160,8 @@ export class Disasters {
     else if (type === 'meltdown') ev = new Meltdown(this, opts);
     else if (type === 'blackhole') ev = new BlackHole(this, x, z, opts);
     else if (type === 'villains') ev = new Villains(this, x, z, opts);
+    else if (type === 'worm') ev = new Worm(this, x, z, opts);
+    else if (type === 'kaiju') ev = new Kaiju(this, x, z, opts);
     else if (type === 'heroes') { const on = this.list.find(e => e.type === 'heroes' && e.alive && !e.leaving); if (on) { on.signal(x, z); return on; } ev = new Heroes(this, x, z, opts); }
     if (!ev) return null;
     this.list.push(ev); this.stats.hazards++;
@@ -246,6 +254,7 @@ export class Disasters {
   update(h) {
     for (let i = this.timers.length - 1; i >= 0; i--) { const t = this.timers[i]; t.t -= h; if (t.t <= 0) { this.timers.splice(i, 1); t.fn(); } }
     for (const e of this.list) e.update(h);
+    this.brawl.update(h);
     for (let i = this.leftovers.length - 1; i >= 0; i--) { const l = this.leftovers[i]; if (l.update) l.update(h); if (l.alive === false) { l.dispose(); this.leftovers.splice(i, 1); } }
     for (let i = this.list.length - 1; i >= 0; i--) if (!this.list[i].alive) { this.list[i].dispose(); this.list.splice(i, 1); }
     this.water.update(h); this.spitFx.update(h); this.boats.update(h);
@@ -273,7 +282,7 @@ export class Disasters {
     this.list.length = 0; this.timers.length = 0; this.events.length = 0; this.bubbles.length = 0;
     for (const l of this.leftovers) l.dispose(); this.leftovers.length = 0;
     for (const b of this.bolts) this.ctx.scene.remove(b.g); this.bolts.length = 0;
-    this.debris.reset(); this.decals.reset(); this.water.reset(); this.boats.reset(); this.zones.reset();
+    this.debris.reset(); this.decals.reset(); this.water.reset(); this.boats.reset(); this.zones.reset(); this.brawl.reset();
     this.weather.set('clear', true);
     this.stats = { buildings: 0, hazards: 0 };
     if (this.ctx.outskirts) { this.ctx.outskirts.reset(); this.later(0, () => this.ctx.outskirts.steam(this.ctx.fire)); } // after fire.reset has cleared the pools

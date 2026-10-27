@@ -9,7 +9,9 @@
 // meteor (Tempo slows it first) and carry it up into space; a big meteor is
 // broken up and its pieces go up too.
 import * as THREE from 'three';
-import { rig, relax, handsOnHips } from './villains.js';
+import { rig, relax, handsOnHips, tumble } from './villains.js';
+import { tossStep } from './brawl.js';
+const up = (v) => v && !v.gone && !v.beaten;
 import { roofTop } from './tripod.js';
 
 const UP = 520; // carried this high, a meteor or a warhead is gone into space
@@ -109,6 +111,7 @@ class Hero {
     const K = kit();
     this.H = H; this.D = H.D; this.name = name; this.t = Math.random() * 5;
     this.x = H.sig.sx + (Math.random() - 0.5) * 30; this.y = H.sig.sy + 20; this.z = H.sig.sz + (Math.random() - 0.5) * 30; this.vx = this.vy = this.vz = 0; this.hs = 0; this.yaw = 0; this.pitch = 0;
+    this.side = 'hero'; this.busyT = 0;
     this.state = 'wait'; this.waitT = 2.5 + (o.delay || 0); this.job = null; this.cd = 0; this.punchT = 0; this.castT = 0; this.carry = null;
     this.rig = rig({ mats: { ...K, hair: K.hair[name] }, slim: o.slim, longHair: o.longHair, capeLen: 1.1 }); this.rig.root.visible = false; H.scene.add(this.rig.root);
     if (o.wings) { // four insect wings at the shoulder blades
@@ -134,6 +137,9 @@ class Hero {
     if (this.state === 'gone') return;
     if (this.state === 'wait') { this.waitT -= h; if (this.waitT <= 0 && this.H.hold <= 0) { this.state = 'fly'; this.rig.root.visible = true; } return; }
     if (this.state === 'leave') { this.fly(this.x, UP + 50, this.z, h, 60); if (this.y > UP) this.state = 'gone'; return; }
+    if (this.tossed) { if (tossStep(this, this.D, h)) this.busyT = 1.0; return; } // thrown: through whatever is in the way, then back up
+    if (this.gripped) return;
+    if (this.busyT > 0) { this.busyT -= h; return; }
     const J = this.job;
     if (!J) { this.idle(h); return; }
     if (J.kind === 'catch') this.doCatch(h, J);
@@ -143,6 +149,7 @@ class Hero {
     else if (J.kind === 'web') this.doWeb(h, J);
     else if (J.kind === 'slow') this.doSlow(h, J);
     else if (J.kind === 'bubble') this.doBubble(h, J);
+    else if (J.kind === 'fetch') this.doFetch(h, J);
   }
   // nothing to do: hover by the signal, then land on its roof
   idle(h) {
@@ -183,6 +190,14 @@ class Hero {
       this.job = null;
     }
   }
+  // a car from the street, to spin round and hurl at a villain
+  fetch(target, back) { let best = null, bd = 60; this.D.ctx.traffic.near(this.x, this.z, 60, (c) => { if (c.mode !== 0 || c.mission || c.gone) return; const d = Math.hypot(c.x - this.x, c.z - this.z); if (d < bd) { bd = d; best = c; } }); if (!best) return false; this.job = { kind: 'fetch', car: best, target, back }; return true; }
+  doFetch(h, J) {
+    const c = J.car;
+    if (!up(J.target) || c.gone || c.mode === 4 || c.mode === 5) { this.job = J.back; return; }
+    const d = this.fly(c.x, (c.y || 0) + 1.5, c.z, h, 60, 15);
+    if (d < 4 && this.D.ctx.traffic.grab(c)) { this.D.brawl.spin(this, c, J.target); this.job = J.back; }
+  }
   // Nova and Tyrant: she goes for anything he has thrown first, then for him
   doFight(h, J) {
     const ty = J.v, V = J.V;
@@ -193,8 +208,10 @@ class Hero {
       if (d < 9) { shell.caught = true; ty.flying.splice(ty.flying.indexOf(shell), 1); this.job = { kind: 'return', shell: shell.shell, k: shell.k, base: shell.base, half: shell.half }; this.D.emit({ type: 'herocatch2', text: 'Nova caught the building in mid-air!' }); }
       return;
     }
+    if (Math.hypot(ty.x - this.x, ty.z - this.z) > 28 && (this.carT = (this.carT ?? 2) - h) <= 0) { this.carT = 5; if (this.fetch(ty, J)) return; } // from a distance: a car at him
     const d = this.fly(ty.x, ty.y + 2, ty.z, h, 60, 15);
     if (d < 5 && this.cd <= 0) {
+      if (Math.random() < 0.45 && !ty.gripped && !ty.tossed) { this.cd = 2; this.D.brawl.grab(this, ty); return; } // grabs him and hurls him through a building
       this.cd = 1.1; this.punchT = 0.35;
       const dx = ty.x - this.x, dz = ty.z - this.z, dl = Math.hypot(dx, dz) || 1;
       ty.hp -= 25; ty.vx += dx / dl * 22; ty.vz += dz / dl * 22; ty.vy += 8; ty.ray = null; ty.wind = 0;
@@ -217,8 +234,10 @@ class Hero {
       return;
     }
     if (!wv || wv.gone || wv.beaten) { this.job = null; return; }
+    if (Math.hypot(wv.x - this.x, wv.z - this.z) > 28 && (this.carT = (this.carT ?? 3) - h) <= 0) { this.carT = 6; if (this.fetch(wv, J)) return; }
     const d = this.fly(wv.x, wv.y + 2, wv.z, h, 65, 20);
     if (d < 4.5 && this.cd <= 0) {
+      if (Math.random() < 0.45 && !wv.gripped && !wv.tossed) { this.cd = 2; this.D.brawl.grab(this, wv); return; }
       this.cd = 1.3; this.punchT = 0.35; wv.hp -= 34;
       this.D.ctx.fire.burst(wv.x, wv.y + 3, wv.z, 12, 1.6);
       if (wv.state === 'perch') wv.hop(true);
@@ -229,6 +248,7 @@ class Hero {
   doSlow(h, J) {
     const bl = J.v, V = J.V;
     if (bl.gone || bl.beaten) { this.job = null; return; }
+    if (bl.trapped > 0.6 && (this.carT = (this.carT ?? 1) - h) <= 0) { this.carT = 6; if (this.fetch(bl, J)) return; } // he is stuck in the bubble: a car at him
     const d = Math.hypot(bl.x - this.x, bl.z - this.z);
     this.fly(bl.x - (bl.x - this.x) / (d || 1) * 45, this.cruiseY(bl.x, bl.z), bl.z - (bl.z - this.z) / (d || 1) * 45, h, 60);
     if (d < 170 && this.cd <= 0) {
@@ -237,7 +257,7 @@ class Hero {
       if (bl.state === 'dash') { const gx = bl.goal[0] - bl.x, gz = bl.goal[1] - bl.z, gl = Math.hypot(gx, gz) || 1, a = Math.min(18, gl); px += gx / gl * a; pz += gz / gl * a; }
       this.H.bubble(px, 3, pz, 20, 5);
     }
-    if (bl.trapped > 3.5) { V.beat(bl, 'Tempo'); this.job = null; }
+    if (bl.trapped > 6 || bl.hp <= 0) { V.beat(bl, 'Tempo'); this.job = null; }
   }
   // Tempo: a bubble over things flying through the air (thrown, flung by a tornado)
   doBubble(h, J) {
@@ -258,6 +278,7 @@ class Hero {
     else { for (const a of A) a.sh.rotation.set(0.1, 0, a.sx * 0.3); for (const L of r.legs) { L.hip.rotation.x = 0.1; L.knee.rotation.x = 0.25; } }
     this.pitch += (pitch - this.pitch) * Math.min(1, dt * 3); r.body.rotation.x = this.pitch; r.head.rotation.x = -this.pitch * 0.6;
     if (!this.landed && this.hs < 10) r.body.position.y = Math.sin(this.t * 2) * 0.2;
+    if (this.tossed || this.gripped || this.spinning) tumble(r, this.t, this.spinning);
     r.cape.update(dt, this.pitch > 0.5 ? 0.12 : Math.min(0.6, this.hs / 30), 0.3 + Math.min(0.7, this.hs / 20));
     if (this.wings) { const fl = this.landed ? 0 : 1; this.wings.forEach((w, i) => { w.rotation.z = fl ? Math.sin(this.t * 55 + i * 1.3) * 0.45 + 0.15 : -0.15; w.rotation.y = -(i < 2 ? 0.25 : 0.7) - (fl ? 0 : 0.6); }); }
     if (this.hands) for (const g of this.hands) g.visible = this.castT > 0;

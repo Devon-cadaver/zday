@@ -4,6 +4,8 @@
 import * as THREE from 'three';
 import { saucerMesh, beamMesh } from './aliens.js';
 import { tripodModel } from './tripod.js';
+import { wormModel } from './worm.js';
+import { kaijuModel } from './kaiju.js';
 
 const std = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.8, ...o });
 const glow = (r, g, b, o = {}) => new THREE.MeshBasicMaterial({ color: new THREE.Color(r, g, b), ...o });
@@ -80,6 +82,12 @@ function saucer() {
   let t = 0; g.userData.tick = (dt) => { t += dt; s.userData.spin.rotation.y += dt * 2; s.position.y = 11 + Math.sin(t * 1.5) * 0.4; b.material.uniforms.uTime.value = t; };
   return g;
 }
+function worm() {
+  const g = new THREE.Group(); ground(g, 24, '#b9a882'); blocks(g, 17, 5, [3, 8]);
+  for (const x of [-30, 30]) add(g, new THREE.CircleGeometry(6, 24).rotateX(-Math.PI / 2), std('#22180f'), x, 0.02, 0); // the pits it came out of and went back into
+  g.add(wormModel()); return g;
+}
+function kaiju() { const g = new THREE.Group(); ground(g, 26); blocks(g, 19, 6, [6, 16]); g.add(kaijuModel()); return g; }
 function tripod() { const g = new THREE.Group(); ground(g, 18); blocks(g, 12, 6, [4, 10]); g.add(tripodModel()); return g; }
 function nuke() {
   const g = new THREE.Group(); ground(g, 10, '#6a5e4c'); blocks(g, 8.5, 6, [2, 4]);
@@ -172,6 +180,6 @@ export function disasterExamples() {
     ['Tornado', tornado(), 17], ['Earthquake', quake(), 10], ['Flood', flood(), 10], ['Tsunami', tsunami(), 15], ['Sinkhole', sinkhole(), 12],
     ['Meteor', meteor(), 17], ['Volcano', volcano(), 16], ['Lava', lava(), 10], ['Dust storm', haboob(), 16], ['Cold wave', blizzard(), 10],
     ['Solar flare', solar(), 11], ['Alien saucer', saucer(), 13], ['Alien tripod', tripod(), 27], ['Black hole', blackhole(), 12],
-    ['Nuclear attack', nuke(), 19], ['Plant meltdown', meltdown(), 20],
+    ['Nuclear attack', nuke(), 19], ['Plant meltdown', meltdown(), 20], ['Giant worm', worm(), 46], ['Kaiju', kaiju(), 52],
   ];
 }

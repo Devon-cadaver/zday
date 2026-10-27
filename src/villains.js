@@ -11,6 +11,7 @@ import * as THREE from 'three';
 import { Splash } from './water.js';
 import { ST } from './people.js';
 import { roofTop } from './tripod.js';
+import { tossStep } from './brawl.js';
 
 const S = 2.2; // a villain stands a bit over twice as tall as a person, so you can pick them out from above
 const G = 9.8, HANDS = 4.9; // gravity; hands raised overhead, metres above the feet
@@ -128,6 +129,13 @@ function run(r, ph, k) {
   A[0].el.rotation.set(-1.4 * k, 0, 0); A[1].el.rotation.set(-1.4 * k, 0, 0);
   r.hips.position.y = 0.94 - 0.07 * k + Math.abs(c) * 0.05 * k;
 }
+// thrown or held (tumbling), or spinning something round at arm's length
+export function tumble(r, t, spinning) {
+  if (spinning) { for (const a of r.arms) { a.sh.rotation.set(-1.5, 0, a.sx * 0.15); a.el.rotation.set(0, 0, 0); } return; }
+  r.body.rotation.x = t * 9; r.body.rotation.z = Math.sin(t * 5) * 0.5;
+  for (const a of r.arms) a.sh.rotation.set(-1.2, 0, a.sx * 1.4);
+  for (const L of r.legs) { L.hip.rotation.x = -0.5; L.knee.rotation.x = 0.8; }
+}
 export function handsOnHips(r) {
   r.legs[0].hip.rotation.z = -0.09; r.legs[1].hip.rotation.z = 0.09;
   for (const a of r.arms) { a.sh.rotation.set(0.15, 0, a.sx * 0.6); a.el.rotation.set(-0.3, 0, -a.sx * 1.7); }
@@ -158,7 +166,7 @@ class Trail {
 
 class Villain {
   constructor(V, o) {
-    this.V = V; this.D = V.D; this.x = o.x; this.z = o.z; this.y = o.y ?? 0; this.yaw = Math.random() * 6.28; this.t = Math.random() * 5; this.speed = 0; this.player = false; this.hp = 100; this.trapped = 0;
+    this.V = V; this.D = V.D; this.x = o.x; this.z = o.z; this.y = o.y ?? 0; this.yaw = Math.random() * 6.28; this.t = Math.random() * 5; this.speed = 0; this.player = false; this.hp = 260; this.trapped = 0; this.side = 'villain'; this.busyT = 0;
     this.rig = rig(o.rig); V.scene.add(this.rig.root);
   }
   face(dx, dz, h, k = 8) { if (Math.hypot(dx, dz) < 1e-4) return; let d = Math.atan2(dx, dz) - this.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); this.yaw += d * Math.min(1, h * k); }
@@ -166,6 +174,17 @@ class Villain {
   ground(x = this.x, z = this.z) { return this.D.ctx.people.groundY(x, z); }
   setPlayer(on) { this.player = on; }
   get gone() { return this.state === 'gone'; }
+  // thrown through the air, in someone's grip, or busy spinning something round: nothing else this step
+  pre(h) {
+    if (this.tossed) { if (tossStep(this, this.D, h) && !this.beaten) this.landed(); return true; }
+    if (this.gripped) return true;
+    if (this.busyT > 0) { this.busyT -= h; return true; }
+    return false;
+  }
+  landed() {}
+  // the hero to go after: each villain has its own rival, otherwise the nearest
+  foe() { const pref = { Blur: 'Tempo', Tyrant: 'Nova', Weaver: 'Dragonfly' }[this.name]; let best = null, bd = 170; for (const f of this.D.brawl.fighters('hero')) { const d = Math.hypot(f.x - this.x, f.z - this.z) - (f.name === pref ? 70 : 0); if (d < bd) { bd = d; best = f; } } return best; }
+  nearCar(R) { let best = null, bd = R; this.D.ctx.traffic.near(this.x, this.z, R, (c) => { if (c.mode !== 0 || c.mission || c.gone) return; const d = Math.hypot(c.x - this.x, c.z - this.z); if (d < bd) { bd = d; best = c; } }); return best; }
   // people near (x, z) are bowled out to arm's length and run for it
   scatter(x, z, R, push = 3) {
     const { people } = this.D.ctx;
@@ -219,14 +238,17 @@ class Blur extends Villain {
     }
     return at || [B.x0 + 40 + Math.random() * (B.x1 - B.x0 - 80), B.z0 + 40 + Math.random() * (B.z1 - B.z0 - 80)];
   }
+  landed() { this.state = 'rest'; this.restT = 1.2; this.speed = 0; this.inB = -1; }
   go(p) { const B = this.D.ctx.city.bounds; this.goal = [clamp(p[0], B.x0 + 15, B.x1 - 15), clamp(p[1], B.z0 + 15, B.z1 - 15)]; this.state = 'dash'; }
   leave() { const B = this.D.ctx.city.bounds, a = Math.random() * 6.28; this.goal = [(B.x0 + B.x1) / 2 + Math.cos(a) * 1400, (B.z0 + B.z1) / 2 + Math.sin(a) * 1400]; this.state = 'dash'; this.leaving = true; }
   update(h) {
     this.t += h;
     if (this.state === 'gone') return;
+    if (this.pre(h)) return;
     if (this.D.slowAt(this.x, 2, this.z) < 1) this.trapped += h; // caught in a time bubble, running or standing
     if (this.state === 'rest') {
       this.speed = 0;
+      if (!this.player && (this.carT = (this.carT ?? 3) - h) <= 0) { this.carT = 7; const foe = this.foe(), c = foe && this.nearCar(25); if (c) this.D.brawl.throwCar(c, this, foe); } // a car at the hero, at a hundred miles an hour
       if ((this.restT -= h) <= 0 && !this.player) this.go(this.pick());
       return;
     }
@@ -287,6 +309,7 @@ class Blur extends Villain {
     const k = Math.min(1, this.speed / 14);
     if (k > 0.02) { run(r, this.ph, k); r.torso.rotation.x = 0.55 * k; r.body.rotation.x = 0.12 * k; r.head.rotation.x = -0.4 * k; }
     else { handsOnHips(r); r.torso.rotation.x = Math.sin(this.t * 1.6) * 0.02; r.head.rotation.y = Math.sin(this.t * 0.7) * 0.5; } // between runs, weighing up where to go next
+    if (this.tossed || this.gripped || this.spinning) tumble(r, this.t, this.spinning);
     r.cape.update(dt, Math.min(1, this.speed / 35), Math.min(1, this.speed / 25) + 0.15);
   }
   dispose() { super.dispose(); this.trail.dispose(this.V.scene); }
@@ -300,6 +323,10 @@ class Tyrant extends Villain {
     this.state = 'arrive'; this.vx = this.vy = this.vz = 0; this.plan = null; this.held = null; this.ray = null; this.rayT = 2.5; this.wind = 0; this.after = 0; this.flying = []; this.pitch = 0; this.hs = 0;
     this.beams = [0, 1].map(() => { const b = strand(V.scene, kit().laser); b.renderOrder = 8; return b; });
   }
+  landed() { this.state = 'stand'; this.standT = 1.2; this.vx = this.vy = this.vz = 0; }
+  dropHeld() { const H = this.held; if (!H) return; if (H.car) { H.car.soft = true; this.D.ctx.traffic.fling(H.car, 0, -1, 0); } else this.flying.push({ shell: H.shell, k: H.k, x: H.shell.position.x, y: H.shell.position.y + H.base, z: H.shell.position.z, vx: 0, vy: 0, vz: 0, w: 0.3, w2: 0.1, half: H.half, hgt: H.hgt, base: H.base, hex: H.hex }); this.held = null; this.plan = null; this.wind = 0; }
+  // the laser eyes on something in the air (a car thrown at him); done() once it is cut through
+  zap(car, done) { if (this.ray || this.state !== 'fly' || this.held) return false; this.ray = { car, done, t: 0, dur: 0.45, ex: car.x, ey: car.y || 0, ez: car.z }; return true; }
   flyY() {
     const city = this.D.ctx.city;
     if (this.held && this.held.shell) return Math.max(24, roofTop(city, this.x, this.z, this.held.half + 8).top + 1.5); // the building overhead clears the roofs below
@@ -309,6 +336,7 @@ class Tyrant extends Villain {
     this.t += h;
     this.flyStep(h);
     if (this.state === 'gone') return;
+    if (this.pre(h)) return;
     if (this.state === 'arrive') {
       const gy = this.ground(); this.vy = Math.max(-70, this.vy - G * 2.5 * h); this.y += this.vy * h;
       if (this.y <= gy) { this.y = gy; this.vy = 0; this.slam(); this.state = 'stand'; this.standT = 1.5; }
@@ -320,7 +348,7 @@ class Tyrant extends Villain {
     if (this.wind > 0) { this.wind -= h; this.hover(h); if (this.wind <= 0) this.release(); }
     else {
       if (!this.plan && !this.player) this.choose();
-      const g = this.goal(), d = this.steer(g[0], g[1], g[2], h, this.held && this.held.shell ? 16 : 26, this.plan && this.plan.kind === 'car' ? 12 : 0); // a moving car needs catching up with
+      const g = this.goal(), d = this.steer(g[0], g[1], g[2], h, this.held && this.held.shell ? 16 : 26, this.plan && (this.plan.kind === 'car' || this.plan.kind === 'brawl') ? 14 : 0); // a moving car needs catching up with
       this.arrived(d, h);
     }
     this.after = Math.max(0, this.after - h);
@@ -341,6 +369,7 @@ class Tyrant extends Villain {
   goal() {
     const P = this.plan;
     if (!P) return [this.x, this.flyY(), this.z];
+    if (P.kind === 'brawl') return [P.foe.x, P.foe.y + 1, P.foe.z];
     if (P.kind === 'car') { const c = P.car, hd = Math.hypot(c.x - this.x, c.z - this.z); return [c.x, hd < 20 ? (c.y || 0) + 1.2 : Math.max(this.flyY(), 22), c.z]; }
     if (P.kind === 'bld') { const hd = Math.hypot(P.bx - this.x, P.bz - this.z); return [P.bx, hd < 16 ? P.gy : Math.max(this.flyY(), P.top + 6), P.bz]; }
     if (P.kind === 'aim') {
@@ -353,6 +382,7 @@ class Tyrant extends Villain {
   arrived(d, h) {
     const P = this.plan; if (!P) return;
     if ((P.t = (P.t || 0) + h) > 20 && P.kind !== 'aim') { this.plan = null; return; } // gave up on it
+    if (P.kind === 'brawl') { const f = P.foe; if (!f || f.state !== 'fly' || f.tossed || f.gripped) { this.plan = null; return; } if (Math.hypot(f.x - this.x, f.y - this.y, f.z - this.z) < 6) { this.D.brawl.grab(this, f); this.plan = null; } return; }
     if (P.kind === 'car') {
       const c = P.car;
       if (this.held || c.gone || c.mode === EXT || c.mode === AIR) { this.plan = null; return; }
@@ -362,12 +392,18 @@ class Tyrant extends Villain {
       if (Math.hypot(P.bx - this.x, P.bz - this.z) < 3 && this.y < P.gy + 2.5) this.lift(P.k);
     } else if (P.kind === 'aim') {
       if (!this.held) { this.plan = null; return; }
+      if (P.foe) { if (P.foe.state !== 'fly') P.foe = null; else { P.tx = P.foe.x; P.tz = P.foe.z; P.ty = P.foe.y; } }
       if (P.tx == null) this.pickThrow();
       if (Math.hypot(P.tx - this.x, P.tz - this.z) < 80 && (!this.held.shell || this.held.t >= 1)) this.wind = 0.45;
     } else if (d < 6) this.plan = null;
   }
   choose() {
     const { traffic, city } = this.D.ctx, r = Math.random();
+    const foe = this.foe(); this.foeNow = null;
+    if (foe && Math.random() < 0.8) { // the heroes are here: go for one, hands on, or with a car
+      if (Math.random() < 0.45) { this.plan = { kind: 'brawl', foe }; return; }
+      const c = this.nearCar(130); if (c) { this.plan = { kind: 'car', car: c }; this.foeNow = foe; return; }
+    }
     if (r < 0.45) {
       let best = null, bd = 1e9;
       traffic.near(this.x, this.z, 170, (c) => { if (c.mode !== DRIVE || c.gone || c.mission) return; const d = Math.hypot(c.x - this.x, c.z - this.z) + Math.random() * 60; if (d < bd) { bd = d; best = c; } });
@@ -414,6 +450,7 @@ class Tyrant extends Villain {
   // what to throw it at: usually a building (the taller the better), sometimes a car
   pickThrow() {
     const P = this.plan, { city, traffic } = this.D.ctx, ks = [];
+    if (this.foeNow && this.foeNow.state === 'fly') { P.foe = this.foeNow; P.tx = P.foe.x; P.tz = P.foe.z; P.ty = P.foe.y; P.k = -1; return; } // at the hero
     city.buildingsNear(this.x, this.z, 170, (k, d, b) => { if (d > 35) ks.push([k, b]); });
     if (ks.length && Math.random() < 0.75) {
       ks.sort((a, b) => b[1].top - a[1].top); const [k, b] = ks[Math.floor(Math.random() * Math.min(8, ks.length))];
@@ -429,7 +466,8 @@ class Tyrant extends Villain {
     if (!H || !P || P.tx == null) { this.plan = null; return; }
     const x0 = this.x, y0 = this.y + HANDS, z0 = this.z, d = Math.hypot(P.tx - x0, P.tz - z0), T = clamp(d / 30, 0.9, 2.6);
     const vx = (P.tx - x0) / T, vz = (P.tz - z0) / T, vy = (P.ty - y0 + 0.5 * G * T * T) / T;
-    if (H.car) { H.car.soft = true; this.D.ctx.traffic.fling(H.car, vx, vy, vz); this.flying.push({ car: H.car, px: H.car.x, pz: H.car.z }); }
+    if (H.car && P.foe && P.foe.state === 'fly') this.D.brawl.throwCar(H.car, this, P.foe); // the hero can catch it, or not
+    else if (H.car) { H.car.soft = true; this.D.ctx.traffic.fling(H.car, vx, vy, vz); this.flying.push({ car: H.car, px: H.car.x, pz: H.car.z }); }
     else this.flying.push({ shell: H.shell, k: H.k, x: H.shell.position.x, y: y0, z: H.shell.position.z, vx, vy, vz, w: (Math.random() - 0.5) * 1.6, w2: (Math.random() - 0.5) * 0.7, half: H.half, hgt: H.hgt, base: H.base, hex: H.hex });
     this.held = null; this.plan = null; this.after = 0.45;
   }
@@ -497,6 +535,7 @@ class Tyrant extends Villain {
   }
   rayStep(h) {
     const R = this.ray; if (!R) return;
+    if (R.car) { R.t += h; R.ex = R.car.x; R.ey = R.car.y || 0; R.ez = R.car.z; if (R.t >= R.dur) { this.ray = null; if (!R.car.gone) R.done(); } return; } // tracking a car in the air till it is cut in two
     R.t += h; const k = Math.min(1, R.t / R.dur), x = lerp(R.x0, R.x1, k), z = lerp(R.z0, R.z1, k);
     R.ex = x; R.ez = z; R.ey = R.y0 > 1 ? R.y0 - k * (R.y0 - 1) * 0.6 : 0.4;
     if ((R.hitT -= h) <= 0) {
@@ -554,6 +593,7 @@ class Tyrant extends Villain {
     if (flying && pitch < 0.5) { for (const L of r.legs) { L.hip.rotation.x = 0.12; L.knee.rotation.x = 0.3; } r.legs[1].hip.rotation.x = 0.2; }
     this.pitch += (pitch - this.pitch) * Math.min(1, dt * 3); r.body.rotation.x = this.pitch; r.head.rotation.x = -this.pitch * 0.6;
     if (flying) r.body.position.y = Math.sin(this.t * 2) * 0.25;
+    if (this.tossed || this.gripped || this.spinning) tumble(r, this.t, this.spinning);
     r.cape.update(dt, this.pitch > 0.5 ? 0.12 : Math.min(0.6, this.hs / 30), 0.3 + Math.min(0.7, this.hs / 20));
     const R = this.ray;
     if (R && r.eyes) {
@@ -642,6 +682,7 @@ class Weaver extends Villain {
     this.t += h; this.act = Math.max(0, this.act - h); this.spat = Math.max(0, this.spat - h);
     for (let i = this.webs.length - 1; i >= 0; i--) { const w = this.webs[i]; w.update(h); if (!w.alive) { w.dispose(); this.webs.splice(i, 1); } }
     if (this.state === 'gone') return;
+    if (this.pre(h)) return;
     if (this.state === 'drop') { this.y = Math.max(this.dropTo, this.y - h * Math.max(6, (this.y - this.dropTo) * 1.6)); if (this.y <= this.dropTo + 0.05) this.state = 'perch'; return; }
     if (this.state === 'leave') { this.y += h * 22; if (this.y > this.anchor[1] - 5) this.state = 'gone'; return; }
     if (this.state === 'swing') { this.swingStep(h); return; }
@@ -651,7 +692,16 @@ class Weaver extends Villain {
       if ((this.webT -= h) <= 0) { this.webT = 2.2 + Math.random() * 2; const p = this.webTarget(); if (p) this.webAt(p[0], p[1]); }
       if ((this.perchT -= h) <= 0) this.hop(false);
     }
+    if (!this.player) this.yankStep(h);
     if ((this.spitT -= h) <= 0) { this.spitT = 1.2 + Math.random() * 0.6; this.spit(); }
+  }
+  landed() { this.swing = null; this.state = 'perch'; this.perchK = -1; this.perchT = 2; }
+  // a web line onto a car in the street, and the car hurled at the hero after him
+  yankStep(h) {
+    if (this.yanked && (this.yanked.t -= h) <= 0) this.yanked = null;
+    if ((this.yankT = (this.yankT ?? 4) - h) > 0) return;
+    this.yankT = 6 + Math.random() * 3; const foe = this.foe(), c = foe && this.nearCar(55);
+    if (c && this.D.brawl.throwCar(c, this, foe)) { this.yanked = { car: c, t: 0.6 }; this.act = 0.4; }
   }
   swingStep(h) {
     const W = this.swing; W.t += h / W.dur;
@@ -764,6 +814,8 @@ class Weaver extends Villain {
       const an = this.swing ? [this.swing.ax, this.swing.ay, this.swing.az] : this.anchor;
       aim(this.line, _w.x, _w.y, _w.z, an[0], an[1], an[2], 0.09); this.line.visible = true;
     }
+    if (!hanging && this.yanked && !this.yanked.car.gone) { r.root.updateMatrixWorld(true); handAt(A[1], _w); const c = this.yanked.car; aim(this.line, _w.x, _w.y, _w.z, c.x, (c.y || 0) + 1, c.z, 0.07); this.line.visible = true; }
+    if (this.tossed || this.gripped || this.spinning) tumble(r, this.t, this.spinning);
     r.cape.update(dt, Math.min(0.85, this.speed / 30), 0.2 + Math.min(0.8, this.speed / 25));
   }
   dispose() { super.dispose(); this.V.scene.remove(this.line); for (const w of this.webs) { w.release(); w.dispose(); } this.webs.length = 0; }
