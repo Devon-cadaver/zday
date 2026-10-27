@@ -13,6 +13,7 @@ import { Helicopters } from './aircraft.js';
 import { Disasters } from './disasters.js';
 import { buildOutskirts } from './outskirts.js';
 import { Sirens } from './sirens.js';
+import { Searchlights } from './searchlights.js';
 
 const P = new URLSearchParams(location.search);
 const coarse = matchMedia('(pointer: coarse)').matches;
@@ -127,7 +128,7 @@ function frame() {
     jx = (Math.random() - 0.5) * k; jy = (Math.random() - 0.5) * k * 0.5; jz = (Math.random() - 0.5) * k;
     camera.position.x += jx; camera.position.y += jy; camera.position.z += jz;
   }
-  sirens.update(time);
+  sirens.update(time); searchlights.update(dt);
   post.render(scene, camera, focus, time);
   camera.position.x -= jx; camera.position.y -= jy; camera.position.z -= jz;
 
@@ -142,5 +143,7 @@ helis.nukeBlast = (x, z, R) => disasters.nukeBlast(x, z, R, { byPlayer: true });
 const sirens = new Sirens(scene, { traffic, helis, boats: disasters.boats, daylight, fire }); // flashing lights on every rescue unit
 disasters.sirens = sirens;
 const game = new Game({ people, traffic, fire, city, camera, controls, renderer, mode, daylight, helis, post, disasters });
+const searchlights = new Searchlights(scene, { game, traffic, helis, city, daylight }); // beams at night on the trouble
+window.__lights = searchlights;
 
 window.__z = { THREE, scene, camera, controls, renderer, post, city, traffic, people, fire, game, daylight, helis, disasters, outskirts, sirens, sun, hemi, setView, buildMs, info: () => renderer.info.render };
