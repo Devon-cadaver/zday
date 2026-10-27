@@ -1,6 +1,9 @@
 // Day and night. phase 0..1 runs one cycle: late afternoon, sunset, night,
-// dawn, morning. Drives the sun and sky, the post grade, lit windows, street
-// lamp light pools and car headlights.
+// dawn, morning. The sun crosses the sky from east to west and sinks below the
+// horizon; the moon rises in the east after it and sets at dawn, so the light
+// (one directional light, and its shadows) swings round and lengthens with
+// them, handing over in the dark between. Also drives the sky, the post grade,
+// lit windows, street lamp light pools and car headlights.
 import * as THREE from 'three';
 
 const C = (h) => new THREE.Color(h);
@@ -24,6 +27,7 @@ export class Daylight {
     Object.assign(this, { scene, sun, hemi, post, city, traffic, people });
     this.sunDir = new THREE.Vector3(-0.78, 0.72, -0.2).normalize();
     this.az0 = Math.atan2(this.sunDir.x, this.sunDir.z);
+    this.azNoon = this.az0 - 0.49; // highest over here; rising 75 degrees one side of it, setting 75 degrees the other
     this.night = 0;
     const tex = poolTexture();
     const quad = new THREE.PlaneGeometry(1, 1); quad.rotateX(-Math.PI / 2);
@@ -53,20 +57,25 @@ export class Daylight {
     return 40 * ((d - 0.9) / 0.1);
   }
 
+  // the moon: up from just after sunset (0.42) until just before dawn (0.87), highest at midnight
+  moonElevation(d) { return d > 0.42 && d < 0.87 ? 52 * Math.sin(Math.PI * (d - 0.42) / 0.45) : -10; }
+  // how far along its arc a body is: -1 rising in the east, 0 at its highest, 1 setting in the west
+  sunArc(d) { return d >= 0.9 ? -1 + (d - 0.9) / 0.1 : d <= 0.4 ? d / 0.4 : 1 + (d - 0.4) / 0.5 * 2; }
+  moonArc(d) { return -1 + 2 * (d - 0.42) / 0.45; }
+  aim(arc, elev) { const az = this.azNoon + arc * 1.3, e = THREE.MathUtils.degToRad(Math.max(elev, 3)); this.sunDir.set(Math.cos(e) * Math.sin(az), Math.sin(e), Math.cos(e) * Math.cos(az)).normalize(); }
+
   set(phase) {
     const d = ((phase % 1) + 1) % 1;
-    const elev = this.elevation(d);
+    const elev = this.elevation(d), mElev = this.moonElevation(d);
     const dayK = sstep(-6, 8, elev), sunK = sstep(-2, 12, elev);
-    const night = this.night = 1 - dayK;
-    const az = this.az0 + (-0.35 + 0.9 * d);
-    const e = THREE.MathUtils.degToRad(Math.max(elev, 8));
-    if (elev > -4) {
-      this.sunDir.set(Math.cos(e) * Math.sin(az), Math.sin(e), Math.cos(e) * Math.cos(az)).normalize();
-      this.sun.intensity = 5 * Math.max(0.08, sunK);
+    const night = this.night = 1 - dayK, moonK = sstep(-2, 14, mElev) * sstep(0.3, 0.9, night);
+    if (sunK > 0.02 || (moonK <= 0.02 && elev > mElev)) { // the sun: long shadows and orange light as it sinks, gone below the horizon
+      this.aim(this.sunArc(d), elev);
+      this.sun.intensity = 5 * sunK;
       this.sun.color.copy(DAY_SUN).lerp(LOW_SUN, 1 - sstep(0, 18, elev));
-    } else {
-      this.sunDir.set(0.3, 0.8, 0.5).normalize();
-      this.sun.intensity = 1.6;
+    } else { // the moon: pale blue, its shadows swinging round as it crosses
+      this.aim(this.moonArc(d), mElev);
+      this.sun.intensity = 1.6 * moonK;
       this.sun.color.copy(MOON);
     }
     this.hemi.intensity = 0.55 + 0.7 * dayK;

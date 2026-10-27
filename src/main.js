@@ -60,7 +60,6 @@ setView(num('x', 0), num('z', 0), num('d', coarse ? 430 : 470), num('p', 48), nu
 const hemi = new THREE.HemisphereLight('#fff0d4', '#7a5c3c', num('hemi', 1.25));
 scene.add(hemi);
 const sun = new THREE.DirectionalLight('#ffd6a0', num('sun', 5.0));
-const sunDir = new THREE.Vector3(-0.78, 0.72, -0.2).normalize();
 sun.castShadow = true;
 sun.shadow.mapSize.set(low ? 2048 : 4096, low ? 2048 : 4096);
 const sc = sun.shadow.camera;
@@ -114,7 +113,7 @@ function frame() {
 
   game.update(dt, fps);
   outskirts.update(time, scene, sun, disasters.lightK, disasters.sunK);
-  sun.position.copy(tg).addScaledVector(sunDir, 700);
+  sun.position.copy(tg).addScaledVector(daylight.sunDir, 700); // the sun (or the moon) where the day and night cycle has it
   sun.target.position.copy(tg);
   // the shadow map only needs redrawing when the world has moved (a simulation step) or the view has
   if (game.simT !== shadowAt || !camAt.equals(camera.position)) { renderer.shadowMap.needsUpdate = true; shadowAt = game.simT; camAt.copy(camera.position); }
