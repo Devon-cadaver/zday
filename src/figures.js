@@ -60,7 +60,8 @@ export const FLAG = { VEST: 1, PACK: 2, ITEM: 4, BALD: 8, GLOW: 16 };
 // skeleton, a missing nose, every bit of skin (a clothed skeleton). aZed.y blood, .z burned, .w 2 = on fire
 export const BONE = { SKULL: 1, HALF: 2, ARM: 4, FORE: 8, SHIN: 16, RIBS: 32, SKEL: 64, NOSE: 128, SKIN: 512 };
 // Animation ids (aAnim): 0 idle, 1 walk, 2 run, 3 shamble, 4 limp/none, 5 arms out standing,
-// 6 aiming, 7 aiming while walking, 8 crawl, 9 sprint with arms out (runner zombie)
+// 6 aiming, 7 aiming while walking, 8 crawl, 9 sprint with arms out (runner zombie), 10 kneel and pray, 11 swing,
+// 12 treading water with both arms up, waving for help
 
 // fragment side of the figure kit: bone, ribs, skull sockets, blood, burns, the radioactive and fire glow
 const ZED_COMMON = /* glsl */`
@@ -154,7 +155,7 @@ vec3 rotZ(vec3 p, float py, float a) {
     bool crawl = (an == 8.0);
     bool armsOut = (an == 3.0 || an == 5.0 || an == 6.0 || an == 7.0 || an == 9.0);
     bool zombie = (an == 3.0 || an == 5.0 || an == 9.0);
-    bool kneel = (an == 10.0), swing = (an == 11.0);
+    bool kneel = (an == 10.0), swing = (an == 11.0), swim = (an == 12.0);
     float chop = swing ? max(0.0, sin(uTime * 7.0 + ph)) : 0.0; // the weapon comes down hard, then back up
     // gait: stride rate, hip swing, knee fold in the swing, arm swing, elbow bend, bounce, forward lean
     float freq = 0.0, hipA = 0.0, kneeA = 0.0, armA = 0.0, el0 = 0.12, elA = 0.0, bob = 0.0, lean = 0.0;
@@ -162,6 +163,7 @@ vec3 rotZ(vec3 p, float py, float a) {
     else if (an == 2.0) { freq = 10.5; hipA = 0.72; kneeA = 1.6; armA = 0.8; el0 = 1.35; elA = 0.3; bob = 0.075; lean = 0.22; }
     else if (an == 9.0) { freq = 11.0; hipA = 0.78; kneeA = 1.55; bob = 0.08; lean = 0.3; }
     else if (an == 3.0) { freq = 3.2; hipA = 0.26; kneeA = 0.45; bob = 0.025; }
+    else if (swim) { freq = 2.6; hipA = 0.45; kneeA = 0.9; }
     bool sideA = (limb == 1.0 || limb == 3.0 || limb == 6.0 || limb == 8.0);
     float phs = uTime * freq + ph + (sideA ? 0.0 : 3.14159), sn = sin(phs);
     bool leg = (limb == 1.0 || limb == 2.0 || limb == 6.0 || limb == 7.0), arm = (limb == 3.0 || limb == 4.0 || limb == 8.0 || limb == 9.0);
@@ -182,6 +184,7 @@ vec3 rotZ(vec3 p, float py, float a) {
       if (crawl) { float cz = sin(uTime * 4.0 + ph) * 0.5; sh = sideA ? 1.9 + cz : 1.9 - cz; el = 0.0; }
       else if (kneel) { sh = 0.45; el = 1.95; } // hands together in front of the face
       else if (swing) { sh = 2.5 - 2.1 * chop; el = 0.25 + 0.3 * chop; }
+      else if (swim) { sh = 2.75 + sin(uTime * 4.5 + ph + (sideA ? 0.0 : 1.9)) * 0.4; el = 0.35; } // both arms up, waving
       else if (armsOut) { sh = (sideA ? 1.35 : 1.2) + (zombie ? (sideA ? sin(uTime * 2.0 + ph) : cos(uTime * 2.3 + ph)) * 0.15 : 0.0); el = zombie ? 0.3 : 0.06; }
       else { sh = -sn * armA; el = el0 + elA * max(0.0, -sn); } // arms swing against the legs, elbows bend more on the forward swing
       if (limb >= 8.0) transformed = rotZ(transformed, ${ELBOW}, el);

@@ -12,6 +12,8 @@ export const UNITS = [
   { id: 'police', name: 'Police', cost: 50, cd: 20, alert: 0 },
   { id: 'bus', name: 'Evac bus', cost: 60, cd: 30, alert: 0 },
   { id: 'boat', name: 'Rescue boat', cost: 80, cd: 20, alert: 0 }, // only once the streets flood
+  { id: 'coast', name: 'Coast Guard', cost: 250, cd: 60, alert: 0 }, // a flood: boats and helicopters at once to the worst spots in the water, no tap
+  { id: 'barrier', name: 'Flood barrier', cost: 200, cd: 25, alert: 0 }, // a tsunami coming: an inflatable barrier across its path
   { id: 'chaser', name: 'Storm chaser', cost: 60, cd: 25, alert: 0 }, // spots tornadoes and aliens: calls in seeders, jets and tanks
   { id: 'seeder', name: 'Cloud seeder', cost: 100, cd: 30, alert: 0 }, // weakens tornadoes, breaks up storms
   { id: 'build', name: 'Construction', cost: 100, cd: 20, alert: 0 }, // rebuilds a fallen building
@@ -26,6 +28,8 @@ export const UNITS = [
   { id: 'nuke', name: 'Nuke', cost: 1000, cd: 9999, alert: 4, once: true },
 ];
 const ALERTS = ['Quiet', 'Incident', 'Spreading', 'Major incident', 'City emergency'];
+const FLOOD_CD = { boat: 5, rescue: 8, water: 15 }; // once the streets flood the coast guard and air rescue go out back to back
+const GROUND = new Set(['police', 'bus', 'fire', 'apc', 'chaser', 'build', 'camp', 'hazmat']); // nothing on wheels gets through flooded streets
 const ROUND = 600;
 const START_RP = 100;
 const SITE_AT = [0, 11, 23]; // the sites of one zombie outbreak break out this far apart
@@ -109,7 +113,8 @@ export class Commander {
     g.resetWorld(); g.setSpeed(1);
     this.t = 0; this.rp = START_RP; this.earned = 0; this.alert = 0; this.blocksInf = 0; this.fires = 0; this.ended = false;
     this.sel = null; this.cool = {}; for (const u of UNITS) this.cool[u.id] = 0;
-    this.cdOf = (id) => id === 'police' ? this.diff.policeCd : id === 'fire' ? this.diff.fireCd : this.cards[id].u.cd;
+    this.cdOf = (id) => id === 'police' ? this.diff.policeCd : id === 'fire' ? this.diff.fireCd : this.flooded() && FLOOD_CD[id] ? FLOOD_CD[id] : this.cards[id].u.cd;
+    this.wasFlooded = false;
     if (g.helis) g.helis.reset();
     this.kills0 = 0; this.sent = 0; this.lost = 0; this.heatT = 0; this.callT = 30;
     this.out0 = 0; this.rescued0 = 0; this.trucks = 0; this.helisSent = 0; this.apcs = 0; this.strikes = 0; this.bombedCiv0 = 0; this.bombed0 = 0;
@@ -191,9 +196,13 @@ export class Commander {
     if (this.alert < c.u.alert) { this.g.toast(c.u.name + ' needs alert level ' + c.u.alert); return; }
     if ((id === 'water' || id === 'rescue') && this.g.disasters.active('solar')) { this.g.toast('Helicopters are grounded by the solar storm'); return; }
     if (id === 'boat' && !this.g.disasters.boats.flooded) { this.g.toast('Rescue boats need flooded streets'); return; }
+    if (id === 'coast' && !this.flooded()) { this.g.toast('The Coast Guard goes out once the streets flood'); return; }
+    if (id === 'barrier' && !this.tsunami()) { this.g.toast('Flood barriers are for holding back a tsunami. Wait for a warning'); return; }
+    if (GROUND.has(id) && this.flooded()) { this.g.toast('The streets are under water: nothing on wheels can get through. Send boats, helicopters or the heroes', 4000); return; }
+    if (id === 'coast') { this.sendCoast(); return; } // no tap: they go where the most people are in the water
     for (const o of Object.values(this.cards)) o.btn.classList.remove('sel');
     this.sel = id; c.btn.classList.add('sel');
-    this.g.toast(id === 'heroes' ? 'Tap where to shine the hero signal' : id === 'build' ? 'Tap a fallen building to rebuild it' : id === 'camp' ? 'Tap where the medical camp should go' : id === 'hazmat' ? 'Tap the area to decontaminate' : 'Tap the map where the ' + c.u.name.toLowerCase() + ' should go');
+    this.g.toast(id === 'heroes' ? 'Tap where to shine the hero signal' : id === 'barrier' ? 'Tap a street ahead of the wave: the barrier goes up across its path' : id === 'build' ? 'Tap a fallen building to rebuild it' : id === 'camp' ? 'Tap where the medical camp should go' : id === 'hazmat' ? 'Tap the area to decontaminate' : 'Tap the map where the ' + c.u.name.toLowerCase() + ' should go');
   }
 
   tap(x, z) {
@@ -209,6 +218,7 @@ export class Commander {
     else if (id === 'bus') this.sendBus(x, z);
     else if (id === 'nuke') this.sendNuke(x, z);
     else if (id === 'boat') this.sendBoat(x, z);
+    else if (id === 'barrier') this.sendBarrier(x, z);
     else if (id === 'chaser') this.sendChaser(x, z);
     else if (id === 'seeder') this.sendSeeder(x, z, true);
     else if (id === 'build') this.sendBuild(x, z);
@@ -299,7 +309,11 @@ export class Commander {
   sendPolice(x, z) {
     const g = this.g, c = this.cards.police;
     const car = g.traffic.dispatchTo(x, z, {
-      onArrive: (ax, az) => { g.people.spawnOfficers(ax, az, this.pr.has('squad4') ? 4 : 2); g.toast('Officers on scene in the ' + this.district(ax, az)); },
+      onArrive: (ax, az) => {
+        g.people.spawnOfficers(ax, az, this.pr.has('squad4') ? 4 : 2);
+        const up = this.tsunami() ? g.people.alarmAt(ax, az, 90) : 0; // a wave coming: they get everyone round them up onto the roofs
+        g.toast(up ? 'Officers in the ' + this.district(ax, az) + ' are getting ' + up + ' people up onto the rooftops' : 'Officers on scene in the ' + this.district(ax, az));
+      },
       onLost: () => { this.lost++; g.toast('A cruiser was wrecked on the way'); },
     });
     if (!car) { g.toast(g.traffic.missions.filter(m => !m.gone).length >= 24 ? 'All cruisers are out' : 'No road to that spot'); return; }
@@ -380,6 +394,29 @@ export class Commander {
     g.toast((big ? 'Patrol boat' : 'Speedboat') + ' on its way through the flooded streets');
   }
 
+  flooded() { return this.g.disasters.boats.flooded; }
+  tsunami() { return this.g.disasters.list.find(e => e.type === 'tsunami' && e.alive && (e.phase === 'warn' || e.phase === 'wave')); }
+  // the Coast Guard all at once: three boats and two rescue helicopters to the worst spots in the water across the city
+  sendCoast() {
+    const g = this.g, D = g.disasters, spots = g.people.swimSpots(5);
+    if (!spots.length) { const s = D.boats.stranded(); if (s) spots.push([s[0], s[1], 0]); }
+    if (!spots.length) { g.toast('Nobody is stranded in the water right now'); return; }
+    let boats = 0;
+    for (let i = 0; i < 3; i++) { const s = spots[i % spots.length]; if (D.boats.send(s[0] + i * 6, s[1], { kind: i === 1 ? 'patrol' : 'speed' })) boats++; }
+    for (let i = 0; i < 2; i++) { const s = spots[i % spots.length]; g.helis.send('rescue', s[0] + i * 12, s[1], { k: -1, onDone: (n) => { if (n) g.toast('Coast Guard helicopter leaving with ' + n + ' pulled from the water', 3000); } }); }
+    this.spend('coast'); this.boatsSent += boats; this.helisSent += 2;
+    g.toast('Coast Guard launched: ' + boats + ' boats and 2 helicopters heading for the people in the water', 4000);
+  }
+  // an inflatable barrier across the tsunami's path at (x, z): it holds that stretch of the wave back for a while
+  sendBarrier(x, z) {
+    const g = this.g, T = this.tsunami();
+    if (!T) { g.toast('No tsunami is coming'); return; }
+    const b = g.disasters.barriers.place(x, z, T);
+    if (!b) { g.toast('The wave is already there. Put the barrier further ahead of it'); return; }
+    this.spend('barrier'); this.barriersUp = (this.barriersUp || 0) + 1;
+    g.toast('Flood barrier inflating in the ' + this.district(b.x, b.z) + '. It will hold that stretch of the wave back for a while', 4000);
+  }
+
   spend(id) {
     const c = this.cards[id];
     this.rp -= c.u.cost; this.cool[id] = this.cdOf(id);
@@ -403,6 +440,11 @@ export class Commander {
 
   sendWater(x, z) {
     const g = this.g;
+    if (this.flooded()) { // over flood water it drops life rafts: people afloat swim to them and hang on until a boat comes
+      const hl = g.helis.send('water', x, z, { onDrop: (dx, dz) => { const n = g.disasters.boats.dropRafts(dx, dz); g.toast(n ? 'Life rafts in the water: ' + n + ' people are holding on' : 'Life rafts dropped, but nobody was in the water there', 3500); } });
+      this.spend('water'); this.helisSent++;
+      g.toast('Helicopter inbound with life rafts, ' + Math.ceil(hl.eta) + ' s out'); return;
+    }
     const fires = g.fire.firesWithin(x, z, 40).length;
     const hl = g.helis.send('water', x, z, {});
     this.spend('water'); this.helisSent++;
@@ -411,6 +453,12 @@ export class Commander {
 
   sendRescue(x, z) {
     const g = this.g, p = g.people;
+    let n = 0, sx = 0, sz = 0; p.around(x, z, 45, (j) => { if (p.st[j] === ST.SWIM) { n++; sx += p.x[j]; sz += p.z[j]; } });
+    if (n) { // people in the water there: it winches them out one by one
+      const hl = g.helis.send('rescue', sx / n, sz / n, { k: -1, onDone: (m) => g.toast(m ? 'Rescue helicopter leaving with ' + m + ' pulled from the water' : 'Rescue helicopter found nobody left in the water') });
+      this.spend('rescue'); this.helisSent++;
+      g.toast('Rescue helicopter inbound to ' + n + ' people in the water, ' + Math.ceil(hl.eta) + ' s out'); return;
+    }
     let best = 0, bk = -1;
     p.bld.forEach((b, k) => {
       if (!p.bRoof[k]) return;
@@ -563,6 +611,9 @@ export class Commander {
     const nc = p.stats.nukedCiv; if (nc > this.nukedCiv0) { this.rp -= 5 * (nc - this.nukedCiv0); this.earned -= 5 * (nc - this.nukedCiv0); this.nukedCiv0 = nc; g.toast('The nuke killed ' + nc + ' civilians', 5000); }
     if (this.rp < 0) this.rp = 0; // penalties cost score, never lock the cards
     for (const id in this.cool) if (this.cool[id] > 0) this.cool[id] = Math.max(0, this.cool[id] - sdt);
+    const fl = this.flooded();
+    if (fl && !this.wasFlooded) { for (const id in FLOOD_CD) if (this.cool[id] > FLOOD_CD[id]) this.cool[id] = FLOOD_CD[id]; g.toast('The streets are flooding. The Coast Guard and air rescue are on full alert: boats and rescue helicopters can go out back to back', 4500); }
+    this.wasFlooded = fl;
     for (const q of this.pins) {
       if (q.life <= 0) continue;
       q.life -= sdt;
@@ -599,7 +650,8 @@ export class Commander {
     for (const c of Object.values(this.cards)) {
       const cd = this.cool[c.u.id];
       c.cd.style.height = cd > 0 ? (100 * cd / this.cdOf(c.u.id)) + '%' : '0';
-      c.btn.classList.toggle('off', (c.u.once && this.nuked) || cd > 0 || this.rp < c.u.cost || this.alert < c.u.alert);
+      const id = c.u.id, wet = this.flooded(), cant = (GROUND.has(id) && wet) || ((id === 'coast' || id === 'boat') && !wet) || (id === 'barrier' && !this.tsunami());
+      c.btn.classList.toggle('off', (c.u.once && this.nuked) || cd > 0 || this.rp < c.u.cost || this.alert < c.u.alert || cant);
       if (c.u.once) c.cd.style.height = '0';
     }
   }

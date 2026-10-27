@@ -3,14 +3,24 @@
 // flooded streets, idles where it was sent and pulls people out of the water
 // and off low rooftops, then heads back out when it is full. In the Sandbox
 // they come on their own to wherever people are stranded; in Commander the
-// player sends them.
+// player sends them. Once there a boat works the area, motoring across to
+// whoever it sees afloat. Life rafts (dropped from a helicopter) keep people
+// afloat until a boat gets to them.
 import * as THREE from 'three';
 import { buildVehicle } from './vehicles.js';
 
 const SPEED = 11;
+const SWIM = 29; // people.js ST.SWIM
+let RAFT = null;
+function raftKit() {
+  if (RAFT) return RAFT;
+  RAFT = { ring: new THREE.TorusGeometry(1.5, 0.42, 8, 18).rotateX(Math.PI / 2), floor: new THREE.CircleGeometry(1.2, 14).rotateX(-Math.PI / 2), canopy: new THREE.ConeGeometry(1.1, 1.2, 10, 1, true).translate(0, 0.9, 0),
+    orange: new THREE.MeshStandardMaterial({ color: '#ff6a1c', roughness: 0.6 }), dark: new THREE.MeshStandardMaterial({ color: '#2a2a2e', roughness: 0.9 }), yellow: new THREE.MeshStandardMaterial({ color: '#ffc21a', roughness: 0.6, side: THREE.DoubleSide }) };
+  return RAFT;
+}
 
 export class Boats {
-  constructor(D) { this.D = D; this.list = []; this.auto = true; this.autoT = 5; this.rescued = 0; }
+  constructor(D) { this.D = D; this.list = []; this.rafts = []; this.auto = true; this.autoT = 5; this.rescued = 0; }
   // enough water in the streets to run a boat
   get flooded() { const W = this.D.water; return W.active && W.level > 0.8; }
   wet(x, z) { const W = this.D.water; return W.levelAt(x, z) - this.D.ctx.people.groundY(x, z) > 0.6 || (W.front && W.levelAt(x, z) > 0); }
@@ -48,11 +58,32 @@ export class Boats {
     return null;
   }
 
+  // life rafts dropped round (x, z): people afloat nearby swim to one and hold on (not tiring) until picked up. The number holding on
+  dropRafts(x, z) {
+    const D = this.D, { people, scene } = D.ctx, K = raftKit(); let held = 0;
+    for (let n = 0; n < 4; n++) {
+      const a = n / 4 * 6.28 + Math.random() * 0.6, rx = x + Math.cos(a) * 9, rz = z + Math.sin(a) * 9;
+      if (!this.wet(rx, rz) || !people.walkable(rx, rz)) continue;
+      const g = new THREE.Group(); g.add(new THREE.Mesh(K.ring, K.orange), new THREE.Mesh(K.floor, K.dark), new THREE.Mesh(K.canopy, K.yellow)); g.position.set(rx, -5, rz); scene.add(g);
+      const r = { g, x: rx, z: rz, t: 0, n: 0 }; this.rafts.push(r);
+      D.water.splash.emit(rx, Math.max(0, D.water.level), rz, 14, { up: [2, 5], spread: 3, life: 1.2, size: 1.4 });
+      people.around(rx, rz, 24, (j) => { // the six nearest swim over and hang on round the side
+        if (people.st[j] !== SWIM || people.fx[j] !== 0 || r.n >= 6) return;
+        const b = r.n / 6 * 6.28; people.fx[j] = 4; people.px[j] = rx + Math.cos(b) * 1.9; people.pz[j] = rz + Math.sin(b) * 1.9; people.t1[j] = Math.max(people.t1[j], 20); r.n++; held++;
+      });
+    }
+    return held;
+  }
   update(h) {
-    const D = this.D;
+    const D = this.D, people = D.ctx.people, many = (people.stats.afloat || 0) > 40;
     if (this.auto && this.flooded && (this.autoT -= h) <= 0) {
-      this.autoT = 12;
-      if (this.list.length < 4) { const p = this.stranded(); if (p) this.send(p[0], p[1], { kind: Math.random() < 0.4 ? 'patrol' : 'speed' }); }
+      this.autoT = many ? 4 : 12;
+      if (this.list.length < (many ? 8 : 4)) { const s = many && people.swimSpots(1)[0], p = s ? [s[0], s[1]] : this.stranded(); if (p) this.send(p[0], p[1], { kind: Math.random() < 0.4 ? 'patrol' : 'speed' }); }
+    }
+    for (let n = this.rafts.length - 1; n >= 0; n--) { // bobbing where they fell, gone once the water is
+      const r = this.rafts[n]; r.t += h;
+      if (!this.flooded || r.t > 150) { D.ctx.scene.remove(r.g); this.rafts.splice(n, 1); continue; }
+      r.g.position.set(r.x, Math.max(0, D.water.level) - 0.15 + Math.sin(r.t * 1.8 + r.x) * 0.08, r.z); r.g.rotation.set(Math.sin(r.t * 1.3) * 0.06, r.t * 0.05, Math.cos(r.t * 1.1) * 0.06);
     }
     for (let n = this.list.length - 1; n >= 0; n--) {
       const b = this.list[n]; b.t += h;
@@ -71,9 +102,20 @@ export class Boats {
           else { this.drop(n); continue; }
         }
       } else if (b.state === 'rescue') {
-        b.v *= Math.exp(-h * 2); b.rt += h; b.yaw += Math.sin(b.t * 0.7) * h * 0.1;
-        if ((b.pickT -= h) <= 0) { b.pickT = 0.5; const got = this.pickUp(b); if (!got) b.idle = (b.idle || 0) + 0.5; else b.idle = 0; }
-        if (b.load >= b.cap || b.rt > 40 || b.idle > 5) { b.state = 'back'; b.k = b.pts.length - 2; if (b.onFull) b.onFull(b); }
+        b.rt += h;
+        if ((b.pickT -= h) <= 0) {
+          b.pickT = 0.5; const got = this.pickUp(b); if (!got) b.idle = (b.idle || 0) + 0.5; else b.idle = 0;
+          if (!got && !b.goal) { const j = people.nearestSwimmer(b.x, b.z, 90); if (j >= 0) { b.goal = [people.x[j], people.z[j]]; b.idle = 0; } } // someone afloat in sight: over to them
+        }
+        if (b.goal) { // straight across the water to them, as long as the way is open water
+          const dx = b.goal[0] - b.x, dz = b.goal[1] - b.z, d = Math.hypot(dx, dz);
+          let dy = Math.atan2(-dz, dx) - b.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); b.yaw += dy * Math.min(1, h * 2.5);
+          const ax = b.x + Math.cos(b.yaw) * 6, az = b.z - Math.sin(b.yaw) * 6, open = this.wet(ax, az) && people.walkable(ax, az);
+          b.v += ((open && Math.abs(dy) < 1.2 ? Math.min(7, d) : Math.abs(dy) >= 1.2 ? 1.5 : 0) - b.v) * Math.min(1, h * 1.5);
+          b.x += Math.cos(b.yaw) * b.v * h; b.z -= Math.sin(b.yaw) * b.v * h;
+          if (d < 6 || (!open && Math.abs(dy) < 1.2)) b.goal = null;
+        } else { b.v *= Math.exp(-h * 2); b.yaw += Math.sin(b.t * 0.7) * h * 0.1; }
+        if (b.load >= b.cap || b.rt > 70 || b.idle > 5) { b.state = 'back'; b.goal = null; b.k = b.pts.length - 2; if (b.onFull) b.onFull(b); }
       } else if (b.state === 'sink') {
         b.st += h; if (b.st > 3) { this.drop(n); continue; }
       }
@@ -113,5 +155,5 @@ export class Boats {
   }
 
   drop(n) { const b = this.list[n]; this.D.ctx.scene.remove(b.obj); b.obj.traverse(m => { if (m.geometry) m.geometry.dispose(); if (m.material) m.material.dispose(); }); this.list.splice(n, 1); }
-  reset() { for (let n = this.list.length - 1; n >= 0; n--) this.drop(n); this.autoT = 5; this.rescued = 0; }
+  reset() { for (let n = this.list.length - 1; n >= 0; n--) this.drop(n); for (const r of this.rafts) this.D.ctx.scene.remove(r.g); this.rafts.length = 0; this.autoT = 5; this.rescued = 0; }
 }

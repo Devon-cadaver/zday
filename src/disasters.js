@@ -15,6 +15,7 @@ import { Haboob, ColdWave } from './fronts.js';
 import { SolarStorm } from './solar.js';
 import { BlackHole } from './blackhole.js';
 import { Boats } from './boats.js';
+import { Barriers } from './barrier.js';
 import { Mushroom, NuclearStrike, Meltdown, nuclearDamage } from './nuke.js';
 import { Villains } from './villains.js';
 import { Zones } from './rebuild.js';
@@ -79,6 +80,7 @@ export class Disasters {
     this.weather = new Weather({ ...ctx, disasters: this });
     this.water = new WaterSurface(this);
     this.boats = new Boats(this); // rescue boats in floods and tsunamis
+    this.barriers = new Barriers(this); // inflatable flood barriers across a tsunami's path
     this.zones = new Zones(this);
     this.brawl = new Brawl(this); // heroes and villains throwing cars and each other // radiation left behind: nothing is rebuilt inside it until hazmat clears it
     this.spitFx = new Splash(scene, 500); this.spitFx.mat.uniforms.uColor.value.setRGB(0.5, 0.95, 0.18); // spitter acid
@@ -257,7 +259,7 @@ export class Disasters {
     this.brawl.update(h);
     for (let i = this.leftovers.length - 1; i >= 0; i--) { const l = this.leftovers[i]; if (l.update) l.update(h); if (l.alive === false) { l.dispose(); this.leftovers.splice(i, 1); } }
     for (let i = this.list.length - 1; i >= 0; i--) if (!this.list[i].alive) { this.list[i].dispose(); this.list.splice(i, 1); }
-    this.water.update(h); this.spitFx.update(h); this.boats.update(h);
+    this.water.update(h); this.spitFx.update(h); this.boats.update(h); this.barriers.update(h);
     if (this.water.active && (this.quenchT = (this.quenchT || 0) - h) <= 0) { this.quenchT = 0.5; const W = this.water, P = this.ctx.people; this.ctx.fire.quench((x, z) => W.levelAt(x, z) - P.groundY(x, z)); } // water puts fires out
     this.weather.update(h);
     this.debris.update(h);
@@ -282,7 +284,7 @@ export class Disasters {
     this.list.length = 0; this.timers.length = 0; this.events.length = 0; this.bubbles.length = 0;
     for (const l of this.leftovers) l.dispose(); this.leftovers.length = 0;
     for (const b of this.bolts) this.ctx.scene.remove(b.g); this.bolts.length = 0;
-    this.debris.reset(); this.decals.reset(); this.water.reset(); this.boats.reset(); this.zones.reset(); this.brawl.reset();
+    this.debris.reset(); this.decals.reset(); this.water.reset(); this.boats.reset(); this.barriers.reset(); this.zones.reset(); this.brawl.reset();
     this.weather.set('clear', true);
     this.stats = { buildings: 0, hazards: 0 };
     if (this.ctx.outskirts) { this.ctx.outskirts.reset(); this.later(0, () => this.ctx.outskirts.steam(this.ctx.fire)); } // after fire.reset has cleared the pools

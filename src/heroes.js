@@ -7,7 +7,9 @@
 // crawls, Blur included, and thrown cars, buildings and tornado debris drift
 // instead of flying. Any of them will catch an incoming nuclear missile or a
 // meteor (Tempo slows it first) and carry it up into space; a big meteor is
-// broken up and its pieces go up too.
+// broken up and its pieces go up too. In a flood or a tsunami they pull people
+// out of the water two at a time and fly them up onto a roof clear of it, and
+// Tempo holds back the incoming wave with his bubbles.
 import * as THREE from 'three';
 import { rig, relax, handsOnHips, tumble, detail } from './villains.js';
 import { tossStep, toss } from './brawl.js';
@@ -126,7 +128,7 @@ class Hero {
     }
     if (o.glow) this.hands = this.rig.arms.map(a => { const g = new THREE.Mesh(K.sphere, K.glow); g.scale.setScalar(0.07); g.position.y = -0.3; g.visible = false; a.el.add(g); return g; });
   }
-  get busy() { return this.job && (this.job.kind === 'catch' || this.job.kind === 'carry' || this.job.kind === 'return' || this.job.kind === 'ferry'); }
+  get busy() { return this.job && (this.job.kind === 'catch' || this.job.kind === 'carry' || this.job.kind === 'return' || this.job.kind === 'ferry' || (this.job.kind === 'swim' && this.job.ppl && this.job.ppl.length > 0)); }
   fly(gx, gy, gz, h, top = 50, extra = 0) {
     const dx = gx - this.x, dy = gy - this.y, dz = gz - this.z, d = Math.hypot(dx, dy, dz), sp = Math.min(top, d * 1.8 + extra), f = Math.min(1, h * 3);
     if (d > 0.01) { this.vx += (dx / d * sp - this.vx) * f; this.vy += (dy / d * sp - this.vy) * f; this.vz += (dz / d * sp - this.vz) * f; }
@@ -156,6 +158,8 @@ class Hero {
     else if (J.kind === 'monster') this.doMonster(h, J);
     else if (J.kind === 'ferry') this.doFerry(h, J);
     else if (J.kind === 'blur') this.doBlur(h, J);
+    else if (J.kind === 'swim') this.doSwim(h, J);
+    else if (J.kind === 'wave') this.doWave(h, J);
   }
   // nothing to do: hover by the signal, then land on its roof
   idle(h) {
@@ -344,6 +348,53 @@ class Hero {
     J.ppl.forEach((j, k) => { people.x[j] = this.x + (k - 0.5) * 0.7; people.y[j] = this.y - 1.6; people.z[j] = this.z; });
     if (d < 2.5 || !J.ppl.length) { for (const j of J.ppl) people.setDown(j, m.x, m.z); this.job = J.back; }
   }
+  // a flood: people afloat pulled out two at a time and flown up onto the nearest roof standing clear of the water
+  doSwim(h, J) {
+    const P = this.D.ctx.people, city = this.D.ctx.city;
+    J.ppl = (J.ppl || []).filter((j) => P.st[j] === 19);
+    J.ppl.forEach((j, k) => { P.x[j] = this.x + (k - 0.5) * 0.7; P.y[j] = this.y - 1.7; P.z[j] = this.z; }); // hanging from their hands
+    if (J.k == null) {
+      if (J.j == null || P.st[J.j] !== 29) { // who next: someone afloat near the busiest spot nearest this hero
+        J.j = null; if ((J.lookT = (J.lookT || 0) - h) > 0) { this.fly(this.x, this.cruiseY(), this.z, h, 20); return; }
+        J.lookT = 0.5;
+        const spots = P.swimSpots(8); let best = null, bd = 1e9; for (const s of spots) { const d = Math.hypot(s[0] - this.x, s[1] - this.z) - s[2] * 4; if (d < bd) { bd = d; best = s; } }
+        const j = best ? P.nearestSwimmer(best[0], best[1], 60) : -1;
+        if (j < 0) { if (J.ppl.length) J.k = this.roofFor(); else { this.job = null; return; } }
+        else J.j = j;
+      }
+      if (J.j != null) {
+        const j = J.j, d = this.fly(P.x[j], P.y[j] + 2.2, P.z[j], h, 60, 15);
+        if (d < 3 && P.grab(j)) {
+          P.fx[j] = 3; J.ppl.push(j); J.j = null;
+          if (!this.H.saidSwim) { this.H.saidSwim = true; this.D.emit({ type: 'heroswim', text: this.name + ' is pulling people out of the water!' }); }
+          if (J.ppl.length >= 2 || P.nearestSwimmer(this.x, this.z, 30) < 0) J.k = this.roofFor();
+        }
+        return;
+      }
+    }
+    if (J.k == null || J.k < 0 || city.dead[J.k]) { J.k = this.roofFor(); if (J.k < 0) { for (const j of J.ppl) P.swim(j, 30); this.job = null; return; } }
+    const b = P.bld[J.k], rf = b.roof, cx = (rf.x0 + rf.x1) / 2, cz = (rf.z0 + rf.z1) / 2, hd = Math.hypot(cx - this.x, cz - this.z);
+    this.fly(cx, hd > 8 ? Math.max(b.roofY + 6, this.cruiseY(this.x, this.z)) : b.roofY + 1.9, cz, h, 55);
+    if (hd < 3 && this.y < b.roofY + 3) { for (const j of J.ppl) P.toRoof(j, J.k); this.D.emit({ type: 'heroroof', n: J.ppl.length }); this.job = null; }
+  }
+  // the nearest roof standing well clear of the water (a building that is still up), or -1
+  roofFor() {
+    const P = this.D.ctx.people, W = this.D.water, city = this.D.ctx.city; let best = -1, bd = 1e9;
+    city.buildingsNear(this.x, this.z, 160, (k, d, b) => { if (city.dead[k] || b.landmark || !P.bld[k] || !P.bld[k].roof || b.roofY < Math.max(0, W.level) + 3) return; const s = d + (P.bRoofAll[k] || 0) * 0.5; if (s < bd) { bd = s; best = k; } });
+    return best;
+  }
+  // a dropped job (the heroes leaving): whoever they were carrying goes back in the water
+  letGo() { const J = this.job; if (J && J.kind === 'swim' && J.ppl) { const P = this.D.ctx.people; for (const j of J.ppl) if (P.st[j] === 19) P.swim(j, 30); J.ppl = []; } }
+  // Tempo and a tsunami coming in: a bubble on the front where it is about to reach the streets in view, holding it to a crawl
+  doWave(h, J) {
+    const e = J.e; if (!e.alive || e.phase !== 'wave') { this.job = null; return; }
+    const c = this.D.ctx.controls.target, p = e.poi(c.x, c.z); if (!p) { this.job = null; return; }
+    const ax = p.x - e.dir.x * 14, az = p.z - e.dir.y * 14, d = this.fly(ax - e.dir.x * 30, 40, az - e.dir.y * 30, h, 70);
+    if (d < 60) {
+      this.cd = 13; this.castT = 0.6; this.H.bubble(ax, 6, az, 46, 7); this.job = null;
+      if (!this.H.saidWave) { this.H.saidWave = true; this.D.emit({ type: 'herowave', text: 'Tempo is holding back the wave with a time bubble!' }); }
+    }
+  }
   // Tempo: a bubble over things flying through the air (thrown, flung by a tornado)
   doBubble(h, J) {
     const d = this.fly(J.x + 25, this.cruiseY(J.x, J.z), J.z + 25, h, 60);
@@ -457,6 +508,11 @@ export class Heroes {
       if (tempo.state === 'fly' && !tempo.job && tempo.cd <= 0 && (M.type === 'kaiju' || M.phase === 'arc')) tempo.job = { kind: 'monster', m: M, slow: true };
       else if (tempo.state === 'fly' && !tempo.job && M.type === 'kaiju') tempo.job = { kind: 'monster', m: M }; // until the next bubble is ready, punches like the others
     }
+    // a tsunami coming in: Tempo slows it; people afloat in a flood: everyone free pulls them out
+    const T = D.list.find(e => e.type === 'tsunami' && e.alive && e.phase === 'wave'), afloat = D.ctx.people.stats.afloat || 0;
+    if (T || afloat) work++;
+    if (T && tempo.state === 'fly' && !tempo.job && tempo.cd <= 0) tempo.job = { kind: 'wave', e: T };
+    if (afloat) for (const hr of live) if (!hr.job) hr.job = { kind: 'swim' };
     // Tempo bubbles things flying through the air: cars and buildings thrown, tornado debris
     if (tempo.state === 'fly' && !tempo.job && tempo.cd <= 0) {
       let best = null, bs = 2;
@@ -479,7 +535,7 @@ export class Heroes {
     }
     if ((this.thinkT -= h) <= 0) { this.thinkT = 0.3; const work = this.assign() + this.who.filter(w => w.job).length; this.idleT = work ? 0 : this.idleT + 0.3; }
     for (const hero of this.who) hero.update(h);
-    if (!this.leaving && this.idleT > (this.brief ? 6 : 40) && this.t > 20) { this.leaving = true; for (const hero of this.who) if (hero.state !== 'gone') hero.state = hero.state === 'wait' ? 'gone' : 'leave'; this.D.emit({ type: 'heroesleave', text: 'All clear. The heroes are flying off' }); }
+    if (!this.leaving && this.idleT > (this.brief ? 6 : 40) && this.t > 20) { this.leaving = true; for (const hero of this.who) if (hero.state !== 'gone') { hero.letGo(); hero.state = hero.state === 'wait' ? 'gone' : 'leave'; } this.D.emit({ type: 'heroesleave', text: 'All clear. The heroes are flying off' }); }
     if (this.leaving && this.who.every(w => w.state === 'gone')) this.alive = false;
   }
   sync(dt) { for (const hero of this.who) hero.sync(dt); }

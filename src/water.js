@@ -175,12 +175,12 @@ export class WaterSurface {
     this.mesh.renderOrder = 2; this.mesh.visible = false; this.mesh.frustumCulled = false;
     D.ctx.scene.add(this.mesh);
     this.splash = new Splash(D.ctx.scene, D.ctx.low ? 1800 : 3600);
-    this.level = -1; this.front = null; this.lag = 9; this.halfW = 1; this.segW = 1;
+    this.level = -1; this.front = null; this.lag = 9; this.wetLag = 1; this.halfW = 1; this.segW = 1; // the flat surface starts lag behind the wave front (the wave's own body before it); for people, cars and boats the water starts right behind it
     this.origin = new THREE.Vector2(); this.dir = new THREE.Vector2(1, 0); this.tan = new THREE.Vector2(0, 1);
     this.levelAt = (x, z) => {
       if (!this.front) return this.level;
       const dx = x - this.origin.x, dz = z - this.origin.y;
-      return dx * this.dir.x + dz * this.dir.y > this.frontAt(dx * this.tan.x + dz * this.tan.y) - this.lag ? -99 : this.level;
+      return dx * this.dir.x + dz * this.dir.y > this.frontAt(dx * this.tan.x + dz * this.tan.y) - this.wetLag ? -99 : this.level;
     };
   }
   frontAt(t) {
@@ -247,6 +247,7 @@ export class SweepFront {
     this.speed = o.speed ?? 15; this.slow = o.slow ?? 0.45; this.fast = o.fast ?? 1.08; this.pileK = o.pile ?? 1.4; this.t = 0;
     this.pull = o.pull || null; // optional (tangent coordinate, front) -> speed factor: lets a player drag the front
     this.F = new Float32Array(FRONT_N); this.P = new Float32Array(FRONT_N).fill(1); this.T = new Float32Array(FRONT_N);
+    this.held = new Uint8Array(FRONT_N); this.tame = new Uint8Array(FRONT_N); // held at a flood barrier; spilled over one (no force left)
     this.pace = new Float32Array(FRONT_N); this.ph = new Float32Array(FRONT_N);
     const a = Math.random() * 6, b = Math.random() * 6, s0 = o.start ?? -40;
     for (let k = 0; k < FRONT_N; k++) { this.F[k] = s0 + Math.sin(k * 0.37 + a) * 5 + Math.sin(k * 0.11 + b) * 9; this.pace[k] = 0.9 + Math.random() * 0.2; this.ph[k] = Math.random() * 6.28; }
@@ -257,20 +258,27 @@ export class SweepFront {
   // how far behind the front (x, z) is (negative: not reached yet)
   behind(x, z) { const dx = x - this.origin.x, dz = z - this.origin.y; return this.frontAt(dx * this.tan.x + dz * this.tan.y) - (dx * this.dir.x + dz * this.dir.y); }
   lead() { let m = Infinity; for (let k = 0; k < FRONT_N; k++) m = Math.min(m, this.F[k]); return m; }
+  tameRange(t0, t1) { for (let k = 0; k < FRONT_N; k++) { const t = -this.halfW + k * this.segW; if (t > t0 && t < t1) this.tame[k] = 1; } }
+  tameAt(t) { return this.tame[Math.max(0, Math.min(FRONT_N - 1, Math.round((t + this.halfW) / this.segW)))] === 1; }
   advance(h) {
-    const { city } = this.D.ctx, F = this.F, P = this.P;
+    const { city } = this.D.ctx, F = this.F, P = this.P, H = this.held, bar = this.D.barriers, slowAt = this.D.slowAt;
     this.t += h;
     for (let k = 0; k < FRONT_N; k++) {
       const [x, z] = this.at(k);
       let blocked = false;
       if (this.slow < 1 && this.inCity(x, z)) city.buildingsNear(x, z, 3, (kb, d) => { if (d === 0 && !city.dead[kb]) blocked = true; });
-      F[k] += this.speed * this.pace[k] * (0.9 + 0.2 * Math.sin(this.t * 0.35 + this.ph[k])) * (blocked ? this.slow : this.fast) * (this.pull ? this.pull(-this.halfW + k * this.segW, F[k]) : 1) * h;
-      P[k] += ((blocked ? this.pileK : 1) - P[k]) * Math.min(1, h * 2.5);
+      const f0 = F[k], slow = slowAt ? this.D.slowAt(x, 4, z) : 1; // one of Tempo's time bubbles holds it to a crawl
+      F[k] += this.speed * this.pace[k] * (0.9 + 0.2 * Math.sin(this.t * 0.35 + this.ph[k])) * (blocked ? this.slow : this.fast) * (this.tame[k] ? 0.6 : 1) * slow * (this.pull ? this.pull(-this.halfW + k * this.segW, F[k]) : 1) * h;
+      H[k] = 0;
+      const b = bar && bar.list.length ? bar.holdAt(this, -this.halfW + k * this.segW, f0) : null;
+      if (b && F[k] > b.stop) { F[k] = b.stop; H[k] = 1; b.held = true; } // stopped at a flood barrier
+      P[k] += ((H[k] ? 1.15 : blocked ? this.pileK : 1) - P[k]) * Math.min(1, h * 2.5);
     }
     // keep it one body: a little smoothing, and no section may trail its neighbour by more than a steep slope
     const T = this.T, L = this.segW * 1.3;
-    for (let k = 0; k < FRONT_N; k++) T[k] = F[k] + 0.02 * ((F[k - 1] ?? F[k]) + (F[k + 1] ?? F[k]) - 2 * F[k]);
+    for (let k = 0; k < FRONT_N; k++) T[k] = H[k] ? F[k] : F[k] + 0.02 * ((F[k - 1] ?? F[k]) + (F[k + 1] ?? F[k]) - 2 * F[k]);
     for (let k = 0; k < FRONT_N - 1; k++) {
+      if (H[k] || H[k + 1]) continue; // held at a barrier: the rest of the wave goes on round it
       const e = T[k + 1] - T[k];
       if (e > L) { T[k] += (e - L) * 0.7; T[k + 1] -= (e - L) * 0.3; } else if (e < -L) { T[k + 1] += (-e - L) * 0.7; T[k] -= (-e - L) * 0.3; }
     }
@@ -322,12 +330,12 @@ export class Tsunami {
       this.advance(h);
       D.shake(0.12);
       const o = this.origin, d = this.dir, tn = this.tan;
-      const inBand = (x, z) => { const dx = x - o.x, dz = z - o.y, s = dx * d.x + dz * d.y, f = W.frontAt(dx * tn.x + dz * tn.y); return s > f - 3 && s < f + 1.5; };
+      const inBand = (x, z) => { const dx = x - o.x, dz = z - o.y, s = dx * d.x + dz * d.y, t = dx * tn.x + dz * tn.y, f = W.frontAt(t); return s > f - 3 && s < f + 1.5 && !this.sw.tameAt(t); }; // what spills over a barrier sweeps nobody away
       const push = () => [d.x * (15 + Math.random() * 7), 3 + Math.random() * 4, d.y * (15 + Math.random() * 7)];
       for (let i = 0; i < people.active; i++) {
         const s = people.st[i];
-        if (s === 8 || s === 10 || s === 17 || s === 19 || s === 20 || people.lvl[i] !== -1) continue;
-        if (inBand(people.x[i], people.z[i])) { const v = push(); people.fling(i, v[0], v[1], v[2]); }
+        if (s === 8 || s === 10 || s === 17 || s === 19 || s === 20 || s === 29 || people.lvl[i] !== -1) continue;
+        if (inBand(people.x[i], people.z[i])) { const f = 6 + Math.random() * 6; people.fling(i, d.x * f, 3 + Math.random() * 3, d.y * f); } // tumbled over and down into the water behind the front (most come up again)
       }
       for (const car of traffic.cars) {
         if (car.gone || car.mode === 4 || car.mode === 5) continue;
@@ -347,7 +355,7 @@ export class Tsunami {
       if (++this.stepN % 2 === 0) {
         for (let k = 0; k < FRONT_N; k++) {
           const [px, pz] = this.at(k);
-          if (!this.inCity(px, pz)) continue;
+          if (!this.inCity(px, pz) || this.sw.tame[k] || this.sw.held[k]) continue;
           for (const it of city.takeStreetNear(px, pz, 9)) { const v = push(); D.debris.add(it.x, it.y, it.z, it.s * 0.9, it.s * 0.6, it.s * 0.9, it.kind === 'tree' ? it.col : '#4a4540', 'fly', { v }); }
           city.buildingsNear(px, pz, 6, (kb, dd, b) => {
             if (this.damaged.has(kb)) return;

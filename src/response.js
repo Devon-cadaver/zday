@@ -123,6 +123,13 @@ export class Responders {
       let best = burning[0], bn = 0; for (const k of burning) { const b = p.bld[k], n = fire.firesWithin((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2, 40).length; if (n > bn) { bn = n; best = k; } }
       const b = p.bld[best]; helis.send('water', (b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2, {});
     }
+    // people afloat in a flood: rescue helicopters over the worst of it (four out at most), life rafts dropped where there are most
+    const afloat = p.stats.afloat || 0;
+    if (helis && afloat > 8) {
+      const spots = p.swimSpots(4);
+      if (helis.list.filter(h => h.kind === 'rescue').length < 4 && this.ready('swimheli', 6)) { const s = spots[Math.floor(Math.random() * Math.min(2, spots.length))]; if (s) helis.send('rescue', s[0], s[1], { k: -1 }); }
+      if (afloat > 25 && this.ready('rafts', 16)) { const s = spots[Math.floor(Math.random() * spots.length)]; if (s) helis.send('water', s[0], s[1], { onDrop: (x, z) => D.boats.dropRafts(x, z) }); }
+    }
     // people stranded on rooftops: a rescue helicopter
     if (helis && helis.list.filter(h => h.kind === 'rescue').length < 2 && this.ready('rescue', 10)) {
       let bk = -1, most = 2; p.bld.forEach((b, k) => { if (p.bRoof[k] > most && !city.dead[k]) { most = p.bRoof[k]; bk = k; } });
@@ -158,7 +165,7 @@ export class Responders {
     // super villains, the giant worm and the kaiju, incoming meteors and missiles: the hero signal (the kaiju has the
     // city to itself for a quarter of a minute first)
     if (!D.list.some(e => e.type === 'heroes' && e.alive && !e.leaving)) {
-      const th = D.list.find(e => e.alive && (e.type === 'villains' || (e.type === 'kaiju' && e.state !== 'leave' && e.t > 15) || (e.type === 'worm' && e.phase !== 'leave' && e.phase !== 'gone') || ((e.type === 'meteor' || e.type === 'nuclear') && (e.phase === 'warn' || e.phase === 'fall'))));
+      const th = D.list.find(e => e.alive && (e.type === 'villains' || (e.type === 'kaiju' && e.state !== 'leave' && e.t > 15) || (e.type === 'tsunami' && e.phase !== 'recede') || (e.type === 'flood' && p.stats.afloat > 20) || (e.type === 'worm' && e.phase !== 'leave' && e.phase !== 'gone') || ((e.type === 'meteor' || e.type === 'nuclear') && (e.phase === 'warn' || e.phase === 'fall'))));
       if (th && this.ready('heroes', 20)) { const v = th.who ? th.who.find(w => !w.gone) : null; D.start('heroes', v ? v.x : th.x, v ? v.z : th.z); }
     }
     // radiation: a hazmat team to each zone (two out at once)

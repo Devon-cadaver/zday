@@ -13,7 +13,7 @@ import { HALF, RW, SW, CURB } from './city.js';
 import { rng } from './textures.js';
 import { figureGeometry, figureMaterial, figureAttributes, rollArchetype, OFFICER_LOOK, FIREFIGHTER_LOOK, SOLDIER_LOOK, ALIEN_LOOK, ZTYPES, rollZombieType, ZSKIN, FLAG, HAT, RADIOACTIVE } from './figures.js';
 
-export const ST = { WALK: 0, IDLE: 1, FLEE: 2, RETURN: 3, GRABBED: 4, TURNING: 5, ZOMBIE: 6, FALLING: 7, DEAD: 8, SEEK: 9, INSIDE: 10, ROOF: 11, PILE: 12, CLIMB: 13, JUMP: 14, COP: 15, FIREMAN: 16, EVAC: 17, BOARD: 18, EXT: 19, AIR: 20, RIOT: 21, ALIEN: 22, FROZEN: 23, FILM: 24, HELD: 25, PRAY: 26, FIGHT: 27, STEAL: 28 };
+export const ST = { WALK: 0, IDLE: 1, FLEE: 2, RETURN: 3, GRABBED: 4, TURNING: 5, ZOMBIE: 6, FALLING: 7, DEAD: 8, SEEK: 9, INSIDE: 10, ROOF: 11, PILE: 12, CLIMB: 13, JUMP: 14, COP: 15, FIREMAN: 16, EVAC: 17, BOARD: 18, EXT: 19, AIR: 20, RIOT: 21, ALIEN: 22, FROZEN: 23, FILM: 24, HELD: 25, PRAY: 26, FIGHT: 27, STEAL: 28, SWIM: 29 };
 // how someone takes danger when it comes: most run or hide, some fight back, some go for a car, some kneel and pray
 export const TRAIT = { NONE: 0, FIGHTER: 1, DRIVER: 2, FAITHFUL: 3 };
 export const KIND = { CIVILIAN: 0, OFFICER: 1, FIREFIGHTER: 2, SOLDIER: 3, ALIEN: 4 };
@@ -39,6 +39,9 @@ const DISASTER_CAUSE = new Set(['fling', 'crush', 'drown', 'zap', 'bolt', 'freez
 const ZSTATE = new Uint8Array(32); [S.ZOMBIE, S.TURNING, S.PILE, S.CLIMB, S.FALLING].forEach(s => { ZSTATE[s] = 1; });
 const ANIM = new Float32Array(32);
 ANIM[S.WALK] = 1; ANIM[S.FLEE] = 2; ANIM[S.RETURN] = 1; ANIM[S.TURNING] = 5; ANIM[S.ZOMBIE] = 3; ANIM[S.FALLING] = 5;
+// afloat in deep water (SWIM): in the hash, can be pulled out (hittable, grabbable), waving for help (anim 12); not
+// a civilian on foot, so crowds, zombies and sirens leave them be
+INHASH[S.SWIM] = HITTABLE[S.SWIM] = GRABBABLE[S.SWIM] = 1; ANIM[S.SWIM] = 12;
 ANIM[S.DEAD] = 4; ANIM[S.SEEK] = 2; ANIM[S.PILE] = 5; ANIM[S.CLIMB] = 5; ANIM[S.JUMP] = 2; ANIM[S.BOARD] = 2; ANIM[S.EXT] = 2; ANIM[S.AIR] = 2; ANIM[S.RIOT] = 1; ANIM[S.ALIEN] = 7; ANIM[S.HELD] = 0; ANIM[S.PRAY] = 10; ANIM[S.FIGHT] = 7; ANIM[S.STEAL] = 2;
 
 // a tangle of bodies: limbs and torsos in zombie greens, rags and shadow
@@ -797,6 +800,11 @@ export class People {
     return { zk, ck };
   }
 
+  // rescue helicopter: the next uninfected survivor on the roof of building k (or -1), taken onto the rope (hoist),
+  // and in at the door (winched)
+  roofPerson(k) { for (let i = 0; i < this.active; i++) if (this.st[i] === S.ROOF && this.lvl[i] === k && !this.inf[i]) return i; return -1; }
+  hoist(j) { if (!this.grab(j)) return false; this.fx[j] = 3; this.hx[j] = 1; this.hz[j] = 0; return true; }
+  winched(j) { this.st[j] = S.EVAC; this.lvl[j] = -1; this.fx[j] = 0; this.stats.rescued++; }
   // rescue helicopter: lift one uninfected survivor off the roof of building k
   evacuateFrom(k) {
     for (let i = 0; i < this.active; i++) {
@@ -888,6 +896,7 @@ export class People {
       switch (s) {
         case S.WALK: this.s[i] += this.spd[i] * h * ((this.waterAt || this.speedK !== 1) ? this.wk(this.x[i], this.z[i]) : 1); this.walkPos(i); break;
         case S.AIR: this.airStep(i, h); break;
+        case S.SWIM: this.swimStep(i, h); break;
         case S.RIOT: this.riotStep(i, h); break;
         case S.FROZEN: this.frozenStep(i, h); break;
         case S.FILM: this.filmStep(i, h); break;
@@ -945,10 +954,10 @@ export class People {
           this.around(zx, zz, 8, (j) => { if (this.r() < 0.5) this.panic(j, zx, zz, i); }, lv);
         }
       }
-      // deep water: the living drown if they stay in it (zombies just keep walking)
+      // deep water: a few seconds wading in it and the living are swept off their feet (zombies just keep walking)
       if (this.waterAt && CIV[this.st[i]] && this.lvl[i] === -1) {
         const d = this.waterAt(this.x[i], this.z[i]) - this.groundY(this.x[i], this.z[i]);
-        if (d > 1.3) { this.wet[i] += h; if (this.wet[i] > 16) { this.kill(i, 0, 0, 'drown'); this.stats.drowned++; } }
+        if (d > 1.3) { this.wet[i] += h; if (this.wet[i] > 5) this.swim(i, 25 + this.r() * 35); }
         else if (this.wet[i] > 0) this.wet[i] = Math.max(0, this.wet[i] - h);
       }
     }
@@ -1289,8 +1298,50 @@ export class People {
       if (sp < 14 || this.r() < 0.3) { this.fx[i] = 2; this.t1[i] = 2 + this.r() * 2; this.think[i] = 0; return; } // gets back up
       this.kill(i, this.tx[i], this.tz[i], 'fling'); return;
     }
+    if (w - gnd > 1.3 && this.kind[i] === KIND.CIVILIAN && this.r() < 0.75) { this.tx[i] *= 0.15; this.tz[i] *= 0.15; this.swim(i, 35 + this.r() * 45); return; } // into deep water: most come up again
     this.st[i] = S.IDLE; // so kill() treats it as the person it was
     this.kill(i, this.tx[i], this.tz[i], 'fling');
+  }
+  // swept off their feet: afloat for secs before they tire and go under
+  swim(i, secs) {
+    if (this.st[i] !== S.AIR) { this.tx[i] = (this.r() - 0.5) * 1.5; this.tz[i] = (this.r() - 0.5) * 1.5; } // thrown in: the throw carries them a little
+    this.st[i] = S.SWIM; this.lvl[i] = -1; this.t1[i] = secs; this.fx[i] = 0; this.wet[i] = 0; this.target[i] = -1; this.bt[i] = -1;
+  }
+  // afloat at the surface, drifting, waving for help, until a boat, a helicopter or a hero gets to them, the water
+  // drops enough to stand, or they tire and go under. On a life raft (fx 1) they hold on where it floats
+  swimStep(i, h) {
+    const w = this.waterAt ? this.waterAt(this.x[i], this.z[i]) : -99, g = this.groundY(this.x[i], this.z[i]);
+    if (w - g < 0.9) { this.st[i] = S.IDLE; this.y[i] = g; this.fx[i] = 0; return; } // back on their feet
+    if (this.fx[i] !== 1 && (this.t1[i] -= h) <= 0) { this.kill(i, 0, 0, 'drown'); this.stats.drowned++; return; }
+    if (this.fx[i] === 1) { if ((this.t1[i] -= h) <= 0) { this.fx[i] = 0; this.t1[i] = 20; } } // the raft has drifted off or gone down
+    else if (this.fx[i] === 4) { // swimming over to a life raft
+      const dx = this.px[i] - this.x[i], dz = this.pz[i] - this.z[i], d = Math.hypot(dx, dz);
+      if (d < 0.4) { this.fx[i] = 1; this.t1[i] = 120; this.face(i, this.px[i] - dx * 3, this.pz[i] - dz * 3); } else { const s = Math.min(d, 1.6 * h); this.x[i] += dx / d * s; this.z[i] += dz / d * s; this.hx[i] = dx / d; this.hz[i] = dz / d; }
+    } else {
+      this.tx[i] += ((this.r() - 0.5) * 1.6 - this.tx[i] * 0.5) * h; this.tz[i] += ((this.r() - 0.5) * 1.6 - this.tz[i] * 0.5) * h;
+      const nx = this.x[i] + this.tx[i] * h, nz = this.z[i] + this.tz[i] * h;
+      if (this.walkable(nx, nz)) { this.x[i] = nx; this.z[i] = nz; } else { this.tx[i] *= -0.5; this.tz[i] *= -0.5; } // off the walls
+      if (this.r() < h * 0.3) { const a = this.r() * 6.28; this.hx[i] = Math.cos(a); this.hz[i] = Math.sin(a); }
+    }
+    this.y[i] = w - 1.3 + Math.sin(this.time * 2.2 + i) * 0.07;
+  }
+  // everyone afloat, bunched by area: the n busiest spots [x, z, count], most first
+  swimSpots(n = 6, cell = 70) {
+    const m = new Map();
+    for (let i = 0; i < this.active; i++) {
+      if (this.st[i] !== S.SWIM) continue;
+      const key = Math.floor(this.x[i] / cell) * 4096 + Math.floor(this.z[i] / cell), e = m.get(key);
+      if (e) { e[0] += this.x[i]; e[1] += this.z[i]; e[2]++; } else m.set(key, [this.x[i], this.z[i], 1]);
+    }
+    return [...m.values()].map(e => [e[0] / e[2], e[1] / e[2], e[2]]).sort((a, b) => b[2] - a[2]).slice(0, n);
+  }
+  // the one afloat nearest (x, z) within R, or -1
+  nearestSwimmer(x, z, R) { let best = -1, bd = R * R; this.around(x, z, R, (j, d2) => { if (this.st[j] === S.SWIM && d2 < bd) { bd = d2; best = j; } }); return best; }
+  // pulled out of the water and set down on the roof of building k (by a hero): they join whoever is up there
+  toRoof(i, k) {
+    const b = this.bld[k], sp = this.roofSpot(k), q = this.roofSpot(k);
+    this.st[i] = S.ROOF; this.lvl[i] = k; this.bHad[k] = 1; this.x[i] = sp[0]; this.z[i] = sp[1]; this.y[i] = b.roofY;
+    this.tx[i] = q[0]; this.tz[i] = q[1]; this.t1[i] = 0; this.think[i] = this.r(); this.watch[i] = 0; this.fx[i] = 0; this.inf[i] = 0;
   }
   // everyone up on, inside or piled against building k when it comes down
   clearBuilding(k, how = 'crush') {
@@ -1319,6 +1370,12 @@ export class People {
       this.wz[j] = ZSTATE[this.st[j]] ? 1 : 0;
       this.kill(j, 0, 0, 'crush'); n++;
     });
+    return n;
+  }
+  // police on the spot before a flood: everyone on the street near (x, z) heads up onto the rooftops. How many went
+  alarmAt(x, z, R) {
+    let n = 0;
+    this.around(x, z, R, (i) => { const s = this.st[i]; if (this.kind[i] === KIND.CIVILIAN && !this.inf[i] && (s === S.WALK || s === S.IDLE || s === S.RETURN || s === S.FLEE || s === S.FILM) && this.trySeek(i)) n++; });
     return n;
   }
   // tsunami and flood sirens: civilians head for the rooftops
@@ -1755,7 +1812,7 @@ export class People {
   sync() {
     const arr = this.mesh.instanceMatrix.array, anim = this.anim;
     const m = this._m4, q = this._q, e = this._e, p = this._p;
-    let humans = 0, infected = 0, zombies = 0, dead = 0, roof = 0, officers = 0, aliens = 0, rioters = 0, colDirty = this.lookDirty, film = 0;
+    let humans = 0, infected = 0, zombies = 0, dead = 0, roof = 0, officers = 0, aliens = 0, rioters = 0, colDirty = this.lookDirty, film = 0, afloat = 0;
     this.bRoof.fill(0); this.bRoofAll.fill(0);
     const t = this.time;
     for (let i = 0; i < this.active; i++) {
@@ -1775,6 +1832,7 @@ export class People {
       else if (s === S.PILE) tilt = -0.95 + Math.sin(t * 6 + i * 1.7) * 0.25;
       else if (s === S.CLIMB) tilt = -1.1;
       else if (s === S.JUMP) tilt = Math.sin(t * 9 + i) * 1.2;
+      else if (s === S.EXT && this.fx[i] === 3) an = 12; // on a rescue rope, holding on with both hands
       else if (s === S.EXT || s === S.AIR) tilt = t * (5 + (i % 5)) + i;
       else if (s === S.DEAD) { tilt = Math.PI / 2; y += 0.17; }
       else if (s === S.ROOF) an = this.t1[i] > 0 || this.fx[i] === 2 ? 2 : this.fx[i] === 1 ? 1 : this.fx[i] === 3 ? 6 : 0;
@@ -1803,6 +1861,7 @@ export class People {
         continue;
       }
       if (s === S.ROOF) { roof++; const k = this.lvl[i]; this.bRoofAll[k]++; if (!this.inf[i]) this.bRoof[k]++; }
+      else if (s === S.SWIM) afloat++;
       if (s === S.COP || (this.kind[i] === KIND.OFFICER && CIV[s])) officers++;
       if (this.inf[i] || s === S.GRABBED) infected++; else if (this.kind[i] === KIND.CIVILIAN) humans++;
       if (this.dirty[i] === 1 && this.inf[i]) {
@@ -1855,7 +1914,7 @@ export class People {
     for (const f of this.flashList) { m.identity(); m.setPosition(f.x, f.y, f.z); this.flashes.setMatrixAt(fc++, m); }
     this.flashes.count = fc;
     this.flashes.instanceMatrix.needsUpdate = true;
-    Object.assign(this.stats, { humans, infected, zombies, dead, roof, officers, aliens, rioters }); this.filmN = film;
+    Object.assign(this.stats, { humans, infected, zombies, dead, roof, officers, aliens, rioters, afloat }); this.filmN = film;
   }
 
   nearestZombie(x, z, skip = -1) {
