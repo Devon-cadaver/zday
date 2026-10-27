@@ -2,7 +2,7 @@
 // simulation, follow camera. Modes plug in: Commander (send help to the city),
 // Be The Disaster (drive one yourself) and Sandbox (drop zombies and disasters).
 import * as THREE from 'three';
-import { ST } from './people.js';
+import { ST, KIND } from './people.js';
 import { Commander } from './commander.js';
 import { Profile, UNLOCK, UPGRADES, LEVELS, MAX_LEVEL, HAZARD_LEVEL, BE_LEVEL } from './profile.js';
 import { HAZARDS, WEATHER, threatName } from './disasters.js';
@@ -33,6 +33,7 @@ const CSS = `
 #zd-drop .n{background:#a6ff4d;color:#1d2a0e;border-radius:6px;padding:3px 6px;font-variant-numeric:tabular-nums}
 #zd-drop.empty{background:rgba(28,20,12,.72);border-color:rgba(255,236,200,.18);opacity:.7}
 #zd-find.on{border-color:#a6ff4d;color:#a6ff4d}
+#zd-good.on{border-color:#8fd3ff;color:#8fd3ff}
 .zd-cards{display:flex;gap:6px;overflow-x:auto;flex:1 1 100%;max-width:100%;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding:2px 0}
 .zd-cards::-webkit-scrollbar{display:none}
 .zd-cards > :first-child{margin-left:auto}.zd-cards > :last-child{margin-right:auto}
@@ -300,15 +301,33 @@ export class Game {
   }
 
   setFollow(i) {
-    this.follow = i; this.followSub = null;
-    if (this.followBtn) { this.followBtn.classList.toggle('on', i >= 0); this.followBtn.textContent = i >= 0 ? 'Following' : 'Follow'; }
+    this.follow = i; this.followSub = null; this.followSide = i >= 0 ? 'bad' : null;
+    if (this.followBtn) { this.followBtn.classList.toggle('on', i >= 0); this.followBtn.textContent = i >= 0 ? 'Zombie' : 'Bad guys'; }
+    if (this.goodBtn) { this.goodBtn.classList.remove('on'); this.goodBtn.textContent = 'Good guys'; }
   }
 
-  // villains, heroes and alien machines on the map, in that order: what Follow steps through
-  subjects() {
+  // what the two follow buttons step through. The bad guys: villains, the kaiju, the worm, riots, alien machines (then
+  // zombies). The good guys: the super heroes, helicopters, rescue vehicles on the move, then the responders on foot
+  // nearest the view (police, firefighters, soldiers, the crews rebuilding)
+  subjects(side = 'bad') {
     const out = [], D = this.disasters; if (!D) return out;
+    if (side === 'good') {
+      for (const e of D.list) if (e.alive && e.type === 'heroes') for (const h of e.who) out.push({ obj: h, name: h.name, pos: () => (h.state === 'fly' ? [h.x, h.y + 2.5, h.z] : null) });
+      if (this.helis) for (const hl of this.helis.list) out.push({ obj: hl, name: 'Helicopter', kind: 'heli', pos: () => (this.helis.list.includes(hl) ? [hl.x, hl.y, hl.z] : null) });
+      const VEH = { police: 'Police car', fire: 'Fire truck', apc: 'Army truck', bus: 'Evacuation bus', chaser: 'Storm chasers', tank: 'Tank', build: 'Construction truck', hazmat: 'Hazmat truck', medic: 'Ambulance', jail: 'Police bus' };
+      for (const c of this.traffic.missions) out.push({ obj: c, name: VEH[c.kind] || 'Rescue truck', kind: 'car', pos: () => (!c.gone && c.mode === 0 ? [c.x, 1.5, c.z] : null) });
+      const p = this.people, tg = this.controls.target, near = [];
+      for (let i = 0; i < p.active; i++) {
+        const k = p.kind[i], s = p.st[i];
+        if (s === ST.DEAD || s === ST.EVAC || s === ST.EXT || s === ST.AIR) continue;
+        const name = k === KIND.OFFICER ? 'Police officer' : k === KIND.SOLDIER ? 'Soldier' : k === KIND.FIREFIGHTER ? (s === ST.HELD ? 'Crew' : 'Firefighter') : null;
+        if (name) near.push([Math.hypot(p.x[i] - tg.x, p.z[i] - tg.z), i, name]);
+      }
+      near.sort((a, b) => a[0] - b[0]);
+      for (const [, i, name] of near.slice(0, 10)) { const k0 = p.kind[i]; out.push({ obj: 'p' + i, name, kind: 'foot', pos: () => (p.kind[i] === k0 && p.st[i] !== ST.DEAD && p.st[i] !== ST.EVAC && i < p.active ? [p.x[i], p.y[i] + 1, p.z[i]] : null) }); }
+      return out.filter(s => s.pos());
+    }
     for (const e of D.list) if (e.alive && e.type === 'villains') for (const v of e.who) out.push({ obj: v, name: v.name, pos: () => (v.gone ? null : [v.x, v.y + 2.5, v.z]) });
-    for (const e of D.list) if (e.alive && e.type === 'heroes') for (const h of e.who) out.push({ obj: h, name: h.name, pos: () => (h.state === 'fly' ? [h.x, h.y + 2.5, h.z] : null) });
     for (const e of D.list) if (e.alive && e.type === 'kaiju') out.push({ obj: e, name: 'Kaiju', pos: () => (e.alive ? [e.x, 30, e.z] : null) });
     for (const e of D.list) if (e.alive && e.type === 'worm') out.push({ obj: e, name: 'Worm', pos: () => (!e.alive || e.phase === 'gone' ? null : e.phase === 'arc' ? [e.x - Math.cos(e.yaw) * 18, Math.max(8, e.y * 0.6), e.z - Math.sin(e.yaw) * 18] : [e.x, Math.max(0, e.y), e.z]) }); // in a leap: the middle of the arc
     for (const e of D.list) if (e.alive && e.type === 'riot' && e.mob) out.push({ obj: e, name: 'Riot', pos: () => (e.alive ? [e.mob.x, 1.5, e.mob.z] : null) });
@@ -318,9 +337,11 @@ export class Game {
     }
     return out.filter(s => s.pos());
   }
-  followSubject(s) {
-    this.follow = -1; this.followSub = s; this.dir = null; this.camDir = null; this.zoomTo = 0;
-    if (this.followBtn) { this.followBtn.classList.add('on'); this.followBtn.textContent = s.name; }
+  followSubject(s, side = this.followSide || 'bad') {
+    this.follow = -1; this.followSub = s; this.followSide = side; this.dir = null; this.camDir = null; this.zoomTo = 0;
+    const on = side === 'good' ? this.goodBtn : this.followBtn, off = side === 'good' ? this.followBtn : this.goodBtn;
+    if (on) { on.classList.add('on'); on.textContent = s.name; }
+    if (off) { off.classList.remove('on'); off.textContent = off === this.goodBtn ? 'Good guys' : 'Bad guys'; }
   }
   // the camera's shot for what it follows: how far back, how steeply it looks down (the angle from overhead), and the
   // side it looks from (base +/- off, whichever is nearer where the camera already is; no base: stay on this side)
@@ -349,15 +370,27 @@ export class Game {
     if (s.name === 'Riot') return { key: 'riot', dist: 240, pol: 0.72 };
     if (s.name.startsWith('Tripod')) return { key: 'tripod', dist: 280, pol: 0.98, base: hd, off: 0.7 };
     if (s.name.startsWith('Saucer')) return { key: 'saucer', dist: 300, pol: 0.86 };
+    if (s.kind === 'car') return { key: 'car', dist: 220, pol: 0.62, base: hd + P, off: 0.4 }; // chasing it down the street, high enough to see over the buildings
+    if (s.kind === 'heli') return { key: 'heli', dist: 280, pol: 0.86, base: hd, off: 0.9 };
+    if (s.kind === 'foot') return { key: 'foot', dist: 150, pol: 0.62 }; // close enough to watch them work, looking down into the street
     return null;
   }
+  // the good guys button: each press the next of them
+  cycleGood() {
+    const subs = this.subjects('good');
+    if (!subs.length) { this.toast('No rescuers out yet. Drop a disaster and they will come'); return; }
+    let k = this.followSub && this.followSide === 'good' ? subs.findIndex(s => s.obj === this.followSub.obj) + 1 : 0;
+    if (k >= subs.length) k = 0;
+    this.followSubject(subs[k], 'good');
+  }
+  // the bad guys button
   cycleFollow() {
     const p = this.people, tg = this.controls.target, subs = this.subjects();
     if (subs.length) { // each press: the next of them, then the zombies (if any), then round again
-      let k = this.followSub ? subs.findIndex(s => s.obj === this.followSub.obj) + 1 : 0;
+      let k = this.followSub && this.followSide === 'bad' ? subs.findIndex(s => s.obj === this.followSub.obj) + 1 : 0;
       if (this.follow >= 0) k = 0;
       if (k >= subs.length && !(p.stats.zombies > 0)) k = 0;
-      if (k < subs.length) { this.followSubject(subs[k]); return; }
+      if (k < subs.length) { this.followSubject(subs[k], 'bad'); return; }
       this.followSub = null;
     }
     let i = -1;
@@ -428,7 +461,7 @@ export class Game {
     this.focusAt = null;
     if (this.followSub) {
       const q = this.followSub.pos();
-      if (!q) { const subs = this.subjects(); if (subs.length) this.followSubject(subs[0]); else this.setFollow(-1); } // it is gone: on to the next
+      if (!q) { const subs = this.subjects(this.followSide || 'bad'); if (subs.length) this.followSubject(subs[0]); else this.setFollow(-1); } // it is gone: on to the next
       else {
         const tg = this.controls.target, off = this._off.copy(this.camera.position).sub(tg), u = off.y > 1 ? q[1] / off.y : 0;
         const gx = q[0] - off.x * u, gz = q[2] - off.z * u, k = 1 - Math.exp(-dt * 6); // the ground point that puts it in the middle of the view
@@ -488,7 +521,8 @@ class Sandbox {
       h: g.addPill('zd-h', 'Humans'), i: g.addPill('zd-i', 'Infected'), z: g.addPill('zd-z', 'Zombies'), d: g.addPill('zd-d', 'Dead'),
       clock: g.addPill('', '', 'zd-clock'),
     };
-    g.followBtn = g.addButton('zd-find', 'Follow', () => g.cycleFollow());
+    g.followBtn = g.addButton('zd-find', 'Bad guys', () => g.cycleFollow());
+    g.goodBtn = g.addButton('zd-good', 'Good guys', () => g.cycleGood());
     g.addSpeedButton();
     this.disBtn = g.addButton('zd-disb', 'Disasters', () => {
       if (this.pending) { const was = this.pending; this.pending = null; this.gauge.cancel(); this.close(); g.toast(was === 'zombies' ? 'Done dropping zombies' : 'Cancelled'); return; } // the button cancels a disaster waiting to be placed
