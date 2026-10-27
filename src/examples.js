@@ -18,7 +18,7 @@ function blocks(g, R, n = 4, h = [4, 9]) {
     add(g, new THREE.BoxGeometry(w, hh, w), std(BLOCK[i % BLOCK.length]), Math.cos(a) * R, hh / 2, Math.sin(a) * R);
   }
 }
-const ground = (g, R, color = '#b9ab8e') => add(g, new THREE.CylinderGeometry(R, R, 0.3, 32), std(color, { roughness: 1 }), 0, -0.15, 0);
+const ground = (g, R, color = '#b9ab8e') => add(g, new THREE.CylinderGeometry(R, R, 0.3, 32), std(color, { roughness: 1 }), 0, -0.1, 0); // its top a little above the plinth's, so the two never fight over the same pixels
 
 const SWIRL_VS = /* glsl */`varying vec2 vUv; varying float vY; void main() { vUv = uv; vY = position.y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
 const SWIRL_FS = /* glsl */`

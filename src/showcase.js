@@ -54,7 +54,7 @@ function add(section, name, obj, fit) {
   sun.shadow.mapSize.set(512, 512); sun.shadow.camera.left = -fit * 1.5; sun.shadow.camera.right = fit * 1.5; sun.shadow.camera.top = fit * 1.5; sun.shadow.camera.bottom = -fit * 1.5;
   scene.add(hemi, sun, plinth(fit * 0.95));
   const pivot = new THREE.Group(); pivot.add(obj); scene.add(pivot);
-  const cam = new THREE.PerspectiveCamera(28, 1, 0.1, Math.max(100, fit * 8)); // far enough for the big dioramas
+  const cam = new THREE.PerspectiveCamera(28, 1, Math.max(0.1, fit * 0.4), Math.max(100, fit * 8)); // far enough for the big dioramas; the near plane well out, for depth precision (no flicker)
   const d = fit * 2.6;
   cam.position.set(d * 0.75, d * 0.62, d * 0.75); cam.lookAt(0, fit * 0.4, 0);
   tiles.push({ el, scene, cam, pivot, obj, rot: r() * 6.28 });
