@@ -96,6 +96,7 @@ class Bubble {
   }
   update(h) {
     this.t += h;
+    if (this.b.pop) { this.b.pop = false; this.t = Math.max(this.t, this.life - 0.4); } // shattered from inside
     if (this.track) { const p = this.track(); if (p) { this.b.x = p.x; this.b.y = p.y; this.b.z = p.z; } else this.t = Math.max(this.t, this.life - 0.4); }
     const k = Math.min(1, this.t / 0.35), out = Math.max(0, Math.min(1, (this.life - this.t) / 0.6));
     this.b.R = this.R * k * (0.6 + 0.4 * out);
@@ -244,7 +245,7 @@ class Hero {
       if (wv.hp <= 0) { V.beat(wv, 'Dragonfly'); this.job = null; }
     }
   }
-  // Tempo and Blur: a bubble where he is going; held in time long enough, he gives up
+  // Tempo and Blur: a bubble where he is going; held in time long enough (24 s in all), he gives up
   doSlow(h, J) {
     const bl = J.v, V = J.V;
     if (bl.gone || bl.beaten) { this.job = null; return; }
@@ -257,7 +258,7 @@ class Hero {
       if (bl.state === 'dash') { const gx = bl.goal[0] - bl.x, gz = bl.goal[1] - bl.z, gl = Math.hypot(gx, gz) || 1, a = Math.min(18, gl); px += gx / gl * a; pz += gz / gl * a; }
       this.H.bubble(px, 3, pz, 20, 5);
     }
-    if (bl.trapped > 6 || bl.hp <= 0) { V.beat(bl, 'Tempo'); this.job = null; }
+    if (bl.trapped > 24 || bl.hp <= 0) { V.beat(bl, 'Tempo'); this.job = null; }
   }
   // Tempo: a bubble over things flying through the air (thrown, flung by a tornado)
   doBubble(h, J) {

@@ -166,7 +166,7 @@ class Trail {
 
 class Villain {
   constructor(V, o) {
-    this.V = V; this.D = V.D; this.x = o.x; this.z = o.z; this.y = o.y ?? 0; this.yaw = Math.random() * 6.28; this.t = Math.random() * 5; this.speed = 0; this.player = false; this.hp = 260; this.trapped = 0; this.side = 'villain'; this.busyT = 0;
+    this.V = V; this.D = V.D; this.x = o.x; this.z = o.z; this.y = o.y ?? 0; this.yaw = Math.random() * 6.28; this.t = Math.random() * 5; this.speed = 0; this.player = false; this.hp = 780; this.trapped = 0; this.side = 'villain'; this.busyT = 0;
     this.rig = rig(o.rig); V.scene.add(this.rig.root);
   }
   face(dx, dz, h, k = 8) { if (Math.hypot(dx, dz) < 1e-4) return; let d = Math.atan2(dx, dz) - this.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); this.yaw += d * Math.min(1, h * k); }
@@ -238,6 +238,13 @@ class Blur extends Villain {
     }
     return at || [B.x0 + 40 + Math.random() * (B.x1 - B.x0 - 80), B.z0 + 40 + Math.random() * (B.z1 - B.z0 - 80)];
   }
+  breakFree() {
+    this.stuck = 0; this.freeT = 4;
+    for (const b of this.D.bubbles) if ((this.x - b.x) ** 2 + (2 - b.y) ** 2 + (this.z - b.z) ** 2 < b.R * b.R) b.pop = true;
+    this.D.ctx.fire.burst(this.x, 2, this.z, 10, 1.5);
+    if (!this.saidFree) { this.saidFree = true; this.D.emit({ type: 'blurfree', text: 'Blur vibrated free of the time bubble!' }); }
+    this.go(this.pick());
+  }
   landed() { this.state = 'rest'; this.restT = 1.2; this.speed = 0; this.inB = -1; }
   go(p) { const B = this.D.ctx.city.bounds; this.goal = [clamp(p[0], B.x0 + 15, B.x1 - 15), clamp(p[1], B.z0 + 15, B.z1 - 15)]; this.state = 'dash'; }
   leave() { const B = this.D.ctx.city.bounds, a = Math.random() * 6.28; this.goal = [(B.x0 + B.x1) / 2 + Math.cos(a) * 1400, (B.z0 + B.z1) / 2 + Math.sin(a) * 1400]; this.state = 'dash'; this.leaving = true; }
@@ -245,7 +252,10 @@ class Blur extends Villain {
     this.t += h;
     if (this.state === 'gone') return;
     if (this.pre(h)) return;
-    if (this.D.slowAt(this.x, 2, this.z) < 1) this.trapped += h; // caught in a time bubble, running or standing
+    if ((this.freeT = (this.freeT || 0) - h) < 0 && this.D.slowAt(this.x, 2, this.z) < 1) { // caught in a time bubble, running or standing; held 3 s straight, he vibrates free and runs (bubbles can't hold him for 4 s after)
+      this.trapped += h; this.stuck = (this.stuck || 0) + h;
+      if (this.stuck > 3 && !this.player) this.breakFree();
+    } else this.stuck = 0;
     if (this.state === 'rest') {
       this.speed = 0;
       if (!this.player && (this.carT = (this.carT ?? 3) - h) <= 0) { this.carT = 7; const foe = this.foe(), c = foe && this.nearCar(25); if (c) this.D.brawl.throwCar(c, this, foe); } // a car at the hero, at a hundred miles an hour
@@ -260,7 +270,7 @@ class Blur extends Villain {
       return;
     }
     this.speed = Math.min(this.leaving ? 80 : 62, this.speed + h * 240, d * 5 + 8);
-    const slow = this.D.slowAt(this.x, 2, this.z);
+    const slow = this.freeT > 0 ? 1 : this.D.slowAt(this.x, 2, this.z);
     const ux = dx / d, uz = dz / d, step = Math.min(d, this.speed * h * slow);
     this.face(ux, uz, h, 30); this.ph += h * slow * (5 + this.speed * 0.45);
     for (let done = 0; done < step;) { const s = Math.min(1.2, step - done); this.x += ux * s; this.z += uz * s; done += s; this.tear(ux, uz); this.trail.push(this.x, this.y, this.z, this.V.t); }
@@ -825,7 +835,7 @@ const KINDS = { Blur, Tyrant, Weaver };
 
 export class Villains {
   constructor(D, x, z, o = {}) {
-    this.type = 'villains'; this.D = D; this.scene = D.ctx.scene; this.alive = true; this.t = 0; this.life = o.life ?? 200; this.persist = !!o.persist;
+    this.type = 'villains'; this.D = D; this.scene = D.ctx.scene; this.alive = true; this.t = 0; this.life = o.life ?? 480; this.persist = !!o.persist; // long enough for the heroes to wear them down
     this.goo = new Splash(this.scene, 700); this.goo.mat.uniforms.uColor.value.setRGB(0.75, 0.08, 0.04); this.goo.mat.blending = THREE.NormalBlending; // red acid
     this.silk = new Splash(this.scene, 300); this.silk.mat.uniforms.uColor.value.setRGB(0.95, 0.94, 0.9); this.silk.mat.blending = THREE.NormalBlending;
     this.shots = []; this._c = new THREE.Color(); this._white = new THREE.Color('#f4f2ec');
@@ -875,7 +885,14 @@ export class Villains {
   }
   update(h) {
     this.t += h;
-    for (const v of this.who) v.update(h);
+    const B = this.D.ctx.city.bounds;
+    for (const v of this.who) {
+      v.update(h);
+      // once in the city they fight there: nothing (a dash, a throw, a punch) carries them out until they are beaten or leave
+      if (v.leaving || v.beaten || v.gone) continue;
+      if (v.x > B.x0 + 8 && v.x < B.x1 - 8 && v.z > B.z0 + 8 && v.z < B.z1 - 8) v.inCity = true;
+      else if (v.inCity) { v.x = clamp(v.x, B.x0 + 8, B.x1 - 8); v.z = clamp(v.z, B.z0 + 8, B.z1 - 8); if (Array.isArray(v.goal)) v.goal = [clamp(v.goal[0], B.x0 + 15, B.x1 - 15), clamp(v.goal[1], B.z0 + 15, B.z1 - 15)]; }
+    }
     this.shotStep(h); this.goo.update(h); this.silk.update(h);
     if (!this.leaving && this.t > this.life) { this.leaving = true; for (const v of this.who) v.leave(); this.D.emit({ type: 'villainsleave', text: 'The super villains are leaving the city' }); }
     if (this.persist) this.who.forEach((v, i) => { if (v.gone && !(v.flying && v.flying.length) && (v.goneT = (v.goneT || 0) + h) > 15) this.respawn(i); });
