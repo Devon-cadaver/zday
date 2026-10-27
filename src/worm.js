@@ -130,11 +130,11 @@ export function wormModel() {
 
 export class Worm {
   constructor(D, x, z, o = {}) {
-    this.type = 'worm'; this.D = D; this.alive = true; this.t = 0; this.life = o.life ?? 140; this.player = !!o.player;
+    this.type = 'worm'; this.D = D; this.alive = true; this.t = 0; this.life = o.life ?? 240; this.player = !!o.player;
     const B = D.ctx.city.bounds, a = Math.random() * 6.28;
     this.goal = [clamp(x, B.x0 + 40, B.x1 - 40), clamp(z, B.z0 + 40, B.z1 - 40)];
     this.x = clamp(this.goal[0] - Math.cos(a) * 70, B.x0 + 20, B.x1 - 20); this.z = clamp(this.goal[1] - Math.sin(a) * 70, B.z0 + 20, B.z1 - 20); this.y = SHALLOW;
-    this.yaw = Math.atan2(this.goal[1] - this.z, this.goal[0] - this.x); this.phase = 'tunnel'; this.arcT = 0; this.vy = 0;
+    this.yaw = Math.atan2(this.goal[1] - this.z, this.goal[0] - this.x); this.phase = 'tunnel'; this.arcT = 0; this.vy = 0; this.hp = o.hp ?? 900;
     this.path = []; for (let k = LEN + 18; k >= 0; k--) this.path.push({ x: this.x - Math.cos(this.yaw) * k, y: this.y - Math.min(6, k * 0.05), z: this.z - Math.sin(this.yaw) * k }); // the whole body from the start, trailing back underground
     this.shook = new Set(); this.holes = 0;
     const p = parts(), scene = D.ctx.scene;
@@ -152,6 +152,8 @@ export class Worm {
   get surfaced() { return this.phase === 'arc'; }
   steer(x, z) { const B = this.D.ctx.city.bounds; this.goal = [clamp(x, B.x0 + 30, B.x1 - 30), clamp(z, B.z0 + 30, B.z1 - 30)]; }
   // up out of the ground now
+  // hurt (by the heroes): enough and it dives deep and leaves once it is back underground
+  damage(n, by) { if (this.phase === 'leave' || this.phase === 'gone') return; this.hp -= n; if (by && !this.saidHero) { this.saidHero = true; this.D.emit({ type: 'wormhero', text: by + ' is fighting the worm!' }); } }
   breach() { if (this.phase !== 'tunnel') return false; this.phase = 'arc'; this.arcT = 0; return true; }
   newGoal() {
     const { people, city } = this.D.ctx, B = city.bounds; let best = -1;
@@ -164,6 +166,7 @@ export class Worm {
   }
   update(h) {
     const D = this.D, { city } = D.ctx, B = city.bounds;
+    h *= D.slowAt(this.x, Math.max(4, this.y), this.z); // a time bubble holds it
     this.t += h;
     if (this.phase === 'gone') { if ((this.goneT += h) > 4) this.alive = false; return; }
     // heading: round towards the goal
@@ -173,7 +176,7 @@ export class Worm {
     if (this.x < B.x0 + 15 || this.x > B.x1 - 15 || this.z < B.z0 + 15 || this.z > B.z1 - 15) { this.yaw += Math.PI * h; this.x = clamp(this.x, B.x0 + 15, B.x1 - 15); this.z = clamp(this.z, B.z0 + 15, B.z1 - 15); }
     if (this.phase === 'tunnel') {
       this.y += (SHALLOW - this.y) * Math.min(1, h * 2);
-      if (this.t > this.life) { this.phase = 'leave'; D.emit({ type: 'wormleave', text: 'The worm has gone deep. The ground is still' }); }
+      if (this.t > this.life || this.hp <= 0) { this.phase = 'leave'; D.emit({ type: 'wormleave', text: this.hp <= 0 ? 'The heroes drove the worm off! It has gone deep' : 'The worm has gone deep. The ground is still' }); }
       else if (!this.player && Math.hypot(this.goal[0] - this.x, this.goal[1] - this.z) < 10) this.breach();
       else if (this.player && Math.hypot(this.goal[0] - this.x, this.goal[1] - this.z) < 4) this.yaw += h * 1.2; // circles under your finger
     } else if (this.phase === 'arc') {

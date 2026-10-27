@@ -1261,6 +1261,13 @@ export class People {
     this.st[i] = S.EXT; this.lvl[i] = -1; this.inf[i] = 0; this.target[i] = -1; this.fx[i] = 0;
     return true;
   }
+  // set someone down on the street unhurt (carried down by a hero); they run from (fx, fz)
+  setDown(i, fx, fz) {
+    if (this.st[i] !== S.EXT) return;
+    this.y[i] = this.groundY(this.x[i], this.z[i]); this.lvl[i] = -1;
+    if (this.wz[i]) { this.st[i] = S.ZOMBIE; return; }
+    this.st[i] = S.IDLE; this.panic(i, fx, fz, -1);
+  }
   // let it go with a velocity: ballistic until it lands
   fling(i, vx, vy, vz) {
     if (this.st[i] !== S.EXT && !this.grab(i)) return;

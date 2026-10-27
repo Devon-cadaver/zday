@@ -13,6 +13,8 @@ import { rig, relax, handsOnHips, tumble } from './villains.js';
 import { tossStep } from './brawl.js';
 const up = (v) => v && !v.gone && !v.beaten;
 import { roofTop } from './tripod.js';
+import { ST } from './people.js';
+const _hv = new THREE.Vector3();
 
 const UP = 520; // carried this high, a meteor or a warhead is gone into space
 const HANDS = 4.9;
@@ -124,7 +126,7 @@ class Hero {
     }
     if (o.glow) this.hands = this.rig.arms.map(a => { const g = new THREE.Mesh(K.sphere, K.glow); g.scale.setScalar(0.07); g.position.y = -0.3; g.visible = false; a.el.add(g); return g; });
   }
-  get busy() { return this.job && (this.job.kind === 'catch' || this.job.kind === 'carry' || this.job.kind === 'return'); }
+  get busy() { return this.job && (this.job.kind === 'catch' || this.job.kind === 'carry' || this.job.kind === 'return' || this.job.kind === 'ferry'); }
   fly(gx, gy, gz, h, top = 50, extra = 0) {
     const dx = gx - this.x, dy = gy - this.y, dz = gz - this.z, d = Math.hypot(dx, dy, dz), sp = Math.min(top, d * 1.8 + extra), f = Math.min(1, h * 3);
     if (d > 0.01) { this.vx += (dx / d * sp - this.vx) * f; this.vy += (dy / d * sp - this.vy) * f; this.vz += (dz / d * sp - this.vz) * f; }
@@ -151,6 +153,8 @@ class Hero {
     else if (J.kind === 'slow') this.doSlow(h, J);
     else if (J.kind === 'bubble') this.doBubble(h, J);
     else if (J.kind === 'fetch') this.doFetch(h, J);
+    else if (J.kind === 'monster') this.doMonster(h, J);
+    else if (J.kind === 'ferry') this.doFerry(h, J);
   }
   // nothing to do: hover by the signal, then land on its roof
   idle(h) {
@@ -260,6 +264,53 @@ class Hero {
     }
     if (bl.trapped > 24 || bl.hp <= 0) { V.beat(bl, 'Tempo'); this.job = null; }
   }
+  // the giant worm and the kaiju: Tempo holds it in a time bubble, Dragonfly cuts loose whoever a tentacle holds,
+  // and they go for its heads (the worm's only when it is above ground)
+  doMonster(h, J) {
+    const m = J.m, kj = m.type === 'kaiju';
+    if (!m.alive || (kj ? m.state === 'leave' : m.phase === 'leave' || m.phase === 'gone')) { this.job = null; return; }
+    if (J.slow) {
+      const at = () => (m.alive ? (kj ? { x: m.x, y: 30, z: m.z } : { x: m.x, y: Math.max(4, m.y), z: m.z }) : null), p = at();
+      const d = this.fly(p.x + 45, this.cruiseY(p.x, p.z) + 15, p.z + 45, h, 60);
+      if (d < 150 && this.cd <= 0) {
+        this.cd = 9; this.castT = 0.6; this.H.bubble(p.x, p.y, p.z, kj ? 42 : 30, 6, at); this.job = null;
+        if (!this.H.saidSlowM) { this.H.saidSlowM = true; this.D.emit({ type: 'heroslowm', text: 'Tempo has the ' + (kj ? 'monster' : 'worm') + ' caught in a time bubble!' }); }
+      }
+      return;
+    }
+    if (J.cut && kj) {
+      const q = m.rig.tents.find((t) => t.held && t.held.ppl && t.held.ppl.length);
+      if (q) {
+        const d = this.fly(q.tip.x, q.tip.y, q.tip.z, h, 75, 25);
+        if (d < 5) {
+          const ppl = m.rescue(q); this.cd = 0.8;
+          if (ppl.length) { this.job = { kind: 'ferry', ppl, back: J, m }; if (!this.H.saidCut) { this.H.saidCut = true; this.D.emit({ type: 'herocut', text: this.name + ' cut people free of a tentacle!' }); } }
+        }
+        return;
+      }
+    }
+    let tx, ty, tz;
+    if (kj) { m.rig.heads[this.H.who.indexOf(this) % 2].head.getWorldPosition(_hv); tx = _hv.x; ty = _hv.y; tz = _hv.z; }
+    else if (m.phase === 'arc' && m.y > 2) { tx = m.x; ty = m.y; tz = m.z; }
+    else { this.fly(m.x + (this.name === 'Nova' ? 25 : -25), this.cruiseY(m.x, m.z) + 10, m.z, h, 45); return; } // over the ground where it is moving, waiting for it to come up
+    const d = this.fly(tx, ty, tz, h, 70, 20);
+    if (d < 6 && this.cd <= 0) {
+      this.cd = this.name === 'Nova' ? 1.2 : 1.6; this.punchT = 0.35;
+      const dx = this.x - tx, dz = this.z - tz, dl = Math.hypot(dx, dz) || 1;
+      m.damage((this.name === 'Nova' ? 12 : 6) * (kj ? 0.7 : 1), this.name); this.D.ctx.fire.burst(tx, ty, tz, 14, 2.5);
+      this.vx = dx / dl * 25; this.vz = dz / dl * 25; this.vy = 6; // knocked back off it
+      this.D.shake(0.15);
+    }
+  }
+  // people cut free: carried down to the street away from the monster and set down unhurt
+  doFerry(h, J) {
+    const people = this.D.ctx.people, m = J.m;
+    J.ppl = J.ppl.filter((j) => people.st[j] === ST.EXT);
+    if (!J.to) { const a = Math.atan2(this.z - m.z, this.x - m.x); J.to = people.snapWalkable(m.x + Math.cos(a) * 70, m.z + Math.sin(a) * 70, 30) || [m.x + Math.cos(a) * 70, m.z + Math.sin(a) * 70]; }
+    const d = this.fly(J.to[0], people.groundY(J.to[0], J.to[1]) + 1.6, J.to[1], h, 45);
+    J.ppl.forEach((j, k) => { people.x[j] = this.x + (k - 0.5) * 0.7; people.y[j] = this.y - 1.6; people.z[j] = this.z; });
+    if (d < 2.5 || !J.ppl.length) { for (const j of J.ppl) people.setDown(j, m.x, m.z); this.job = J.back; }
+  }
   // Tempo: a bubble over things flying through the air (thrown, flung by a tornado)
   doBubble(h, J) {
     const d = this.fly(J.x + 25, this.cruiseY(J.x, J.z), J.z + 25, h, 60);
@@ -361,6 +412,14 @@ export class Heroes {
       if (dragon.state === 'fly' && !dragon.job) { const w = V.who.find(v => v.name === 'Weaver'); if (w && (!w.gone && !w.beaten || w.webs.some(x => x.alive))) dragon.job = { kind: 'web', v: w, V }; }
       if (nova.state === 'fly' && !nova.job && ty) nova.job = { kind: 'fight', v: ty, V };
       if (tempo.state === 'fly' && !tempo.job && bl) tempo.job = { kind: 'slow', v: bl, V };
+    }
+    // the giant monsters: whoever is free goes at it
+    const M = D.list.find(e => e.alive && ((e.type === 'kaiju' && e.state !== 'leave') || (e.type === 'worm' && e.phase !== 'leave' && e.phase !== 'gone')));
+    if (M) {
+      work++;
+      if (nova.state === 'fly' && !nova.job) nova.job = { kind: 'monster', m: M };
+      if (dragon.state === 'fly' && !dragon.job) dragon.job = { kind: 'monster', m: M, cut: true };
+      if (tempo.state === 'fly' && !tempo.job && tempo.cd <= 0 && (M.type === 'kaiju' || M.phase === 'arc')) tempo.job = { kind: 'monster', m: M, slow: true };
     }
     // Tempo bubbles things flying through the air: cars and buildings thrown, tornado debris
     if (tempo.state === 'fly' && !tempo.job && tempo.cd <= 0) {

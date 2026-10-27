@@ -253,7 +253,7 @@ export function kaijuModel() {
 const _fr = new THREE.Frustum(), _pm = new THREE.Matrix4(), _sp = new THREE.Sphere();
 export class Kaiju {
   constructor(D, x, z, o = {}) {
-    this.type = 'kaiju'; this.D = D; this.alive = true; this.t = 0; this.hp = o.hp ?? 400; this.life = o.life ?? 200; this.player = !!o.player;
+    this.type = 'kaiju'; this.D = D; this.alive = true; this.t = 0; this.hp = o.hp ?? 1200; this.life = o.life ?? 300; this.player = !!o.player;
     const B = D.ctx.city.bounds, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2;
     // in from the edge of the city nearest where it was called
     const ex = x - cx, ez = z - cz, side = Math.abs(ex) > Math.abs(ez) ? [Math.sign(ex || 1), 0] : [0, Math.sign(ez || 1)];
@@ -265,7 +265,18 @@ export class Kaiju {
     if (!o.quiet) D.emit({ type: 'warn', hazard: 'kaiju', x: this.goal[0], z: this.goal[1], r: 60, exact: true, text: 'A giant monster is coming into the city from the ' + (side[0] ? (side[0] > 0 ? 'east' : 'west') : (side[1] > 0 ? 'south' : 'north')) + '!' });
   }
   steer(x, z) { const B = this.D.ctx.city.bounds; this.goal = [clamp(x, B.x0 + 30, B.x1 - 30), clamp(z, B.z0 + 30, B.z1 - 30)]; }
-  damage(n) { if (this.state === 'leave') return; this.hp -= n; this.D.ctx.fire.burst(this.x, 30, this.z, 20, 4); if (this.hp <= 0) this.retreat('The monster is hurt and retreating out of the city!'); }
+  damage(n, by) {
+    if (this.state === 'leave') return; this.hp -= n; if (!by) this.D.ctx.fire.burst(this.x, 30, this.z, 20, 4);
+    if (by && !this.saidHero) { this.saidHero = true; this.D.emit({ type: 'kaijuhero', text: by + ' is fighting the monster!' }); }
+    if (this.hp <= 0) this.retreat(by ? 'The heroes drove the monster off! It is retreating out of the city' : 'The monster is hurt and retreating out of the city!');
+  }
+  // a hero cuts what a tentacle holds loose: a car falls softly, the people are handed over (returned) to be carried down
+  rescue(q) {
+    const H = q.held, { people, traffic } = this.D.ctx; q.held = null; q.state = 'idle'; q.t = 0;
+    if (!H) return [];
+    if (H.car && !H.car.gone) { H.car.soft = true; traffic.fling(H.car, 0, -1, 0); }
+    return H.ppl ? H.ppl.filter((j) => people.st[j] === ST.EXT) : [];
+  }
   retreat(text) { if (this.state === 'leave') return; this.state = 'leave'; this.dropCar(); this.act = null; for (const q of this.rig.tents) this.tentIdle(q); const B = this.D.ctx.city.bounds, d = [this.x - B.x0, B.x1 - this.x, this.z - B.z0, B.z1 - this.z], m = Math.min(...d); this.goal = m === d[0] ? [B.x0 - 120, this.z] : m === d[1] ? [B.x1 + 120, this.z] : m === d[2] ? [this.x, B.z0 - 120] : [this.x, B.z1 + 120]; this.D.emit({ type: 'kaijuleave', text }); }
   onEvent(e) { if ((e.type === 'blast' && Math.hypot(e.x - this.x, e.z - this.z) < 35) || ((e.type === 'nuked' || e.type === 'nukeflash') && Math.hypot(e.x - this.x, e.z - this.z) < 200)) this.damage(e.type === 'blast' ? 50 : 999); }
   // pick something to do next: grab a car, swipe a building, roar
@@ -280,6 +291,7 @@ export class Kaiju {
   dropCar() { const a = this.act; if (a && a.kind === 'car' && a.held && !a.car.gone) this.D.ctx.traffic.fling(a.car, 0, -2, 0); }
   update(h) {
     const D = this.D, B = D.ctx.city.bounds;
+    h *= D.slowAt(this.x, 30, this.z); // held in one of Tempo's time bubbles, it all but stops
     this.t += h;
     if (this.state !== 'leave' && this.t > this.life) this.retreat('The monster is wandering back out of the city');
     if (this.state === 'leave' && (this.x < B.x0 - 100 || this.x > B.x1 + 100 || this.z < B.z0 - 100 || this.z > B.z1 + 100)) { this.alive = false; return; }
@@ -477,7 +489,7 @@ export class Kaiju {
     r.hips.position.y = exact || this.hy == null ? hy : this.hy;
     r.root.position.set(this.x, 0, this.z); r.root.rotation.y = -this.yaw;
     if (!exact) {
-      r.root.updateMatrixWorld(true); tentacles(r, Math.min(dt, 0.25), this.st);
+      r.root.updateMatrixWorld(true); tentacles(r, Math.min(dt, 0.25) * this.D.slowAt(this.x, 30, this.z), this.st);
       if (!this.swept || this.seen()) { sweep(r, this.st); this.swept = true; }
     }
   }
