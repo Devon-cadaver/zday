@@ -491,7 +491,8 @@ export class Kaiju {
     r.root.position.set(this.x, 0, this.z); r.root.rotation.y = -this.yaw;
     if (!exact) {
       r.root.updateMatrixWorld(true); tentacles(r, Math.min(dt, 0.25) * this.D.slowAt(this.x, 30, this.z), this.st);
-      if (!this.swept || this.seen()) { sweep(r, this.st); this.swept = true; }
+      const far = this.D.ctx.camera.position.distanceToSquared(r.root.position) > 560 * 560; this.fN = (this.fN || 0) + 1; // far off, its body is rebuilt every other frame: no one can tell
+      if (!this.swept || (this.seen() && (!far || this.fN % 2 === 0))) { sweep(r, this.st); this.swept = true; }
     }
   }
   dispose() { this.dropCar(); for (const q of this.rig.tents) this.tentIdle(q); this.D.ctx.scene.remove(this.rig.root); this.rig.body.geo.dispose(); }
