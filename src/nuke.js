@@ -266,16 +266,21 @@ export class NuclearStrike {
       return;
     }
     if (this.phase === 'fall') {
-      this.ft += h; const k = Math.min(1, this.ft / 5), p = this.from.clone().lerp(this.to, k * k * (3 - 2 * k) * 0.25 + k * 0.75);
+      this.ft += h * D.slowAt(this.missile.position.x, this.missile.position.y, this.missile.position.z); const k = Math.min(1, this.ft / 5), p = this.from.clone().lerp(this.to, k * k * (3 - 2 * k) * 0.25 + k * 0.75); // a time bubble holds it back
       this.missile.position.copy(p); this.missile.lookAt(this.to);
       if (Math.random() < 0.9) { const r = fire.smoke.alloc(2, p.x, p.y, p.z, 1.5, 1.5, 1.6, fire.uniforms.uTime.value); fire.later(2, () => fire.smoke.end(r, fire.uniforms.uTime.value)); fire.later(12, () => fire.smoke.release(r)); }
       fire.burst(p.x, p.y, p.z, 3, 2.2);
       if (k >= 1) { D.ctx.scene.remove(this.missile); this.missile.traverse(m => { if (m.geometry) { m.geometry.dispose(); m.material.dispose(); } }); this.missile = null; nuclearDamage(D, this.x, this.z, this.R); this.phase = 'after'; this.at = 0; D.emit({ type: 'detonation', x: this.x, z: this.z, text: 'Detonation. The ' + D.district(this.x, this.z) + ' district is gone' }); }
       return;
     }
+    if (this.phase === 'held') { const p = this.missile.position; fire.burst(p.x, p.y - 3, p.z, 2, 2); return; }
     if ((this.at += h) > 3) this.alive = false;
   }
-  poi() { return this.phase === 'fall' && this.missile ? { x: this.missile.position.x, z: this.missile.position.z, danger: 0, range: 3000 } : null; }
+  get OBJ() { return this.missile; } set OBJ(v) { this.missile = v; }
+  // a hero has it: no impact; the hero carries it up and away (the ball follows the hero) until vanish()
+  seize() { if (this.phase !== 'fall') return false; this.phase = 'held'; return true; }
+  vanish() { this.phase = 'gone'; const o = this.OBJ; if (o) { this.D.ctx.scene.remove(o); o.traverse(m => { if (m.geometry) { m.geometry.dispose(); m.material.dispose(); } }); } this.OBJ = null; this.alive = false; }
+  poi() { return (this.phase === 'fall' || this.phase === 'held') && this.missile ? { x: this.missile.position.x, z: this.missile.position.z, danger: 0, range: 3000 } : null; }
   sync() {}
   dispose() { if (this.missile) this.D.ctx.scene.remove(this.missile); }
 }

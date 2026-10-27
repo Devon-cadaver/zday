@@ -16,6 +16,7 @@ export const UNITS = [
   { id: 'build', name: 'Construction', cost: 100, cd: 20, alert: 0 }, // rebuilds a fallen building
   { id: 'camp', name: 'Medical camp', cost: 120, cd: 40, alert: 0 }, // shelters people nearby until the rebuilding is done
   { id: 'hazmat', name: 'Hazmat team', cost: 120, cd: 30, alert: 0 }, // clears radiation so building can start, decontaminates people
+  { id: 'heroes', name: 'Hero signal', cost: 300, cd: 120, alert: 0 }, // Dragonfly, Nova and Tempo: catch meteors and missiles, slow what flies
   { id: 'fire', name: 'Fire truck', cost: 80, cd: 30, alert: 2 },
   { id: 'water', name: 'Water heli', cost: 150, cd: 60, alert: 2 },
   { id: 'rescue', name: 'Rescue heli', cost: 120, cd: 45, alert: 2 },
@@ -100,7 +101,7 @@ export class Commander {
     if (g.helis) g.helis.doubleDrop = this.pr.has('doubledrop');
     for (const o of [...(this.works || []), ...(this.camps || []), ...(this.hazmats || [])]) o.dispose();
     this.works = []; this.camps = []; this.hazmats = []; this.buildTo = new Set();
-    this.rebuiltN = 0; this.crews = 0; this.campsSent = 0; this.sheltered = 0; this.hazSent = 0; this.cleanups = 0; this.jailBuses = 0;
+    this.rebuiltN = 0; this.crews = 0; this.campsSent = 0; this.sheltered = 0; this.hazSent = 0; this.cleanups = 0; this.jailBuses = 0; this.heroCalls = 0;
     g.resetWorld(); g.setSpeed(1);
     this.t = 0; this.rp = START_RP; this.earned = 0; this.alert = 0; this.blocksInf = 0; this.fires = 0; this.ended = false;
     this.sel = null; this.cool = {}; for (const u of UNITS) this.cool[u.id] = 0;
@@ -152,7 +153,7 @@ export class Commander {
   // nothing left to deal with: no disaster under way, no zombies or bitten, no buildings burning
   quiet() {
     const p = this.g.people;
-    return !this.g.disasters.list.length && p.stats.zombies === 0 && p.stats.infected === 0 && this.fires === 0 && this.sites.every(s => s.fired);
+    return !this.g.disasters.list.some(e => e.type !== 'heroes') && p.stats.zombies === 0 && p.stats.infected === 0 && this.fires === 0 && this.sites.every(s => s.fired);
   }
 
   // a 911 call: toast, call strip, and a search zone on the map (jittered, so it is a hunt)
@@ -188,7 +189,7 @@ export class Commander {
     if (id === 'boat' && !this.g.disasters.boats.flooded) { this.g.toast('Rescue boats need flooded streets'); return; }
     for (const o of Object.values(this.cards)) o.btn.classList.remove('sel');
     this.sel = id; c.btn.classList.add('sel');
-    this.g.toast(id === 'build' ? 'Tap a fallen building to rebuild it' : id === 'camp' ? 'Tap where the medical camp should go' : id === 'hazmat' ? 'Tap the area to decontaminate' : 'Tap the map where the ' + c.u.name.toLowerCase() + ' should go');
+    this.g.toast(id === 'heroes' ? 'Tap where to shine the hero signal' : id === 'build' ? 'Tap a fallen building to rebuild it' : id === 'camp' ? 'Tap where the medical camp should go' : id === 'hazmat' ? 'Tap the area to decontaminate' : 'Tap the map where the ' + c.u.name.toLowerCase() + ' should go');
   }
 
   tap(x, z) {
@@ -209,6 +210,7 @@ export class Commander {
     else if (id === 'build') this.sendBuild(x, z);
     else if (id === 'camp') this.sendCamp(x, z);
     else if (id === 'hazmat') this.sendHazmat(x, z);
+    else if (id === 'heroes') { this.g.disasters.start('heroes', x, z); this.spend('heroes'); this.heroCalls++; }
   }
 
   // a construction crew to the nearest fallen building: it clears the rubble and builds it back up
@@ -660,6 +662,7 @@ export class Commander {
       ['Incidents', this.hit.map(threatName).join(', ') || 'none'],
       ...(this.hit.some(h => h !== 'zombies') ? [['Killed by disasters', (s.disasterCiv + s.drowned).toLocaleString()]] : []),
       ...(s.arrests ? [['Rioters arrested / taken away', s.arrests + ' / ' + s.jailed]] : []),
+      ...(this.heroCalls ? [['Hero signals', this.heroCalls]] : []),
       ...(this.crews || this.campsSent || this.hazSent ? [['Buildings rebuilt', this.rebuiltN], ['Sheltered in camps / bites treated', this.sheltered + ' / ' + s.treated], ['Hazmat clean-ups', this.cleanups]] : []),
       ...(this.hit.includes('aliens') ? [['Saucers / tripods downed', this.saucers + ' / ' + (this.tripods || 0)], ['Aliens killed', s.aliensKilled], ['Abducted', s.abducted]] : []),
       ['Time', Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0')],

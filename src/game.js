@@ -104,11 +104,12 @@ const CSS = `
 #zd-dis .zd-btn.sel{border-color:#a6ff4d;color:#a6ff4d}
 #zd-dis .zd-btn.zb{color:#a6ff4d;border-color:rgba(166,255,77,.35)}
 #zd-dis .zd-btn.zb.empty{opacity:.5}
+#zd-dis .zd-btn.hero{color:#ffe08a;border-color:rgba(255,224,138,.45)}
 #zd-disb.on{border-color:#ff9a5a;color:#ffb070}
 @media (prefers-reduced-motion: reduce){#zd-toast{transition:none}}
 `;
 
-const UNIT_NAMES = { build: 'Construction crew', camp: 'Medical camp', hazmat: 'Hazmat team', police: 'Police cruiser', bus: 'Evacuation bus', chaser: 'Storm chaser', seeder: 'Cloud seeder', boat: 'Rescue boat', fire: 'Fire truck', water: 'Water helicopter', rescue: 'Rescue helicopter', apc: 'Army APC', strike: 'Airstrike', nuke: 'Nuke' };
+const UNIT_NAMES = { heroes: 'Hero signal', build: 'Construction crew', camp: 'Medical camp', hazmat: 'Hazmat team', police: 'Police cruiser', bus: 'Evacuation bus', chaser: 'Storm chaser', seeder: 'Cloud seeder', boat: 'Rescue boat', fire: 'Fire truck', water: 'Water helicopter', rescue: 'Rescue helicopter', apc: 'Army APC', strike: 'Airstrike', nuke: 'Nuke' };
 
 // the city runs on its own behind the menu
 class Idle {
@@ -385,8 +386,10 @@ class Sandbox {
   buildPanel() {
     const g = this.g, d = document.createElement('div'); d.id = 'zd-dis'; d.hidden = true;
     d.innerHTML = '<div class="h">Disasters</div><div class="g"><button class="zd-btn zb" type="button" data-zb>Zombies · ' + START_DROPS + '</button>' + Object.keys(HAZARDS).map(h => '<button class="zd-btn" type="button" data-hz="' + h + '">' + HAZARDS[h].name + '</button>').join('') + '</div>' +
+      '<div class="h">Heroes</div><div class="g"><button class="zd-btn hero" type="button" data-hero>Hero signal \u262E</button></div>' +
       '<div class="h">Weather</div><div class="g w">' + Object.keys(WEATHER).map(w => '<button class="zd-btn" type="button" data-wx="' + w + '">' + WEATHER[w].name.replace('Thunderstorm', 'Storm') + '</button>').join('') + '</div>';
     document.body.appendChild(d); this.panel = d; this.zbBtn = d.querySelector('[data-zb]');
+    d.querySelector('[data-hero]').onclick = () => { const tg = g.controls.target; g.disasters.start('heroes', tg.x, tg.z); this.pending = null; this.close(); if (this.clock < 0) this.clock = 0; }; // the peace sign goes up over the middle of the view
     this.zbBtn.onclick = () => { // armed until the Shamblers run out or you tap Done: every tap on a street drops one
       if (this.dropsLeft <= 0) { g.toast('No Shamblers left. Tap Reset to start over'); return; }
       this.pending = 'zombies'; d.querySelectorAll('[data-hz]').forEach(o => o.classList.remove('sel'));

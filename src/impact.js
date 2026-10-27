@@ -177,16 +177,17 @@ export class Meteor {
     }
     if (this.phase === 'fall') {
       const fallT = 3 + Math.max(0, this.R - 20) / 50; // a giant takes longer to come down, and you see it all the way
-      this.ft += h; const k = Math.min(1, this.ft / fallT), p = this.from.clone().lerp(this.to, k);
+      this.ft += h * D.slowAt(this.ball.position.x, this.ball.position.y, this.ball.position.z); const k = Math.min(1, this.ft / fallT), p = this.from.clone().lerp(this.to, k); // a time bubble holds it back
       this.ball.position.copy(p);
       const back = this.small ? 0 : Math.max(6, this.R * 0.32) * 1.3, dv = this.to.clone().sub(this.from).normalize(); // the fire streams off behind it
       if (Math.random() < 0.8) fire.burst(p.x - dv.x * back, p.y - dv.y * back, p.z - dv.z * back, 5 + Math.round(this.R / 15), this.small ? 3 : Math.max(7, this.R * 0.3));
       if (this.R > 40) D.shake(k * k * 0.8);
       if (Math.random() < 0.5) { const r = fire.smoke.alloc(3, p.x, p.y, p.z, 4, 4, this.small ? 1.5 : 3, fire.uniforms.uTime.value); fire.later(3, () => fire.smoke.end(r, fire.uniforms.uTime.value)); fire.later(14, () => fire.smoke.release(r)); }
       D.flash(k * k * (this.small ? 0.1 : 0.35));
-      if (k >= 1) { D.ctx.scene.remove(this.ball); this.ball.traverse(o => { if (o.geometry) { o.geometry.dispose(); o.material.dispose(); } }); this.impact(); this.phase = 'after'; this.at = 0; }
+      if (k >= 1) { D.ctx.scene.remove(this.ball); this.ball.traverse(o => { if (o.geometry) { o.geometry.dispose(); o.material.dispose(); } }); this.ball = null; this.impact(); this.phase = 'after'; this.at = 0; }
       return;
     }
+    if (this.phase === 'held') { const p = this.ball.position; if (Math.random() < 0.7) fire.burst(p.x, p.y - 4, p.z, 4, Math.max(5, this.R * 0.25)); return; }
     this.at += h;
     if (this.ring) {
       const k = Math.min(1, this.at / 1.6); this.ring.scale.setScalar(0.1 + k * this.R * 7); this.ring.material.opacity = 0.55 * (1 - k);
@@ -194,7 +195,11 @@ export class Meteor {
     }
     if (this.at > 4) this.alive = false;
   }
-  poi() { return this.phase === 'fall' && this.ball ? { x: this.ball.position.x, z: this.ball.position.z, danger: 0, range: 3000 } : null; }
+  poi() { return (this.phase === 'fall' || this.phase === 'held') && this.ball ? { x: this.ball.position.x, z: this.ball.position.z, danger: 0, range: 3000 } : null; }
+  get OBJ() { return this.ball; } set OBJ(v) { this.ball = v; }
+  // a hero has it: no impact; the hero carries it up and away (the ball follows the hero) until vanish()
+  seize() { if (this.phase !== 'fall') return false; this.phase = 'held'; return true; }
+  vanish() { this.phase = 'gone'; const o = this.OBJ; if (o) { this.D.ctx.scene.remove(o); o.traverse(m => { if (m.geometry) { m.geometry.dispose(); m.material.dispose(); } }); } this.OBJ = null; this.alive = false; }
   impact() {
     const D = this.D, { people, traffic, city, fire } = D.ctx, x = this.x, z = this.z, R = this.R;
     if (R >= 40) { // a city killer and up: a crater blasted out of the ground and a blast like two nukes going off at once

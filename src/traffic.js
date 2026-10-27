@@ -113,6 +113,7 @@ export class Traffic {
     car.mode = AIR; car.vx = vx; car.vy = vy; car.vz = vz; car.w = (this.r() - 0.5) * 6; car.rw = (this.r() - 0.5) * 8; car.pw = (this.r() - 0.5) * 6;
   }
   airStep(car, h) {
+    if (this.slowAt) h *= this.slowAt(car.x, car.y, car.z); // a time bubble
     car.vy -= 9.8 * h; car.x += car.vx * h; car.y += car.vy * h; car.z += car.vz * h;
     car.yaw += car.w * h; car.roll += car.rw * h; car.pitch += car.pw * h;
     const w = this.waterAt ? this.waterAt(car.x, car.z) : -99, gy = this.groundAt ? this.groundAt(car.x, car.z) : 0;

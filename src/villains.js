@@ -42,7 +42,7 @@ function kit() {
 
 const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
 // stretch a beam or a thread (kit().ray) from a to b
-function aim(mesh, ax, ay, az, bx, by, bz, r) {
+export function aim(mesh, ax, ay, az, bx, by, bz, r) {
   _v.set(bx - ax, by - ay, bz - az); const len = _v.length() || 0.01; _v.multiplyScalar(1 / len);
   mesh.position.set(ax, ay, az); mesh.quaternion.setFromUnitVectors(_up, _v); mesh.scale.set(r, len, r);
 }
@@ -51,10 +51,10 @@ function dropShell(scene, shell) { scene.remove(shell); shell.traverse((m) => { 
 
 // a cape: cloth hung from the shoulders that streams out behind with speed and ripples
 class Cape {
-  constructor(parent, len) {
+  constructor(parent, len, mat) {
     this.C = 5; this.R = 9; this.len = len; this.lift = 0; this.t = Math.random() * 10;
     this.g = new THREE.PlaneGeometry(1, 1, this.C - 1, this.R - 1); // its vertices are laid out again every frame
-    this.mesh = new THREE.Mesh(this.g, kit().cape); this.mesh.castShadow = true; this.mesh.frustumCulled = false; parent.add(this.mesh);
+    this.mesh = new THREE.Mesh(this.g, mat || kit().cape); this.mesh.castShadow = true; this.mesh.frustumCulled = false; parent.add(this.mesh);
   }
   // lift: 0 hangs straight down, 1 streams straight back; flap: how hard it ripples
   update(dt, lift, flap) {
@@ -77,40 +77,44 @@ class Cape {
 }
 
 // a figure about 1.8 m tall (before scaling) facing +z, feet at the origin; every limb a pivot
-function rig(o = {}) {
-  const m = kit(), root = new THREE.Group(), body = new THREE.Group(); root.add(body); body.scale.setScalar(S);
+export function rig(o = {}) {
+  const m = kit(), mt = o.mats || m, root = new THREE.Group(), body = new THREE.Group(); root.add(body); body.scale.setScalar(S);
   const part = (g, mat, sx, sy, sz, x, y, z, parent) => { const me = new THREE.Mesh(g, mat); me.scale.set(sx, sy, sz); me.position.set(x, y, z); me.castShadow = true; parent.add(me); return me; };
   const pivot = (parent, x, y, z) => { const p = new THREE.Group(); p.position.set(x, y, z); parent.add(p); return p; };
   const hips = pivot(body, 0, 0.94, 0);
-  part(m.box, m.suit, 0.3, 0.16, 0.18, 0, 0, 0, hips);
+  const sl = o.slim ? 0.88 : 1;
+  part(m.box, mt.suit, 0.3 * sl, 0.16, 0.18, 0, 0, 0, hips);
   const legs = [-1, 1].map(sx => {
-    const hip = pivot(hips, sx * 0.09, -0.04, 0); part(m.limb, m.suit, 0.075, 0.46, 0.075, 0, 0, 0, hip);
-    const knee = pivot(hip, 0, -0.45, 0); part(m.limb, m.suit, 0.06, 0.44, 0.06, 0, 0, 0, knee); part(m.box, m.suit, 0.1, 0.07, 0.22, 0, -0.45, 0.05, knee);
+    const hip = pivot(hips, sx * 0.09, -0.04, 0); part(m.limb, mt.suit, 0.075 * sl, 0.46, 0.075 * sl, 0, 0, 0, hip);
+    const knee = pivot(hip, 0, -0.45, 0); part(m.limb, mt.suit, 0.06 * sl, 0.44, 0.06 * sl, 0, 0, 0, knee); part(m.box, mt.boot || mt.suit, 0.1, 0.07, 0.22, 0, -0.45, 0.05, knee);
     return { hip, knee };
   });
   const torso = pivot(hips, 0, 0.06, 0);
-  part(m.box, m.suit, 0.36, 0.5, 0.2, 0, 0.28, 0, torso);
-  part(m.box, m.suit, 0.44, 0.1, 0.22, 0, 0.5, 0, torso); // shoulders
+  part(m.box, mt.suit, 0.36 * sl, 0.5, 0.2, 0, 0.28, 0, torso);
+  part(m.box, mt.suit, 0.44 * sl, 0.1, 0.22, 0, 0.5, 0, torso); // shoulders
+  if (mt.belt) part(m.box, mt.belt, 0.37 * sl, 0.05, 0.21, 0, 0.05, 0, torso);
+  if (mt.badge) part(m.box, mt.badge, 0.12, 0.12, 0.02, 0, 0.36, 0.105, torso); // the emblem on the chest
   const head = pivot(torso, 0, 0.7, 0);
-  part(m.ball, m.skin, 0.11, 0.13, 0.115, 0, 0, 0, head);
-  part(m.ball, m.hair, 0.117, 0.085, 0.122, 0, 0.055, -0.014, head); // slicked-back black hair
-  part(m.box, m.skin, 0.06, 0.08, 0.06, 0, -0.13, 0, head); // neck
-  const eyes = o.eyes ? [-1, 1].map(sx => part(m.ball, m.eye, 0.024, 0.02, 0.016, sx * 0.042, 0.015, 0.104, head)) : null;
+  part(m.ball, mt.skin, 0.11, 0.13, 0.115, 0, 0, 0, head);
+  part(m.ball, mt.hair, 0.117, 0.085, 0.122, 0, 0.055, -0.014, head); // the hair
+  if (o.longHair) part(m.box, mt.hair, 0.12, 0.26, 0.06, 0, -0.1, -0.1, head); // a long ponytail down the back
+  part(m.box, mt.skin, 0.06, 0.08, 0.06, 0, -0.13, 0, head); // neck
+  const eyes = o.eyes ? [-1, 1].map(sx => part(m.ball, mt.eye || m.eye, 0.024, 0.02, 0.016, sx * 0.042, 0.015, 0.104, head)) : null;
   const arms = [];
   (o.arms === 6 ? [0.48, 0.34, 0.2] : [0.48]).forEach((y, row) => {
     for (const sx of [-1, 1]) {
-      const sh = pivot(torso, sx * 0.23, y, 0); part(m.limb, m.suit, 0.055, 0.3, 0.055, 0, 0, 0, sh);
-      const el = pivot(sh, 0, -0.29, 0); part(m.limb, m.suit, 0.045, 0.27, 0.045, 0, 0, 0, el); part(m.ball, m.skin, 0.045, 0.05, 0.045, 0, -0.29, 0, el);
+      const sh = pivot(torso, sx * 0.23 * sl, y, 0); part(m.limb, mt.suit, 0.055 * sl, 0.3, 0.055 * sl, 0, 0, 0, sh);
+      const el = pivot(sh, 0, -0.29, 0); part(m.limb, mt.suit, 0.045 * sl, 0.27, 0.045 * sl, 0, 0, 0, el); part(m.ball, mt.glove || mt.skin, 0.045, 0.05, 0.045, 0, -0.29, 0, el);
       arms.push({ sh, el, sx, row });
     }
   });
-  const cape = new Cape(torso, o.capeLen ?? 1.15);
+  const cape = new Cape(torso, o.capeLen ?? 1.15, mt.cape);
   return { root, body, hips, torso, head, legs, arms, eyes, cape };
 }
 // a hand's place in the world (call after the pose is set and the matrices updated)
-const handAt = (arm, out) => arm.el.localToWorld(out.set(0, -0.3, 0));
+export const handAt = (arm, out) => arm.el.localToWorld(out.set(0, -0.3, 0));
 
-function relax(r) {
+export function relax(r) {
   for (const L of r.legs) { L.hip.rotation.set(0, 0, 0); L.knee.rotation.set(0, 0, 0); }
   for (const a of r.arms) { a.sh.rotation.set(0, 0, a.sx * 0.08); a.el.rotation.set(0, 0, 0); }
   r.torso.rotation.set(0, 0, 0); r.head.rotation.set(0, 0, 0); r.body.rotation.set(0, 0, 0); r.body.position.y = 0; r.hips.position.y = 0.94;
@@ -124,7 +128,7 @@ function run(r, ph, k) {
   A[0].el.rotation.set(-1.4 * k, 0, 0); A[1].el.rotation.set(-1.4 * k, 0, 0);
   r.hips.position.y = 0.94 - 0.07 * k + Math.abs(c) * 0.05 * k;
 }
-function handsOnHips(r) {
+export function handsOnHips(r) {
   r.legs[0].hip.rotation.z = -0.09; r.legs[1].hip.rotation.z = 0.09;
   for (const a of r.arms) { a.sh.rotation.set(0.15, 0, a.sx * 0.6); a.el.rotation.set(-0.3, 0, -a.sx * 1.7); }
 }
@@ -154,7 +158,7 @@ class Trail {
 
 class Villain {
   constructor(V, o) {
-    this.V = V; this.D = V.D; this.x = o.x; this.z = o.z; this.y = o.y ?? 0; this.yaw = Math.random() * 6.28; this.t = Math.random() * 5; this.speed = 0; this.player = false;
+    this.V = V; this.D = V.D; this.x = o.x; this.z = o.z; this.y = o.y ?? 0; this.yaw = Math.random() * 6.28; this.t = Math.random() * 5; this.speed = 0; this.player = false; this.hp = 100; this.trapped = 0;
     this.rig = rig(o.rig); V.scene.add(this.rig.root);
   }
   face(dx, dz, h, k = 8) { if (Math.hypot(dx, dz) < 1e-4) return; let d = Math.atan2(dx, dz) - this.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); this.yaw += d * Math.min(1, h * k); }
@@ -221,8 +225,9 @@ class Blur extends Villain {
       return;
     }
     this.speed = Math.min(this.leaving ? 80 : 62, this.speed + h * 240, d * 5 + 8);
-    const ux = dx / d, uz = dz / d, step = Math.min(d, this.speed * h);
-    this.face(ux, uz, h, 30); this.ph += h * (5 + this.speed * 0.45);
+    const slow = this.D.slowAt(this.x, 2, this.z); if (slow < 1) this.trapped += h; // caught in a time bubble
+    const ux = dx / d, uz = dz / d, step = Math.min(d, this.speed * h * slow);
+    this.face(ux, uz, h, 30); this.ph += h * slow * (5 + this.speed * 0.45);
     for (let done = 0; done < step;) { const s = Math.min(1.2, step - done); this.x += ux * s; this.z += uz * s; done += s; this.tear(ux, uz); this.trail.push(this.x, this.y, this.z, this.V.t); }
     this.y = this.ground();
     if ((this.scareT -= h) <= 0) { this.scareT = 0.3; this.D.ctx.people.scare(this.x, this.z, 24, 0.6); }
@@ -412,7 +417,7 @@ class Tyrant extends Villain {
     const x0 = this.x, y0 = this.y + HANDS, z0 = this.z, d = Math.hypot(P.tx - x0, P.tz - z0), T = clamp(d / 30, 0.9, 2.6);
     const vx = (P.tx - x0) / T, vz = (P.tz - z0) / T, vy = (P.ty - y0 + 0.5 * G * T * T) / T;
     if (H.car) { H.car.soft = true; this.D.ctx.traffic.fling(H.car, vx, vy, vz); this.flying.push({ car: H.car, px: H.car.x, pz: H.car.z }); }
-    else this.flying.push({ shell: H.shell, x: H.shell.position.x, y: y0, z: H.shell.position.z, vx, vy, vz, w: (Math.random() - 0.5) * 1.6, w2: (Math.random() - 0.5) * 0.7, half: H.half, hgt: H.hgt, base: H.base, hex: H.hex });
+    else this.flying.push({ shell: H.shell, k: H.k, x: H.shell.position.x, y: y0, z: H.shell.position.z, vx, vy, vz, w: (Math.random() - 0.5) * 1.6, w2: (Math.random() - 0.5) * 0.7, half: H.half, hgt: H.hgt, base: H.base, hex: H.hex });
     this.held = null; this.plan = null; this.after = 0.45;
   }
   // thrown things in flight: what they hit
@@ -428,8 +433,10 @@ class Tyrant extends Villain {
         f.px = c.x; f.pz = c.z;
         continue;
       }
-      f.vy -= G * h; f.x += f.vx * h; f.y += f.vy * h; f.z += f.vz * h;
-      f.shell.position.set(f.x, f.y - f.base, f.z); f.shell.rotation.y += f.w * h; f.shell.rotation.x += f.w2 * h;
+      if (f.caught) continue; // a hero has it
+      const hs = h * this.D.slowAt(f.x, f.y, f.z);
+      f.vy -= G * hs; f.x += f.vx * hs; f.y += f.vy * hs; f.z += f.vz * hs;
+      f.shell.position.set(f.x, f.y - f.base, f.z); f.shell.rotation.y += f.w * hs; f.shell.rotation.x += f.w2 * hs;
       let hit = false; city.buildingsNear(f.x, f.z, f.half * 0.6, (k, d, b) => { if (b.top > f.y + 1) hit = true; });
       if (hit || f.y <= this.ground(f.x, f.z) + 0.5) { this.crash(f); this.flying.splice(i, 1); }
     }
@@ -492,7 +499,7 @@ class Tyrant extends Villain {
   leave() {
     const H = this.held;
     if (H && H.car) { H.car.soft = true; this.D.ctx.traffic.fling(H.car, 0, -1, 0); }
-    else if (H) this.flying.push({ shell: H.shell, x: H.shell.position.x, y: H.shell.position.y + H.base, z: H.shell.position.z, vx: 0, vy: 0, vz: 0, w: 0.3, w2: 0.1, half: H.half, hgt: H.hgt, base: H.base, hex: H.hex });
+    else if (H) this.flying.push({ shell: H.shell, k: H.k, x: H.shell.position.x, y: H.shell.position.y + H.base, z: H.shell.position.z, vx: 0, vy: 0, vz: 0, w: 0.3, w2: 0.1, half: H.half, hgt: H.hgt, base: H.base, hex: H.hex });
     this.held = null; this.plan = null; this.ray = null; this.wind = 0; this.state = this.state === 'gone' ? 'gone' : 'leave'; this.vy = 0;
   }
   // in Be The Disaster: a quick tap grabs what is nearest, or throws what he holds; holding fires the lasers
@@ -761,6 +768,8 @@ export class Villains {
     if (!o.only || o.only === 'weaver') this.who.push(new Weaver(this, x, z));
     if (!o.quiet) D.emit({ type: 'warn', hazard: 'villains', x, z, r: 60, text: 'Super villains are attacking the ' + D.district(x, z) + ' district! Blur, Tyrant and Weaver' });
   }
+  // a hero has beaten one of them: they give up and leave the city
+  beat(v, by) { if (v.beaten || v.gone) return; v.beaten = true; v.leave(); this.D.emit({ type: 'villainbeaten', x: v.x, z: v.z, text: by + ' beat ' + v.name + '! ' + v.name + ' is fleeing the city' }); }
   near(x, z) { const { camera, controls } = this.D.ctx, c = controls.target; return Math.hypot(x - c.x, z - c.z) < camera.position.distanceTo(c) * 1.2; }
   tintWeb(c) { this._c.set(c.colHex).lerp(this._white, 0.7); this.D.ctx.traffic.tint(c, '#' + this._c.getHexString()); }
   // set a car alight where it is (it stops dead rather than careering on)
@@ -796,7 +805,7 @@ export class Villains {
     for (const v of this.who) v.update(h);
     this.shotStep(h); this.goo.update(h); this.silk.update(h);
     if (!this.leaving && this.t > this.life) { this.leaving = true; for (const v of this.who) v.leave(); this.D.emit({ type: 'villainsleave', text: 'The super villains are leaving the city' }); }
-    if (this.leaving && this.who.every(v => v.gone && !(v.flying && v.flying.length))) this.alive = false;
+    if (this.who.every(v => v.gone && !(v.flying && v.flying.length))) this.alive = false;
   }
   sync(dt, realT) {
     for (const v of this.who) v.sync(dt, realT);

@@ -257,6 +257,13 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 - Sirens (sirens.js): flashing light bars on every mission vehicle, boats, heli beacons, plus beacons at sites, camps and cordons. Additive points (bigger halos at night) and coloured street light pools at night. The old whole-vehicle red/blue emissive flash is gone.
 - Commander unit cards now sit in one horizontally scrolling row (.zd-cards).
 
+## Super heroes (heroes.js)
+- Hero signal: Sandbox Disasters menu (Heroes section, "Hero signal ☮") or Commander card (L4, 300 pts, cd 120). D.start('heroes', x, z): a searchlight on the tallest roof near the view angles up towards the camera and paints a glowing peace sign on clouds at the top of the view (sprite sized to ~0.085 x its camera distance). Calling again while they are around just re-lights it.
+- Dragonfly (four buzzing insect wings): cuts every Weaver web (web.release), then hits Weaver 3 times (34 hp each, knocks him off his perch). Nova (female, ponytail, strongest): grabs any building Tyrant throws and carries it home (city.restoreBuilding), punches Tyrant 4 times (25 hp) and catches what he drops. Tempo (glowing hands): time bubbles (D.bubbles, D.slowAt = 0.1 inside) ahead of Blur until he has been trapped 3.5 s; bubbles over thrown cars/buildings and tornado debris (traffic.airStep, debris FLY, Tyrant shells all honour slowAt).
+- All three: incoming meteors and nuclear missiles. They wait under the target during the warning, Tempo bubbles the falling object, the nearest (Nova preferred) seizes it (e.seize(): phase held) and flies it up to y 520, then e.vanish(). Meteors R >= 40 are smashed first (glowing chunks fly up). Tested: normal meteor, warhead and planet killer all caught, no damage.
+- Villains.beat(v, hero): v.leave() with a toast; the Villains event ends when all are gone. Heroes leave after 40 s with nothing to do. Commander.quiet() ignores the heroes event.
+- Hero look: peach skin, white suit, boots and cape, gold belt and chest emblem (rig() in villains.js now takes mats, slim, longHair).
+
 ## Next
 - Sean tests v1.3 on his phone; tune from his notes. Candidates: Be The Disaster score scales and ranks once real scores come in, the saucer size at close zoom, how often zombie outbreaks turn up in Commander, incident pacing, card bar height on the phone.
 

@@ -104,11 +104,13 @@ export class Debris {
         this.rx[i] += this.wx[i] * h; this.ry[i] += this.wy[i] * h; this.rz[i] += this.wz[i] * h;
         if (this.t[i] <= 0) this.fling(i, vt);
       } else if (md === M.FLY) {
+        const h0 = h; h *= this.slowAt ? this.slowAt(this.x[i], this.y[i], this.z[i]) : 1; // a time bubble
         this.vy[i] -= G * h; this.x[i] += this.vx[i] * h; this.y[i] += this.vy[i] * h; this.z[i] += this.vz[i] * h;
         this.rx[i] += this.wx[i] * h; this.ry[i] += this.wy[i] * h; this.rz[i] += this.wz[i] * h;
         const w = wy ? wy(this.x[i], this.z[i]) : -99;
         if (w > 0.3 && this.y[i] <= w) { this.mode[i] = M.FLOAT; if (this.onSplash && this.vy[i] < -6) this.onSplash(this.x[i], w, this.z[i], this.sx[i]); this.vy[i] = 0; }
         else if (this.y[i] <= this.groundY(this.x[i], this.z[i]) + this.sy[i] * 0.4) { this.y[i] = this.groundY(this.x[i], this.z[i]) + this.sy[i] * 0.4; this.mode[i] = M.REST; this.t[i] = 25 + Math.random() * 10; this.rx[i] = 0; this.rz[i] = (Math.random() - 0.5) * 0.3; }
+        h = h0;
       } else if (md === M.FLOAT) {
         const w = wy ? wy(this.x[i], this.z[i]) : -99;
         const f = Math.exp(-0.35 * h); this.vx[i] *= f; this.vz[i] *= f;
@@ -159,7 +161,8 @@ export class Debris {
         o.position.x += (vt.x + (vt.lx || 0) * l + Math.cos(d.a) * r - o.position.x) * f; o.position.z += (vt.z + (vt.lz || 0) * l + Math.sin(d.a) * r - o.position.z) * f;
         o.rotation.x += d.w.x * h; o.rotation.y += d.w.y * h; o.rotation.z += d.w.z * h;
       } else if (d.mode === M.FLY) {
-        d.v.y -= G * h; o.position.addScaledVector(d.v, h);
+        const hs = h * (this.slowAt ? this.slowAt(o.position.x, o.position.y, o.position.z) : 1);
+        d.v.y -= G * hs; o.position.addScaledVector(d.v, hs);
         o.rotation.x += d.w.x * h; o.rotation.y += d.w.y * h; o.rotation.z += d.w.z * h;
         const w = wy ? wy(o.position.x, o.position.z) : -99;
         if (w > 0.4 && o.position.y <= w) { d.mode = M.FLOAT; if (this.onSplash) this.onSplash(o.position.x, w, o.position.z, 3); d.v.y = 0; }

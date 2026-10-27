@@ -18,6 +18,7 @@ import { Boats } from './boats.js';
 import { Mushroom, NuclearStrike, Meltdown, nuclearDamage } from './nuke.js';
 import { Villains } from './villains.js';
 import { Zones } from './rebuild.js';
+import { Heroes } from './heroes.js';
 
 export const threatName = (h) => (h === 'zombies' ? 'Zombie outbreak' : HAZARDS[h].name);
 
@@ -39,6 +40,8 @@ export const HAZARDS = {
   blackhole: { name: 'Black hole', tap: true },
   villains: { name: 'Super villains', tap: true },
 };
+// called by the hero signal rather than picked as a disaster
+export const HELPERS = { heroes: { name: 'Hero signal' } };
 export { WEATHER };
 
 class TornadoEvent {
@@ -65,6 +68,8 @@ export class Disasters {
     this.debris.groundY = (x, z) => this.holeFloor(x, z) ?? people.groundY(x, z); // debris, cars and people fall into pits and craters
     ctx.traffic.groundAt = (x, z) => this.holeFloor(x, z) ?? 0;
     people.holeAt = (x, z) => this.holeFloor(x, z);
+    this.bubbles = []; // Tempo's time bubbles: { x, y, z, R }
+    ctx.traffic.slowAt = this.debris.slowAt = (x, y, z) => this.slowAt(x, y, z);
     this.decals = new Decals(scene);
     this.weather = new Weather({ ...ctx, disasters: this });
     this.water = new WaterSurface(this);
@@ -109,6 +114,8 @@ export class Disasters {
   mushroom(x, z, R) { return new Mushroom(this, x, z, R); }
   nukeBlast(x, z, R, o = {}) { return nuclearDamage(this, x, z, R, o); }
   contaminate(x, z, R) { return this.zones.add(x, z, R); }
+  // how fast time runs at a point: a crawl inside a time bubble
+  slowAt(x, y, z) { for (const b of this.bubbles) if ((x - b.x) ** 2 + (y - b.y) ** 2 + (z - b.z) ** 2 < b.R * b.R) return 0.1; return 1; }
   // the widest a held sinkhole or black hole can get: a pit covering about ten city blocks
   get maxHoleR() { const c = this.ctx.city, B = c.bounds; return (B.x1 - B.x0) / c.NB * 1.78; }
   inHole(x, z) { return this.holeFloor(x, z) != null; }
@@ -147,6 +154,7 @@ export class Disasters {
     else if (type === 'meltdown') ev = new Meltdown(this, opts);
     else if (type === 'blackhole') ev = new BlackHole(this, x, z, opts);
     else if (type === 'villains') ev = new Villains(this, x, z, opts);
+    else if (type === 'heroes') { const on = this.list.find(e => e.type === 'heroes' && e.alive && !e.leaving); if (on) { on.signal(x, z); return on; } ev = new Heroes(this, x, z, opts); }
     if (!ev) return null;
     this.list.push(ev); this.stats.hazards++;
     return ev;
@@ -261,7 +269,7 @@ export class Disasters {
   }
   reset() {
     for (const e of this.list) e.dispose();
-    this.list.length = 0; this.timers.length = 0; this.events.length = 0;
+    this.list.length = 0; this.timers.length = 0; this.events.length = 0; this.bubbles.length = 0;
     for (const l of this.leftovers) l.dispose(); this.leftovers.length = 0;
     for (const b of this.bolts) this.ctx.scene.remove(b.g); this.bolts.length = 0;
     this.debris.reset(); this.decals.reset(); this.water.reset(); this.boats.reset(); this.zones.reset();
