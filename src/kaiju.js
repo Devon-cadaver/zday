@@ -202,6 +202,7 @@ function tentacles(r, dt, time) {
         if (p[i + 1] < 0.4) p[i + 1] = 0.4;
       }
     }
+    if (!Number.isFinite(p[(TP - 1) * 3] + p[(TP - 1) * 3 + 1] + p[(TP - 1) * 3 + 2])) { q.ready = false; continue; } // it went wrong: laid out afresh next frame
     q.tip.set(p[(TP - 1) * 3], p[(TP - 1) * 3 + 1], p[(TP - 1) * 3 + 2]);
     for (let k = 0; k < TP; k++) q.T.P[k].set(p[k * 3], p[k * 3 + 1], p[k * 3 + 2]).applyMatrix4(_inv);
   }

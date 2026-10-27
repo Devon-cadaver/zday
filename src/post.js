@@ -11,6 +11,8 @@ void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }
 
 const COMMON = /* glsl */`
 #include <packing>
+// a broken pixel (not a number, or infinite) is dropped here: blurred into the glow's mip chain it would spread into a big black square
+vec3 clean(vec3 c) { return min(max(c, vec3(0.0)), vec3(64000.0)); } // GPU min/max return the number when one side is not a number, and this survives compilers that drop isnan()
 uniform sampler2D tDepth;
 uniform float cameraNear, cameraFar, focus, band, range;
 float viewZ(vec2 uv) {
@@ -34,14 +36,14 @@ const float RAD_SCALE = 0.85;
 void main() {
   float cz = viewZ(vUv);
   float cs = cocN(cz) * maxBlur;
-  vec3 col = texture2D(tColor, vUv).rgb;
+  vec3 col = clean(texture2D(tColor, vUv).rgb);
   float tot = 1.0;
   float rad = RAD_SCALE;
   float ang = 0.0;
   for (int i = 0; i < 180; i++) {
     if (rad >= maxBlur) break;
     vec2 tc = vUv + vec2(cos(ang), sin(ang)) * texel * rad;
-    vec3 sc = texture2D(tColor, tc).rgb;
+    vec3 sc = clean(texture2D(tColor, tc).rgb);
     float sz = viewZ(tc);
     float ss = cocN(sz) * maxBlur;
     if (sz > cz) ss = clamp(ss, 0.0, cs * 2.0);
@@ -103,7 +105,7 @@ vec2 lensUV(vec2 uv) {
 }
 void main() {
   vec2 uv = lensUV(vUv);
-  vec3 sharp = texture2D(tColor, uv).rgb;
+  vec3 sharp = clean(texture2D(tColor, uv).rgb);
   vec3 col = sharp;
   if (dofOn > 0.5) {
     vec4 bl = texture2D(tBlur, uv);
@@ -112,7 +114,7 @@ void main() {
   }
   if (uLens > 0.0) { float r = length((vUv - uLensC) * vec2(res.x / res.y, 1.0)); col *= smoothstep(uLensR * uLens * 0.4, uLensR * uLens * 0.48, r); } // its shadow
   // soft glow from the blurred mip chain
-  vec3 g = textureLod(tBlur, uv, 4.0).rgb * 0.5 + textureLod(tBlur, uv, 6.0).rgb * 0.5;
+  vec3 g = clean(textureLod(tBlur, uv, 4.0).rgb * 0.5 + textureLod(tBlur, uv, 6.0).rgb * 0.5);
   col += max(g - 0.55, 0.0) * glow + g * glow * 0.12;
   col = aces(col * exposure * (1.0 + 0.9 * night));
   col = toSRGB(col);

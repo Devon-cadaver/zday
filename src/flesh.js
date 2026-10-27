@@ -188,6 +188,7 @@ class Tube {
   }
   update(time = 0) {
     const { R, C, S, n, P, d, cum, c, t, rad, o, off, shape, cs, sn } = this, pos = this.body.pos, nrm = this.body.nrm, radii = o.radii;
+    for (let i = 0; i < n; i++) if (!Number.isFinite(P[i].x + P[i].y + P[i].z)) return; // a bad point: keep the last shape rather than draw garbage
     // a smooth curve through the control points (Catmull-Rom), finely sampled
     let m = 0;
     for (let i = 0; i < n - 1; i++) {
@@ -218,11 +219,12 @@ class Tube {
       rad[k] = r;
     }
     // tangents, and the frame round each ring: up (N) towards tube.ref, or carried down from the ring before
-    let nx = 0, ny = 1, nz = 0;
+    let nx = 0, ny = 1, nz = 0, px0 = 0, py0 = 1, pz0 = 0;
     for (let k = 0; k < R; k++) {
       const k0 = Math.max(0, k - 1), k1 = Math.min(R - 1, k + 1);
-      let tx = c[k1 * 3] - c[k0 * 3], ty = c[k1 * 3 + 1] - c[k0 * 3 + 1], tz = c[k1 * 3 + 2] - c[k0 * 3 + 2]; const tl = Math.hypot(tx, ty, tz) || 1;
-      tx /= tl; ty /= tl; tz /= tl; t[k * 3] = tx; t[k * 3 + 1] = ty; t[k * 3 + 2] = tz;
+      let tx = c[k1 * 3] - c[k0 * 3], ty = c[k1 * 3 + 1] - c[k0 * 3 + 1], tz = c[k1 * 3 + 2] - c[k0 * 3 + 2]; const tl = Math.hypot(tx, ty, tz);
+      if (tl > 1e-6) { tx /= tl; ty /= tl; tz /= tl; px0 = tx; py0 = ty; pz0 = tz; } else { tx = px0; ty = py0; tz = pz0; } // two rings in one place: the way the tube was going
+      t[k * 3] = tx; t[k * 3 + 1] = ty; t[k * 3 + 2] = tz;
       let ax = nx, ay = ny, az = nz;
       if (k === 0 || !o.pt) { const rr = this.ref, dt = rr.x * tx + rr.y * ty + rr.z * tz, px = rr.x - dt * tx, py = rr.y - dt * ty, pz = rr.z - dt * tz, pl = Math.hypot(px, py, pz); if (pl > 0.25 || k === 0) { ax = px; ay = py; az = pz; if (pl < 1e-4) { ax = -tz; ay = 0; az = tx; if (Math.abs(tx) + Math.abs(tz) < 1e-4) { ax = 1; az = 0; } } } }
       const dt = ax * tx + ay * ty + az * tz; ax -= dt * tx; ay -= dt * ty; az -= dt * tz; const al = Math.hypot(ax, ay, az) || 1;
@@ -241,7 +243,7 @@ class Tube {
         const a = (off + k1 * W + j) * 3, b = (off + k0 * W + j) * 3, l = (off + k * W + (j + 1) % C) * 3, r = (off + k * W + (j + C - 1) % C) * 3;
         const ux = pos[a] - pos[b], uy = pos[a + 1] - pos[b + 1], uz = pos[a + 2] - pos[b + 2], wx = pos[l] - pos[r], wy = pos[l + 1] - pos[r + 1], wz = pos[l + 2] - pos[r + 2];
         let x = wy * uz - wz * uy, y = wz * ux - wx * uz, z = wx * uy - wy * ux, ln = Math.hypot(x, y, z);
-        if (ln < 1e-9) { const sg = k < R / 2 ? -1 : 1; x = t[k * 3] * sg; y = t[k * 3 + 1] * sg; z = t[k * 3 + 2] * sg; ln = 1; }
+        if (ln < 1e-9) { const sg = k < R / 2 ? -1 : 1; x = t[k * 3] * sg; y = t[k * 3 + 1] * sg; z = t[k * 3 + 2] * sg; ln = Math.hypot(x, y, z); if (ln < 1e-9) { x = 0; y = 1; z = 0; ln = 1; } } // never zero: a zero normal is a broken pixel
         const v = (off + k * W + j) * 3, v2 = (off + k * W + C) * 3;
         nrm[v] = x / ln; nrm[v + 1] = y / ln; nrm[v + 2] = z / ln;
         if (j === 0) { nrm[v2] = nrm[v]; nrm[v2 + 1] = nrm[v + 1]; nrm[v2 + 2] = nrm[v + 2]; }
