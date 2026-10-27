@@ -11,9 +11,10 @@ import { Gauge, SIZED } from './gauge.js';
 import { Responders } from './response.js';
 import { curvedHit } from './curve.js';
 import { PLACES, placeKey, travel } from './places.js';
+import { dragScroll } from './ui.js';
 
 const CSS = `
-#zd-top{position:fixed;left:0;right:0;top:0;display:flex;gap:6px;align-items:center;flex-wrap:wrap;
+#zd-top{position:fixed;left:0;right:0;top:0;display:flex;gap:6px;align-items:center;justify-content:center;flex-wrap:wrap;
   padding:calc(8px + env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 0 max(10px, env(safe-area-inset-left));pointer-events:none;
   font:600 12px/1 system-ui,-apple-system,"Segoe UI",sans-serif;color:#f6ead2;letter-spacing:.04em}
 .zd-pill{display:flex;gap:6px;align-items:baseline;background:rgba(28,20,12,.62);border:1px solid rgba(255,236,200,.14);
@@ -23,9 +24,24 @@ const CSS = `
 .zd-h b{color:#fff4e0}.zd-i b{color:#ffc233}.zd-z b{color:#a6ff4d}.zd-d b{color:#e07a6a}.zd-rp b{color:#7be0ff}
 .zd-al{border-color:rgba(255,120,60,.35)}.zd-al b{color:#ffb070;font-size:12px;letter-spacing:.03em}
 .zd-al.a3 b{color:#ff8a4a}.zd-al.a4 b{color:#ff5a3a}
-#zd-clock{margin-left:auto;opacity:.85;font-variant-numeric:tabular-nums}
-#zd-bar{position:fixed;left:0;right:0;bottom:0;display:flex;gap:8px;justify-content:center;align-items:flex-end;flex-wrap:wrap;
-  padding:0 max(10px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left))}
+#zd-clock{opacity:.85;font-variant-numeric:tabular-nums}
+#zd-bar{position:fixed;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none;
+  padding:0 max(8px, env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left))}
+#zd-bar > *{pointer-events:auto}
+#zd-bar [hidden]{display:none!important}
+.zd-dock{order:3;display:flex;gap:6px;width:100%;max-width:520px;align-items:stretch}
+.zd-dock .zd-btn{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:8px 2px 7px;
+  font-size:10.5px;line-height:1.15;letter-spacing:.02em;text-transform:none;text-align:center}
+.zd-dock .zd-btn svg{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.zd-dock .zd-btn .l{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-width:100%}
+.zd-dock .zd-btn.on{border-color:#a6ff4d;color:#a6ff4d}
+.zd-extra{order:1;display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap;max-width:100%}
+#zd-help{background:rgba(200,60,40,.9);border-color:rgba(255,160,130,.6);color:#fff0e8;padding:10px 16px}
+#zd-help.on{background:rgba(230,80,50,.95)}
+#zd-followchip{display:flex;align-items:center;gap:10px;background:rgba(28,20,12,.82);border:1px solid rgba(166,255,77,.4);border-radius:20px;padding:4px 4px 4px 14px;
+  font:600 12px/1.2 system-ui,-apple-system,"Segoe UI",sans-serif;color:#f6ead2;max-width:100%;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+#zd-followchip b{color:#a6ff4d}
+#zd-followchip .zd-btn{padding:7px 11px;min-width:0;border-radius:15px;font-size:11px}
 .zd-btn{appearance:none;border:1px solid rgba(255,236,200,.18);background:rgba(28,20,12,.72);color:#f6ead2;border-radius:10px;
   font:700 12px/1 system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:.06em;text-transform:uppercase;padding:11px 12px;
   backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);touch-action:manipulation;cursor:pointer;min-width:52px;position:relative;overflow:hidden}
@@ -36,9 +52,16 @@ const CSS = `
 #zd-drop.empty{background:rgba(28,20,12,.72);border-color:rgba(255,236,200,.18);opacity:.7}
 #zd-find.on{border-color:#a6ff4d;color:#a6ff4d}
 #zd-good.on{border-color:#8fd3ff;color:#8fd3ff}
-#zd-stop{padding-left:12px;padding-right:12px}#zd-stop[hidden]{display:none}
-.zd-cards{display:flex;gap:6px;overflow-x:auto;flex:1 1 100%;max-width:100%;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding:2px 0}
+.zd-cardwrap{order:2;position:relative;width:100%;max-width:640px}
+.zd-cards{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:2px 0}
 .zd-cards::-webkit-scrollbar{display:none}
+.zd-cardwrap.cl .zd-cards{-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 40px);mask-image:linear-gradient(90deg,transparent 0,#000 40px)}
+.zd-cardwrap.cr .zd-cards{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 40px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 40px),transparent)}
+.zd-cardwrap.cl.cr .zd-cards{-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 40px,#000 calc(100% - 40px),transparent);mask-image:linear-gradient(90deg,transparent 0,#000 40px,#000 calc(100% - 40px),transparent)}
+.zd-arr{position:absolute;top:50%;transform:translateY(-50%);width:30px;height:30px;border-radius:15px;border:1px solid rgba(255,236,200,.3);background:rgba(28,20,12,.92);
+  color:#f6ead2;font:700 18px/1 system-ui,sans-serif;padding:0 0 2px;display:none;z-index:1;cursor:pointer;touch-action:manipulation}
+.zd-arr.l{left:0}.zd-arr.r{right:0}
+.zd-cardwrap.cl .zd-arr.l,.zd-cardwrap.cr .zd-arr.r{display:block}
 .zd-cards > :first-child{margin-left:auto}.zd-cards > :last-child{margin-right:auto}
 .zd-cards .zd-card{flex:none}
 .zd-card{display:flex;flex-direction:column;gap:4px;align-items:center;min-width:62px;padding:8px 7px 7px;text-transform:none;letter-spacing:.02em}
@@ -56,7 +79,7 @@ const CSS = `
 #zd-call[hidden]{display:none}
 #zd-call .t{flex:1;min-width:0}
 #zd-call .zd-btn{padding:8px 12px;background:rgba(200,60,40,.9);border-color:rgba(255,160,130,.5);min-width:0}
-#zd-fps{position:fixed;right:max(8px, env(safe-area-inset-right));bottom:calc(74px + env(safe-area-inset-bottom));font:10px system-ui,sans-serif;color:#f6ead2;opacity:.45;pointer-events:none}
+#zd-fps{position:fixed;right:max(8px, env(safe-area-inset-right));bottom:calc(var(--zd-bar-h, 64px) + 4px);font:10px system-ui,sans-serif;color:#f6ead2;opacity:.45;pointer-events:none}
 #zd-end{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(14,10,6,.78);z-index:5;
   padding:max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));box-sizing:border-box;font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;color:#f6ead2}
 #zd-end[hidden]{display:none}
@@ -71,6 +94,7 @@ const CSS = `
 #zd-menu{position:fixed;inset:0;z-index:6;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 40%,rgba(20,14,8,.55),rgba(14,10,6,.86));
   padding:max(16px, env(safe-area-inset-left));font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;color:#f6ead2}
 #zd-menu[hidden]{display:none}
+body.zd-menu-on #zd-menu{padding-top:calc(60px + env(safe-area-inset-top))}
 #zd-menu .box{width:100%;max-width:380px;background:rgba(32,24,14,.92);border:1px solid rgba(255,236,200,.18);border-radius:16px;text-align:center;max-height:100%;display:flex;flex-direction:column;overflow:hidden}
 #zd-menu .mbody{overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:22px 20px 18px;min-height:0;flex:1 1 auto}
 #zd-menu .mhead{display:flex;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid rgba(255,236,200,.14);flex:none;background:rgba(24,18,10,.6)}
@@ -103,21 +127,28 @@ const CSS = `
 #zd-end .xp{font-size:13px;color:#7be0ff;margin:4px 0 0}
 #zd-end .lvl{font-size:15px;color:#a6ff4d;font-weight:700;margin:6px 0 0}
 #zd-end .row2{display:flex;gap:8px;justify-content:center}
-#zd-dis{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(64px + env(safe-area-inset-bottom));width:min(94vw,440px);background:rgba(28,20,12,.9);
-  border:1px solid rgba(255,236,200,.16);border-radius:12px;padding:10px;z-index:3;font:600 11px/1.2 system-ui,-apple-system,"Segoe UI",sans-serif;color:#f6ead2}
+#zd-dis{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--zd-bar-h, 64px) + 8px);width:min(calc(100vw - 16px),440px);box-sizing:border-box;
+  display:flex;flex-direction:column;overflow:hidden;background:rgba(28,20,12,.93);border:1px solid rgba(255,236,200,.16);border-radius:14px;z-index:3;
+  font:600 11px/1.2 system-ui,-apple-system,"Segoe UI",sans-serif;color:#f6ead2}
 #zd-dis[hidden]{display:none}
-#zd-dis .h{font-size:10px;letter-spacing:.1em;text-transform:uppercase;opacity:.7;margin:2px 2px 6px}
-#zd-dis .g{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px}
-#zd-dis .g.w{grid-template-columns:repeat(4,1fr);margin-bottom:0}
-#zd-dis .zd-btn{padding:10px 4px;min-width:0;font-size:11px;letter-spacing:.03em;text-transform:none}
+#zd-dis .tabs{display:flex;gap:4px;padding:6px;border-bottom:1px solid rgba(255,236,200,.12);flex:none}
+#zd-dis .tabs button{flex:1 1 0;appearance:none;border:0;background:none;color:#f6ead2;opacity:.6;font:700 11px/1 system-ui,-apple-system,"Segoe UI",sans-serif;
+  letter-spacing:.08em;text-transform:uppercase;padding:10px 4px;border-radius:8px;cursor:pointer;touch-action:manipulation}
+#zd-dis .tabs button.on{opacity:1;background:rgba(255,236,200,.1);color:#fff4e0}
+#zd-dis .pbody{overflow-y:auto;padding:8px 8px 10px;min-height:0;flex:1 1 auto}
+#zd-dis .h{font-size:10px;letter-spacing:.1em;text-transform:uppercase;opacity:.7;margin:12px 2px 6px;text-align:center}
+#zd-dis .g{display:flex;flex-wrap:wrap;justify-content:center;gap:6px}
+#zd-dis .g > .zd-btn{flex:0 0 calc((100% - 12px) / 3);box-sizing:border-box}
+#zd-dis .g.two > .zd-btn{flex:0 0 calc((100% - 6px) / 2)}
+#zd-dis .zd-btn{padding:11px 4px;min-width:0;font-size:11px;letter-spacing:.03em;text-transform:none}
 #zd-dis .zd-btn.sel{border-color:#a6ff4d;color:#a6ff4d}
 #zd-dis .zd-btn.zb{color:#a6ff4d;border-color:rgba(166,255,77,.35)}
 #zd-dis .zd-btn.zb.empty{opacity:.5}
 #zd-dis .zd-btn.hero{color:#ffe08a;border-color:rgba(255,224,138,.45)}
 #zd-dis .zd-btn.auto{color:#7be0ff;border-color:rgba(123,224,255,.4)}
 #zd-dis .zd-btn.auto.off{color:#f6ead2;opacity:.6;border-color:rgba(255,236,200,.18)}
-#zd-dis .g.one{grid-template-columns:1fr 1fr}
-#zd-disb.on{border-color:#ff9a5a;color:#ffb070}
+#zd-disb{border-color:rgba(255,154,90,.55);color:#ffc08a}
+#zd-disb.on{background:rgba(120,58,24,.88);border-color:#ff9a5a;color:#ffd9b8}
 @media (prefers-reduced-motion: reduce){#zd-toast{transition:none}}
 `;
 
@@ -128,6 +159,21 @@ const UNIT_DESC = { police: 'Officers who fight zombies and arrest rioters', bus
   apc: 'A squad of soldiers to hold a crossing', strike: 'Bombs one spot', nuke: 'Wipes out a whole district' };
 const THREAT_HINT = { villains: 'Blur, Tyrant and Weaver. Only the super heroes can beat them' };
 const UNIT_NAMES = { heroes: 'Super heroes (hero signal)', build: 'Construction crew', camp: 'Medical camp', hazmat: 'Hazmat team', police: 'Police cruiser', bus: 'Evacuation bus', chaser: 'Storm chaser', seeder: 'Cloud seeder', boat: 'Rescue boat', coast: 'Coast Guard', barrier: 'Flood barrier', fire: 'Fire truck', water: 'Water helicopter', rescue: 'Rescue helicopter', apc: 'Army APC', strike: 'Airstrike', nuke: 'Nuke' };
+
+// the buttons along the bottom: a line drawing over a short name
+const svg = (d) => '<svg viewBox="0 0 24 24" aria-hidden="true">' + d + '</svg>';
+const ICON = {
+  'zd-disb': svg('<path d="M13 2 4.5 13.5H11L10 22l8.5-11.5H12z"/>'),
+  'zd-find': svg('<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>'),
+  'zd-good': svg('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M5.6 5.6l3.6 3.6M14.8 14.8l3.6 3.6M18.4 5.6l-3.6 3.6M9.2 14.8l-3.6 3.6"/>'),
+  'zd-speed': svg('<path d="M3 6.5 11 12l-8 5.5zM12 6.5l8 5.5-8 5.5z"/>'),
+  'zd-reset': svg('<path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v5h5"/>'),
+  'zd-menu-btn': svg('<path d="M4 7h16M4 12h16M4 17h16"/>'),
+  'zd-pick': svg('<rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/>'),
+  'zd-swap': svg('<path d="M4 8h14l-3.5-3.5M20 16H6l3.5 3.5"/>'),
+};
+ICON['zd-restart'] = ICON['zd-reset'];
+const EXTRA = new Set(['zd-help']); // shown above the bar only when they are wanted
 
 // the city runs on its own behind the menu
 class Idle {
@@ -161,8 +207,8 @@ export class Game {
   }
 
   startMode(which, kind) {
-    this.menu.hidden = true;
-    this.top.innerHTML = ''; this.bar.innerHTML = '';
+    this.menu.hidden = true; document.body.classList.remove('zd-menu-on');
+    this.top.innerHTML = ''; this.bar.innerHTML = ''; this.followChip = this.stopBtn = null;
     this.mode = which === 'sandbox' ? new Sandbox(this) : which === 'be' ? new BeTheDisaster(this, kind) : new Commander(this);
   }
 
@@ -214,7 +260,8 @@ export class Game {
         '<div class="btns back"><button class="zd-btn" type="button" data-go="main">Back</button></div>';
     }
     this.menu.innerHTML = '<div class="box">' + head + '<div class="mbody">' + body + '</div></div>';
-    this.menu.hidden = false;
+    this.menu.hidden = false; document.body.classList.add('zd-menu-on');
+    dragScroll(this.menu.querySelector('.mbody'), 'y');
     this.menu.querySelectorAll('[data-go]').forEach(b => { b.onclick = () => { const go = b.dataset.go; if (go === 'commander' || go === 'sandbox') this.startMode(go); else this.showMenu(go); }; });
     this.menu.querySelectorAll('[data-place]').forEach(b => { b.onclick = () => travel(b.dataset.place); });
     this.menu.querySelectorAll('[data-be]').forEach(b => { b.onclick = () => this.startMode('be', b.dataset.be); });
@@ -238,6 +285,8 @@ export class Game {
     document.body.append(this.top, this.bar, toast, fps);
     const old = document.getElementById('hud'); if (old) old.remove();
     this.el = { toast, fps };
+    const barH = () => document.documentElement.style.setProperty('--zd-bar-h', this.bar.offsetHeight + 'px');
+    if (window.ResizeObserver) new ResizeObserver(barH).observe(this.bar); else setInterval(barH, 500);
   }
   addPill(cls, label, id) {
     const d = document.createElement('div'); d.className = 'zd-pill ' + cls;
@@ -246,15 +295,39 @@ export class Game {
     this.top.appendChild(d);
     return d.querySelector('b');
   }
+  // a button in the row along the bottom (an icon over its name), or above it for the ones that come and go; cards go
+  // in their own row (the caller moves them there)
   addButton(id, html, onClick, cls = '') {
-    const b = document.createElement('button'); b.type = 'button'; b.className = 'zd-btn ' + cls; b.id = id; b.innerHTML = html;
-    b.onclick = onClick; this.bar.appendChild(b);
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'zd-btn ' + cls; b.id = id; b.onclick = onClick;
+    if (EXTRA.has(id) || cls.includes('zd-card')) { b.innerHTML = html; (cls.includes('zd-card') ? this.bar : this.extraRow()).appendChild(b); }
+    else { b.innerHTML = (ICON[id] || '') + '<span class="l">' + html + '</span>'; this.row('dock', 'zd-dock').appendChild(b); }
     return b;
   }
-  addSpeedButton() {
-    this.speedBtn = this.addButton('zd-speed', '1x', () => { this.speed = this.speed >= 4 ? 1 : this.speed * 2; this.speedBtn.textContent = this.speed + 'x'; });
+  row(key, cls) { if (!this[key] || !this.bar.contains(this[key])) { this[key] = document.createElement('div'); this[key].className = cls; this.bar.appendChild(this[key]); } return this[key]; }
+  extraRow() { return this.row('extra', 'zd-extra'); }
+  setLabel(b, text) { if (b) (b.querySelector('.l') || b).textContent = text; }
+  // a row of cards wider than the screen: drag it, or tap the arrows that show at either end while there are more
+  addCardRow() {
+    const w = document.createElement('div'); w.className = 'zd-cardwrap';
+    w.innerHTML = '<div class="zd-cards"></div><button type="button" class="zd-arr l" aria-label="More on the left">\u2039</button><button type="button" class="zd-arr r" aria-label="More on the right">\u203A</button>';
+    this.bar.appendChild(w);
+    const row = w.firstChild, by = dragScroll(row, 'x');
+    const ends = () => { const m = row.scrollWidth - row.clientWidth; w.classList.toggle('cl', row.scrollLeft > 2); w.classList.toggle('cr', row.scrollLeft < m - 2); };
+    row.addEventListener('scroll', ends, { passive: true }); addEventListener('resize', ends); setTimeout(ends, 0);
+    if (window.ResizeObserver) new ResizeObserver(ends).observe(row);
+    w.querySelector('.l').onclick = () => by(-row.clientWidth * 0.7); w.querySelector('.r').onclick = () => by(row.clientWidth * 0.7);
+    return row;
   }
-  setSpeed(s) { this.speed = s; if (this.speedBtn) this.speedBtn.textContent = s + 'x'; }
+  // above the bar while the camera follows something: what it is, and a button to stop
+  addFollowChip() {
+    const c = this.followChip = document.createElement('div'); c.id = 'zd-followchip'; c.hidden = true;
+    c.innerHTML = '<span>Following <b></b></span><button type="button" class="zd-btn" id="zd-stop">\u2715 Stop</button>';
+    this.extraRow().appendChild(c); this.stopBtn = c.querySelector('#zd-stop'); this.stopBtn.onclick = () => this.setFollow(-1);
+  }
+  addSpeedButton() {
+    this.speedBtn = this.addButton('zd-speed', '1x', () => { this.speed = this.speed >= 4 ? 1 : this.speed * 2; this.setLabel(this.speedBtn, this.speed + 'x'); });
+  }
+  setSpeed(s) { this.speed = s; this.setLabel(this.speedBtn, s + 'x'); }
 
   toast(msg, ms = 2600) {
     const t = this.el.toast; t.textContent = msg; t.style.opacity = '1';
@@ -311,12 +384,13 @@ export class Game {
   // following: the view is locked on the subject, one finger (or the left mouse button) turns round it, two pinch to zoom; not following: drag pans
   lockControls(on) {
     const c = this.controls; c.enablePan = !on; c.mouseButtons.LEFT = on ? THREE.MOUSE.ROTATE : THREE.MOUSE.PAN; c.touches.ONE = on ? THREE.TOUCH.ROTATE : THREE.TOUCH.PAN;
-    if (this.stopBtn) this.stopBtn.hidden = !on;
+    if (this.followChip) this.followChip.hidden = !on;
   }
   setFollow(i) {
     this.follow = i; this.followSub = null; this.followSide = i >= 0 ? 'bad' : null; this.manualCam = false; this.lockControls(i >= 0);
-    if (this.followBtn) { this.followBtn.classList.toggle('on', i >= 0); this.followBtn.textContent = i >= 0 ? 'Zombie' : 'Bad guys'; }
-    if (this.goodBtn) { this.goodBtn.classList.remove('on'); this.goodBtn.textContent = 'Good guys'; }
+    if (this.followBtn) { this.followBtn.classList.toggle('on', i >= 0); this.setLabel(this.followBtn, i >= 0 ? 'Next disaster' : 'Follow disaster'); }
+    if (this.goodBtn) { this.goodBtn.classList.remove('on'); this.setLabel(this.goodBtn, 'Follow rescue'); }
+    if (this.followChip && i >= 0) this.followChip.querySelector('b').textContent = 'a zombie';
   }
 
   // what the two follow buttons step through. The bad guys: villains, the kaiju, the worm, riots, alien machines, every
@@ -394,8 +468,9 @@ export class Game {
   followSubject(s, side = this.followSide || 'bad') {
     this.follow = -1; this.followSub = s; this.followSide = side; this.dir = null; this.camDir = null; this.zoomTo = 0; this.manualCam = false; this.followIn = false; this.lockControls(true);
     const on = side === 'good' ? this.goodBtn : this.followBtn, off = side === 'good' ? this.followBtn : this.goodBtn;
-    if (on) { on.classList.add('on'); on.textContent = s.name; }
-    if (off) { off.classList.remove('on'); off.textContent = off === this.goodBtn ? 'Good guys' : 'Bad guys'; }
+    if (on) { on.classList.add('on'); this.setLabel(on, side === 'good' ? 'Next rescue' : 'Next disaster'); }
+    if (off) { off.classList.remove('on'); this.setLabel(off, off === this.goodBtn ? 'Follow rescue' : 'Follow disaster'); }
+    if (this.followChip) this.followChip.querySelector('b').textContent = s.name;
   }
   // the camera's shot for what it follows: how far back, how steeply it looks down (the angle from overhead), and the
   // side it looks from (base +/- off, whichever is nearer where the camera already is; no base: stay on this side)
@@ -430,7 +505,7 @@ export class Game {
     if (s.kind === 'disaster') return this.disasterShot(o);
     return null;
   }
-  // the good guys button: each press the next of them
+  // the Follow rescue button: each press the next of them
   cycleGood() {
     const subs = this.subjects('good');
     if (!subs.length) { this.toast('No rescuers out yet. Drop a disaster and they will come'); return; }
@@ -438,7 +513,7 @@ export class Game {
     if (k >= subs.length) k = 0;
     this.followSubject(subs[k], 'good');
   }
-  // the bad guys button
+  // the Follow disaster button
   cycleFollow() {
     const p = this.people, tg = this.controls.target, subs = this.subjects();
     if (subs.length) { // each press: the next of them, then the zombies (if any), then round again
@@ -582,14 +657,14 @@ class Sandbox {
       h: g.addPill('zd-h', 'Humans'), i: g.addPill('zd-i', 'Infected'), z: g.addPill('zd-z', 'Zombies'), d: g.addPill('zd-d', 'Dead'),
       clock: g.addPill('', '', 'zd-clock'),
     };
-    this.helpBtn = g.addButton('zd-help', 'Call heroes', () => this.callHeroes()); this.helpBtn.hidden = true; // only while there is something they could stop
-    g.followBtn = g.addButton('zd-find', 'Bad guys', () => g.cycleFollow());
-    g.goodBtn = g.addButton('zd-good', 'Good guys', () => g.cycleGood());
-    g.stopBtn = g.addButton('zd-stop', '&#x2715;', () => g.setFollow(-1)); g.stopBtn.hidden = true; g.stopBtn.title = 'Stop following'; g.stopBtn.setAttribute('aria-label', 'Stop following');
-    g.addSpeedButton();
+    this.helpBtn = g.addButton('zd-help', 'Call the heroes', () => this.callHeroes()); this.helpBtn.hidden = true; // only while there is something they could stop
+    g.addFollowChip();
     this.disBtn = g.addButton('zd-disb', 'Disasters', () => {
       if (this.pending) { const was = this.pending; this.pending = null; this.gauge.cancel(); this.close(); g.toast(was === 'zombies' ? 'Done dropping zombies' : 'Cancelled'); return; } // the button cancels a disaster waiting to be placed
-      this.panel.style.bottom = (g.bar.offsetHeight + 8) + 'px'; this.panel.hidden = !this.panel.hidden; this.disBtn.classList.toggle('on', !this.panel.hidden); });
+      this.showPanel(this.panel.hidden); });
+    g.followBtn = g.addButton('zd-find', 'Follow disaster', () => g.cycleFollow());
+    g.goodBtn = g.addButton('zd-good', 'Follow rescue', () => g.cycleGood());
+    g.addSpeedButton();
     g.addButton('zd-reset', 'Reset', () => this.reset());
     g.addButton('zd-menu-btn', 'Menu', () => { location.href = location.pathname; });
     this.buildPanel(); this.bindHold();
@@ -598,25 +673,32 @@ class Sandbox {
   }
   buildPanel() {
     const g = this.g, d = document.createElement('div'); d.id = 'zd-dis'; d.hidden = true;
-    d.innerHTML = '<div class="h">Disasters</div><div class="g"><button class="zd-btn zb" type="button" data-zb>Zombies · ' + START_DROPS + '</button>' + Object.keys(HAZARDS).map(h => '<button class="zd-btn" type="button" data-hz="' + h + '">' + HAZARDS[h].name + '</button>').join('') + '</div>' +
-      '<div class="h">Help</div><div class="g one"><button class="zd-btn auto" type="button" data-auto>Auto responders: On</button><button class="zd-btn hero" type="button" data-hero>Hero signal \u262E</button></div>' +
-      '<div class="h">Travel</div><div class="g">' + Object.keys(PLACES).map(k => '<button class="zd-btn' + (k === placeKey() ? ' sel' : '') + '" type="button" data-place="' + k + '">' + PLACES[k].name + '</button>').join('') + '</div>' +
-      '<div class="h">Weather</div><div class="g w">' + Object.keys(WEATHER).map(w => '<button class="zd-btn" type="button" data-wx="' + w + '">' + WEATHER[w].name.replace('Thunderstorm', 'Storm') + '</button>').join('') + '</div>';
+    d.innerHTML = '<div class="tabs"><button type="button" class="on" data-tab="dis">Disasters</button><button type="button" data-tab="wx">Weather</button><button type="button" data-tab="go">Travel</button></div><div class="pbody">' +
+      '<div data-pane="dis"><div class="g"><button class="zd-btn zb" type="button" data-zb>Zombies · ' + START_DROPS + '</button>' + Object.keys(HAZARDS).map(h => '<button class="zd-btn" type="button" data-hz="' + h + '">' + HAZARDS[h].name + '</button>').join('') + '</div>' +
+      '<div class="h">Help</div><div class="g two"><button class="zd-btn auto" type="button" data-auto>Auto responders: On</button><button class="zd-btn hero" type="button" data-hero>Hero signal \u262E</button></div></div>' +
+      '<div data-pane="wx" hidden><div class="g">' + Object.keys(WEATHER).map(w => '<button class="zd-btn" type="button" data-wx="' + w + '">' + WEATHER[w].name.replace('Thunderstorm', 'Storm') + '</button>').join('') + '</div></div>' +
+      '<div data-pane="go" hidden><div class="g">' + Object.keys(PLACES).map(k => '<button class="zd-btn' + (k === placeKey() ? ' sel' : '') + '" type="button" data-place="' + k + '">' + PLACES[k].name + '</button>').join('') + '</div></div></div>';
     document.body.appendChild(d); this.panel = d; this.zbBtn = d.querySelector('[data-zb]');
+    const body = d.querySelector('.pbody'); dragScroll(body, 'y');
+    d.querySelectorAll('[data-tab]').forEach(t => { t.onclick = () => {
+      d.querySelectorAll('[data-tab]').forEach(o => o.classList.toggle('on', o === t));
+      d.querySelectorAll('[data-pane]').forEach(p => { p.hidden = p.dataset.pane !== t.dataset.tab; }); body.scrollTop = 0;
+    }; });
+    addEventListener('resize', () => { if (!d.hidden) this.fitPanel(); });
     const autoBtn = d.querySelector('[data-auto]');
     autoBtn.onclick = () => { this.auto.setOn(!this.auto.on); autoBtn.textContent = 'Auto responders: ' + (this.auto.on ? 'On' : 'Off'); autoBtn.classList.toggle('off', !this.auto.on); g.toast(this.auto.on ? 'Responders will answer every disaster and rebuild afterwards' : 'Responders off: nobody comes to help', 3500); };
     d.querySelector('[data-hero]').onclick = () => { const tg = g.controls.target; g.disasters.start('heroes', tg.x, tg.z); this.pending = null; this.close(); if (this.clock < 0) this.clock = 0; }; // the peace sign goes up over the middle of the view
     this.zbBtn.onclick = () => { // armed until the Shamblers run out or you tap Done: every tap on a street drops one
       if (this.dropsLeft <= 0) { g.toast('No Shamblers left. Tap Reset to start over'); return; }
       this.pending = 'zombies'; d.querySelectorAll('[data-hz]').forEach(o => o.classList.remove('sel'));
-      this.panel.hidden = true; this.zombieLabel();
+      this.showPanel(false); this.zombieLabel();
       g.toast('Tap streets to drop Shambler zombies (' + this.dropsLeft + ' left)', 4000);
     };
     d.querySelectorAll('[data-hz]').forEach(b => { b.onclick = () => {
       const h = b.dataset.hz;
       if (HAZARDS[h].tap) { // out of the way so you can see where it goes
         this.pending = h; d.querySelectorAll('[data-hz]').forEach(o => o.classList.toggle('sel', o.dataset.hz === h));
-        this.panel.hidden = true; this.disBtn.textContent = 'Cancel ' + HAZARDS[h].name.toLowerCase();
+        this.showPanel(false); g.setLabel(this.disBtn, 'Cancel');
         if (SIZED[h]) { g.controls.enabled = false; g.toast('Press and hold where it goes: the longer you hold, the bigger it gets. Let go to drop it', 4500); } // the finger sizes it instead of moving the camera
         else g.toast('Tap the map where the ' + HAZARDS[h].name.toLowerCase() + ' should strike', 4000);
         return;
@@ -628,9 +710,15 @@ class Sandbox {
   }
   zombieLabel() {
     if (this.zbBtn) { this.zbBtn.textContent = 'Zombies · ' + this.dropsLeft; this.zbBtn.classList.toggle('empty', this.dropsLeft <= 0); }
-    if (this.pending === 'zombies') this.disBtn.textContent = 'Done · ' + this.dropsLeft + ' left';
+    if (this.pending === 'zombies') this.g.setLabel(this.disBtn, 'Done (' + this.dropsLeft + ' left)');
   }
-  close() { this.panel.hidden = true; this.disBtn.classList.remove('on'); this.disBtn.textContent = 'Disasters'; if (!this.gauge.active) this.g.controls.enabled = true; }
+  // the panel sits between the bar and the numbers at the top, and scrolls if the screen is too short for it
+  showPanel(on) {
+    this.panel.hidden = !on; document.body.classList.toggle('zd-panel', on); this.disBtn.classList.toggle('on', on);
+    if (on) this.fitPanel();
+  }
+  fitPanel() { const top = this.g.top.getBoundingClientRect().bottom; this.panel.style.maxHeight = Math.max(170, innerHeight - this.g.bar.offsetHeight - top - 22) + 'px'; }
+  close() { this.showPanel(false); this.g.setLabel(this.disBtn, 'Disasters'); if (!this.gauge.active) this.g.controls.enabled = true; }
   // meteors, tornadoes, black holes, volcanoes, sinkholes and warheads: press, hold to size it (drag to aim), let go and it lands
   bindHold() {
     const g = this.g, dom = g.renderer.domElement;

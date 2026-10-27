@@ -70,7 +70,7 @@ export class Commander {
     this.el.alertPill = this.el.alert.parentElement;
     this.pr = g.profile; this.diff = this.pr.difficulty();
     this.cards = {};
-    const row = document.createElement('div'); row.className = 'zd-cards'; g.bar.appendChild(row);
+    const row = g.addCardRow();
     for (const u of UNITS) {
       if (!this.pr.unlocked(u.id)) continue;
       const b = g.addButton('zd-card-' + u.id, '<span class="nm">' + u.name + '</span><span class="cost">' + u.cost + ' pts</span><span class="cd"></span>', () => this.select(u.id), 'zd-card' + (u.once ? ' zd-nuke' : ''));

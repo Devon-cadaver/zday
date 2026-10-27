@@ -5,6 +5,7 @@
 // the biggest explosions. Streamed from music/ through two players that take
 // turns (a track is only fetched when it is wanted), into the sound engine's
 // master volume. The note button steps loud, medium, quiet, off.
+import { sideButton } from './ui.js';
 const BASE = import.meta.env.BASE_URL || './';
 const TRACKS = { calm: 'music/calm.mp3', storm: 'music/storm.mp3', rebuild: 'music/rebuild.mp3' };
 const LEVELS = [0, 0.2, 0.38, 0.62]; // off, quiet, medium, loud
@@ -19,10 +20,9 @@ export class Music {
     document.addEventListener('visibilitychange', () => { const p = this.players[this.cur]; if (!p || !this.level) return; if (document.hidden) p.el.pause(); else p.el.play().catch(() => {}); });
   }
   button() {
-    const b = this.btn = document.createElement('button'); b.type = 'button'; b.id = 'zd-music'; b.title = 'Music';
-    b.style.cssText = 'position:fixed;right:10px;top:calc(42% + 46px);z-index:30;width:38px;height:38px;border-radius:19px;border:1px solid rgba(255,255,255,0.15);background:rgba(20,18,16,0.72);color:#f2ead8;font-size:16px;line-height:1;padding:0;cursor:pointer';
+    const b = this.btn = sideButton('zd-music', 'Music');
     b.onclick = (e) => { e.stopPropagation(); this.setLevel((this.level + 3) % 4); }; // loud, medium, quiet, off, loud...
-    this.show(); document.body.appendChild(b);
+    this.show();
   }
   show() { this.btn.innerHTML = levelIcon('🎵', this.level); }
   setLevel(lv) {

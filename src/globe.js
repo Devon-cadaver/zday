@@ -12,6 +12,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { PLACES, placeKey, travel } from './places.js';
 import { damageOf, craters, addCrater, sendMeteor } from './world.js';
+import { sideButton } from './ui.js';
 
 const R = 10;
 // the places' character on the map: what each one wants to be next to
@@ -79,10 +80,9 @@ export class Globe {
     this.button();
   }
   button() {
-    const b = document.createElement('button'); b.type = 'button'; b.id = 'zd-globe'; b.title = 'The world'; b.textContent = '🌍';
-    b.style.cssText = 'position:fixed;right:10px;top:calc(42% + 92px);z-index:30;width:38px;height:38px;border-radius:19px;border:1px solid rgba(255,255,255,0.15);background:rgba(20,18,16,0.72);color:#f2ead8;font-size:18px;line-height:36px;padding:0;cursor:pointer';
+    const b = sideButton('zd-globe', 'The world'); b.textContent = '🌍'; b.style.fontSize = '19px';
     b.onclick = (e) => { e.stopPropagation(); this.open(); };
-    document.body.appendChild(b); this.btn = b;
+    this.btn = b;
   }
   // the planet, built the first time it is opened
   build() {
@@ -243,7 +243,7 @@ export class Globe {
     this.uiEl.style.display = 'none'; this.backBtn.style.display = 'none'; this.metBtn.style.display = 'none'; this.armed = false; for (const k in this.tags) this.tags[k].style.display = 'none';
     if (this.onArrive) this.onArrive();
   }
-  toggleHud(on) { for (const el of document.querySelectorAll('#zd-top, #zd-bar, #zd-dis, #zd-call, #zd-toast, #zd-end')) el.style.visibility = on ? '' : 'hidden'; }
+  toggleHud(on) { for (const el of document.querySelectorAll('#zd-top, #zd-bar, #zd-dis, #zd-call, #zd-toast, #zd-end, #zd-menu')) el.style.visibility = on ? '' : 'hidden'; }
   // down to a place: fly in over it; back where you were, the city is still there; anywhere else is built afresh
   go(key) {
     if (this.fly) return;

@@ -12,6 +12,7 @@
 // water, fire, rain, rotor blades, a siren - fade in and out with what is near.
 import * as THREE from 'three';
 import { Music, levelIcon } from './music.js';
+import { sideButton } from './ui.js';
 
 const SR = 24000;
 let seed = 7;
@@ -259,16 +260,14 @@ export class Audio {
     document.addEventListener('visibilitychange', () => { if (!this.ctx) return; if (document.hidden) this.ctx.suspend(); else if (!this.muted || this.music.level) this.ctx.resume(); });
   }
   button() {
-    const b = this.btn = document.createElement('button'); b.type = 'button'; b.id = 'zd-sound'; b.title = 'Sound';
-    b.style.cssText = 'position:fixed;right:10px;top:42%;z-index:30;opacity:0.85;width:38px;height:38px;border-radius:19px;border:1px solid rgba(255,255,255,0.15);background:rgba(20,18,16,0.72);color:#f2ead8;font-size:17px;line-height:36px;padding:0;cursor:pointer';
-    b.style.lineHeight = '1'; b.style.fontSize = '16px';
+    const b = this.btn = sideButton('zd-sound', 'Sound');
     const show = () => { b.innerHTML = levelIcon('🔊', this.level); };
     b.onclick = (e) => { // loud, medium, quiet, off, loud...
       e.stopPropagation(); this.level = (this.level + 3) % 4; this.muted = this.level === 0; show();
       try { localStorage.setItem('zday_sound', String(this.level)); } catch (er) { /* no storage */ }
       if (this.ctx) { this.master.gain.setTargetAtTime(LEVELS[this.level], this.ctx.currentTime, 0.05); if (!this.muted) this.ctx.resume(); } else this.unlock();
     };
-    show(); document.body.appendChild(b);
+    show();
   }
   unlock() {
     if (this.ctx) { if (this.ctx.state !== 'running' && (!this.muted || this.music.level) && !document.hidden) this.ctx.resume(); return; }
