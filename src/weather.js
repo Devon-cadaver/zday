@@ -117,7 +117,7 @@ export class Weather {
     sun.intensity *= p.sun; hemi.intensity *= p.hemi;
     // extra weather fog is set so the haze at the point you look at is the same at any zoom
     const dist = this.ctx.camera.position.distanceTo(this.ctx.controls.target);
-    if (scene.fog) scene.fog.density = this.base.fog * (1 + (p.fog - 1) * Math.min(1.4, 430 / dist));
+    if (scene.fog) scene.fog.density = this.base.fog * (1 + (p.fog - 1) * Math.min(1.4, 430 / dist)) * Math.min(1, 1000 / dist); // zoomed far out the haze thins, so the whole world stays in view
     const night = post.opts.night || 0;
     this._c.copy(this._sky).multiplyScalar(1 - night * 0.82);
     scene.background.lerp(this._c, p.skyK);

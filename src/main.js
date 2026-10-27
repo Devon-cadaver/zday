@@ -15,8 +15,11 @@ import { buildOutskirts } from './outskirts.js';
 import { Sirens } from './sirens.js';
 import { Searchlights } from './searchlights.js';
 import { Audio } from './audio.js';
+import { CURVE, curveFrame } from './curve.js';
+import { PLACES, placeKey } from './places.js';
 
 const P = new URLSearchParams(location.search);
+CURVE.on = P.get('curve') !== '0'; // ?curve=0: the flat world, to compare
 const coarse = matchMedia('(pointer: coarse)').matches;
 const low = P.get('q') === 'low' || (coarse && P.get('q') !== 'high');
 const num = (k, d) => (P.has(k) ? parseFloat(P.get(k)) : d);
@@ -35,13 +38,13 @@ const haze = new THREE.Color('#d9bf95');
 scene.background = haze;
 scene.fog = new THREE.FogExp2(haze, num('fog', 0.0006));
 
-const camera = new THREE.PerspectiveCamera(num('fov', 18), innerWidth / innerHeight, 10, 3000);
+const camera = new THREE.PerspectiveCamera(num('fov', 18), innerWidth / innerHeight, 10, 7000); // far: zoomed right out, the horizon where the world curves away
 const controls = new MapControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 controls.screenSpacePanning = false;
 controls.minDistance = 120; // close enough to watch a fight
-controls.maxDistance = 1100;
+controls.maxDistance = CURVE.on ? 2200 : 1100; // out far enough to see the whole city and the world curving away round it
 controls.minPolarAngle = 0.35;
 controls.maxPolarAngle = 1.05;
 controls.zoomSpeed = 0.8;
@@ -74,11 +77,12 @@ scene.add(sun, sun.target);
 // world
 const t0 = performance.now();
 const tex = makeTextures(renderer);
-const city = buildCity(tex, { seed: num('seed', 20261025), blocks: low ? 10 : 12 });
+const place = PLACES[placeKey()]; // which place in the world this is (the big city unless ?place= says otherwise)
+const city = buildCity(tex, { ...place, seed: num('seed', place.seed ?? 20261025), blocks: Math.min(place.blocks ?? 12, low ? 10 : 12) });
 scene.add(city.group);
 const outskirts = buildOutskirts(scene, city, { low });
-const traffic = new Traffic(city, scene, { cars: low ? 160 : 280 });
-const people = new People(city, scene, { people: low ? 2600 : 5200 });
+const traffic = new Traffic(city, scene, { cars: Math.round((low ? 160 : 280) * (place.cars ?? 1)) });
+const people = new People(city, scene, { people: Math.round((low ? 2600 : 5200) * (place.people ?? 1)) });
 const fire = new Fire(scene, city, { low });
 const helis = new Helicopters(scene, city, fire, people);
 helis.traffic = traffic;
@@ -117,6 +121,7 @@ function frame() {
   outskirts.update(time, scene, sun, disasters.lightK, disasters.sunK);
   sun.position.copy(tg).addScaledVector(daylight.sunDir, 700); // the sun (or the moon) where the day and night cycle has it
   sun.target.position.copy(tg);
+  { const e = Math.max(300, Math.min(950, camera.position.distanceTo(tg) * 0.45)); if (e !== sc.right) { sc.left = sc.bottom = -e; sc.right = sc.top = e; sc.far = 1600 + e; sc.updateProjectionMatrix(); } } // shadows cover what is in view
   // the shadow map only needs redrawing when the world has moved (a simulation step) or the view has
   if (game.simT !== shadowAt || !camAt.equals(camera.position)) { renderer.shadowMap.needsUpdate = true; shadowAt = game.simT; camAt.copy(camera.position); }
   const focus = camera.position.distanceTo(game.focusAt || tg); // whatever Follow is on stays in focus
@@ -130,6 +135,7 @@ function frame() {
     camera.position.x += jx; camera.position.y += jy; camera.position.z += jz;
   }
   sirens.update(time); searchlights.update(dt);
+  curveFrame(scene, camera, tg); // the world curves away as you zoom out
   post.render(scene, camera, focus, time);
   camera.position.x -= jx; camera.position.y -= jy; camera.position.z -= jz;
 

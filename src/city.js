@@ -106,6 +106,9 @@ function crownGeometry() {
   return m;
 }
 
+// opts (all optional; the defaults build the big city): seed, blocks (blocks a side), maxFloors, tall (how often a
+// building is 7-12 storeys), landmarks (which of spire, deco, dome, stadium), centers (downtown clusters), diag (the
+// diagonal avenue), tint (extra weight for wall materials, e.g. { sand: 12 } for a desert town)
 export function buildCity(tex, opts = {}) {
   const r = rng(opts.seed ?? 20261025);
   const NB = opts.blocks ?? 12;
@@ -122,7 +125,7 @@ export function buildCity(tex, opts = {}) {
   const NZ = NB + 1, nid = (i, j) => i * NZ + j, ekey = (a, b) => (a < b ? a + '-' + b : b + '-' + a);
   const layout = { removed: new Set(), rounds: [], diags: [], superblocks: [] };
   const splitBlk = new Map(), roundAt = new Map(), owner = new Map();
-  { // the diagonal avenue runs corner to corner through k blocks
+  if (opts.diag !== false) { // the diagonal avenue runs corner to corner through k blocks
     const k = NB >= 12 ? 4 : 3, dj = r() < 0.5 ? 1 : -1;
     const i0 = 1 + Math.floor(r() * (NB - k - 1));
     const j0 = dj > 0 ? 1 + Math.floor(r() * (NB - k - 1)) : k + 1 + Math.floor(r() * (NB - k - 1));
@@ -177,7 +180,7 @@ export function buildCity(tex, opts = {}) {
 
   // downtown clusters
   const centers = [];
-  for (let k = 0; k < 3; k++) centers.push([(r() - 0.5) * sx[NB] * 1.2, (r() - 0.5) * sz[NB] * 1.2, 90 + r() * 90]);
+  for (let k = 0; k < (opts.centers ?? 3); k++) centers.push([(r() - 0.5) * sx[NB] * 1.2, (r() - 0.5) * sz[NB] * 1.2, (90 + r() * 90) * Math.min(1, NB / 12)]);
   const heightAt = (x, z) => {
     let h = 0;
     for (const [cx, cz, s] of centers) h = Math.max(h, Math.exp(-((x - cx) ** 2 + (z - cz) ** 2) / (2 * s * s)));
@@ -196,6 +199,7 @@ export function buildCity(tex, opts = {}) {
     let w;
     if (style === 1) w = { glass: 6, concrete: 2, dark: 1.5, stone: 1 }; // ribbon windows: a modern office block
     else { w = { ...MIX[district(x, z)] }; if (fl >= 9) for (const k of ['stone', 'concrete', 'dark']) w[k] = (w[k] || 0) * 2 + 1; }
+    if (opts.tint) for (const k in opts.tint) w[k] = (w[k] || 0) + opts.tint[k]; // the place's own character
     let t = r() * Object.values(w).reduce((a, b) => a + b, 0), m = 'sand';
     for (const k in w) { if ((t -= w[k]) <= 0) { m = k; break; } }
     return shade(lin(pick(MATERIALS[m])), 0.92 + r() * 0.14);
@@ -299,12 +303,13 @@ export function buildCity(tex, opts = {}) {
     curB = buildings.length;
     const hf = heightAt((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2);
     let fl; const q = r();
+    const tall = opts.tall ?? 0.12;
     if (q < 0.38) fl = 1 + Math.floor(r() * 3);
-    else if (q < 0.88) fl = 3 + Math.floor(r() * 4);
+    else if (q < 1 - tall) fl = 3 + Math.floor(r() * 4);
     else fl = 7 + Math.floor(r() * 6);
     fl = Math.max(1, Math.round(fl * (0.8 + hf * 0.8)));
     if (interior) fl = Math.max(1, Math.round(fl * 0.6));
-    fl = Math.min(fl, Math.floor(Math.min(w, d) * 0.9), 16);
+    fl = Math.min(fl, Math.floor(Math.min(w, d) * 0.9), opts.maxFloors ?? 16);
     const sq = r();
     const style = fl >= 9 ? (sq < 0.25 ? 1 : sq < 0.7 ? 0 : 2) : (sq < 0.45 ? 0 : sq < 0.72 ? 2 : sq < 0.93 ? 3 : 1);
     const col = wallColor((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2, fl, style);
@@ -597,7 +602,7 @@ export function buildCity(tex, opts = {}) {
       cand.push({ key, x, z, s: heightAt(x, z) + r() * 0.35 });
     }
     cand.sort((a, b) => b.s - a.s);
-    const kinds = ['spire', 'deco', 'dome', 'stadium'];
+    const kinds = opts.landmarks || ['spire', 'deco', 'dome', 'stadium'];
     for (const c of cand) {
       if (landmarks.size >= kinds.length) break;
       if ([...landmarks.values()].some(o => Math.hypot(o.x - c.x, o.z - c.z) < 140)) continue;

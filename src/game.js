@@ -9,6 +9,8 @@ import { HAZARDS, WEATHER, threatName } from './disasters.js';
 import { BeTheDisaster, BE } from './be.js';
 import { Gauge, SIZED } from './gauge.js';
 import { Responders } from './response.js';
+import { curvedHit } from './curve.js';
+import { PLACES, placeKey, travel } from './places.js';
 
 const CSS = `
 #zd-top{position:fixed;left:0;right:0;top:0;display:flex;gap:6px;align-items:center;flex-wrap:wrap;
@@ -172,13 +174,17 @@ export class Game {
       '<div class="next">' + (next ? (next - pr.xp).toLocaleString() + ' XP to level ' + (lvl + 1) + this.nextUnlockText(lvl + 1) : 'Maximum level') + '</div>';
     let body, head = '';
     const top = (title) => '<div class="mhead"><button class="zd-btn" type="button" data-go="main">\u2039 Back</button><div class="mt">' + title + '</div></div>';
-    if (panel === 'main') {
+    if (panel === 'travel') { // the places in the world: the big city and the towns
+      const here = placeKey();
+      body = top('Travel') + '<div class="btns">' + Object.keys(PLACES).map(k => '<button class="zd-btn' + (k === here ? ' main' : '') + '" type="button" data-place="' + k + '">' + PLACES[k].name + (k === here ? ' · you are here' : '') + '<div style="font-size:11px;opacity:0.7;margin-top:2px">' + PLACES[k].blurb + '</div></button>').join('') + '</div>';
+    } else if (panel === 'main') {
       const beOpen = Object.keys(BE).filter(k => lvl >= BE_LEVEL[k]).length;
       body = '<h1>MY TINY<br>DISASTER</h1><div class="tag">Save the city, or be the disaster</div>' + rank +
         '<div class="btns"><button class="zd-btn main" type="button" data-go="commander">Play · Commander</button>' +
         '<button class="zd-btn" type="button" data-go="unlocks">Units and upgrades' + (pr.bank >= 3000 && UPGRADES.some(u => pr.canBuy(u.id)) ? ' · upgrade available' : '') + '</button>' +
         '<button class="zd-btn" type="button" data-go="be">Be The Disaster · ' + beOpen + ' of ' + Object.keys(BE).length + ' unlocked</button>' +
         '<button class="zd-btn dim" type="button" data-go="sandbox">Sandbox · drop zombies and disasters</button>' +
+        '<button class="zd-btn dim" type="button" data-go="travel">Travel · ' + PLACES[placeKey()].name + '</button>' +
         '<a class="zd-btn dim" href="showcase.html" style="text-decoration:none;display:block">Roster · every model</a></div>' +
         '<div class="foot">' + pr.data.rounds + ' rounds played · best score ' + pr.data.best.toLocaleString() + ' · ' + pr.data.stars + ' stars' + (pr.ok ? '' : ' · progress is not being saved on this device') + '</div>';
     } else if (panel === 'be') {
@@ -210,6 +216,7 @@ export class Game {
     this.menu.innerHTML = '<div class="box">' + head + '<div class="mbody">' + body + '</div></div>';
     this.menu.hidden = false;
     this.menu.querySelectorAll('[data-go]').forEach(b => { b.onclick = () => { const go = b.dataset.go; if (go === 'commander' || go === 'sandbox') this.startMode(go); else this.showMenu(go); }; });
+    this.menu.querySelectorAll('[data-place]').forEach(b => { b.onclick = () => travel(b.dataset.place); });
     this.menu.querySelectorAll('[data-be]').forEach(b => { b.onclick = () => this.startMode('be', b.dataset.be); });
     this.menu.querySelectorAll('[data-buy]').forEach(b => { b.onclick = () => { if (pr.buy(b.dataset.buy)) { this.toast('Upgrade bought'); this.showMenu('unlocks'); } }; });
   }
@@ -283,8 +290,7 @@ export class Game {
     const r = this.renderer.domElement.getBoundingClientRect();
     const ndc = new THREE.Vector2(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
     this.ray.setFromCamera(ndc, this.camera);
-    const hit = new THREE.Vector3();
-    return this.ray.ray.intersectPlane(this.plane, hit) ? hit : null;
+    return curvedHit(this.ray.ray, new THREE.Vector3()); // onto the ground as drawn, bent by the world's curve
   }
 
   // pan (and optionally zoom) the camera to a point
@@ -594,6 +600,7 @@ class Sandbox {
     const g = this.g, d = document.createElement('div'); d.id = 'zd-dis'; d.hidden = true;
     d.innerHTML = '<div class="h">Disasters</div><div class="g"><button class="zd-btn zb" type="button" data-zb>Zombies · ' + START_DROPS + '</button>' + Object.keys(HAZARDS).map(h => '<button class="zd-btn" type="button" data-hz="' + h + '">' + HAZARDS[h].name + '</button>').join('') + '</div>' +
       '<div class="h">Help</div><div class="g one"><button class="zd-btn auto" type="button" data-auto>Auto responders: On</button><button class="zd-btn hero" type="button" data-hero>Hero signal \u262E</button></div>' +
+      '<div class="h">Travel</div><div class="g">' + Object.keys(PLACES).map(k => '<button class="zd-btn' + (k === placeKey() ? ' sel' : '') + '" type="button" data-place="' + k + '">' + PLACES[k].name + '</button>').join('') + '</div>' +
       '<div class="h">Weather</div><div class="g w">' + Object.keys(WEATHER).map(w => '<button class="zd-btn" type="button" data-wx="' + w + '">' + WEATHER[w].name.replace('Thunderstorm', 'Storm') + '</button>').join('') + '</div>';
     document.body.appendChild(d); this.panel = d; this.zbBtn = d.querySelector('[data-zb]');
     const autoBtn = d.querySelector('[data-auto]');
@@ -616,6 +623,7 @@ class Sandbox {
       }
       g.disasters.start(h); this.close(); if (this.clock < 0) this.clock = 0;
     }; });
+    d.querySelectorAll('[data-place]').forEach(b => { b.onclick = () => { if (b.dataset.place !== placeKey()) travel(b.dataset.place, 'sandbox'); else this.close(); }; });
     d.querySelectorAll('[data-wx]').forEach(b => { b.onclick = () => { g.disasters.weather.set(b.dataset.wx); g.toast('Weather: ' + WEATHER[b.dataset.wx].name); this.close(); }; });
   }
   zombieLabel() {
