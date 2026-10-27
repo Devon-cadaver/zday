@@ -7,18 +7,16 @@
 import * as THREE from 'three';
 import { Hole, swallow } from './impact.js';
 import { cutGround } from './holes.js';
+import { scaly } from './skins.js';
 
-const SEG = 40, GAP = 3.3, R0 = 5.4, SHALLOW = -9, ARC_H = 38, SPEED = 13, MAXP = 3000;
+const LEN = 132, STEP = 1.2, NS = 112, RING = 22, R0 = 5.4, SHALLOW = -9, ARC_H = 38, SPEED = 13, MAXP = 3000; // a ring of RING vertices every STEP m along LEN m of body
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const sstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+const SAND = new THREE.Color('#cdb894'), DARK = new THREE.Color('#54402f'), BELLY = new THREE.Color('#e4d6b8');
 
 let P = null;
 function parts() {
   if (P) return P;
-  const ring = [[0.9, -0.5], [0.98, -0.42], [1, -0.2], [1, 0.2], [0.98, 0.42], [0.9, 0.5]].map(([r, y]) => new THREE.Vector2(r, y)); // one ridged ring of the body
-  // the maw: a thick lip round a dark throat, three rows of teeth pointing in
-  const lip = new THREE.TorusGeometry(1, 0.22, 10, 28).rotateX(Math.PI / 2);
-  const throat = new THREE.CylinderGeometry(0.95, 0.6, 1.6, 24, 1, true).translate(0, -0.8, 0);
-  const tooth = new THREE.ConeGeometry(0.07, 0.42, 5).rotateX(Math.PI / 2).translate(0, 0, -0.2);
   // the furrow it leaves: broken, sunken ground with a ragged edge
   const c = document.createElement('canvas'); c.width = 64; c.height = 128; const x = c.getContext('2d');
   for (let py = 0; py < 128; py += 2) for (let px = 0; px < 64; px += 2) {
@@ -28,43 +26,101 @@ function parts() {
     x.fillStyle = 'rgba(' + Math.round(70 * d * chunk) + ',' + Math.round(56 * d * chunk) + ',' + Math.round(42 * d * chunk) + ',' + (u > edge - 0.12 ? 0.75 : 1) + ')'; x.fillRect(px, py, 2, 2);
   }
   const tex = new THREE.CanvasTexture(c); tex.wrapT = THREE.RepeatWrapping; tex.colorSpace = THREE.SRGBColorSpace;
+  const skin = scaly('#ffffff', [4, 1], { rows: 4, cols: 4, bump: 3.2 }); skin.vertexColors = true; // banded by vertex colour
   P = {
-    seg: new THREE.LatheGeometry(ring, 18), lip, throat, tooth,
-    skin: new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.75 }), // banded by instance colour
-    lipMat: new THREE.MeshStandardMaterial({ color: '#8a6a52', roughness: 0.6 }),
+    skin, scales: scaly('#cdb894', [3, 2], { rows: 4, cols: 5, bump: 3 }), inner: new THREE.MeshStandardMaterial({ color: '#5a1a14', roughness: 0.45, side: THREE.BackSide }),
     throatMat: new THREE.MeshStandardMaterial({ color: '#2a0e0c', roughness: 0.4, side: THREE.BackSide }),
-    toothMat: new THREE.MeshStandardMaterial({ color: '#e8dcc0', roughness: 0.5 }),
+    toothMat: new THREE.MeshStandardMaterial({ color: '#ece2c8', roughness: 0.45 }),
+    petal: new THREE.SphereGeometry(1, 16, 10, 0, Math.PI * 2 / 3 - 0.05, 0, Math.PI / 2), // a third of a dome: three close over the mouth
+    tooth: new THREE.ConeGeometry(0.06, 0.38, 6),
     furrowMat: cutGround(new THREE.MeshStandardMaterial({ map: tex, transparent: true, depthWrite: false, roughness: 1, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 })),
   };
   return P;
 }
-const BAND = [new THREE.Color('#c9b48e'), new THREE.Color('#c9b48e'), new THREE.Color('#3e3026')]; // two sandy rings, one dark: the stripes
 
-// the head: maw facing +y
+// the body: one continuous tube, rebuilt along the spine every frame (no separate pieces, so no seams)
+function tubeGeometry() {
+  const g = new THREE.BufferGeometry(), V = NS * (RING + 1);
+  for (const [k, n] of [['position', 3], ['normal', 3], ['uv', 2], ['color', 3]]) g.setAttribute(k, new THREE.BufferAttribute(new Float32Array(V * n), n));
+  const idx = []; for (let i = 0; i < NS - 1; i++) for (let j = 0; j < RING; j++) { const a = i * (RING + 1) + j, b = a + RING + 1; idx.push(a, b, a + 1, b, b + 1, a + 1); } // wound to face outwards
+  g.setIndex(idx); g.setDrawRange(0, 0);
+  return g;
+}
+// S: spine samples from the head back, each { x, y, z, d (distance from the head) }; t: time, for the ripple
+function fillTube(g, S, t) {
+  const n = S.length; if (n < 2) { g.setDrawRange(0, 0); return; }
+  const Pp = g.attributes.position.array, N = g.attributes.normal.array, U = g.attributes.uv.array, C = g.attributes.color.array;
+  let nx = 0, ny = 1, nz = 0;
+  for (let i = 0; i < n; i++) {
+    const a = S[Math.max(0, i - 1)], b = S[Math.min(n - 1, i + 1)], s = S[i];
+    let tx = a.x - b.x, ty = a.y - b.y, tz = a.z - b.z; const tl = Math.hypot(tx, ty, tz) || 1; tx /= tl; ty /= tl; tz /= tl;
+    if (i === 0 && Math.abs(ty) > 0.9) { nx = 1; ny = 0; nz = 0; } // the frame is carried down the body, kept square to it, so the skin never twists
+    const dt = nx * tx + ny * ty + nz * tz; nx -= tx * dt; ny -= ty * dt; nz -= tz * dt; const nl = Math.hypot(nx, ny, nz) || 1; nx /= nl; ny /= nl; nz /= nl;
+    const bx = ty * nz - tz * ny, by = tz * nx - tx * nz, bz = tx * ny - ty * nx;
+    const u = s.d / LEN, r = R0 * (1 - 0.62 * Math.pow(u, 1.3)) * (1 + 0.03 * Math.cos(s.d * 2.4)) * (1 + 0.045 * Math.sin(t * 3 - s.d * 0.25)); // tapering to the tail, gently ringed, a slow ripple running down it
+    const ph = (s.d % 12) / 12, dark = sstep(0.58, 0.7, ph) * (1 - sstep(0.9, 1, ph)); // the dark bands, soft-edged
+    for (let j = 0; j <= RING; j++) {
+      const th = j / RING * Math.PI * 2, c = Math.cos(th), sn = Math.sin(th), ox = nx * c + bx * sn, oy = ny * c + by * sn, oz = nz * c + bz * sn, k = i * (RING + 1) + j;
+      Pp[k * 3] = s.x + ox * r; Pp[k * 3 + 1] = s.y + oy * r; Pp[k * 3 + 2] = s.z + oz * r;
+      N[k * 3] = ox; N[k * 3 + 1] = oy; N[k * 3 + 2] = oz; U[k * 2] = j / RING; U[k * 2 + 1] = s.d / 9;
+      const belly = sstep(0.2, 0.75, -oy) * (1 - dark) * 0.7;
+      C[k * 3] = SAND.r + (DARK.r - SAND.r) * dark + (BELLY.r - SAND.r) * belly; C[k * 3 + 1] = SAND.g + (DARK.g - SAND.g) * dark + (BELLY.g - SAND.g) * belly; C[k * 3 + 2] = SAND.b + (DARK.b - SAND.b) * dark + (BELLY.b - SAND.b) * belly;
+    }
+  }
+  g.setDrawRange(0, (n - 1) * RING * 6);
+  for (const k of ['position', 'normal', 'uv', 'color']) g.attributes[k].needsUpdate = true;
+}
+// points every STEP m back along a path (newest point last), up to LEN m
+function spine(path, out) {
+  out.length = 0; let i = path.length - 1, acc = 0, want = 0;
+  if (i < 0) return out;
+  out.push({ x: path[i].x, y: path[i].y, z: path[i].z, d: 0 }); want = STEP;
+  while (i > 0 && want <= LEN) {
+    const a = path[i], b = path[i - 1], L = Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+    if (acc + L >= want) { const f = (want - acc) / (L || 1); out.push({ x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, z: a.z + (b.z - a.z) * f, d: want }); want += STEP; continue; }
+    acc += L; i--;
+  }
+  return out;
+}
+
+// the head: a scaly collar the width of the body, and three jaw flaps that fold back to open the maw (it faces +y)
 function headMesh() {
   const p = parts(), g = new THREE.Group();
-  const add = (geo, mat) => { const m = new THREE.Mesh(geo, mat); m.castShadow = true; g.add(m); return m; };
-  add(p.lip, p.lipMat); add(p.throat, p.throatMat);
-  const teeth = new THREE.InstancedMesh(p.tooth, p.toothMat, 3 * 22), m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
-  for (let row = 0; row < 3; row++) for (let i = 0; i < 22; i++) {
-    const a = (i + row * 0.5) / 22 * Math.PI * 2, r = 0.9 - row * 0.12, y = -0.05 - row * 0.32;
-    e.set(0.7 + row * 0.25, -a + Math.PI / 2, 0, 'YXZ'); q.setFromEuler(e);
-    m.compose(new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r), q, new THREE.Vector3(1, 1, 1)); teeth.setMatrixAt(row * 22 + i, m);
+  const add = (geo, mat, parent = g) => { const m = new THREE.Mesh(geo, mat); m.castShadow = true; parent.add(m); return m; };
+  add(new THREE.CylinderGeometry(1.0, 1.0, 1.4, RING, 1, true).translate(0, -0.7, 0), p.scales);
+  add(new THREE.CylinderGeometry(0.93, 0.45, 2.4, 22, 1, true).translate(0, -1.2, 0), p.throatMat);
+  const ring = new THREE.InstancedMesh(p.tooth, p.toothMat, 2 * 20), m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), one = new THREE.Vector3(1, 1, 1);
+  for (let row = 0; row < 2; row++) for (let i = 0; i < 20; i++) { // rings of teeth down the throat, pointing in
+    const a = (i + row * 0.5) / 20 * Math.PI * 2, r = 0.86 - row * 0.12; e.set(0, -a, Math.PI / 2 + 0.5, 'YXZ'); q.setFromEuler(e);
+    m.compose(new THREE.Vector3(Math.cos(a) * r, -0.15 - row * 0.45, Math.sin(a) * r), q, one); ring.setMatrixAt(row * 20 + i, m);
   }
-  g.add(teeth);
+  g.add(ring);
+  const mid = (Math.PI * 2 / 3 - 0.05) / 2, hinges = [];
+  for (let i = 0; i < 3; i++) {
+    const turn = new THREE.Group(); turn.rotation.y = i * Math.PI * 2 / 3; g.add(turn);
+    const rim = new THREE.Vector3(-Math.cos(mid), 0, Math.sin(mid)), axis = new THREE.Vector3(Math.sin(mid), 0, Math.cos(mid));
+    const hinge = new THREE.Group(); hinge.position.copy(rim); turn.add(hinge);
+    const shell = new THREE.Group(); shell.position.copy(rim).multiplyScalar(-1); hinge.add(shell);
+    add(p.petal, p.scales, shell); add(p.petal, p.inner, shell);
+    const teeth = new THREE.InstancedMesh(p.tooth, p.toothMat, 8); // along the inside of each flap
+    for (let k = 0; k < 8; k++) { const ph = 0.12 + k * 0.24, th = 1.15 + (k % 2) * 0.22, dir = new THREE.Vector3(-Math.cos(ph) * Math.sin(th), Math.cos(th), Math.sin(ph) * Math.sin(th)); q.setFromUnitVectors(new THREE.Vector3(0, -1, 0), dir); m.compose(dir.clone().multiplyScalar(0.93), q, one); teeth.setMatrixAt(k, m); }
+    shell.add(teeth);
+    hinges.push({ hinge, axis });
+  }
+  g.userData.setOpen = (k) => { for (const H of hinges) H.hinge.quaternion.setFromAxisAngle(H.axis, k * 1.9); }; // 0 shut, 1 folded right back
+  g.userData.setOpen(0.2);
   return g;
 }
 
-// a static worm for the roster: an arc out of one pit and down into another
+// a static worm for the roster: an arc out of one pit and down into another, maw open
 export function wormModel() {
-  const p = parts(), g = new THREE.Group(), body = new THREE.InstancedMesh(p.seg, p.skin, SEG), m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
-  const at = (s) => new THREE.Vector3(-34 + s * 68, -4 + 26 * Math.sin(Math.PI * s), 0);
-  for (let i = 0; i < SEG; i++) {
-    const s = 1 - i / (SEG - 1), a = at(s), b = at(Math.max(0, s - 0.01)), r = R0 * (1 - 0.5 * i / SEG) * 0.55;
-    q.setFromUnitVectors(up, a.clone().sub(b).normalize()); m.compose(a, q, new THREE.Vector3(r, GAP * 0.62, r)); body.setMatrixAt(i, m); body.setColorAt(i, BAND[i % 3]);
-  }
-  g.add(body);
-  const h = headMesh(); h.scale.setScalar(R0 * 0.62); h.position.copy(at(1)); h.quaternion.setFromUnitVectors(up, at(1).sub(at(0.99)).normalize()); g.add(h);
+  const g = new THREE.Group(), path = [];
+  for (let u = 0; u <= 0.82; u += 0.004) path.push({ x: (u - 0.41) * 140, y: -12 + 48 * Math.sin(Math.PI * u), z: 0 }); // out of the ground on the left, head coming down on the right
+  const geo = tubeGeometry(); fillTube(geo, spine(path, []).map(q => ({ ...q, d: q.d })), 0);
+  const body = new THREE.Mesh(geo, parts().skin); body.castShadow = true; g.add(body);
+  const h = headMesh(), a = path[path.length - 1], b = path[path.length - 4]; h.scale.setScalar(R0); h.position.set(a.x, a.y, a.z);
+  h.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(a.x - b.x, a.y - b.y, a.z - b.z).normalize()); h.userData.setOpen(0.85); g.add(h);
+  g.scale.setScalar(0.55);
   return g;
 }
 
@@ -77,9 +133,8 @@ export class Worm {
     this.yaw = Math.atan2(this.goal[1] - this.z, this.goal[0] - this.x); this.phase = 'tunnel'; this.arcT = 0; this.vy = 0;
     this.path = [{ x: this.x, y: this.y, z: this.z }]; this.shook = new Set(); this.holes = 0;
     const p = parts(), scene = D.ctx.scene;
-    this.body = new THREE.InstancedMesh(p.seg, p.skin, SEG); this.body.castShadow = true; this.body.frustumCulled = false;
-    for (let i = 0; i < SEG; i++) this.body.setColorAt(i, BAND[i % 3]);
-    this.head = headMesh(); this.head.scale.setScalar(R0 * 1.15); scene.add(this.body, this.head);
+    this.body = new THREE.Mesh(tubeGeometry(), p.skin); this.body.castShadow = true; this.body.frustumCulled = false; this.spine = [];
+    this.head = headMesh(); this.head.scale.setScalar(R0); this.open = 0.2; scene.add(this.body, this.head);
     // the furrow: a ribbon along the tunnel, grown as it goes
     const g = new THREE.BufferGeometry(); this.fp = new Float32Array(MAXP * 6); this.fu = new Float32Array(MAXP * 4); const idx = [];
     for (let i = 0; i < MAXP - 1; i++) { const k = i * 2; idx.push(k, k + 2, k + 1, k + 1, k + 2, k + 3); }
@@ -124,7 +179,7 @@ export class Worm {
     // breaking the surface: a pit, everything there swallowed; and back in again
     if (py < 0 && this.y >= 0) this.burst(true); else if (py >= 0 && this.y < 0) this.burst(false);
     const d = Math.hypot(this.x - (this.path[this.path.length - 1].x), this.z - this.path[this.path.length - 1].z);
-    if (d >= 1) { this.path.push({ x: this.x, y: this.y, z: this.z }); if (this.path.length > SEG * GAP + 20) this.path.shift(); }
+    if (d >= 1) { this.path.push({ x: this.x, y: this.y, z: this.z }); if (this.path.length > LEN + 20) this.path.shift(); }
     if (this.y < 0) this.underground(px, pz); else this.airborne();
   }
   // tunnelling: the ground caves in along the way, shaking what stands above
@@ -177,23 +232,17 @@ export class Worm {
   poi() { return this.phase === 'arc' ? { x: this.x, z: this.z, danger: 30, range: 320 } : null; }
   sync(dt, realT) {
     // the body follows the path the head has been along
-    const P = this.path, m = this._m, q = this._q, v = this._v; let n = 0, i = P.length - 1, acc = 0, prev = P[i];
-    for (let s = 0; s < SEG && i > 0; s++) {
-      const want = s * GAP; while (i > 0 && acc < want) { const a = P[i], b = P[i - 1]; acc += Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z); i--; }
-      const a = P[i], b = P[Math.min(P.length - 1, i + 1)];
-      v.set(b.x - a.x, b.y - a.y, b.z - a.z); if (v.lengthSq() < 1e-6) v.set(Math.cos(this.yaw), 0, Math.sin(this.yaw)); v.normalize();
-      q.setFromUnitVectors(this._up, v); const r = R0 * (1 - 0.55 * s / SEG) * (1 + 0.04 * Math.sin(realT * 4 - s * 0.6));
-      m.compose(this._p.set(a.x, a.y, a.z), q, this._s.set(r, GAP * 1.12, r)); this.body.setMatrixAt(n++, m); prev = a;
-    }
-    this.body.count = n; this.body.instanceMatrix.needsUpdate = true;
-    const h0 = P[P.length - 1], h1 = P[Math.max(0, P.length - 3)];
-    v.set(h0.x - h1.x, h0.y - h1.y, h0.z - h1.z); if (v.lengthSq() < 1e-6) v.set(Math.cos(this.yaw), 0, Math.sin(this.yaw)); v.normalize();
+    const S = spine(this.path, this.spine); fillTube(this.body.geometry, S, realT);
+    const a = S[0], b = S[Math.min(S.length - 1, 2)], v = this._v;
+    v.set(a.x - b.x, a.y - b.y, a.z - b.z); if (v.lengthSq() < 1e-6) v.set(Math.cos(this.yaw), 0, Math.sin(this.yaw)); v.normalize();
     this.head.position.set(this.x, this.y, this.z); this.head.quaternion.setFromUnitVectors(this._up, v);
-    this.head.scale.setScalar(R0 * 1.15 * (1 + 0.06 * Math.sin(realT * 3))); // the maw working
+    // the jaws: open wide as it breaks out, shut again before it goes back in, barely parted underground
+    const want = this.phase === 'arc' ? (this.arcT < 4.6 ? 1 : 0.15) : 0.12 + 0.06 * Math.sin(realT * 1.5);
+    this.open += (want - this.open) * (dt > 0 ? 1 - Math.exp(-dt * 3) : 1); this.head.userData.setOpen(this.open);
     this.head.visible = this.body.visible = this.phase !== 'gone';
   }
   dispose() {
-    const D = this.D, sc = D.ctx.scene, fu = this.furrow; sc.remove(this.body, this.head); this.body.dispose();
+    const D = this.D, sc = D.ctx.scene, fu = this.furrow; sc.remove(this.body, this.head); this.body.geometry.dispose();
     D.leftovers.push({ update() {}, sync() {}, dispose() { sc.remove(fu); fu.geometry.dispose(); } }); // the caved-in furrow stays until the city is reset, like the pits
   }
 }

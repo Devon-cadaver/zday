@@ -303,6 +303,11 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 - kaiju.js: ~45 m hunched rig (legs, very long arms, neck, jaw, tail, back spines), walks in from the nearest edge at 5.5 m/s, foot plants at the leg cycle crush (buildings < 45 m, crushNear 4 m, cars flung), wades through < 70 m, swipes, picks up and throws cars, roars; hp 400, airstrike blasts 50 (auto responders strike every 9 s), retreats at 0 hp or after 200 s. Be: KaijuCtl drag walks, tap car/building/open ground = throw/swipe/roar.
 - Sandbox Follow also covers riots, the worm and the kaiju. Commander threats: worm L6, kaiju L8. Roster dioramas for both (showcase camera far plane scales with the tile).
 
+## Worm and kaiju redesign
+- skins.js: scaleTexture (canvas of overlapping shingled scales, tiled) and scaly(color, repeat) = MeshStandardMaterial with it as map and bump map. Used by both creatures.
+- Worm body is now one continuous tube rebuilt each frame along the spine (fillTube: a ring of 22 vertices every 1.2 m over 132 m, frame carried down the body so it never twists, gentle rings, taper, a ripple, soft dark bands and a pale belly in vertex colour; triangles wound outward). Head: scaly collar, throat with two rings of teeth, three scaly jaw flaps (red inside, toothed) that ease open as it breaches and shut before it dives.
+- Kaiju: every limb is a tapered cylinder with a ball at its top joint, ellipsoid feet, hands, skull, jaw and belly, all scaly, so no seams. Joints ease towards each pose (sync(dt) keeps an eased copy; sync(0) gives the exact pose for footfalls without disturbing it); folds use a gentle ease curve; the body rolls and twists with the stride.
+
 ## Next
 - Sean tests v1.3 on his phone; tune from his notes. Candidates: Be The Disaster score scales and ranks once real scores come in, the saucer size at close zoom, how often zombie outbreaks turn up in Commander, incident pacing, card bar height on the phone.
 
