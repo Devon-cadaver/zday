@@ -313,8 +313,8 @@ export class Game {
     if (this.goodBtn) { this.goodBtn.classList.remove('on'); this.goodBtn.textContent = 'Good guys'; }
   }
 
-  // what the two follow buttons step through. The bad guys: villains, the kaiju, the worm, riots, alien machines (then
-  // zombies). The good guys: the super heroes, helicopters, rescue vehicles on the move, then the responders on foot
+  // what the two follow buttons step through. The bad guys: villains, the kaiju, the worm, riots, alien machines, every
+  // other disaster (a tornado, a storm front, a falling meteor, a volcano...), then zombies. The good guys: the super heroes, helicopters, rescue vehicles on the move, then the responders on foot
   // nearest the view (police, firefighters, soldiers, the crews rebuilding)
   subjects(side = 'bad') {
     const out = [], D = this.disasters; if (!D) return out;
@@ -342,7 +342,48 @@ export class Game {
       e.tripods.forEach((t, k) => out.push({ obj: t, name: 'Tripod ' + (k + 1), pos: () => (t.state === 'walk' || t.state === 'drop' ? [t.x, t.y, t.z] : null) }));
       e.saucers.forEach((s, k) => out.push({ obj: s, name: 'Saucer ' + (k + 1), pos: () => (s.state === 'cruise' || s.state === 'act' ? [s.x, s.y, s.z] : null) }));
     }
+    const own = new Set(['villains', 'kaiju', 'worm', 'riot', 'aliens', 'heroes']);
+    for (const e of D.list) if (e.alive && !own.has(e.type)) { const name = HAZARDS[e.type] ? HAZARDS[e.type].name : e.type === 'nukeblast' ? 'Nuclear blast' : null; if (name) out.push({ obj: e, name, kind: 'disaster', pos: () => this.disasterAt(e) }); }
     return out.filter(s => s.pos());
+  }
+  // a storm front sweeping the city (tsunami, dust storm, cold wave, solar flare): the point of it level with the view,
+  // its heading, and whether it has gone by. Null for anything else
+  front(e) {
+    const tg = this.controls.target;
+    if (e.sw && (e.type === 'tsunami' || e.type === 'haboob' || e.type === 'coldwave')) {
+      const sw = e.sw, t = (tg.x - sw.origin.x) * sw.tan.x + (tg.z - sw.origin.y) * sw.tan.y, s = sw.frontAt(t);
+      return { x: sw.origin.x + sw.tan.x * t + sw.dir.x * s, z: sw.origin.y + sw.tan.y * t + sw.dir.y * s, dx: sw.dir.x, dz: sw.dir.y, gone: e.phase === 'recede' || e.phase === 'after' || e.phase === 'warn' && e.type === 'tsunami' };
+    }
+    if (e.type === 'solar' && e.dir) {
+      const d = e.dir, o = e.origin, t = (tg.x - o[0]) * -d[1] + (tg.z - o[1]) * d[0];
+      return { x: o[0] + d[0] * e.ws - d[1] * t, z: o[1] + d[1] * e.ws + d[0] * t, dx: d[0], dz: d[1], gone: e.ws > e.extent + 60 };
+    }
+    return null;
+  }
+  // where the follow camera looks for a disaster: a little ahead of a storm front (so the wall comes on towards the camera),
+  // the middle of a tornado's funnel, a falling meteor or missile, where people are afloat in a flood, the spot itself
+  disasterAt(e) {
+    if (!e.alive) return null;
+    const tg = this.controls.target, F = this.front(e);
+    if (F) return F.gone ? null : [F.x + F.dx * 45, 12, F.z + F.dz * 45];
+    if (e.type === 'tornado') { const tw = e.tw; return tw && tw.phase !== 'gone' ? [tw.x, Math.min(70, (tw.H || 120) * 0.35), tw.z] : null; }
+    if (e.type === 'flood') { const s = this.people.swimSpots(1)[0]; return s ? [s[0], 2, s[1]] : [tg.x, 2, tg.z]; }
+    const o = e.ball || e.missile; if (o && o.position && (e.phase === 'fall' || e.phase === 'held')) return [o.position.x, o.position.y, o.position.z]; // on its way down
+    if (e.x == null) { const p = e.poi && e.poi(tg.x, tg.z); return p ? [p.x, 5, p.z] : null; }
+    return [e.x, e.type === 'volcano' ? 40 : 5, e.z];
+  }
+  // the camera's shot for a disaster: ahead of a front looking back at it, chasing a tornado from behind, standing well
+  // back from the rest
+  disasterShot(e) {
+    const F = this.front(e), P = Math.PI;
+    if (F) return { key: 'lead-' + e.type, dist: e.type === 'haboob' ? 700 : 560, pol: 0.94, base: Math.atan2(F.dz, F.dx), off: 0.4, rate: 1.4 };
+    if (e.type === 'tornado') return { key: 'tornado', dist: 480, pol: 1.0, base: (this.camDir ? this.camDir.heading : 0) + P, off: 0.55 }; // low enough to see how tall the funnel is
+    if (e.type === 'meteor' || e.type === 'nuclear') return { key: 'sky-' + e.type, dist: 560, pol: 1.02 };
+    if (e.type === 'sinkhole') return { key: 'sinkhole', dist: 320, pol: 0.62 }; // looking down into the pit
+    if (e.type === 'quake') return { key: 'quake', dist: 600, pol: 0.78 };
+    if (e.type === 'volcano') return { key: 'volcano', dist: 680, pol: 0.92 };
+    if (e.type === 'flood') return { key: 'flood', dist: 380, pol: 0.72 };
+    return { key: e.type, dist: 540, pol: 0.86 };
   }
   followSubject(s, side = this.followSide || 'bad') {
     this.follow = -1; this.followSub = s; this.followSide = side; this.dir = null; this.camDir = null; this.zoomTo = 0; this.manualCam = false; this.lockControls(true);
@@ -380,6 +421,7 @@ export class Game {
     if (s.kind === 'car') return { key: 'car', dist: 220, pol: 0.62, base: hd + P, off: 0.4 }; // chasing it down the street, high enough to see over the buildings
     if (s.kind === 'heli') return { key: 'heli', dist: 280, pol: 0.86, base: hd, off: 0.9 };
     if (s.kind === 'foot') return { key: 'foot', dist: 150, pol: 0.62 }; // close enough to watch them work, looking down into the street
+    if (s.kind === 'disaster') return this.disasterShot(o);
     return null;
   }
   // the good guys button: each press the next of them
