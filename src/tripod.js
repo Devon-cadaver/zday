@@ -78,6 +78,25 @@ function parts() {
   return shared;
 }
 
+// a tripod standing still, for the roster: the head, its glass dome over the grinder, three bowed legs and the little tentacles
+export function tripodModel() {
+  const P = parts(), g = new THREE.Group(), head = new THREE.Group(), hy = 26; head.position.y = hy; g.add(head);
+  for (const [geo, mat] of [[P.head, P.hull], [P.band, P.dark], [P.collar, P.dark], [P.arm, P.dark], [P.vent, P.dark], [P.eye, P.eyeMat]]) { const m = new THREE.Mesh(geo, mat); m.castShadow = true; head.add(m); }
+  head.add(new THREE.Mesh(P.meat, new THREE.MeshStandardMaterial({ color: '#6a2620', roughness: 0.4 })));
+  head.add(new THREE.Mesh(P.dome, new THREE.MeshStandardMaterial({ color: '#a8e0d4', transparent: true, opacity: 0.35, roughness: 0.1, depthWrite: false })));
+  for (let i = 0; i < 3; i++) {
+    const a = i * 2.094, ox = Math.cos(a), oz = Math.sin(a), hip = new THREE.Vector3(ox * HIP_R, hy - 1.5, oz * HIP_R), foot = new THREE.Vector3(ox * 14, 0.3, oz * 14);
+    const curve = new THREE.CubicBezierCurve3(hip, hip.clone().add(new THREE.Vector3(ox * 6, 6, oz * 6)), foot.clone().add(new THREE.Vector3(ox * 4, (hip.y - foot.y) * 0.45, oz * 4)), foot);
+    const leg = new THREE.Mesh(new THREE.TubeGeometry(curve, 30, 0.8, 8), P.skin); leg.castShadow = true; g.add(leg);
+  }
+  for (let i = 0; i < TENT; i++) {
+    const a = i / TENT * 6.28, ox = Math.cos(a), oz = Math.sin(a);
+    const c = new THREE.CatmullRomCurve3([new THREE.Vector3(ox * 2.2, hy - 2.2, oz * 2.2), new THREE.Vector3(ox * 3.2, hy - 5, oz * 3.2), new THREE.Vector3(ox * 3, hy - 8.5, oz * 3.6)]);
+    g.add(new THREE.Mesh(new THREE.TubeGeometry(c, 10, 0.25, 5), P.skin));
+  }
+  return g;
+}
+
 const bez = (a, b, c, d, t, out) => { const u = 1 - t; for (let k = 0; k < 3; k++) out[k] = u * u * u * a[k] + 3 * u * u * t * b[k] + 3 * u * t * t * c[k] + t * t * t * d[k]; return out; };
 
 export class Tripod {

@@ -1,11 +1,12 @@
-// Roster page: every figure and vehicle on its own plinth, rendered into one
-// fixed canvas with a scissor viewport per tile (so a phone needs one WebGL
-// context, not sixty).
+// Roster page: every figure, vehicle and disaster on its own plinth, rendered
+// into one fixed canvas with a scissor viewport per tile (so a phone needs one
+// WebGL context, not a hundred), clipped to the panel's scrolling list.
 import * as THREE from 'three';
 import { figureGeometry, figureMaterial, figureAttributes, ARCHETYPES, OFFICER_LOOK, FIREFIGHTER_LOOK, SOLDIER_LOOK, CREW_LOOK, HAZMAT_LOOK, MEDIC_LOOK, ZTYPES, FLAG } from './figures.js';
 import { heroModel } from './heroes.js';
 import { villainModel } from './villains.js';
 import { siteModel, tentModel } from './rebuild.js';
+import { disasterExamples } from './examples.js';
 import { VEHICLES, buildVehicle } from './vehicles.js';
 import { rng } from './textures.js';
 
@@ -15,11 +16,11 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setClearColor(0x000000, 0);
 renderer.shadowMap.enabled = true;
 const fig = figureMaterial();
-const tiles = [];
+const tiles = [], list = document.getElementById('list');
 
 function plinth(size) {
   const g = new THREE.CylinderGeometry(size, size * 1.08, size * 0.12, 6);
-  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: '#1b2838', roughness: 0.8 }));
+  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: '#4a3c2a', roughness: 0.8 }));
   m.position.y = -size * 0.06; m.receiveShadow = true; m.rotation.y = Math.PI / 6;
   return m;
 }
@@ -74,6 +75,8 @@ for (const n of ['Blur', 'Tyrant', 'Weaver']) add('Super villains', n, villainMo
 add('Rebuilding', 'Construction site', siteModel(), 30);
 add('Rebuilding', 'Medical tent', tentModel(false), 3.4);
 add('Rebuilding', 'Hazmat decon tent', tentModel(true), 3.4);
+// ---------- the disasters themselves
+for (const [name, obj, fit] of disasterExamples()) add('Disasters', name, obj, fit);
 for (const [k, Z] of ZTYPES.entries()) {
   const base = ARCHETYPES[k % 3 === 0 ? 0 : k % 3 === 1 ? 4 : 2].roll(r);
   const L = Z.look(base); L.scale = Z.scale || 1; L.torso = Z.torso || 1;
@@ -102,17 +105,19 @@ function frame() {
   const dt = Math.min(0.05, clock.getDelta());
   fig.uTime.value += dt;
   renderer.setScissorTest(true);
-  const H = innerHeight;
+  const H = innerHeight, L = list.getBoundingClientRect(); // only what shows in the scrolling list
+  renderer.setScissor(0, 0, innerWidth, H); renderer.clear();
   for (const t of tiles) {
     const rc = t.el.getBoundingClientRect();
-    if (rc.bottom < 0 || rc.top > H || rc.right < 0 || rc.left > innerWidth) continue;
+    if (rc.bottom < L.top || rc.top > L.bottom || rc.right < L.left || rc.left > L.right) continue;
     t.rot += dt * 0.5;
     t.pivot.rotation.y = t.rot;
     if (t.obj.userData.tick) t.obj.userData.tick(dt);
     if (t.obj.userData.rotor) { t.obj.userData.rotor.rotation.y += dt * 18; t.obj.position.y = 0.4 + Math.sin(t.rot * 2) * 0.08; }
     const w = rc.width, h = rc.height, left = rc.left, bottom = H - rc.bottom;
     t.cam.aspect = w / h; t.cam.updateProjectionMatrix();
-    renderer.setViewport(left, bottom, w, h); renderer.setScissor(left, bottom, w, h);
+    const sTop = Math.max(rc.top, L.top), sBot = Math.min(rc.bottom, L.bottom);
+    renderer.setViewport(left, bottom, w, h); renderer.setScissor(left, H - sBot, w, sBot - sTop);
     renderer.render(t.scene, t.cam);
   }
   requestAnimationFrame(frame);

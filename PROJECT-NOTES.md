@@ -273,6 +273,10 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 - Crew figures (people.spawnCrew, HELD fx 0, kind FIREFIGHTER, dismissed with people.dismiss): construction workers (CREW_LOOK) round the truck at a site, hazmat crew in yellow suits (HAZMAT_LOOK), paramedics (MEDIC_LOOK) at camps. Crew ids: sites 20000+, hazmat 26000+, medics camp id + 10000.
 - Roster (showcase.js) adds firefighter, soldier, the three crews, the heroes (heroModel) and villains (villainModel) with animated capes and wings, a construction site with its crane (siteModel/buildCrane), and both tents. New trucks show up from VEHICLES automatically.
 
+## Roster page
+- Framed like the game menus: pinned header (‹ Back, Roster) over a scrolling list; the canvas sits inside #wrap above the panel background and below header and labels (z 2 vs 3), and each tile is scissored to the list's visible rect. Tiles minmax(100px) so three across on a phone.
+- Disasters section: examples.js builds small animated dioramas (tornado, quake, flood, tsunami, sinkhole, meteor, volcano, lava, dust storm, cold wave, solar flare, saucer, tripod via tripodModel(), black hole, nuke, meltdown).
+
 ## Next
 - Sean tests v1.3 on his phone; tune from his notes. Candidates: Be The Disaster score scales and ranks once real scores come in, the saucer size at close zoom, how often zombie outbreaks turn up in Commander, incident pacing, card bar height on the phone.
 
