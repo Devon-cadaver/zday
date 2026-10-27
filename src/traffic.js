@@ -463,6 +463,7 @@ export class Traffic {
     this.pose(car);
     if (car.v < 0.3) car.blocked += h; else car.blocked = 0;
     car.pedWait = car.pedGap < 99 && car.v < 2 ? (car.pedWait || 0) + h : Math.max(0, (car.pedWait || 0) - h * 2);
+    if (car.mission && car.leaving && car.blocked > 8) { this.remove(car); if (car.onGone) car.onGone(car); return; } // held up on the way out of town: count it as gone so its place is free
     if (car.mission && car.blocked > 4 && !car.leaving) {
       const last = car.ri + 2 >= car.route.length;
       const dToStop = last && !car.turn ? Math.abs(this.stopAt(car) - car.s) : 99;
@@ -687,8 +688,11 @@ export class Traffic {
 
   dispatch(route, opts = {}) {
     const kind = opts.kind || 'police', def = MISSION_KINDS[kind];
-    const slot = this.missions.filter(m => m.kind === kind).length;
-    if (!route || route.length < 2 || this.missions.length >= MISSION_CAP || slot >= def.cap) return null;
+    if (!route || route.length < 2 || this.missions.filter(m => !m.gone && (m.mode === DRIVE || m.mode === PARKED)).length >= MISSION_CAP) return null;
+    // the first free place in this kind's mesh: a vehicle that has left the city gives its place back (a wreck keeps its own)
+    let slot = 0; while (this.missions.some(m => m.kind === kind && m.slot === slot && !m.gone)) slot++;
+    if (slot >= def.cap) return null;
+    const old = this.missions.findIndex(m => m.kind === kind && m.slot === slot); if (old >= 0) this.missions.splice(old, 1);
     const id = this.cars.length;
     const car = { id, mission: true, kind, slot, route, ri: 0, mode: DRIVE, cruise: opts.cruise ?? def.cruise, v: 0, panic: 0, think: 0,
       pedGap: 99, blocked: 0, resume: -1, x: 0, z: 0, y: 0, roll: 0, pitch: 0, vy: 0, hx: 1, hz: 0, yaw: 0, vx: 0, vz: 0, w: 0, ignite: false, burning: false, hits: 0, zx: 0, zz: 0,
@@ -696,7 +700,7 @@ export class Traffic {
     this.startSeg(car, route[0], route[1]);
     car.s = 0; this.pose(car);
     this.cars.push(car); this.missions.push(car);
-    this.missionMeshes[kind].count = slot + 1;
+    this.missionMeshes[kind].count = Math.max(this.missionMeshes[kind].count, slot + 1);
     let len = 0;
     for (let k = 1; k < route.length; k++) len += Math.hypot(this.nodes[route[k]].x - this.nodes[route[k - 1]].x, this.nodes[route[k]].z - this.nodes[route[k - 1]].z);
     car.eta = len / car.cruise;

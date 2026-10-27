@@ -277,6 +277,11 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 - Framed like the game menus: pinned header (‹ Back, Roster) over a scrolling list; the canvas sits inside #wrap above the panel background and below header and labels (z 2 vs 3), and each tile is scissored to the list's visible rect. Tiles minmax(100px) so three across on a phone.
 - Disasters section: examples.js builds small animated dioramas (tornado, quake, flood, tsunami, sinkhole, meteor, volcano, lava, dust storm, cold wave, solar flare, saucer, tripod via tripodModel(), black hole, nuke, meltdown).
 
+## Sandbox auto-responders (response.js)
+- Responders (on by default; Disasters menu > Help > Auto responders On/Off) answer everything for free: fire trucks to burning buildings (4 out) and a water drop on 3+ fires, rescue helis to roofs, police to zombie clusters (6 out) and riots, an APC past 60 zombies, cloud seeding + a storm chaser on tornadoes, airstrikes on tripods and low saucers, hazmat to radiation zones, the hero signal for villains and incoming meteors and missiles. Once D.list is empty: construction crews (4 sites, nearest the view first, 10 s after a building fell, skipping holes and radiation) and a medical camp by the work.
+- Shared with Commander: seedEffect, campSpot, custodyBuses.
+- Fixes found on the way: mission vehicles that leave free their mesh slot (they used to cap each kind per round, 24 dispatches total); a departing mission stuck 8 s counts as gone; Sandbox units drive off once their job is done; people.setupBuildings sets b.t for every building with a door (small burning buildings crashed firemanStep).
+
 ## Next
 - Sean tests v1.3 on his phone; tune from his notes. Candidates: Be The Disaster score scales and ranks once real scores come in, the saucer size at close zoom, how often zombie outbreaks turn up in Commander, incident pacing, card bar height on the phone.
 

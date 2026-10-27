@@ -239,9 +239,9 @@ export class People {
     this.rgrid = Array.from({ length: this.rw * this.rh }, () => []);
     bl.forEach((b, k) => {
       const rf = b.roof, area = Math.max(0, rf.x1 - rf.x0) * Math.max(0, rf.z1 - rf.z0);
+      if (b.door && b.n) b.t = [-b.n[1], b.n[0]]; // along the wall from the door (firefighters line up on it, however small the building)
       if (!b.door || area < 20) return;
       this.bCap[k] = Math.min(120, Math.floor(area / 5));
-      b.t = [-b.n[1], b.n[0]];
       const ci = Math.floor((b.door[0] - this.rx0) / RCELL), cj = Math.floor((b.door[1] - this.rz0) / RCELL);
       if (ci >= 0 && cj >= 0 && ci < this.rw && cj < this.rh) this.rgrid[cj * this.rw + ci].push(k);
     });
@@ -1298,7 +1298,7 @@ export class People {
   // the police bus is here: everyone in custody group id walks to its door
   custodyToBus(id, x, z, busId) {
     let n = 0;
-    for (let i = 0; i < this.active; i++) if (this.st[i] === S.HELD && this.bt[i] === id) { this.st[i] = S.BOARD; this.tx[i] = x; this.tz[i] = z; this.bt[i] = busId; this.t1[i] = 40; this.inc[i] = 0; this.fx[i] = 1; this.wt[i] = 1.8; n++; }
+    for (let i = 0; i < this.active; i++) if (this.st[i] === S.HELD && this.bt[i] === id) { this.st[i] = S.BOARD; this.tx[i] = x; this.tz[i] = z; this.bt[i] = busId; this.t1[i] = 40; this.inc[i] = 0; this.fx[i] = 1; this.wt[i] = 2.6; n++; }
     return n;
   }
   // caught in a super villain's web: stuck where they stand until the web lets go

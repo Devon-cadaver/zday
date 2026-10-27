@@ -6,6 +6,7 @@ import { ST } from './people.js';
 import { HAZARD_LEVEL, WEATHER_LEVEL } from './profile.js';
 import { WEATHER, threatName } from './disasters.js';
 import { Site, Camp, Hazmat } from './rebuild.js';
+import { seedEffect, campSpot, custodyBuses } from './response.js';
 
 export const UNITS = [
   { id: 'police', name: 'Police', cost: 50, cd: 20, alert: 0 },
@@ -253,15 +254,7 @@ export class Commander {
     g.toast('Ambulance on its way to set up a camp, about ' + Math.ceil(car.eta) + ' s out');
   }
   // open ground for the tents near (x, z): walkable with nothing built within 10 m, a park or a square rather than a road
-  campSpot(x, z) {
-    const p = this.g.people, city = this.g.city; let best = null, bd = 1e9;
-    for (let r = 0; r <= 60; r += 5) for (let a = 0; a < 6.28; a += r ? 5 / r : 7) {
-      const px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r; if (!p.walkable(px, pz)) continue;
-      let clear = true; city.buildingsNear(px, pz, 10, () => { clear = false; }); if (!clear) continue;
-      const d = r + (p.onRoad(px, pz) ? 25 : 0); if (d < bd) { bd = d; best = [px, pz]; }
-    }
-    return best;
-  }
+  campSpot(x, z) { return campSpot(this.g.people, this.g.city, x, z); }
   // a hazmat clean-up where the truck parks: radiation, people with a dose, burning wrecks
   sendHazmat(x, z) {
     const g = this.g;
@@ -296,25 +289,8 @@ export class Commander {
   }
   // rioters in custody: a police bus comes for them and takes them out of the area
   custodyTick() {
-    const g = this.g, p = g.people;
-    for (const c of p.custody) {
-      if (c.done) continue;
-      if (c.bus) {
-        const bus = c.bus; if (bus.gone || bus.mode !== 3 || bus.leaving) continue;
-        bus.loadT = (bus.loadT || 0) + 1; let boarding = 0;
-        for (let i = 0; i < p.active; i++) if (p.st[i] === ST.BOARD && p.bt[i] === bus.id) boarding++;
-        if ((!boarding && bus.loadT > 2) || bus.loadT > 35) { p.releaseBus(bus.id); g.traffic.depart(bus); c.done = true; }
-        continue;
-      }
-      const n = p.heldBy(c.id);
-      if (!n) { c.done = true; continue; }
-      if (n < 4 && p.time - c.t < 20) continue; // wait a little for a bus load
-      const car = g.traffic.dispatchTo(c.x, c.z, { kind: 'jail',
-        onArrive: (ax, az, bus) => { bus.loadT = 0; bus.loaded = 0; const k = p.custodyToBus(c.id, ax, az, bus.id); g.toast('Police bus loading ' + k + ' arrested rioters in the ' + this.district(ax, az)); },
-        onLost: (bus) => { p.releaseBus(bus.id); c.done = true; },
-        onGone: (bus) => { g.toast('Police bus away with ' + (bus.loaded || 0) + ' rioters', 3000); } });
-      if (car) { c.bus = car; this.jailBuses++; if (this.jailBuses === 1) g.toast('A police bus is on its way to take the arrested rioters away', 3500); }
-    }
+    const g = this.g;
+    custodyBuses(g, (x, z) => this.district(x, z), () => { this.jailBuses++; if (this.jailBuses === 1) g.toast('A police bus is on its way to take the arrested rioters away', 3500); });
   }
 
   sendPolice(x, z) {
@@ -323,7 +299,7 @@ export class Commander {
       onArrive: (ax, az) => { g.people.spawnOfficers(ax, az, this.pr.has('squad4') ? 4 : 2); g.toast('Officers on scene in the ' + this.district(ax, az)); },
       onLost: () => { this.lost++; g.toast('A cruiser was wrecked on the way'); },
     });
-    if (!car) { g.toast(g.traffic.missions.length >= 24 ? 'All cruisers are out' : 'No road to that spot'); return; }
+    if (!car) { g.toast(g.traffic.missions.filter(m => !m.gone).length >= 24 ? 'All cruisers are out' : 'No road to that spot'); return; }
     this.spend('police'); this.sent++;
     g.toast('Cruiser dispatched, about ' + Math.ceil(car.eta) + ' s out');
   }
@@ -342,15 +318,7 @@ export class Commander {
     g.helis.seed(x, z, { onSeed: (sx, sz) => this.seeded(sx, sz) });
   }
   seeded(x, z) {
-    const g = this.g, D = g.disasters; let hit = 0;
-    for (const e of D.list) {
-      if (e.type !== 'tornado' || !e.tw) continue;
-      const tw = e.tw; if (Math.hypot(tw.x - x, tw.z - z) > 220) continue;
-      hit++; tw.size = Math.max(0.6, tw.size - 0.55); tw.applySize(); tw.life = Math.min(tw.life, tw.t + 25);
-      if (tw.size < 1.05 && tw.phase === 'ground') { tw.phase = 'rope'; tw.ropeT = 0; }
-    }
-    const w = D.weather.type;
-    if (w === 'storm') D.weather.set('rain'); else if (w === 'rain' && !D.active('flood')) D.weather.set('clear');
+    const g = this.g, { hit, w } = seedEffect(g.disasters, x, z);
     g.toast(hit ? 'Seeding run complete: the tornado is losing strength' : w === 'storm' ? 'Seeding run complete: the storm is breaking up into rain' : 'Seeding run complete', 3500);
   }
   // storm chasers on station: what they see, they call in

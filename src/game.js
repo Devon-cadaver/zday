@@ -8,6 +8,7 @@ import { Profile, UNLOCK, UPGRADES, LEVELS, MAX_LEVEL, HAZARD_LEVEL, BE_LEVEL } 
 import { HAZARDS, WEATHER, threatName } from './disasters.js';
 import { BeTheDisaster, BE } from './be.js';
 import { Gauge, SIZED } from './gauge.js';
+import { Responders } from './response.js';
 
 const CSS = `
 #zd-top{position:fixed;left:0;right:0;top:0;display:flex;gap:6px;align-items:center;flex-wrap:wrap;
@@ -109,6 +110,9 @@ const CSS = `
 #zd-dis .zd-btn.zb{color:#a6ff4d;border-color:rgba(166,255,77,.35)}
 #zd-dis .zd-btn.zb.empty{opacity:.5}
 #zd-dis .zd-btn.hero{color:#ffe08a;border-color:rgba(255,224,138,.45)}
+#zd-dis .zd-btn.auto{color:#7be0ff;border-color:rgba(123,224,255,.4)}
+#zd-dis .zd-btn.auto.off{color:#f6ead2;opacity:.6;border-color:rgba(255,236,200,.18)}
+#zd-dis .g.one{grid-template-columns:1fr 1fr}
 #zd-disb.on{border-color:#ff9a5a;color:#ffb070}
 @media (prefers-reduced-motion: reduce){#zd-toast{transition:none}}
 `;
@@ -381,6 +385,7 @@ class Sandbox {
   constructor(g) {
     this.g = g; this.msgs = SANDBOX_MSGS;
     if (g.disasters) g.disasters.boats.auto = true; // rescue boats come by themselves here
+    this.auto = new Responders(g); // and so does everyone else, unless you switch them off
     this.el = {
       h: g.addPill('zd-h', 'Humans'), i: g.addPill('zd-i', 'Infected'), z: g.addPill('zd-z', 'Zombies'), d: g.addPill('zd-d', 'Dead'),
       clock: g.addPill('', '', 'zd-clock'),
@@ -399,9 +404,11 @@ class Sandbox {
   buildPanel() {
     const g = this.g, d = document.createElement('div'); d.id = 'zd-dis'; d.hidden = true;
     d.innerHTML = '<div class="h">Disasters</div><div class="g"><button class="zd-btn zb" type="button" data-zb>Zombies · ' + START_DROPS + '</button>' + Object.keys(HAZARDS).map(h => '<button class="zd-btn" type="button" data-hz="' + h + '">' + HAZARDS[h].name + '</button>').join('') + '</div>' +
-      '<div class="h">Heroes</div><div class="g"><button class="zd-btn hero" type="button" data-hero>Hero signal \u262E</button></div>' +
+      '<div class="h">Help</div><div class="g one"><button class="zd-btn auto" type="button" data-auto>Auto responders: On</button><button class="zd-btn hero" type="button" data-hero>Hero signal \u262E</button></div>' +
       '<div class="h">Weather</div><div class="g w">' + Object.keys(WEATHER).map(w => '<button class="zd-btn" type="button" data-wx="' + w + '">' + WEATHER[w].name.replace('Thunderstorm', 'Storm') + '</button>').join('') + '</div>';
     document.body.appendChild(d); this.panel = d; this.zbBtn = d.querySelector('[data-zb]');
+    const autoBtn = d.querySelector('[data-auto]');
+    autoBtn.onclick = () => { this.auto.setOn(!this.auto.on); autoBtn.textContent = 'Auto responders: ' + (this.auto.on ? 'On' : 'Off'); autoBtn.classList.toggle('off', !this.auto.on); g.toast(this.auto.on ? 'Responders will answer every disaster and rebuild afterwards' : 'Responders off: nobody comes to help', 3500); };
     d.querySelector('[data-hero]').onclick = () => { const tg = g.controls.target; g.disasters.start('heroes', tg.x, tg.z); this.pending = null; this.close(); if (this.clock < 0) this.clock = 0; }; // the peace sign goes up over the middle of the view
     this.zbBtn.onclick = () => { // armed until the Shamblers run out or you tap Done: every tap on a street drops one
       if (this.dropsLeft <= 0) { g.toast('No Shamblers left. Tap Reset to start over'); return; }
@@ -465,7 +472,9 @@ class Sandbox {
     }
     if (performance.now() > (this.hintAt || 0)) { this.hintAt = performance.now() + 5000; g.toast('Open Disasters to drop zombies or unleash a disaster'); }
   }
+  onEvent(e) { this.auto.onEvent(e); }
   reset() {
+    this.auto.reset();
     this.g.resetWorld();
     this.dropsLeft = START_DROPS; if (this.pending === 'zombies') { this.pending = null; this.close(); } this.zombieLabel();
     this.clock = -1; this.milestone = 0;
@@ -474,6 +483,7 @@ class Sandbox {
   phase() { return (Math.max(0, this.clock) / 600) % 1; }
   update(sdt, dt) {
     this.gauge.update(dt || 0);
+    this.auto.update(sdt);
     if (this.gauge.active) { const g = this.g, R = SIZED[this.gauge.kind].ring(this.gauge.v), d = g.camera.position.distanceTo(g.controls.target), want = Math.min(g.controls.maxDistance || 1200, R * 3); if (want > d + 5) g.zoomTo = want; } // pull back to keep the ring in view
     const s = this.g.people.stats;
     if (this.clock >= 0) this.clock += sdt;
