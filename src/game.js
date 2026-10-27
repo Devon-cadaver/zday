@@ -34,6 +34,7 @@ const CSS = `
 #zd-drop.empty{background:rgba(28,20,12,.72);border-color:rgba(255,236,200,.18);opacity:.7}
 #zd-find.on{border-color:#a6ff4d;color:#a6ff4d}
 #zd-good.on{border-color:#8fd3ff;color:#8fd3ff}
+#zd-stop{padding-left:12px;padding-right:12px}#zd-stop[hidden]{display:none}
 .zd-cards{display:flex;gap:6px;overflow-x:auto;flex:1 1 100%;max-width:100%;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding:2px 0}
 .zd-cards::-webkit-scrollbar{display:none}
 .zd-cards > :first-child{margin-left:auto}.zd-cards > :last-child{margin-right:auto}
@@ -273,7 +274,8 @@ export class Game {
     };
     dom.addEventListener('pointerup', up);
     dom.addEventListener('pointercancel', up);
-    this.controls.addEventListener('start', () => { this.zoomTo = 0; if (this.follow >= 0 || this.followSub) this.setFollow(-1); });
+    // touching the view while following does not let go: it turns and zooms round whoever is followed, and the camera keeps that angle
+    this.controls.addEventListener('start', () => { this.zoomTo = 0; if (this.follow >= 0 || this.followSub) this.manualCam = true; });
     this.ray = new THREE.Raycaster(); this.plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   }
 
@@ -300,8 +302,13 @@ export class Game {
     this.simT = 0; this.shake = 0; this.seen = {}; this.setFollow(-1);
   }
 
+  // following: the view is locked on the subject, one finger (or the left mouse button) turns round it, two pinch to zoom; not following: drag pans
+  lockControls(on) {
+    const c = this.controls; c.enablePan = !on; c.mouseButtons.LEFT = on ? THREE.MOUSE.ROTATE : THREE.MOUSE.PAN; c.touches.ONE = on ? THREE.TOUCH.ROTATE : THREE.TOUCH.PAN;
+    if (this.stopBtn) this.stopBtn.hidden = !on;
+  }
   setFollow(i) {
-    this.follow = i; this.followSub = null; this.followSide = i >= 0 ? 'bad' : null;
+    this.follow = i; this.followSub = null; this.followSide = i >= 0 ? 'bad' : null; this.manualCam = false; this.lockControls(i >= 0);
     if (this.followBtn) { this.followBtn.classList.toggle('on', i >= 0); this.followBtn.textContent = i >= 0 ? 'Zombie' : 'Bad guys'; }
     if (this.goodBtn) { this.goodBtn.classList.remove('on'); this.goodBtn.textContent = 'Good guys'; }
   }
@@ -338,7 +345,7 @@ export class Game {
     return out.filter(s => s.pos());
   }
   followSubject(s, side = this.followSide || 'bad') {
-    this.follow = -1; this.followSub = s; this.followSide = side; this.dir = null; this.camDir = null; this.zoomTo = 0;
+    this.follow = -1; this.followSub = s; this.followSide = side; this.dir = null; this.camDir = null; this.zoomTo = 0; this.manualCam = false; this.lockControls(true);
     const on = side === 'good' ? this.goodBtn : this.followBtn, off = side === 'good' ? this.followBtn : this.goodBtn;
     if (on) { on.classList.add('on'); on.textContent = s.name; }
     if (off) { off.classList.remove('on'); off.textContent = off === this.goodBtn ? 'Good guys' : 'Bad guys'; }
@@ -409,7 +416,7 @@ export class Game {
       const f = Math.min(1, dt * 2); cd.vx += ((q[0] - cd.x) / dt - cd.vx) * f; cd.vz += ((q[2] - cd.z) / dt - cd.vz) * f; cd.x = q[0]; cd.z = q[2];
       if (Math.hypot(cd.vx, cd.vz) > 2) cd.heading = Math.atan2(cd.vz, cd.vx);
     }
-    const sh = this.shot(this.followSub); if (!sh) return;
+    const sh = this.shot(this.followSub); if (!sh || this.manualCam) return; // turned or zoomed by hand: keep that angle
     const tg = this.controls.target, off = this._off.copy(this.camera.position).sub(tg), r = off.length() || 1;
     let pol = Math.acos(Math.min(1, Math.max(-1, off.y / r))), az = Math.atan2(off.z, off.x);
     const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -523,6 +530,7 @@ class Sandbox {
     };
     g.followBtn = g.addButton('zd-find', 'Bad guys', () => g.cycleFollow());
     g.goodBtn = g.addButton('zd-good', 'Good guys', () => g.cycleGood());
+    g.stopBtn = g.addButton('zd-stop', '&#x2715;', () => g.setFollow(-1)); g.stopBtn.hidden = true; g.stopBtn.title = 'Stop following'; g.stopBtn.setAttribute('aria-label', 'Stop following');
     g.addSpeedButton();
     this.disBtn = g.addButton('zd-disb', 'Disasters', () => {
       if (this.pending) { const was = this.pending; this.pending = null; this.gauge.cancel(); this.close(); g.toast(was === 'zombies' ? 'Done dropping zombies' : 'Cancelled'); return; } // the button cancels a disaster waiting to be placed
