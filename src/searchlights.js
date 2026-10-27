@@ -55,10 +55,10 @@ export class Searchlights {
     const nearest = (x, z, R) => { let best = null, bd = R; for (const q of T) { const d = Math.hypot(q.x - x, q.z - z); if (d < bd) { bd = d; best = q; } } return best; };
     const use = (key, ax, ay, az, bx, by, bz) => { if (n >= MAX) return; const s = slots[n++]; s.want = true; if (s.key !== key) { s.key = key; s.a.set(ax, ay, az); s.b.set(bx, by, bz); } s.wa.set(ax, ay, az); s.wb.set(bx, by, bz); };
     // helicopters: on the nearest trouble, or sweeping the street below
-    for (const hl of this.helis.list) {
-      const q = nearest(hl.x, hl.z, 240), a = this.t * 0.6 + (hl.bob || 0);
-      if (q) use(hl, hl.x, hl.y - 1.5, hl.z, q.x + Math.cos(a) * 4, q.y * 0.5, q.z + Math.sin(a) * 4);
-      else use(hl, hl.x, hl.y - 1.5, hl.z, hl.x + Math.cos(a) * 22, 0, hl.z + Math.sin(a) * 22);
+    for (const hl of this.helis.list) { // the lamp under the nose
+      const q = nearest(hl.x, hl.z, 240), a = this.t * 0.6 + (hl.bob || 0), nx = hl.x + (hl.hx || 0) * 6, ny = hl.y + 1.4, nz = hl.z + (hl.hz || 0) * 6;
+      if (q) use(hl, nx, ny, nz, q.x + Math.cos(a) * 4, q.y * 0.5, q.z + Math.sin(a) * 4);
+      else use(hl, nx, ny, nz, nx + Math.cos(a) * 22, 0, nz + Math.sin(a) * 22);
     }
     if (!T.length) return;
     // lamps on the tallest roof near each disaster (up to four), tracking it

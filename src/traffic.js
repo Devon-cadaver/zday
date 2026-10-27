@@ -493,6 +493,11 @@ export class Traffic {
 
   wreckStep(car, h, P) {
     const nx = car.x + car.vx * h, nz = car.z + car.vz * h;
+    if (car.v > 1.5) for (const pc of this.parkedNear(nx, nz, 2.3)) { // into a parked car: it stops against it, and dents it
+      car.vx *= -0.3; car.vz *= -0.3; car.w *= 0.5; this.events.push({ type: 'crash', x: pc.x, z: pc.z });
+      if (!pc.dented) { pc.dented = true; pc.im.setColorAt(pc.k, this._c.set(pc.hex).multiplyScalar(0.55)); pc.im.instanceColor.needsUpdate = true; }
+      return;
+    }
     if (P && !P.walkable(nx, nz)) { car.vx *= -0.25; car.vz *= -0.25; car.w *= 0.5; }
     else { car.x = nx; car.z = nz; }
     car.yaw += car.w * h;

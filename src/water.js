@@ -131,16 +131,16 @@ export class Splash {
   // n droplets from (x, y, z). o: dir [vx, vz] mean sideways velocity, up [min, max], spread, life, size,
   // along [tx, tz, half] to spread the source along a line, rise (random start height)
   emit(x, y, z, n, o = {}) {
-    const up = o.up || [4, 9], dir = o.dir || [0, 0], sp = o.spread ?? 3, life = o.life ?? 1.6, size = o.size ?? 2, al = o.along, rise = o.rise ?? 0;
+    const up = o.up || [4, 9], dir = o.dir || [0, 0], sp = o.spread ?? 3, life = o.life ?? 1.6, size = o.size ?? 2, al = o.along, rise = o.rise ?? 0, v = o.v; // v: thrown at exactly this velocity (a jet)
     for (let k = 0; k < n; k++) {
       const i = this.head; this.head = (this.head + 1) % this.cap;
       const a = al ? (Math.random() * 2 - 1) * al[2] : 0;
       this.pos[i * 3] = x + (al ? al[0] * a : 0) + (Math.random() - 0.5) * 1.5;
       this.pos[i * 3 + 1] = y + Math.random() * rise;
       this.pos[i * 3 + 2] = z + (al ? al[1] * a : 0) + (Math.random() - 0.5) * 1.5;
-      this.vel[i * 3] = dir[0] * (0.5 + Math.random()) + (Math.random() - 0.5) * sp;
-      this.vel[i * 3 + 1] = up[0] + Math.random() * (up[1] - up[0]);
-      this.vel[i * 3 + 2] = dir[1] * (0.5 + Math.random()) + (Math.random() - 0.5) * sp;
+      this.vel[i * 3] = (v ? v[0] : dir[0] * (0.5 + Math.random())) + (Math.random() - 0.5) * sp;
+      this.vel[i * 3 + 1] = v ? v[1] + (Math.random() - 0.5) * sp : up[0] + Math.random() * (up[1] - up[0]);
+      this.vel[i * 3 + 2] = (v ? v[2] : dir[1] * (0.5 + Math.random())) + (Math.random() - 0.5) * sp;
       this.tt[i * 3] = this.time - Math.random() * 0.15; this.tt[i * 3 + 1] = life * (0.7 + Math.random() * 0.6); this.tt[i * 3 + 2] = size * (0.6 + Math.random() * 0.8);
     }
     this.dirty = true;

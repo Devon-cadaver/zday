@@ -266,6 +266,12 @@ export class Fire {
   }
 
   // ---------- fighting fires
+  // a stream of water from a hose or a truck's cannon at (x0, y0, z0) to (x1, y1, z1): droplets thrown on the arc that lands there
+  jet(x0, y0, z0, x1, y1, z1, n = 1, size = 0.5) {
+    const J = this.jets; if (!J) return;
+    const dx = x1 - x0, dz = z1 - z0, T = Math.max(0.3, Math.hypot(dx, dz) / 24);
+    J.emit(x0, y0, z0, n, { v: [dx / T, (y1 - y0 + 4.9 * T * T) / T, dz / T], spread: 0.5, life: T * 1.15, size });
+  }
   // a short burst of white mist (hose spray, water drop)
   spray(x, z, y = 1.5, n = 4, spread = 1.2, size = 0.5) {
     const t = this.uniforms.uTime.value;

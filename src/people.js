@@ -1251,6 +1251,7 @@ export class People {
     const wx = b.wall[0] - x, wz = b.wall[1] - z, wd = Math.hypot(wx, wz) || 1;
     this.hx[i] = wx / wd; this.hz[i] = wz / wd; this.fx[i] = 2;
     F.douse(k, h);
+    F.jet(x + this.hx[i] * 0.5, this.y[i] + 1.2, z + this.hz[i] * 0.5, b.wall[0] - b.n[0] * 0.4 + b.t[0] * Math.sin(this.time * 0.7 + i) * 2, 2.5 + (i % 4) * 1.5, b.wall[1] - b.n[1] * 0.4 + b.t[1] * Math.sin(this.time * 0.7 + i) * 2, 2, 0.9); // the hose
     this.wt[i] -= h;
     if (this.wt[i] <= 0) { this.wt[i] = 0.35; F.spray(b.wall[0] - b.n[0] * 0.6 + (this.r() - 0.5) * 2, b.wall[1] - b.n[1] * 0.6 + (this.r() - 0.5) * 2, 1.5 + this.r() * 4); }
   }

@@ -92,11 +92,21 @@ export class SolarStorm {
     if (this.ws < this.extent + 200) {
       this.ws += 70 * h;
       const o = this.origin, d = this.dir, at = (x, z) => (x - o[0]) * d[0] + (z - o[1]) * d[1];
-      for (const car of D.ctx.traffic.cars) { // engines die as the wave rolls over them
+      const T = D.ctx.traffic;
+      for (const car of T.cars) { // as the wave rolls over them the electronics go: drivers lose control, engines die, the rest panic
         if (car.mission || car.gone || this.rolled.has(car) || at(car.x, car.z) > this.ws) continue;
-        this.rolled.add(car); if (car.mode === 0 && Math.random() < 0.22) { this.stalled.set(car, car.cruise); car.cruise = 0; }
+        this.rolled.add(car); if (car.mode !== 0) continue;
+        const r = Math.random();
+        if (r < 0.4 && car.v > 3) T.crash(car, null, 8 + Math.random() * 8); // skidding out of control into whatever is near
+        else if (r < 0.6) { this.stalled.set(car, car.cruise); car.cruise = 0; }
+        else { car.panic = Math.max(car.panic || 0, 12); car.zx = car.x - d[0] * 20; car.zz = car.z - d[1] * 20; }
       }
-      for (const l of city.lamps) { const s = at(l.x, l.z); if (s < this.ws && s > this.ws - 70 * h && Math.random() < 0.18) this.sparks.emit(l.x + l.arm[0] * 1.3, 6.5, l.z + l.arm[1] * 1.3, 18, { up: [2, 7], spread: 6, life: 0.9, size: 0.6 }); }
+      for (const l of city.lamps) {
+        const s = at(l.x, l.z); if (!(s < this.ws && s > this.ws - 70 * h) || Math.random() > 0.18) continue;
+        const x = l.x + l.arm[0] * 1.3, z = l.z + l.arm[1] * 1.3;
+        this.sparks.emit(x, 6.5, z, 18, { up: [2, 7], spread: 6, life: 0.9, size: 0.6 });
+        if (Math.random() < 0.12) this.spark(x, z); // the surge sets something alight
+      }
       if (!this.waveSaid && this.ws > 60) { this.waveSaid = true; D.flash(0.25); }
     }
     // transformers blowing near where you are looking
@@ -107,10 +117,7 @@ export class SolarStorm {
         const x = l.x + l.arm[0] * 1.3, z = l.z + l.arm[1] * 1.3;
         this.sparks.emit(x, 6.5, z, 26, { up: [2, 8], spread: 7, life: 1.1, size: 0.7 });
         if (Math.random() < 0.3) D.flash(0.05);
-        if (Math.random() < 0.08) {
-          let best = 1e9, bk = -1; city.buildingsNear(x, z, 16, (k, d) => { if (d < best) { best = d; bk = k; } });
-          if (bk >= 0 && fire.igniteBuilding(bk) && !this.said) { this.said = true; D.emit({ type: 'transformer', text: 'Transformers are exploding and starting fires' }); }
-        }
+        if (Math.random() < 0.16) this.spark(x, z);
       }
     }
     if (this.t > this.life) {
@@ -118,6 +125,14 @@ export class SolarStorm {
       for (const [car, cruise] of this.stalled) car.cruise = cruise;
       D.emit({ type: 'solarend', text: 'The geomagnetic storm has passed. Power and radio are coming back' });
     }
+  }
+  // sparks from the surge: the nearest building catches, or a parked car (two dozen fires at most from one flare)
+  spark(x, z) {
+    const D = this.D, { city, fire, traffic } = D.ctx;
+    if ((this.fires = this.fires || 0) >= 24) return;
+    if (Math.random() < 0.3) { const pc = traffic.parkedNear(x, z, 9).find(p => !p.burnt); if (pc) { traffic.burnParked(pc); fire.carFire(pc.x, pc.z); this.fires++; return; } }
+    let best = 1e9, bk = -1; city.buildingsNear(x, z, 16, (k, d) => { if (d < best && !city.dead[k]) { best = d; bk = k; } });
+    if (bk >= 0 && fire.igniteBuilding(bk)) { this.fires++; if (!this.said) { this.said = true; D.emit({ type: 'transformer', text: 'Transformers are exploding and starting fires' }); } }
   }
   // after the day/night cycle has set the lights: the grid is down
   afterLight() {

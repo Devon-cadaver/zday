@@ -10,7 +10,7 @@ export const RW = 10;          // road width (curb to curb)
 export const SW = 3;           // sidewalk width
 export const HALF = RW / 2 + SW; // street corridor half width
 export const CURB = 0.18;      // sidewalk height
-export const LANE = 2.5;       // lane offset from road centre
+export const LANE = 2.15;      // lane offset from road centre (a bus in it clears the cars parked at the kerb)
 const GF = 4, FH = 3;          // ground floor and upper floor heights
 
 const lin = (hex) => { const c = new THREE.Color(hex); return [c.r, c.g, c.b]; };
@@ -673,8 +673,8 @@ export function buildCity(tex, opts = {}) {
       for (let z = loz + 12; z <= hiz; z += 32) if (!nearNode(z, sz) && !vGone(i, z) && !skip(sx[i] + side * 5.4, z)) lamps.push({ x: sx[i] + side * (RW / 2 + 0.4), z, arm: [-side, 0] });
       // parked cars
       for (let z = loz; z <= hiz; z += 5.6) {
-        if (nearNode(z, sz) || r() < 0.55 || vGone(i, z) || skip(sx[i] + side * 4.1, z)) continue;
-        parked.push({ x: sx[i] + side * 4.1, z, y: 0, rot: Math.PI / 2 + (side > 0 ? Math.PI : 0) });
+        if (nearNode(z, sz) || r() < 0.55 || vGone(i, z) || skip(sx[i] + side * 4.35, z)) continue;
+        parked.push({ x: sx[i] + side * 4.35, z, y: 0, rot: Math.PI / 2 + (side > 0 ? Math.PI : 0) });
       }
     }
   }
@@ -689,8 +689,8 @@ export function buildCity(tex, opts = {}) {
       }
       for (let x = lo + 12; x <= hi; x += 32) if (!nearNode(x, sx) && !hGone(j, x) && !skip(x, sz[j] + side * 5.4)) lamps.push({ x, z: sz[j] + side * (RW / 2 + 0.4), arm: [0, -side] });
       for (let x = lo; x <= hi; x += 5.6) {
-        if (nearNode(x, sx) || r() < 0.55 || hGone(j, x) || skip(x, sz[j] + side * 4.1)) continue;
-        parked.push({ x, z: sz[j] + side * 4.1, y: 0, rot: side > 0 ? 0 : Math.PI });
+        if (nearNode(x, sx) || r() < 0.55 || hGone(j, x) || skip(x, sz[j] + side * 4.35)) continue;
+        parked.push({ x, z: sz[j] + side * 4.35, y: 0, rot: side > 0 ? 0 : Math.PI });
       }
     }
   }

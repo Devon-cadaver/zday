@@ -386,7 +386,7 @@ export class Game {
     return { key: e.type, dist: 540, pol: 0.86 };
   }
   followSubject(s, side = this.followSide || 'bad') {
-    this.follow = -1; this.followSub = s; this.followSide = side; this.dir = null; this.camDir = null; this.zoomTo = 0; this.manualCam = false; this.lockControls(true);
+    this.follow = -1; this.followSub = s; this.followSide = side; this.dir = null; this.camDir = null; this.zoomTo = 0; this.manualCam = false; this.followIn = false; this.lockControls(true);
     const on = side === 'good' ? this.goodBtn : this.followBtn, off = side === 'good' ? this.followBtn : this.goodBtn;
     if (on) { on.classList.add('on'); on.textContent = s.name; }
     if (off) { off.classList.remove('on'); off.textContent = off === this.goodBtn ? 'Good guys' : 'Bad guys'; }
@@ -510,8 +510,12 @@ export class Game {
     this.focusAt = null;
     if (this.followSub) {
       const q = this.followSub.pos();
-      if (!q) { const subs = this.subjects(this.followSide || 'bad'); if (subs.length) this.followSubject(subs[0]); else this.setFollow(-1); } // it is gone: on to the next
-      else {
+      const B = this.city.bounds, inCity = (p) => p && p[0] > B.x0 + 12 && p[0] < B.x1 - 12 && p[2] > B.z0 + 12 && p[2] < B.z1 - 12;
+      if (q && inCity(q)) this.followIn = true;
+      if (!q || (this.followIn && !inCity(q))) { // gone, or on its way out of the city: on to another of the same side, or stop
+        const side = this.followSide || 'bad', cur = this.followSub.obj, next = this.subjects(side).find(s => s.obj !== cur && inCity(s.pos()));
+        if (next) this.followSubject(next, side); else this.setFollow(-1);
+      } else {
         const tg = this.controls.target, off = this._off.copy(this.camera.position).sub(tg), u = off.y > 1 ? q[1] / off.y : 0;
         const gx = q[0] - off.x * u, gz = q[2] - off.z * u, k = 1 - Math.exp(-dt * 6); // the ground point that puts it in the middle of the view
         const dx = (gx - tg.x) * k, dz = (gz - tg.z) * k;

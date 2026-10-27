@@ -82,6 +82,7 @@ export class Disasters {
     this.water = new WaterSurface(this);
     this.boats = new Boats(this); // rescue boats in floods and tsunamis
     this.barriers = new Barriers(this); // inflatable flood barriers across a tsunami's path
+    this.jets = ctx.fire.jets = new Splash(ctx.scene, ctx.low ? 1500 : 3000); this.jets.mat.uniforms.uColor.value.setRGB(1.1, 1.2, 1.3); // water from hoses and fire trucks' cannons
     this.zones = new Zones(this);
     this.brawl = new Brawl(this); // heroes and villains throwing cars and each other // radiation left behind: nothing is rebuilt inside it until hazmat clears it
     this.spitFx = new Splash(scene, 500); this.spitFx.mat.uniforms.uColor.value.setRGB(0.5, 0.95, 0.18); // spitter acid
@@ -171,6 +172,17 @@ export class Disasters {
     return ev;
   }
 
+  // fire trucks parked at a fire: the roof cannon arcs a jet onto the building nearest them that is burning, and it helps put it out
+  cannons(h) {
+    const { traffic, fire, city } = this.ctx;
+    for (const c of traffic.missions) {
+      if (c.kind !== 'fire' || c.mode !== 3 || c.gone) continue;
+      const k = (c.fireK != null && fire.bFire[c.fireK] === 1) ? c.fireK : (c.fireK = fire.firesWithin(c.x, c.z, 55)[0]); if (k == null) continue;
+      const b = city.buildings[k], tx = Math.max(b.x0, Math.min(b.x1, c.x)), tz = Math.max(b.z0, Math.min(b.z1, c.z)), sw = Math.sin(this.ctx.fire.uniforms.uTime.value * 0.6 + c.id) * 3;
+      fire.jet(c.x, 4, c.z, tx + sw, Math.min(b.top - 1, 6 + (c.id % 3) * 4), tz - sw, 4, 1.6);
+      fire.douse(k, h * 0.6);
+    }
+  }
   // a wave or a dust wall slams into building k from direction (dx, dz): the windows on the far side blow out
   blowWindows(k, dx, dz, power = 1) {
     const { city } = this.ctx, b = city.buildings[k]; if (!b || city.dead[k]) return;
@@ -261,7 +273,7 @@ export class Disasters {
     this.brawl.update(h);
     for (let i = this.leftovers.length - 1; i >= 0; i--) { const l = this.leftovers[i]; if (l.update) l.update(h); if (l.alive === false) { l.dispose(); this.leftovers.splice(i, 1); } }
     for (let i = this.list.length - 1; i >= 0; i--) if (!this.list[i].alive) { this.list[i].dispose(); this.list.splice(i, 1); }
-    this.water.update(h); this.spitFx.update(h); this.boats.update(h); this.barriers.update(h);
+    this.water.update(h); this.spitFx.update(h); this.boats.update(h); this.barriers.update(h); this.jets.update(h); this.cannons(h);
     if (this.water.active && (this.quenchT = (this.quenchT || 0) - h) <= 0) { this.quenchT = 0.5; const W = this.water, P = this.ctx.people; this.ctx.fire.quench((x, z) => W.levelAt(x, z) - P.groundY(x, z)); } // water puts fires out
     this.weather.update(h);
     this.debris.update(h);
@@ -272,7 +284,7 @@ export class Disasters {
     this.lightK = (0.3 + 0.7 * Math.min(1.2, (sun.intensity * 0.6 + hemi.intensity * 0.55) / 3.7)) * (1 - night * 0.55);
     for (const e of this.list) e.sync(dt, realT);
     for (const l of this.leftovers) l.sync(dt, realT);
-    this.water.sync(dt, realT); this.boats.sync(dt, realT); this.spitFx.sync(this.lightK, this.ctx.fire.uniforms.uScale.value);
+    this.water.sync(dt, realT); this.boats.sync(dt, realT); this.jets.sync(this.lightK, this.ctx.fire.uniforms.uScale.value); this.spitFx.sync(this.lightK, this.ctx.fire.uniforms.uScale.value);
     this.weather.sync(dt, realT); this.zones.sync(realT);
     const sir = this.sirens; if (sir) { sir.beacons = sir.beacons.filter(b => !b.candle); for (const c of this.ctx.people.circles) sir.beacons.push({ x: c.x, y: 0.35, z: c.z, c: [2.2, 1.3, 0.45], kind: 'steady', candle: true, pool: 3.5 }); } // candles in the prayer circles
     this.debris.sync();
