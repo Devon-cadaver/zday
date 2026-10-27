@@ -1005,7 +1005,7 @@ export class People {
     this.grenadeCd -= h;
     for (let k = this.grenades.length - 1; k >= 0; k--) {
       const gr = this.grenades[k];
-      if ((gr.t -= h) <= 0) { this.grenades.splice(k, 1); this.blast(gr.x, gr.z, 5, false); this.puff(gr.x, gr.z); if (this.fire) this.fire.spray(gr.x, gr.z, 0.5, 6, 2.5, 0.9); }
+      if ((gr.t -= h) <= 0) { this.grenades.splice(k, 1); this.events.push({ type: 'boom', x: gr.x, z: gr.z, size: 0 }); this.blast(gr.x, gr.z, 5, false); this.puff(gr.x, gr.z); if (this.fire) this.fire.spray(gr.x, gr.z, 0.5, 6, 2.5, 0.9); }
     }
   }
 

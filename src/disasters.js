@@ -16,6 +16,7 @@ import { SolarStorm } from './solar.js';
 import { BlackHole } from './blackhole.js';
 import { Boats } from './boats.js';
 import { Barriers } from './barrier.js';
+import { sfx } from './audio.js';
 import { Mushroom, NuclearStrike, Meltdown, nuclearDamage } from './nuke.js';
 import { Villains } from './villains.js';
 import { Zones } from './rebuild.js';
@@ -174,6 +175,7 @@ export class Disasters {
   blowWindows(k, dx, dz, power = 1) {
     const { city } = this.ctx, b = city.buildings[k]; if (!b || city.dead[k]) return;
     const xs = Math.abs(dx) > Math.abs(dz), s = xs ? Math.sign(dx) : Math.sign(dz), hgt = b.top - b.baseY;
+    sfx(hgt > 14 || power > 0.9 ? 'glassBig' : 'glass', (b.x0 + b.x1) / 2, b.baseY + Math.min(20, hgt * 0.5), (b.z0 + b.z1) / 2, { gain: Math.min(1, 0.5 + power * 0.5) });
     // the far face bursts outwards; the face taking the hit shatters and rains down the wall
     for (const [face, out, k0] of [[s, 1, 1], [-s, 0.25, 0.5]]) {
       const n = Math.round(Math.min(50, 14 + hgt * 0.9) * power * k0);

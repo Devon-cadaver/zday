@@ -8,6 +8,7 @@
 // ground: cars kicked flying, buildings in the way ploughed through, a trench of
 // cracks and dust behind, and a fling at the end.
 import * as THREE from 'three';
+import { sfx } from './audio.js';
 
 const AIR = 5, EXT = 4;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -68,7 +69,7 @@ export class Brawl {
   fighters(side) { const out = []; for (const e of this.D.list) if (e.alive && e.type === (side === 'hero' ? 'heroes' : 'villains')) for (const f of e.who) if (alive(f)) out.push(f); return out; }
   // the villains event a villain belongs to (for beating it)
   owner(v) { return this.D.list.find(e => e.type === 'villains' && e.who.includes(v)); }
-  hurt(f, n, by) { if (f.side !== 'villain') return; f.hp -= n * (f.frail || 1); if (f.hp <= 0) { const V = this.owner(f); if (V) V.beat(f, by.name); } }
+  hurt(f, n, by) { sfx('thud', f.x, (f.y || 0) + 2, f.z, { gain: Math.min(1.3, 0.5 + n / 40) }); if (f.side !== 'villain') return; f.hp -= n * (f.frail || 1); if (f.hp <= 0) { const V = this.owner(f); if (V) V.beat(f, by.name); } }
   // car (held, or still on the street) thrown by `by` at fighter `target`
   throwCar(car, by, target) {
     const { traffic } = this.D.ctx, [tx, ty, tz] = aimAt(target), x0 = car.x, y0 = car.y || 0, z0 = car.z, d = Math.hypot(tx - x0, tz - z0), T = clamp(d / 38, 0.5, 2.2);

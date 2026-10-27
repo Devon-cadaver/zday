@@ -9,6 +9,7 @@
 // until the cold breaks).
 import * as THREE from 'three';
 import { NOISE, FRONT, SweepFront, Splash } from './water.js';
+import { sfx } from './audio.js';
 
 const CURTAIN_VS = /* glsl */`
 uniform float uTime, uH, uBack; uniform vec2 uOrigin, uDir, uTan;
@@ -262,6 +263,7 @@ export class DustLightning {
     const fork = main[3 + Math.floor(Math.random() * 3)], fe = fork.clone().add(new THREE.Vector3((Math.random() - 0.5) * 120, -40 - Math.random() * 60, (Math.random() - 0.5) * 120)); fe.y = Math.max(0, fe.y);
     const br = path(fork, fe, 5, 18); for (let k = 0; k < br.length - 1; k++) seg(br[k], br[k + 1], 1.3);
     D.ctx.scene.add(g); this.bolts.push({ g, life: 0.32, mid: main[4].clone() });
+    sfx('thunder', end.x, 40, end.z, { delay: 0.15 });
     if (sw.inCity(end.x, end.z, 0)) D.ctx.fire.burst(end.x, 1, end.z, 14, 2.2);
     D.flash(0.05);
   }

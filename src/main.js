@@ -14,6 +14,7 @@ import { Disasters } from './disasters.js';
 import { buildOutskirts } from './outskirts.js';
 import { Sirens } from './sirens.js';
 import { Searchlights } from './searchlights.js';
+import { Audio } from './audio.js';
 
 const P = new URLSearchParams(location.search);
 const coarse = matchMedia('(pointer: coarse)').matches;
@@ -144,6 +145,7 @@ const sirens = new Sirens(scene, { traffic, helis, boats: disasters.boats, dayli
 disasters.sirens = sirens;
 const game = new Game({ people, traffic, fire, city, camera, controls, renderer, mode, daylight, helis, post, disasters });
 const searchlights = new Searchlights(scene, { game, traffic, helis, city, daylight }); // beams at night on the trouble
+game.audio = new Audio(camera, controls); // sound: switched on by the first tap
 window.__lights = searchlights;
 
-window.__z = { THREE, scene, camera, controls, renderer, post, city, traffic, people, fire, game, daylight, helis, disasters, outskirts, sirens, sun, hemi, setView, buildMs, info: () => renderer.info.render };
+window.__z = { THREE, scene, camera, controls, renderer, post, city, traffic, people, fire, game, daylight, helis, disasters, outskirts, sirens, sun, hemi, setView, buildMs, audio: game.audio, info: () => renderer.info.render };

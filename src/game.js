@@ -489,6 +489,7 @@ export class Game {
     const dEv = this.disasters ? this.disasters.events : [];
     for (const list of [p.events, this.traffic.events, this.fire.events, this.helis ? this.helis.events : [], dEv]) {
       for (const e of list) {
+        if (this.audio) this.audio.event(e);
         if (this.disasters) this.disasters.onEvent(e);
         const handled = this.mode.onEvent ? this.mode.onEvent(e) : false;
         if (list === dEv && e.text && handled !== true) this.toast(e.text, 4200);
@@ -497,6 +498,7 @@ export class Game {
       list.length = 0;
     }
     this.mode.update(sdt, dt);
+    if (this.audio) this.audio.update(dt, this);
     if (this.flash > 0) { this.flash = Math.max(0, this.flash - dt * 0.6); this.post.opts.flash = Math.min(1, this.flash * this.flash); } else this.post.opts.flash = 0;
     if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 1.2);
     if (fps) this.el.fps.textContent = fps + ' fps';

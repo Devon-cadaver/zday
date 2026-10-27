@@ -322,7 +322,8 @@ export class Tsunami {
         this.phase = 'wave'; this.wave.visible = true;
         W.colors('sea'); W.origin.copy(this.origin); W.dir.copy(this.dir); W.tan.copy(this.tan); W.halfW = this.halfW; W.segW = this.segW; W.front = this.front; W.lag = 9;
         W.level = this.floodH;
-        D.emit({ type: 'tsunamihit', text: 'The wave is here!' });
+        const c = D.ctx.controls.target, p = this.poi(c.x, c.z);
+        D.emit({ type: 'tsunamihit', x: p ? p.x : c.x, z: p ? p.z : c.z, text: 'The wave is here!' });
       }
       return;
     }
