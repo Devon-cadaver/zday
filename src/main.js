@@ -17,6 +17,7 @@ import { Searchlights } from './searchlights.js';
 import { Audio } from './audio.js';
 import { CURVE, curveFrame } from './curve.js';
 import { PLACES, placeKey } from './places.js';
+import { Globe } from './globe.js';
 
 const P = new URLSearchParams(location.search);
 CURVE.on = P.get('curve') !== '0'; // ?curve=0: the flat world, to compare
@@ -98,6 +99,7 @@ if (P.get('dof') === '0') post.opts.dof = false;
 if (P.get('grade') === '0') post.opts.grade = false;
 
 addEventListener('resize', () => {
+  globe.resize();
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight); post.setSize();
 });
@@ -110,6 +112,8 @@ const B = city.bounds, M = 10;
 function frame() {
   const dt = Math.min(0.05, clock.getDelta());
   time += dt;
+  if (globe.active) { controls.enabled = false; globe.frame(dt); frames++; fpsT += dt; requestAnimationFrame(frame); globeWas = true; return; } // up on the globe: the city waits
+  if (globeWas) { globeWas = false; controls.enabled = true; }
   controls.update();
   // keep the view over the city
   const tg = controls.target;
@@ -152,6 +156,7 @@ disasters.sirens = sirens;
 const game = new Game({ people, traffic, fire, city, camera, controls, renderer, mode, daylight, helis, post, disasters });
 const searchlights = new Searchlights(scene, { game, traffic, helis, city, daylight }); // beams at night on the trouble
 game.audio = new Audio(camera, controls); // sound: switched on by the first tap
+const globe = game.globe = new Globe(renderer); let globeWas = false; // the world from orbit: the big city and the towns
 window.__lights = searchlights;
 
 window.__z = { THREE, scene, camera, controls, renderer, post, city, traffic, people, fire, game, daylight, helis, disasters, outskirts, sirens, sun, hemi, setView, buildMs, audio: game.audio, info: () => renderer.info.render };

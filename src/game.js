@@ -273,7 +273,7 @@ export class Game {
       const d = downs.get(e.pointerId); downs.delete(e.pointerId);
       if (!d) return;
       const wasMulti = multi; if (downs.size === 0) multi = false;
-      if (e.type !== 'pointerup' || wasMulti || e.button > 0) return;
+      if (e.type !== 'pointerup' || wasMulti || e.button > 0 || (this.globe && this.globe.active)) return; // up on the globe, taps are the globe's
       if (Math.hypot(e.clientX - d.x, e.clientY - d.y) < 10 && performance.now() - d.t < 400) {
         const hit = this.worldPoint(e.clientX, e.clientY);
         if (hit) this.mode.tap(hit.x, hit.z);
