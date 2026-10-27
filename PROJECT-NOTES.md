@@ -233,6 +233,11 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 - Bug fixes: two more inline comments had swallowed code (BlackHole Rh/tick so sized black holes never fed; the blizzard snow colour). A scan for '// ... ; code' found no others.
 - Tested: gauge labels and ring, planet-killer fall and impact screenshots, sized tornado/black hole/volcano/sinkhole/warhead runs (worst step 19 ms), Be meteor/sinkhole/volcano/nuclear with the gauge, a Commander tornado (one seeding + chaser call-in roped it out) and alien round (8 jets, 2 tanks, both tripods down), all 18 Be modes and 15 Sandbox disasters without errors.
 
+## Roof flicker fix (iPhone)
+- Flickering squares on roofs on Sean's iPhone were depth fighting: the rust roof patches sat 5 cm above the roof, roof-garden grass 6 cm (1 cm above the rust), and style-3 and landmark cornices shared the roof's plane.
+- Rust patches are now 14 cm raised slabs, garden lawns sit in 32 cm planters, cornices stop 8 cm under the roof. The camera near plane follows the zoom (max(10, 0.2 x distance), main.js), about 9-22x more depth precision. Same RNG order, so the city layout is unchanged.
+- Rule: keep any flat detail at least ~10 cm off the surface under it, never coplanar.
+
 ## Next
 - Sean tests v1.3 on his phone; tune from his notes. Candidates: Be The Disaster score scales and ranks once real scores come in, the saucer size at close zoom, how often zombie outbreaks turn up in Commander, incident pacing, card bar height on the phone.
 

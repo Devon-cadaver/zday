@@ -226,7 +226,8 @@ export function buildCity(tex, opts = {}) {
     };
     if (r() < 0.45) { // terracotta / rust surfacing
       const pw = w * (0.35 + r() * 0.55), pd = d * (0.35 + r() * 0.55);
-      top(B.roof, rp(Math.min(pw, w - 2 * m), Math.min(pd, d - 2 * m)), y + 0.05, lin(pick(RUST)));
+      const p = rp(Math.min(pw, w - 2 * m), Math.min(pd, d - 2 * m)), c = lin(pick(RUST));
+      sides(B.roof, p, y, y + 0.14, c, PLAIN); top(B.roof, p, y + 0.14, c);
     }
     let hut = null;
     if ((need || r() < 0.7) && w > 4.5 && d > 4.5) { // stair / lift hut, with the door people come up through
@@ -254,7 +255,7 @@ export function buildCity(tex, opts = {}) {
       }
     }
     if (r() < 0.55) { // roof garden
-      if (r() < 0.6) top(B.grass, rp(w * 0.5, d * 0.4), y + 0.06, lin('#a0a070'), 6);
+      if (r() < 0.6) { const p = rp(w * 0.5, d * 0.4); sides(B.roof, p, y, y + 0.32, lin('#b5ab98'), PLAIN); top(B.grass, p, y + 0.32, lin('#a0a070'), 6); }
       const n = 2 + Math.floor(r() * Math.min(14, area / 20));
       for (let k = 0; k < n; k++) {
         const s = 0.45 + r() * 0.7; const p = rp(s * 2, s * 2);
@@ -313,7 +314,7 @@ export function buildCity(tex, opts = {}) {
     const h = y0 + GF + fl * FH;
     sides(B.fac[style], b, y0 + GF, h, col, { su: 12, sv: 12, v0: y0 + GF });
     top(B.roof, b, h, lin(pick(ROOFS)));
-    if (style === 3) box(B.roof, { x0: b.x0 - 0.3, x1: b.x1 + 0.3, z0: b.z0 - 0.3, z1: b.z1 + 0.3 }, h - 0.5, h, toWhite(col, 0.2));
+    if (style === 3) box(B.roof, { x0: b.x0 - 0.3, x1: b.x1 + 0.3, z0: b.z0 - 0.3, z1: b.z1 + 0.3 }, h - 0.5, h - 0.08, toWhite(col, 0.2));
     parapet(b, h, col, style === 1 ? 1.2 : 0.9);
     if ((style === 0 || style === 2) && fl >= 2 && r() < 0.55) {
       let mask = 1 << Math.floor(r() * 4);
@@ -373,7 +374,7 @@ export function buildCity(tex, opts = {}) {
       const y1 = y + t.fl * FH; fl += t.fl;
       sides(B.fac[style], t.b, y, y1, col, { su: 12, sv: 12, v0: y0 + GF });
       top(B.roof, t.b, y1, lin(o.roof || '#a39c8e'));
-      box(B.roof, { x0: t.b.x0 - 0.35, x1: t.b.x1 + 0.35, z0: t.b.z0 - 0.35, z1: t.b.z1 + 0.35 }, y1 - 0.7, y1, toWhite(col, o.trim ?? 0.25)); // cornice
+      box(B.roof, { x0: t.b.x0 - 0.35, x1: t.b.x1 + 0.35, z0: t.b.z0 - 0.35, z1: t.b.z1 + 0.35 }, y1 - 0.7, y1 - 0.08, toWhite(col, o.trim ?? 0.25)); // cornice
       parapet(t.b, y1, col, 1.0);
       y = y1;
     }

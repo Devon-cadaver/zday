@@ -114,6 +114,8 @@ function frame() {
   sun.position.copy(tg).addScaledVector(sunDir, 700);
   sun.target.position.copy(tg);
   const focus = camera.position.distanceTo(tg);
+  const nearZ = Math.max(10, focus * 0.2); // the near plane follows the zoom: far more depth precision, so flat rooftop details don't flicker on phones
+  if (Math.abs(camera.near - nearZ) > 0.5) { camera.near = nearZ; camera.updateProjectionMatrix(); }
   // camera shake (quakes, blasts, the tsunami): a jolt for this frame only
   let jx = 0, jy = 0, jz = 0;
   if (game.shake > 0) {
