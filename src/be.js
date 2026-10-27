@@ -35,7 +35,7 @@ export const BE = {
   nuclear: { name: 'Nuclear strike', k: 0.2, hint: 'Hold to set the yield, let go to launch. Three warheads, another every minute' },
   meltdown: { name: 'Meltdown', k: 1.4, zom: true, hint: 'Hold to overload the reactor until it blows, then drag to steer the fallout over the city' },
   worm: { name: 'Giant worm', k: 1.3, hint: 'Drag to steer it under the streets. Let go and it bursts out of the ground there' },
-  kaiju: { name: 'Kaiju', k: 0.9, hint: 'Drag to walk it. Tap a car to throw it, tap a building to swipe it, tap open ground to roar' },
+  kaiju: { name: 'Kaiju', k: 0.9, hint: 'Drag to walk it. Tap a car to throw it, tap people to send a tentacle, tap a building to swipe it, tap open ground to roar' },
   villains: { name: 'Super villains', k: 1, hint: 'Play as Blur, Tyrant or Weaver; Switch changes who. Blur runs where you drag, Tyrant grabs and throws what you tap, Weaver webs the street' },
 };
 

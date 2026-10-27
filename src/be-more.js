@@ -282,11 +282,12 @@ export class KaijuCtl {
     const { traffic, city } = this.be.D.ctx, x = this.fx, z = this.fz; K.steer(K.x, K.z); // a tap does not walk it
     let car = null; traffic.near(x, z, 10, (c) => { if (!car && !c.gone && c.mode === 0 && !c.mission) car = c; });
     if (car && Math.hypot(car.x - K.x, car.z - K.z) < 40) { K.act = { kind: 'car', car, t: 0, arm: 0 }; return; }
+    if (K.tentGrab(x, z)) return; // a tentacle goes for whoever (or whatever car) is there
     let bk = -1; city.buildingsNear(x, z, 3, (k) => { if (bk < 0) bk = k; });
     if (bk >= 0 && Math.hypot(x - K.x, z - K.z) < 40) { K.yaw = Math.atan2(z - K.z, x - K.x); K.act = { kind: 'swipe', k: bk, t: 0, arm: 1 }; return; }
     K.act = { kind: 'roar', t: 0 };
   }
   update() {}
   follow() { return [this.k.x, this.k.z]; }
-  label() { return this.k.cars + ' cars thrown'; }
+  label() { return this.k.cars + ' cars thrown · ' + this.k.grabbed + ' grabbed'; }
 }
