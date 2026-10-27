@@ -392,7 +392,7 @@ class Tyrant extends Villain {
   arrived(d, h) {
     const P = this.plan; if (!P) return;
     if ((P.t = (P.t || 0) + h) > 20 && P.kind !== 'aim') { this.plan = null; return; } // gave up on it
-    if (P.kind === 'brawl') { const f = P.foe; if (!f || f.state !== 'fly' || f.tossed || f.gripped) { this.plan = null; return; } if (Math.hypot(f.x - this.x, f.y - this.y, f.z - this.z) < 6) { this.D.brawl.grab(this, f); this.plan = null; } return; }
+    if (P.kind === 'brawl') { const f = P.foe; if (!f || f.state !== 'fly' || f.tossed || f.gripped) { this.plan = null; return; } if (Math.hypot(f.x - this.x, f.y - this.y, f.z - this.z) < 6) { if (Math.random() < 0.45 && this.D.brawl.drag(this, f)) this.busyT = 3; else this.D.brawl.grab(this, f); this.plan = null; } return; } // through a building, or by the throat down the street
     if (P.kind === 'car') {
       const c = P.car;
       if (this.held || c.gone || c.mode === EXT || c.mode === AIR) { this.plan = null; return; }

@@ -216,7 +216,9 @@ class Hero {
     if (Math.hypot(ty.x - this.x, ty.z - this.z) > 28 && (this.carT = (this.carT ?? 2) - h) <= 0) { this.carT = 5; if (this.fetch(ty, J)) return; } // from a distance: a car at him
     const d = this.fly(ty.x, ty.y + 2, ty.z, h, 60, 15);
     if (d < 5 && this.cd <= 0) {
-      if (Math.random() < 0.45 && !ty.gripped && !ty.tossed) { this.cd = 2; this.D.brawl.grab(this, ty); return; } // grabs him and hurls him through a building
+      const r = Math.random();
+      if (r < 0.3 && !ty.gripped && !ty.tossed) { this.cd = 2; this.D.brawl.grab(this, ty); return; } // grabs him and hurls him through a building
+      if (r < 0.5 && !ty.gripped && !ty.tossed && this.D.brawl.drag(this, ty)) { this.cd = 3; return; } // or by the throat, down the street
       this.cd = 1.1; this.punchT = 0.35;
       const dx = ty.x - this.x, dz = ty.z - this.z, dl = Math.hypot(dx, dz) || 1;
       ty.hp -= 25; ty.vx += dx / dl * 22; ty.vz += dz / dl * 22; ty.vy += 8; ty.ray = null; ty.wind = 0;
@@ -242,7 +244,9 @@ class Hero {
     if (Math.hypot(wv.x - this.x, wv.z - this.z) > 28 && (this.carT = (this.carT ?? 3) - h) <= 0) { this.carT = 6; if (this.fetch(wv, J)) return; }
     const d = this.fly(wv.x, wv.y + 2, wv.z, h, 65, 20);
     if (d < 4.5 && this.cd <= 0) {
-      if (Math.random() < 0.45 && !wv.gripped && !wv.tossed) { this.cd = 2; this.D.brawl.grab(this, wv); return; }
+      const r = Math.random();
+      if (r < 0.3 && !wv.gripped && !wv.tossed) { this.cd = 2; this.D.brawl.grab(this, wv); return; }
+      if (r < 0.5 && !wv.gripped && !wv.tossed && this.D.brawl.drag(this, wv)) { this.cd = 3; return; }
       this.cd = 1.3; this.punchT = 0.35; wv.hp -= 34;
       this.D.ctx.fire.burst(wv.x, wv.y + 3, wv.z, 12, 1.6);
       if (wv.state === 'perch') wv.hop(true);
