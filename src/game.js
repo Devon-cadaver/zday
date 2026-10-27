@@ -310,7 +310,7 @@ export class Game {
     for (const e of D.list) if (e.alive && e.type === 'villains') for (const v of e.who) out.push({ obj: v, name: v.name, pos: () => (v.gone ? null : [v.x, v.y + 2.5, v.z]) });
     for (const e of D.list) if (e.alive && e.type === 'heroes') for (const h of e.who) out.push({ obj: h, name: h.name, pos: () => (h.state === 'fly' ? [h.x, h.y + 2.5, h.z] : null) });
     for (const e of D.list) if (e.alive && e.type === 'kaiju') out.push({ obj: e, name: 'Kaiju', pos: () => (e.alive ? [e.x, 30, e.z] : null) });
-    for (const e of D.list) if (e.alive && e.type === 'worm') out.push({ obj: e, name: 'Worm', pos: () => (e.alive && e.phase !== 'gone' ? [e.x, Math.max(0, e.y), e.z] : null) });
+    for (const e of D.list) if (e.alive && e.type === 'worm') out.push({ obj: e, name: 'Worm', pos: () => (!e.alive || e.phase === 'gone' ? null : e.phase === 'arc' ? [e.x - Math.cos(e.yaw) * 18, Math.max(8, e.y * 0.6), e.z - Math.sin(e.yaw) * 18] : [e.x, Math.max(0, e.y), e.z]) }); // in a leap: the middle of the arc
     for (const e of D.list) if (e.alive && e.type === 'riot' && e.mob) out.push({ obj: e, name: 'Riot', pos: () => (e.alive ? [e.mob.x, 1.5, e.mob.z] : null) });
     for (const e of D.list) if (e.alive && e.type === 'aliens') {
       e.tripods.forEach((t, k) => out.push({ obj: t, name: 'Tripod ' + (k + 1), pos: () => (t.state === 'walk' || t.state === 'drop' ? [t.x, t.y, t.z] : null) }));
@@ -319,9 +319,37 @@ export class Game {
     return out.filter(s => s.pos());
   }
   followSubject(s) {
-    this.follow = -1; this.followSub = s;
+    this.follow = -1; this.followSub = s; this.dir = null; this.camDir = null; this.zoomTo = 0;
     if (this.followBtn) { this.followBtn.classList.add('on'); this.followBtn.textContent = s.name; }
-    if (this.camera.position.distanceTo(this.controls.target) > 330) this.zoomTo = 280;
+  }
+  // the camera's shot for what it follows: how far back, how steeply it looks down (the angle from overhead), and the
+  // side it looks from (base +/- off, whichever is nearer where the camera already is; no base: stay on this side)
+  shot(s) {
+    const o = s.obj, hd = this.camDir ? this.camDir.heading : 0, P = Math.PI;
+    if (s.name === 'Kaiju') {
+      if (o.state === 'leave') return { key: 'k-leave', dist: 380, pol: 0.82, base: o.yaw + P, off: 0.6 }; // watching it go
+      if (o.act && o.act.kind === 'roar') return { key: 'k-roar', dist: 260, pol: 1.03, base: o.yaw, off: 0.3 }; // low, in front, looking up at it
+      if (o.act || o.rig.tents.some(q => q.state === 'hold' || q.state === 'whip')) return { key: 'k-act', dist: 290, pol: 0.9, base: o.yaw, off: 0.9 };
+      return { key: 'k-walk', dist: 330, pol: 0.93, base: o.yaw, off: 0.7 }; // low three-quarter view: how tall it is
+    }
+    if (s.name === 'Worm') {
+      if (o.phase === 'arc') return { key: 'w-arc', dist: 300, pol: 1.0, base: o.yaw, off: P / 2, rate: 2.2 }; // side on, the whole leap in view (quick: the leap is short)
+      return { key: 'w-dig', dist: 320, pol: 0.62, base: o.yaw + P, off: 0.5 }; // from behind and above: the ground caving in ahead of it
+    }
+    if (o.side === 'hero' && o.job && o.job.m) return { key: 'h-monster', dist: 320, pol: 0.97, base: hd, off: 0.8 }; // the hero and the monster both in view
+    const foe = o.side === 'villain' ? o.foe && o.foe() : o.side === 'hero' && o.job ? o.job.v : null;
+    if (foe && foe.x != null && !foe.gone) { // a fight up close: side on to the two of them
+      const d = Math.hypot(foe.x - o.x, foe.z - o.z);
+      if (d < 50 || o.gripped || o.tossed) return { key: 'fight', dist: Math.max(140, d * 2.6), pol: 0.95, base: Math.atan2(foe.z - o.z, foe.x - o.x), off: P / 2 };
+    }
+    if (o.name === 'Blur') return o.state === 'dash' ? { key: 'b-dash', dist: 270, pol: 0.75, base: hd + P, off: 0.6 } : { key: 'b-rest', dist: 170, pol: 0.92 }; // chasing him from behind
+    if (o.name === 'Tyrant') return { key: o.held ? 't-hold' : 't-fly', dist: o.held ? 280 : 240, pol: 0.9, base: hd, off: 0.9 };
+    if (o.name === 'Weaver') return { key: 'weaver', dist: 200, pol: 0.86, base: hd, off: 0.8 };
+    if (o.side === 'hero') return { key: 'hero', dist: 200, pol: 0.84, base: hd, off: 0.8 };
+    if (s.name === 'Riot') return { key: 'riot', dist: 240, pol: 0.72 };
+    if (s.name.startsWith('Tripod')) return { key: 'tripod', dist: 280, pol: 0.98, base: hd, off: 0.7 };
+    if (s.name.startsWith('Saucer')) return { key: 'saucer', dist: 300, pol: 0.86 };
+    return null;
   }
   cycleFollow() {
     const p = this.people, tg = this.controls.target, subs = this.subjects();
@@ -338,6 +366,31 @@ export class Game {
     if (i < 0) { this.toast('No zombies yet. Tap a street to drop one'); return; }
     this.setFollow(i);
     if (this.camera.position.distanceTo(tg) > 260) this.zoomTo = 230;
+  }
+
+  // the follow camera as a director: it works out which way the subject is heading, picks a shot for what it is doing
+  // (re-aimed when that changes, or every 8 s) and glides round, up or down and in or out to it
+  direct(q, dt) {
+    const cd = this.camDir && this.camDir.obj === this.followSub.obj ? this.camDir : (this.camDir = { obj: this.followSub.obj, x: q[0], z: q[2], vx: 0, vz: 0, heading: 0 });
+    if (dt > 0) {
+      const f = Math.min(1, dt * 2); cd.vx += ((q[0] - cd.x) / dt - cd.vx) * f; cd.vz += ((q[2] - cd.z) / dt - cd.vz) * f; cd.x = q[0]; cd.z = q[2];
+      if (Math.hypot(cd.vx, cd.vz) > 2) cd.heading = Math.atan2(cd.vz, cd.vx);
+    }
+    const sh = this.shot(this.followSub); if (!sh) return;
+    const tg = this.controls.target, off = this._off.copy(this.camera.position).sub(tg), r = off.length() || 1;
+    let pol = Math.acos(Math.min(1, Math.max(-1, off.y / r))), az = Math.atan2(off.z, off.x);
+    const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+    if (!this.dir || this.dir.key !== sh.key || this.realT > this.dir.until) {
+      let want = null;
+      if (sh.base != null) { const a1 = sh.base + sh.off, a2 = sh.base - sh.off; want = Math.abs(wrap(a1 - az)) < Math.abs(wrap(a2 - az)) ? a1 : a2; }
+      this.dir = { key: sh.key, az: want, until: this.realT + 8 };
+    }
+    const k = 1 - Math.exp(-dt * (sh.rate || 0.8)), kd = 1 - Math.exp(-dt * 1.2);
+    if (this.dir.az != null) az += wrap(this.dir.az - az) * k;
+    pol += (Math.min(1.04, Math.max(0.4, sh.pol)) - pol) * k;
+    const fit = Math.min(1.8, Math.max(1, 0.75 / this.camera.aspect)); // a phone held upright sees a narrow slice: stand further back
+    const nr = r + (Math.min(1080, Math.max(125, sh.dist * fit)) - r) * kd;
+    this.camera.position.set(tg.x + nr * Math.sin(pol) * Math.cos(az), tg.y + nr * Math.cos(pol), tg.z + nr * Math.sin(pol) * Math.sin(az));
   }
 
   update(dt, fps) {
@@ -382,6 +435,7 @@ export class Game {
         const dx = (gx - tg.x) * k, dz = (gz - tg.z) * k;
         tg.x += dx; tg.z += dz; this.camera.position.x += dx; this.camera.position.z += dz;
         this.focusAt = this._fp.set(q[0], q[1], q[2]); // the depth of field is focused on it, so it stays sharp and what is behind it blurs
+        this.direct(q, dt);
       }
     }
     if (this.zoomTo) {
