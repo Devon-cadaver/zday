@@ -18,6 +18,7 @@ import { Audio } from './audio.js';
 import { CURVE, curveFrame } from './curve.js';
 import { PLACES, placeKey } from './places.js';
 import { Globe } from './globe.js';
+import { damageOf, rememberDamage, takeMeteor } from './world.js';
 
 const P = new URLSearchParams(location.search);
 CURVE.on = P.get('curve') !== '0'; // ?curve=0: the flat world, to compare
@@ -157,6 +158,14 @@ const game = new Game({ people, traffic, fire, city, camera, controls, renderer,
 const searchlights = new Searchlights(scene, { game, traffic, helis, city, daylight }); // beams at night on the trouble
 game.audio = new Audio(camera, controls); // sound: switched on by the first tap
 const globe = game.globe = new Globe(renderer); let globeWas = false; // the world from orbit: the big city and the towns
+// what this place remembers: the buildings that came down here last time (Sandbox; Commander starts each round fresh)
+const sandbox = () => game.mode && game.mode.kind === 'sandbox';
+for (const k of damageOf(placeKey())) if (city.buildings[k] && !city.dead[k]) { people.clearBuilding(k, 'spare'); city.hideBuilding(k); city.addRubble(k, 0.75); }
+const keepDamage = () => { if (!sandbox()) return; const dead = []; for (let k = 0; k < city.buildings.length; k++) if (city.dead[k]) dead.push(k); rememberDamage(placeKey(), dead); };
+setInterval(keepDamage, 5000); addEventListener('pagehide', keepDamage); globe.onOpen = keepDamage;
+// a meteor sent down from orbit on this place: it comes in now
+const meteorIn = () => { const m = takeMeteor(placeKey()); if (!m || !sandbox()) return; const B = city.bounds, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2, hx = (B.x1 - B.x0) * 0.4, hz = (B.z1 - B.z0) * 0.4; disasters.start('meteor', cx + Math.max(-hx, Math.min(hx, m.x)), cz + Math.max(-hz, Math.min(hz, m.z)), { warn: 7, size: m.size }); };
+globe.onArrive = meteorIn; setTimeout(meteorIn, 1500);
 window.__lights = searchlights;
 
 window.__z = { THREE, scene, camera, controls, renderer, post, city, traffic, people, fire, game, daylight, helis, disasters, outskirts, sirens, sun, hemi, setView, buildMs, audio: game.audio, info: () => renderer.info.render };

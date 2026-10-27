@@ -575,7 +575,7 @@ const START_DROPS = 3;
 
 class Sandbox {
   constructor(g) {
-    this.g = g; this.msgs = SANDBOX_MSGS;
+    this.g = g; this.msgs = SANDBOX_MSGS; this.kind = 'sandbox';
     if (g.disasters) g.disasters.boats.auto = true; // rescue boats come by themselves here
     this.auto = new Responders(g); // and so does everyone else, unless you switch them off
     this.el = {

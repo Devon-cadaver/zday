@@ -5,9 +5,13 @@
 // tap a place to fly down to it, and the page is built again around that place.
 // The game waits while you are up here. Everything is made in code: the map is
 // painted from noise on a sphere, so it has no seams and no poles pinching.
+// Places that have taken damage smoke; meteors leave craters; the meteor button
+// sends one down wherever you tap, and a direct hit on a town flies you down to
+// watch it land.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { PLACES, placeKey, travel } from './places.js';
+import { damageOf, craters, addCrater, sendMeteor } from './world.js';
 
 const R = 10;
 // the places' character on the map: what each one wants to be next to
@@ -66,6 +70,7 @@ function cloudTexture(W, H) {
   g.putImageData(img, 0, 0);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
+const toLatLon = (p) => { const n = p.clone().normalize(); return [Math.asin(n.y), Math.atan2(-n.z, n.x)]; };
 const toVec = (lat, lon, r = R) => new THREE.Vector3(Math.cos(lat) * Math.cos(lon) * r, Math.sin(lat) * r, -Math.cos(lat) * Math.sin(lon) * r); // as SphereGeometry wraps the map
 
 export class Globe {
@@ -96,6 +101,7 @@ export class Globe {
     const sp = new Float32Array(1500 * 3); for (let i = 0; i < 1500; i++) { const v = new THREE.Vector3().randomDirection().multiplyScalar(150 + Math.random() * 80); sp.set([v.x, v.y, v.z], i * 3); }
     const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(sp, 3)); scene.add(new THREE.Points(sg, new THREE.PointsMaterial({ color: '#cfd8ff', size: 0.6, sizeAttenuation: true })));
     this.placeTowns();
+    this.decorate();
     this.labels();
     this.controls = new OrbitControls(cam, this.renderer.domElement); this.controls.enablePan = false; this.controls.enableDamping = true; this.controls.dampingFactor = 0.08;
     this.controls.minDistance = R * 1.25; this.controls.maxDistance = R * 5; this.controls.rotateSpeed = 0.5; this.controls.enabled = false;
@@ -142,6 +148,52 @@ export class Globe {
     this.here = new THREE.Mesh(new THREE.RingGeometry(0.62, 0.7, 48), new THREE.MeshBasicMaterial({ color: '#ffe08a', transparent: true, side: THREE.DoubleSide, depthWrite: false })); // a ring round where you are
     const hs = this.spots[placeKey()], hp = toVec(hs[0], hs[1], R * 1.003); this.here.position.copy(hp); this.here.lookAt(hp.clone().multiplyScalar(2)); this.scene.add(this.here);
   }
+  // the marks the world carries: craters (glowing a while when fresh), smoke over places that have taken damage
+  decorate() {
+    const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.5, 'rgba(255,255,255,0.45)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+    this.puff = new THREE.CanvasTexture(c);
+    this.craterMat = new THREE.MeshBasicMaterial({ color: '#2a2018', transparent: true, opacity: 0.85, depthWrite: false });
+    this.craterGeo = new THREE.CircleGeometry(1, 24);
+    this.marks = [];
+    for (const [lat, lon, size, when] of craters()) this.crater(lat, lon, size, when);
+    this.smoke = [];
+    for (const key in PLACES) {
+      const n = damageOf(key).length; if (n < 3 || !this.spots[key]) continue;
+      const [lat, lon] = this.spots[key], base = toVec(lat, lon, R), k = Math.min(1, n / 40);
+      for (let i = 0; i < 5; i++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.puff, color: '#5a5550', transparent: true, depthWrite: false })); this.scene.add(s); this.smoke.push({ s, base, nrm: base.clone().normalize(), ph: i / 5, k }); }
+    }
+  }
+  crater(lat, lon, size, when = Date.now()) {
+    const p = toVec(lat, lon, R * 1.0015), m = new THREE.Mesh(this.craterGeo, this.craterMat); m.position.copy(p); m.lookAt(p.clone().multiplyScalar(2)); m.scale.setScalar(size);
+    const glow = new THREE.Mesh(this.craterGeo, new THREE.MeshBasicMaterial({ color: new THREE.Color(3, 1.2, 0.3), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending })); glow.position.copy(p.clone().multiplyScalar(1.0004)); glow.lookAt(p.clone().multiplyScalar(2)); glow.scale.setScalar(size * 0.6);
+    this.scene.add(m, glow); this.marks.push({ glow, when });
+  }
+  // a meteor from deep space onto the point p on the planet
+  strike(p) {
+    const n = p.clone().normalize(), side = new THREE.Vector3(0, 1, 0).cross(n).normalize(), from = n.clone().multiplyScalar(R * 2.8).addScaledVector(side, R * 1.4);
+    const rock = new THREE.Mesh(new THREE.IcosahedronGeometry(0.16, 1), new THREE.MeshBasicMaterial({ color: new THREE.Color(3, 1.5, 0.5) }));
+    this.scene.add(rock); this.met = { rock, from, to: n.clone().multiplyScalar(R * 1.002), n, t: 0, trailT: 0, trail: [] };
+    this.armed = false; this.metBtn.classList.remove('on');
+  }
+  impact(M) {
+    const [lat, lon] = toLatLon(M.to); this.scene.remove(M.rock);
+    this.flash = { s: new THREE.Sprite(new THREE.SpriteMaterial({ map: this.puff, color: new THREE.Color(4, 2.6, 1.2), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })), t: 0 };
+    this.flash.s.position.copy(M.to); this.scene.add(this.flash.s);
+    this.ring = { m: new THREE.Mesh(new THREE.RingGeometry(0.9, 1, 48), new THREE.MeshBasicMaterial({ color: '#ffe2b0', transparent: true, side: THREE.DoubleSide, depthWrite: false })), t: 0 };
+    this.ring.m.position.copy(M.to.clone().multiplyScalar(1.001)); this.ring.m.lookAt(M.to.clone().multiplyScalar(2)); this.scene.add(this.ring.m);
+    addCrater(lat, lon, 0.28); this.crater(lat, lon, 0.28);
+    // a town under it: it is coming down on them; fly down to watch
+    let hit = null, hd = 0.1;
+    for (const key in this.spots) { const [la, lo] = this.spots[key], d = Math.acos(Math.min(1, Math.sin(lat) * Math.sin(la) + Math.cos(lat) * Math.cos(la) * Math.cos(lon - lo))); if (d < hd) { hd = d; hit = key; } }
+    if (hit) {
+      const [la, lo] = this.spots[hit], S = 4500; // radians on the globe to metres in the place
+      sendMeteor(hit, { x: (lon - lo) * Math.cos(la) * S, z: -(lat - la) * S, size: 34 });
+      this.say('Direct hit on ' + PLACES[hit].name + '! Flying down to watch it land');
+      setTimeout(() => { if (this.active) this.go(hit); }, 2200);
+    } else this.say('The meteor hit open ground. Tap the meteor button to send another');
+  }
+  say(text) { this.sub.textContent = text; }
   labels() {
     this.tags = {};
     for (const key in PLACES) {
@@ -155,6 +207,19 @@ export class Globe {
     const u = this.uiEl = document.createElement('div');
     u.style.cssText = 'position:fixed;left:0;right:0;top:14px;z-index:41;text-align:center;color:#f6eedc;font:700 15px system-ui,sans-serif;letter-spacing:0.12em;pointer-events:none;display:none';
     u.innerHTML = 'THE WORLD<div style="font:500 12px system-ui,sans-serif;letter-spacing:0;opacity:0.75;margin-top:4px">Spin it, tap a town to go there</div>';
+    this.sub = u.querySelector('div');
+    const met = this.metBtn = document.createElement('button'); met.type = 'button'; met.className = 'zd-btn'; met.textContent = '☄ Send a meteor';
+    met.style.cssText = 'position:fixed;left:50%;bottom:70px;transform:translateX(-50%);z-index:41;display:none';
+    met.onclick = (e) => { e.stopPropagation(); this.armed = !this.armed; met.classList.toggle('on', this.armed); this.say(this.armed ? 'Tap the planet where it should hit' : 'Spin it, tap a town to go there'); };
+    document.body.appendChild(met);
+    // a tap on the planet while the meteor is armed: that is where it hits
+    const dom = this.renderer.domElement, ray = new THREE.Raycaster(); let down = null;
+    dom.addEventListener('pointerdown', (e) => { down = [e.clientX, e.clientY]; });
+    dom.addEventListener('pointerup', (e) => {
+      if (!this.active || !this.armed || this.met || !down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 10) return;
+      ray.setFromCamera(new THREE.Vector2(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1), this.cam);
+      const h = ray.intersectObject(this.planet)[0]; if (h) this.strike(h.point);
+    });
     const back = this.backBtn = document.createElement('button'); back.type = 'button'; back.className = 'zd-btn'; back.textContent = 'Back to ' + PLACES[placeKey()].name;
     back.style.cssText = 'position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:41;display:none';
     back.onclick = (e) => { e.stopPropagation(); this.go(placeKey()); };
@@ -170,13 +235,15 @@ export class Globe {
     this.rise = { t: 0, from: R * 1.15, to: R * 3.2, dir: p.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), 0.25).add(new THREE.Vector3(0, 0.25, 0)).normalize() };
     this.controls.enabled = true;
     document.body.classList.add('zd-globe-on'); this.toggleHud(false);
-    this.uiEl.style.display = ''; this.backBtn.style.display = '';
+    this.uiEl.style.display = ''; this.backBtn.style.display = ''; this.metBtn.style.display = '';
+    if (this.onOpen) this.onOpen();
   }
   close() {
     this.active = false; this.controls.enabled = false; this.toggleHud(true);
-    this.uiEl.style.display = 'none'; this.backBtn.style.display = 'none'; for (const k in this.tags) this.tags[k].style.display = 'none';
+    this.uiEl.style.display = 'none'; this.backBtn.style.display = 'none'; this.metBtn.style.display = 'none'; this.armed = false; for (const k in this.tags) this.tags[k].style.display = 'none';
+    if (this.onArrive) this.onArrive();
   }
-  toggleHud(on) { for (const el of document.querySelectorAll('#zd-top, #zd-bar, .zd-top, .zd-bar, #zd-dis, #zd-call')) el.style.visibility = on ? '' : 'hidden'; }
+  toggleHud(on) { for (const el of document.querySelectorAll('#zd-top, #zd-bar, #zd-dis, #zd-call, #zd-toast, #zd-end')) el.style.visibility = on ? '' : 'hidden'; }
   // down to a place: fly in over it; back where you were, the city is still there; anywhere else is built afresh
   go(key) {
     if (this.fly) return;
@@ -188,6 +255,17 @@ export class Globe {
     this.t += dt;
     this.clouds.rotation.y += dt * 0.012;
     this.here.material.opacity = 0.55 + 0.45 * Math.sin(this.t * 3);
+    for (const S of this.smoke) { const k = (this.t * 0.25 + S.ph) % 1; S.s.position.copy(S.base).addScaledVector(S.nrm, 0.1 + k * 1.4 * S.k); S.s.scale.setScalar((0.25 + k * 0.9) * (0.5 + S.k)); S.s.material.opacity = (1 - k) * 0.7; }
+    for (const M of this.marks) M.glow.material.opacity = Math.max(0, 1 - (Date.now() - M.when) / 60000) * (0.7 + 0.3 * Math.sin(this.t * 7));
+    if (this.met) { // on its way in, a burning trail behind it
+      const M = this.met; M.t += dt; const k = Math.min(1, M.t / 1.7), e = k * k; M.rock.position.lerpVectors(M.from, M.to, e);
+      if ((M.trailT -= dt) <= 0) { M.trailT = 0.025; const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.puff, color: new THREE.Color(2.4, 1.1, 0.4), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); s.position.copy(M.rock.position); s.scale.setScalar(0.5); this.scene.add(s); M.trail.push({ s, t: 0 }); }
+      if (k >= 1) { this.impact(M); this.fade = M.trail; this.met = null; }
+    }
+    if (this.fade) { for (const f of this.fade) { f.t += dt; f.s.material.opacity = Math.max(0, 1 - f.t / 0.8); f.s.scale.setScalar(0.5 + f.t * 0.6); } if (this.fade.every(f => f.t > 0.8)) { for (const f of this.fade) this.scene.remove(f.s); this.fade = null; } }
+    else if (this.met) for (const f of this.met.trail) { f.t += dt; f.s.material.opacity = Math.max(0, 1 - f.t / 0.8); }
+    if (this.flash) { const F = this.flash; F.t += dt; F.s.scale.setScalar(0.3 + F.t * 6); F.s.material.opacity = Math.max(0, 1 - F.t / 0.9); if (F.t > 0.9) { this.scene.remove(F.s); this.flash = null; } }
+    if (this.ring) { const G = this.ring; G.t += dt; G.m.scale.setScalar(0.1 + G.t * 1.8); G.m.material.opacity = Math.max(0, 1 - G.t / 1.2); if (G.t > 1.2) { this.scene.remove(G.m); this.ring = null; } }
     if (this.rise) { // pulling back off the city
       const R0 = this.rise; R0.t += dt; const k = Math.min(1, R0.t / 1.6), e = 1 - Math.pow(1 - k, 3), r = R0.from + (R0.to - R0.from) * e;
       const dir = this.cam.position.clone().normalize().lerp(R0.dir, Math.min(1, dt * 1.2)).normalize(); this.cam.position.copy(dir.multiplyScalar(r)); this.cam.lookAt(0, 0, 0);
