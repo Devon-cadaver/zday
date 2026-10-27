@@ -107,6 +107,7 @@ export class People {
     this.px = new Float32Array(N); this.pz = new Float32Array(N); this.watch = new Uint8Array(N); // what someone is watching (a disaster nearby)
     this.st = new Uint8Array(N); this.inf = new Uint8Array(N); this.dirty = new Uint8Array(N); this.fx = new Uint8Array(N); this.kind = new Uint8Array(N); this.zt = new Uint8Array(N);
     this.zrad = new Uint8Array(N); this.spitT = new Float32Array(N); this.specT = 0; // irradiated (turns radioactive); a spitter's cooldown
+    this.hord = new Int32Array(N).fill(-1); this.hordes = new Map(); this.hordeN = 0; this.hordeT = 0; // which horde a zombie walks with (hordeTick)
     this.blk = new Int16Array(N); this.lvl = new Int16Array(N); this.bt = new Int16Array(N);
     this.target = new Int32Array(N);
     this.base = new Array(N); this.trait = new Uint8Array(N);
@@ -148,7 +149,7 @@ export class People {
     this.flashes = new THREE.InstancedMesh(new THREE.SphereGeometry(0.35, 6, 4), new THREE.MeshBasicMaterial({ color: '#fff2a0' }), this.flashMax);
     this.flashes.count = 0; this.flashes.frustumCulled = false;
     parent.add(this.flashes);
-    this.flashList = []; this.grenades = []; this.grenadeCd = 0; this.lifted = [];
+    this.flashList = []; this.grenades = []; this.grenadeCd = 0; this.lifted = []; this.doors = new Map(); // bus doors (busDoor)
     // phones held up by people filming a disaster (their screens glow at night)
     this.phones = new THREE.InstancedMesh(new THREE.BoxGeometry(0.22, 0.34, 0.03), new THREE.MeshBasicMaterial({ color: new THREE.Color(1.3, 1.5, 1.9) }), 900);
     this.phones.count = 0; this.phones.frustumCulled = false; parent.add(this.phones);
@@ -301,6 +302,7 @@ export class People {
 
   reset() {
     if (this.grid0) this.grid.set(this.grid0);
+    this.doors.clear();
     const r = this.r = rng(this.opts.seed ?? 99);
     this.makeCrowds(r);
     const blocks = this.blocks = this.city.walkBlocks.map(b => ({ ...b, w: b.x1 - b.x0, d: b.z1 - b.z0, P: 2 * (b.x1 - b.x0 + b.z1 - b.z0) }));
@@ -336,6 +338,7 @@ export class People {
     this.stats = { humans: this.nHuman, infected: 0, zombies: 0, dead: 0, roof: 0, bites: 0, runover: 0, shot: 0, officers: 0, rescued: 0, bombed: 0, bombedCiv: 0, bused: 0, nukedCiv: 0, nukedZ: 0,
       disasterCiv: 0, disasterZ: 0, drowned: 0, abducted: 0, aliens: 0, aliensKilled: 0, rioters: 0, arrests: 0, jailed: 0, treated: 0, prayed: 0, fought: 0, stole: 0 };
     this.wz.fill(0); this.wet.fill(0); this.cuff.fill(0); this.watch.fill(0); this.waterAt = null; this.alarmT = 0; this.speedK = 1; this.mobs = [];
+    this.hord.fill(-1); this.hordes.clear(); this.hordeT = 0;
     this.events = [];
     this.flashList.length = 0; this.grenades.length = 0; this.grenadeCd = 0;
     for (const d of this.dust) { d.m.visible = false; d.t = 1; }
@@ -745,15 +748,24 @@ export class People {
     return out;
   }
 
+  // the front door of bus busId, on the side with room to stand: [door x, z, a step inside x, z], and when it is next
+  // free (one at a time up the steps). Worked out once per stop
+  busDoor(busId) {
+    let D = this.doors.get(busId); if (D) return D;
+    const bus = this.traffic && this.traffic.cars[busId]; if (!bus || bus.gone) return null;
+    const hx = bus.hx ?? Math.cos(bus.yaw), hz = bus.hz ?? -Math.sin(bus.yaw), s = this.walkable(bus.x + hx * 3 - hz * 3.5, bus.z + hz * 3 + hx * 3.5) ? 1 : -1, rx = -hz * s, rz = hx * s;
+    D = { d: [bus.x + hx * 3.2 + rx * 1.8, bus.z + hz * 3.2 + rz * 1.8, bus.x + hx * 3.2 + rx * 0.2, bus.z + hz * 3.2 + rz * 0.2], free: 0 };
+    this.doors.set(busId, D); return D;
+  }
   // evacuation bus parked at (x,z): up to n street civilians within R run for its door
   callToBus(x, z, R, n, busId) {
-    const c = [];
+    const c = [], D = this.busDoor(busId); if (D) { x = D.d[0]; z = D.d[1]; }
     this.around(x, z, R, (j, d2) => { if (this.kind[j] === 0 && !this.inf[j] && (this.st[j] === S.WALK || this.st[j] === S.IDLE || this.st[j] === S.FLEE || this.st[j] === S.RETURN)) c.push([d2, j]); });
     c.sort((a, b) => a[0] - b[0]);
     let k = 0;
     for (const [, j] of c) {
       if (k >= n) break;
-      this.st[j] = S.BOARD; this.tx[j] = x; this.tz[j] = z; this.bt[j] = busId; this.t1[j] = 25; this.inc[j] = 0; this.fx[j] = 0;
+      this.st[j] = S.BOARD; this.tx[j] = x; this.tz[j] = z; this.bt[j] = busId; this.t1[j] = 25; this.inc[j] = 0; this.fx[j] = 0; this.watch[j] = 0;
       this.wt[j] = RUN[0] + this.r() * (RUN[1] - RUN[0]); k++;
     }
     return k;
@@ -761,13 +773,27 @@ export class People {
 
   // everyone still running for bus busId gives up
   releaseBus(busId) {
-    for (let i = 0; i < this.active; i++) if (this.st[i] === S.BOARD && this.bt[i] === busId) { this.st[i] = S.IDLE; this.bt[i] = -1; this.fx[i] = 0; this.panic(i, this.tx[i], this.tz[i], -1); }
+    for (let i = 0; i < this.active; i++) if (this.st[i] === S.BOARD && this.bt[i] === busId && this.watch[i] !== 2) { this.st[i] = S.IDLE; this.bt[i] = -1; this.fx[i] = 0; this.watch[i] = 0; this.panic(i, this.tx[i], this.tz[i], -1); }
+    this.doors.delete(busId);
   }
 
+  // running for the bus door; there, waiting a turn (watch 1), then up the steps and in (watch 2)
   boardStep(i, h) {
-    const dx = this.tx[i] - this.x[i], dz = this.tz[i] - this.z[i], d = Math.hypot(dx, dz);
+    const dx = this.tx[i] - this.x[i], dz = this.tz[i] - this.z[i], d = Math.hypot(dx, dz), D = this.doors.get(this.bt[i]);
+    const aboard = () => { this.st[i] = S.EVAC; this.lvl[i] = -1; if (this.fx[i] === 1) this.stats.jailed++; else this.stats.bused++; this.fx[i] = 0; this.watch[i] = 0; this.events.push({ type: 'boarded', i, bus: this.bt[i] }); };
+    if (this.watch[i] === 2) { // from where they stood to the door, then up into the bus
+      this.t1[i] -= h; const k = 1 - Math.max(0, this.t1[i]) / 0.9;
+      if (k < 0.55) { const e = k / 0.55; this.x[i] = this.px[i] + (D.d[0] - this.px[i]) * e; this.z[i] = this.pz[i] + (D.d[1] - this.pz[i]) * e; }
+      else { const e = (k - 0.55) / 0.45; this.x[i] = D.d[0] + (D.d[2] - D.d[0]) * e; this.z[i] = D.d[1] + (D.d[3] - D.d[1]) * e; this.y[i] = this.groundY(this.x[i], this.z[i]) + 0.55 * e; }
+      if (this.t1[i] <= 0) aboard();
+      return;
+    }
     this.t1[i] -= h;
-    if (d < 2.2) { this.st[i] = S.EVAC; this.lvl[i] = -1; if (this.fx[i] === 1) this.stats.jailed++; else this.stats.bused++; this.fx[i] = 0; this.events.push({ type: 'boarded', i, bus: this.bt[i] }); return; }
+    if (D && d < 2.6) { // at the door: in turn
+      if (this.time < D.free) { this.watch[i] = 1; this.face(i, D.d[2], D.d[3]); return; }
+      D.free = this.time + 0.42; this.watch[i] = 2; this.t1[i] = 0.9; this.px[i] = this.x[i]; this.pz[i] = this.z[i]; this.face(i, D.d[2], D.d[3]); return;
+    }
+    if (!D && d < 2.2) { aboard(); return; }
     if (this.t1[i] <= 0) { this.st[i] = S.IDLE; this.bt[i] = -1; this.fx[i] = 0; return; }
     if (this.inc[i] > 0) { this.inc[i] -= h; if (!this.move(i, this.hx[i], this.hz[i], this.wt[i] * h)) this.inc[i] = 0; return; }
     this.hx[i] = dx / d; this.hz[i] = dz / d;
@@ -891,6 +917,7 @@ export class People {
     this.time += h;
     this.buildHash();
     if ((this.specT -= h) <= 0) { this.specT = 0.5; this.specials(); }
+    if ((this.hordeT -= h) <= 0) { this.hordeT = 1; this.hordeTick(); }
     for (let i = 0; i < this.active; i++) {
       const s = this.st[i];
       switch (s) {
@@ -1469,8 +1496,8 @@ export class People {
   }
   // the police bus is here: everyone in custody group id walks to its door
   custodyToBus(id, x, z, busId) {
-    let n = 0;
-    for (let i = 0; i < this.active; i++) if (this.st[i] === S.HELD && this.bt[i] === id) { this.st[i] = S.BOARD; this.tx[i] = x; this.tz[i] = z; this.bt[i] = busId; this.t1[i] = 40; this.inc[i] = 0; this.fx[i] = 1; this.wt[i] = 2.6; n++; }
+    let n = 0; const D = this.busDoor(busId); if (D) { x = D.d[0]; z = D.d[1]; }
+    for (let i = 0; i < this.active; i++) if (this.st[i] === S.HELD && this.bt[i] === id) { this.st[i] = S.BOARD; this.tx[i] = x; this.tz[i] = z; this.bt[i] = busId; this.t1[i] = 40; this.inc[i] = 0; this.fx[i] = 1; this.wt[i] = 2.6; this.watch[i] = 0; n++; }
     return n;
   }
   // caught in a super villain's web: stuck where they stand until the web lets go
@@ -1636,12 +1663,76 @@ export class People {
     this.target[i] = -1;
     const k = this.bt[i];
     if (k >= 0) { this.toPile(i, h, k, Z); return; }
-    this.wt[i] -= h;
     const alerted = this.fx[i] === 3;
+    if (!alerted && this.hord[i] >= 0 && this.hordeStep(i, h, Z)) return; // with the horde
+    this.wt[i] -= h;
     if (this.wt[i] <= 0 || !this.move(i, this.hx[i], this.hz[i], (alerted ? Z.chase : Z.wander) * h)) {
       this.randomCardinal(i, 3);
       this.wt[i] = 3 + this.r() * 6; this.fx[i] = 0;
     }
+  }
+
+  // ---------- hordes: zombies band together and move as one, like a mob. Noise draws them - a car tearing past (they go
+  // after it until it is gone, or something new turns their heads), people - and they close on people from every side,
+  // a ring tightening round them. Once a zombie sees someone close it is every zombie for itself (zombieStep)
+  hordeTick() {
+    const H = this.hordes, Z = S.ZOMBIE;
+    for (const g of H.values()) { g.sx = 0; g.sz = 0; g.n = 0; }
+    for (let i = 0; i < this.active; i++) {
+      const id = this.hord[i]; if (id < 0) continue;
+      const g = H.get(id);
+      if (!g || this.st[i] !== Z || this.lvl[i] !== -1 || (this.x[i] - g.x) ** 2 + (this.z[i] - g.z) ** 2 > 90 * 90) { this.hord[i] = -1; continue; }
+      g.sx += this.x[i]; g.sz += this.z[i]; g.n++;
+    }
+    for (const [id, g] of H) { if (g.n < 3) { H.delete(id); continue; } g.x = g.sx / g.n; g.z = g.sz / g.n; }
+    // stragglers fall in with a horde nearby, or band together into a new one
+    for (let i = 0; i < this.active; i++) {
+      if (this.st[i] !== Z || this.hord[i] >= 0 || this.lvl[i] !== -1) continue;
+      let best = -1, bd = 45 * 45;
+      for (const [id, g] of H) { const d2 = (g.x - this.x[i]) ** 2 + (g.z - this.z[i]) ** 2; if (d2 < bd) { bd = d2; best = id; } }
+      if (best >= 0) { this.hord[i] = best; H.get(best).n++; continue; }
+      let m = 0; this.around(this.x[i], this.z[i], 22, (j) => { if (this.st[j] === Z && this.hord[j] < 0) m++; });
+      if (m < 4) continue;
+      const id = this.hordeN++, g = { x: this.x[i], z: this.z[i], n: 0, gx: this.x[i], gz: this.z[i], focus: null, ft: 0, wa: this.r() * 6.28, waT: 0 };
+      H.set(id, g); this.around(this.x[i], this.z[i], 22, (j) => { if (this.st[j] === Z && this.hord[j] < 0) { this.hord[j] = id; g.n++; } });
+    }
+    for (const g of H.values()) this.hordeAim(g);
+  }
+  // what a horde goes for: what has its attention now, unless something louder or nearer comes along
+  hordeAim(g) {
+    const loud = (c) => (c.panic > 0 || c.burning ? 0.1 : 0.025) * Math.abs(c.v || 0) / Math.max(15, Math.hypot(c.x - g.x, c.z - g.z)); // a car: the faster and nearer, the louder; one fleeing in a panic most of all
+    const crowd = (x, z, R) => { let n = 0, sx = 0, sz = 0; this.around(x, z, R, (j) => { if (CIV[this.st[j]] && !this.inf[j]) { n++; sx += this.x[j]; sz += this.z[j]; } }); return n ? [sx / n, sz / n, n] : null; };
+    const f = g.focus; let cur = 0;
+    g.ft++;
+    if (f && f.car) { const c = f.car; if (!c.gone && c.mode !== 4 && c.mode !== 5 && Math.hypot(c.x - g.x, c.z - g.z) < 180) { cur = Math.max(loud(c), g.ft < 6 ? 0.05 : 0); g.gx = c.x + (c.hx || 0) * Math.abs(c.v || 0) * 1.2; g.gz = c.z + (c.hz || 0) * Math.abs(c.v || 0) * 1.2; } } // after it, where it is going
+    else if (f && f.ppl) { const q = crowd(f.x, f.z, 30); if (q && g.ft < 40) { f.x = g.gx = q[0]; f.z = g.gz = q[1]; cur = Math.min(q[2], 20) * 0.1 / Math.max(15, Math.hypot(q[0] - g.x, q[1] - g.z)); } }
+    // something new: a car tearing past, or people within reach
+    let nf = null, ns = 0;
+    if (this.traffic) this.traffic.near(g.x, g.z, 120, (c) => { if (c.gone || c.mode === 4 || c.mode === 5 || Math.abs(c.v || 0) < 5) return; const s = loud(c); if (s > ns) { ns = s; nf = { car: c }; } });
+    const q = crowd(g.x, g.z, 60); if (q && q[2] >= 2) { const s = Math.min(q[2], 20) * 0.1 / Math.max(15, Math.hypot(q[0] - g.x, q[1] - g.z)); if (s > ns) { ns = s; nf = { ppl: true, x: q[0], z: q[1] }; } }
+    if (nf && ns > cur * 1.5 && (!f || nf.car !== f.car)) { g.focus = nf; g.ft = 0; if (nf.car) { g.gx = nf.car.x; g.gz = nf.car.z; } else { g.gx = nf.x; g.gz = nf.z; } return; }
+    if (cur > 0) return;
+    // nothing: the horde drifts down the streets together, turning now and then
+    g.focus = null;
+    if ((g.waT -= 1) <= 0 || Math.hypot(g.gx - g.x, g.gz - g.z) < 8) {
+      g.waT = 8 + this.r() * 8; g.wa += (this.r() - 0.5) * 2;
+      const p = this.snapWalkable(g.x + Math.cos(g.wa) * 45, g.z + Math.sin(g.wa) * 45, 25); if (p) { g.gx = p[0]; g.gz = p[1]; } else g.wa += Math.PI;
+    }
+  }
+  // a horde member: its own place in the mass round the horde's goal (a ring round people, so they are hemmed in)
+  hordeStep(i, h, Z) {
+    const g = this.hordes.get(this.hord[i]); if (!g) { this.hord[i] = -1; return false; }
+    const a = i * 2.39996, ring = g.focus && g.focus.ppl;
+    const r = ring ? Math.max(1, 13 - 1.6 * g.ft) + (i % 5) * 0.8 : Math.min(15, 1.3 * Math.sqrt(g.n)) * (0.3 + 0.7 * ((i * 0.618) % 1)); // the ring closes in
+    const tx = g.gx + Math.cos(a) * r + Math.sin(this.time * 0.9 + i) * 1.2, tz = g.gz + Math.sin(a) * r + Math.cos(this.time * 0.7 + i) * 1.2;
+    const dx = tx - this.x[i], dz = tz - this.z[i], d = Math.hypot(dx, dz);
+    this.fx[i] = 0;
+    if (d < 0.8) return true; // in its place: swaying
+    const sp = (g.focus ? Z.chase * (g.focus.car ? 1 : 0.8) : Z.wander) * (d > 25 ? 1.2 : 1);
+    if (this.wt[i] > 0) { this.wt[i] -= h; if (this.move(i, this.hx[i], this.hz[i], sp * h)) return true; } // round a corner
+    this.hx[i] = dx / d; this.hz[i] = dz / d;
+    if (!this.move(i, dx / d, dz / d, Math.min(d, sp * h)) && this.randomCardinal(i, 1.5)) this.wt[i] = 1.2;
+    return true;
   }
 
   // zombies within R that are not after anyone shamble towards (x, z) (Be The Disaster: the horde follows your finger)
@@ -1838,6 +1929,7 @@ export class People {
       else if (s === S.ROOF) an = this.t1[i] > 0 || this.fx[i] === 2 ? 2 : this.fx[i] === 1 ? 1 : this.fx[i] === 3 ? 6 : 0;
       else if (s === S.FILM) { an = this.films(i) ? 6 : 0; film++; }
       else if (s === S.HELD) an = this.t1[i] > 0 ? (this.t1[i] > 5 ? 2 : 1) : 0;
+      else if (s === S.BOARD) an = this.watch[i] === 1 ? 0 : this.watch[i] === 2 ? 1 : 2; // waiting a turn at the door, stepping in
       else if (s === S.PRAY) an = this.fx[i] ? 10 : 2;
       else if (s === S.FIGHT) an = this.fx[i] ? 11 : this.target[i] >= 0 ? 2 : 7;
       else if (s === S.COP) an = this.fx[i] === 1 ? 7 : this.fx[i] === 2 ? 6 : 0;
