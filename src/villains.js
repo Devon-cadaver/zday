@@ -262,6 +262,7 @@ class Blur extends Villain {
     const sx = e === 0 ? B.x0 - 40 : e === 1 ? B.x1 + 40 : x, sz = e === 2 ? B.z0 - 40 : e === 3 ? B.z1 + 40 : z;
     super(V, { x: sx, z: sz });
     this.name = 'Blur'; this.hint = 'drag and he runs there, straight through everything in the way';
+    this.frail = 2; // built for speed, not for taking a hit: a blow lands twice as hard on him
     this.state = 'dash'; this.goal = [x, z]; this.restT = 0; this.ph = 0; this.inB = -1; this.scareT = 0;
     this.trail = new Trail(V.scene);
   }
@@ -282,8 +283,9 @@ class Blur extends Villain {
     if (!this.saidFree) { this.saidFree = true; this.D.emit({ type: 'blurfree', text: 'Blur vibrated free of the time bubble!' }); }
     this.go(this.pick());
   }
-  landed() { this.state = 'rest'; this.restT = 1.2; this.speed = 0; this.inB = -1; }
-  go(p) { const B = this.D.ctx.city.bounds; this.goal = [clamp(p[0], B.x0 + 15, B.x1 - 15), clamp(p[1], B.z0 + 15, B.z1 - 15)]; this.state = 'dash'; }
+  // thrown down hard he sees stars for a moment (long enough for a hero to get hold of him again), and the next bubble holds him
+  landed() { this.state = 'rest'; this.restT = this.dazed = 1.4; this.speed = 0; this.inB = -1; this.stuck = 0; this.freeT = 0; }
+  go(p) { const B = this.D.ctx.city.bounds; this.goal = [clamp(p[0], B.x0 + 15, B.x1 - 15), clamp(p[1], B.z0 + 15, B.z1 - 15)]; this.state = 'dash'; this.dazed = 0; }
   leave() { const B = this.D.ctx.city.bounds, a = Math.random() * 6.28; this.goal = [(B.x0 + B.x1) / 2 + Math.cos(a) * 1400, (B.z0 + B.z1) / 2 + Math.sin(a) * 1400]; this.state = 'dash'; this.leaving = true; }
   update(h) {
     this.t += h;
@@ -294,8 +296,8 @@ class Blur extends Villain {
       if (this.stuck > 3 && !this.player) this.breakFree();
     } else this.stuck = 0;
     if (this.state === 'rest') {
-      this.speed = 0;
-      if (!this.player && (this.carT = (this.carT ?? 3) - h) <= 0) { this.carT = 7; const foe = this.foe(), c = foe && this.nearCar(25); if (c) this.D.brawl.throwCar(c, this, foe); } // a car at the hero, at a hundred miles an hour
+      this.speed = 0; this.dazed = Math.max(0, (this.dazed || 0) - h);
+      if (!this.player && !this.dazed && (this.carT = (this.carT ?? 3) - h) <= 0) { this.carT = 7; const foe = this.foe(), c = foe && this.nearCar(25); if (c) this.D.brawl.throwCar(c, this, foe); } // a car at the hero, at a hundred miles an hour
       if ((this.restT -= h) <= 0 && !this.player) this.go(this.pick());
       return;
     }
@@ -355,6 +357,7 @@ class Blur extends Villain {
     this.place(); relax(r);
     const k = Math.min(1, this.speed / 14);
     if (k > 0.02) { run(r, this.ph, k); r.torso.rotation.x = 0.55 * k; r.body.rotation.x = 0.12 * k; r.head.rotation.x = -0.4 * k; }
+    else if (this.dazed > 0) { r.body.rotation.z = Math.sin(this.t * 4) * 0.12; r.torso.rotation.x = 0.35; r.head.rotation.set(0.3, Math.sin(this.t * 3) * 0.4, Math.sin(this.t * 6) * 0.3); for (const a of r.arms) { a.sh.rotation.set(-0.3, 0, a.sx * 0.5); a.el.rotation.set(-0.6, 0, 0); } } // seeing stars, swaying on his feet
     else { handsOnHips(r); r.torso.rotation.x = Math.sin(this.t * 1.6) * 0.02; r.head.rotation.y = Math.sin(this.t * 0.7) * 0.5; } // between runs, weighing up where to go next
     if (this.tossed || this.gripped || this.spinning) tumble(r, this.t, this.spinning);
     r.cape.update(dt, Math.min(1, this.speed / 35), Math.min(1, this.speed / 25) + 0.15); detail(r, this.D);

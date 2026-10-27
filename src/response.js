@@ -155,9 +155,10 @@ export class Responders {
         if (t) helis.strike(t.x, t.z, { radius: 25 });
       }
     }
-    // super villains, the giant worm and the kaiju, incoming meteors and missiles: the hero signal
+    // super villains, the giant worm and the kaiju, incoming meteors and missiles: the hero signal (the kaiju has the
+    // city to itself for a quarter of a minute first)
     if (!D.list.some(e => e.type === 'heroes' && e.alive && !e.leaving)) {
-      const th = D.list.find(e => e.alive && (e.type === 'villains' || (e.type === 'kaiju' && e.state !== 'leave') || (e.type === 'worm' && e.phase !== 'leave' && e.phase !== 'gone') || ((e.type === 'meteor' || e.type === 'nuclear') && (e.phase === 'warn' || e.phase === 'fall'))));
+      const th = D.list.find(e => e.alive && (e.type === 'villains' || (e.type === 'kaiju' && e.state !== 'leave' && e.t > 15) || (e.type === 'worm' && e.phase !== 'leave' && e.phase !== 'gone') || ((e.type === 'meteor' || e.type === 'nuclear') && (e.phase === 'warn' || e.phase === 'fall'))));
       if (th && this.ready('heroes', 20)) { const v = th.who ? th.who.find(w => !w.gone) : null; D.start('heroes', v ? v.x : th.x, v ? v.z : th.z); }
     }
     // radiation: a hazmat team to each zone (two out at once)
