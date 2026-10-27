@@ -9,7 +9,7 @@
 // meteor (Tempo slows it first) and carry it up into space; a big meteor is
 // broken up and its pieces go up too.
 import * as THREE from 'three';
-import { rig, relax, handsOnHips, tumble } from './villains.js';
+import { rig, relax, handsOnHips, tumble, detail } from './villains.js';
 import { tossStep } from './brawl.js';
 const up = (v) => v && !v.gone && !v.beaten;
 import { roofTop } from './tripod.js';
@@ -335,7 +335,7 @@ class Hero {
     this.pitch += (pitch - this.pitch) * Math.min(1, dt * 3); r.body.rotation.x = this.pitch; r.head.rotation.x = -this.pitch * 0.6;
     if (!this.landed && this.hs < 10) r.body.position.y = Math.sin(this.t * 2) * 0.2;
     if (this.tossed || this.gripped || this.spinning) tumble(r, this.t, this.spinning);
-    r.cape.update(dt, this.pitch > 0.5 ? 0.12 : Math.min(0.6, this.hs / 30), 0.3 + Math.min(0.7, this.hs / 20));
+    r.cape.update(dt, this.pitch > 0.5 ? 0.12 : Math.min(0.6, this.hs / 30), 0.3 + Math.min(0.7, this.hs / 20)); detail(r, this.D);
     if (this.wings) { const fl = this.landed ? 0 : 1; this.wings.forEach((w, i) => { w.rotation.z = fl ? Math.sin(this.t * 55 + i * 1.3) * 0.45 + 0.15 : -0.15; w.rotation.y = -(i < 2 ? 0.25 : 0.7) - (fl ? 0 : 0.6); }); }
     if (this.hands) for (const g of this.hands) g.visible = this.castT > 0;
   }
@@ -351,7 +351,7 @@ export function heroModel(name) {
     const w = new THREE.Mesh(K.wingGeo, K.wing); w.scale.setScalar(0.85); pv.add(w); wings.push(pv);
   }
   if (name === 'Tempo') for (const a of r.arms) { const g = new THREE.Mesh(K.sphere, K.glow); g.scale.setScalar(0.07); g.position.y = -0.3; a.el.add(g); }
-  let t = 0; r.root.userData.tick = (dt) => { t += dt; r.cape.update(dt, 0.12, 0.35); wings.forEach((w, i) => { w.rotation.z = Math.sin(t * 40 + i * 1.3) * 0.4 + 0.15; }); }; r.cape.update(0.1, 0.12, 0.35);
+  let t = 0; r.root.userData.tick = (dt) => { t += dt; r.cape.update(dt, 0.12, 0.35); wings.forEach((w, i) => { w.rotation.z = Math.sin(t * 40 + i * 1.3) * 0.4 + 0.15; }); }; r.cape.update(0.1, 0.12, 0.35); detail(r, null, true);
   return r.root;
 }
 

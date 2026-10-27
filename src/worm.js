@@ -8,6 +8,9 @@ import * as THREE from 'three';
 import { Hole, swallow } from './impact.js';
 import { cutGround } from './holes.js';
 import { scaly } from './skins.js';
+import { hideMaterial, sstep as ss } from './flesh.js';
+// the worm's hide: pale, so the sand and dark bands painted on it in vertex colour show through; creased pale flesh on the belly
+const SANDHIDE = { key: 'worm', dry: 0.28, scales: [[226, 214, 192], [212, 198, 174], [234, 224, 204], [200, 186, 160], [220, 206, 182]], gap: [120, 96, 72], base: [214, 190, 160], light: [232, 214, 188], bruise: [176, 146, 120], vein: [168, 128, 110], small: [222, 208, 184] };
 
 const LEN = 132, STEP = 1.2, NS = 112, RING = 22, R0 = 5.4, SHALLOW = -9, ARC_H = 38, SPEED = 13, MAXP = 3000; // a ring of RING vertices every STEP m along LEN m of body
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -26,9 +29,9 @@ function parts() {
     x.fillStyle = 'rgba(' + Math.round(70 * d * chunk) + ',' + Math.round(56 * d * chunk) + ',' + Math.round(42 * d * chunk) + ',' + (u > edge - 0.12 ? 0.75 : 1) + ')'; x.fillRect(px, py, 2, 2);
   }
   const tex = new THREE.CanvasTexture(c); tex.wrapT = THREE.RepeatWrapping; tex.colorSpace = THREE.SRGBColorSpace;
-  const skin = scaly('#ffffff', [4, 1], { rows: 4, cols: 4, bump: 3.2 }); skin.vertexColors = true; // banded by vertex colour
+  const skin = hideMaterial({ palette: SANDHIDE, normal: 1.5, rim: [0.035, 0.026, 0.016] }); // banded by vertex colour
   P = {
-    skin, scales: scaly('#cdb894', [3, 2], { rows: 4, cols: 5, bump: 3 }), inner: new THREE.MeshStandardMaterial({ color: '#5a1a14', roughness: 0.45, side: THREE.BackSide }),
+    skin, scales: hideMaterial({ palette: SANDHIDE, mask: 1, vertexColors: false, color: '#cdb894', repeat: 3, normal: 1.5, rim: [0.035, 0.026, 0.016] }), // the head in the same hide as the body inner: new THREE.MeshStandardMaterial({ color: '#5a1a14', roughness: 0.45, side: THREE.BackSide }),
     throatMat: new THREE.MeshStandardMaterial({ color: '#2a0e0c', roughness: 0.4, side: THREE.BackSide }),
     toothMat: new THREE.MeshStandardMaterial({ color: '#ece2c8', roughness: 0.45 }),
     petal: new THREE.SphereGeometry(1, 16, 10, 0, Math.PI * 2 / 3 - 0.05, 0, Math.PI / 2), // a third of a dome: three close over the mouth
@@ -41,7 +44,7 @@ function parts() {
 // the body: one continuous tube, rebuilt along the spine every frame (no separate pieces, so no seams)
 function tubeGeometry() {
   const g = new THREE.BufferGeometry(), V = NS * (RING + 1);
-  for (const [k, n] of [['position', 3], ['normal', 3], ['uv', 2], ['color', 3]]) g.setAttribute(k, new THREE.BufferAttribute(new Float32Array(V * n), n));
+  for (const [k, n] of [['position', 3], ['normal', 3], ['uv', 2], ['color', 3], ['aMask', 1]]) g.setAttribute(k, new THREE.BufferAttribute(new Float32Array(V * n), n));
   const idx = []; for (let i = 0; i < NS - 1; i++) for (let j = 0; j < RING; j++) { const a = i * (RING + 1) + j, b = a + RING + 1; idx.push(a, b, a + 1, b, b + 1, a + 1); } // wound to face outwards
   g.setIndex(idx); g.setDrawRange(0, 0);
   return g;
@@ -49,7 +52,7 @@ function tubeGeometry() {
 // S: spine samples from the head back, each { x, y, z, d (distance from the head) }; t: time, for the ripple
 function fillTube(g, S, t) {
   const n = S.length; if (n < 2) { g.setDrawRange(0, 0); return; }
-  const Pp = g.attributes.position.array, N = g.attributes.normal.array, U = g.attributes.uv.array, C = g.attributes.color.array;
+  const Pp = g.attributes.position.array, N = g.attributes.normal.array, U = g.attributes.uv.array, C = g.attributes.color.array, Mk = g.attributes.aMask.array;
   let nx = 0, ny = 1, nz = 0;
   for (let i = 0; i < n; i++) {
     const a = S[Math.max(0, i - 1)], b = S[Math.min(n - 1, i + 1)], s = S[i];
@@ -64,14 +67,14 @@ function fillTube(g, S, t) {
     for (let j = 0; j <= RING; j++) {
       const th = j / RING * Math.PI * 2, c = Math.cos(th), sn = Math.sin(th), ox = nx * c + bx * sn, oy = ny * c + by * sn, oz = nz * c + bz * sn, k = i * (RING + 1) + j;
       Pp[k * 3] = s.x + ox * r; Pp[k * 3 + 1] = s.y + oy * r; Pp[k * 3 + 2] = s.z + oz * r;
-      N[k * 3] = ox; N[k * 3 + 1] = oy; N[k * 3 + 2] = oz; U[k * 2] = j / RING; U[k * 2 + 1] = s.d / 9;
+      N[k * 3] = ox; N[k * 3 + 1] = oy; N[k * 3 + 2] = oz; U[k * 2] = j / RING * 4; U[k * 2 + 1] = s.d / 8.5; Mk[k] = 1 - ss(0.25, 0.7, -oy); // scales over the back and sides, bare creased flesh underneath
       const belly = sstep(0.2, 0.75, -oy) * (1 - dark) * 0.7, back = sstep(0.55, 0.95, oy) * 0.45 * (1 - dark), groove = 0.14 * Math.pow(0.5 - 0.5 * Math.cos(s.d * Math.PI * 2 / 2.6), 6);
       const dk = Math.min(1, dark + back), sh = 1 - groove;
       C[k * 3] = (SAND.r + (DARK.r - SAND.r) * dk + (BELLY.r - SAND.r) * belly) * sh; C[k * 3 + 1] = (SAND.g + (DARK.g - SAND.g) * dk + (BELLY.g - SAND.g) * belly) * sh; C[k * 3 + 2] = (SAND.b + (DARK.b - SAND.b) * dk + (BELLY.b - SAND.b) * belly) * sh;
     }
   }
   g.setDrawRange(0, (n - 1) * RING * 6);
-  for (const k of ['position', 'normal', 'uv', 'color']) g.attributes[k].needsUpdate = true;
+  for (const k of ['position', 'normal', 'uv', 'color', 'aMask']) g.attributes[k].needsUpdate = true;
 }
 // points every STEP m back along a path (newest point last), up to LEN m
 function spine(path, out) {

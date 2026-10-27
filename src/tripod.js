@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import { beamMesh } from './aliens.js';
 import { Splash, NOISE } from './water.js';
 import { ST, KIND } from './people.js';
+import { Body } from './flesh.js';
 
 const HEAD_Y = 40, MAX_Y = 80, HIP_R = 4, STANCE = 17, SEG = 18, TENT = 6;
 const STURDY = 26;
@@ -344,15 +345,39 @@ export class Tripod {
     }
   }
 
+  // close to the camera, the legs and tentacles are smooth tubes swept through the same joints (flesh.js); further off
+  // the chain of cylinders, which costs less and looks the same from there
+  smoothLegs(n) {
+    const cam = this.D.ctx.camera, near = cam.position.distanceToSquared(this.obj.position) < 400 * 400 && n === 3 * SEG + TENT * 6;
+    if (near && !this.smooth) {
+      const body = new Body(parts().skin);
+      for (let i = 0; i < 3; i++) body.add({ rings: 46, cols: 10, len: 60, radii: Array.from({ length: SEG + 1 }, (_, k) => 1.15 - (k / SEG) * 0.75), capStart: true, capEnd: true, pt: true, lumps: 0.02 });
+      for (let i = 0; i < TENT; i++) body.add({ rings: 12, cols: 6, len: 8, radii: Array.from({ length: 7 }, (_, k) => k === 6 ? 0 : 0.42 - (k / 6) * 0.3), capStart: true, capEnd: true, pt: true, lumps: 0 });
+      const mesh = body.build([0, 0, 0], 1); mesh.frustumCulled = false; this.D.ctx.scene.add(mesh);
+      this.smooth = { body, mesh };
+    }
+    if (!this.smooth) return;
+    this.smooth.mesh.visible = near; this.segs.visible = !near;
+    if (!near) return;
+    const pts = this._pts, B = this.smooth.body;
+    for (let i = 0; i < 3 + TENT; i++) {
+      const T = B.tubes[i], m = i < 3 ? SEG : 6, base = i < 3 ? i * SEG : 3 * SEG + (i - 3) * 6;
+      for (let k = 0; k <= m; k++) { const e = pts[base + Math.min(m - 1, k)], o = k < m ? 0 : 3; T.P[k].set(e[o], e[o + 1], e[o + 2]); }
+      T.update(0);
+    }
+    B.commit();
+  }
   sync(dt, realT) {
-    if (this.gone) { this.obj.visible = this.segs.visible = this.beam.visible = this.rayMesh.visible = false; return; }
+    if (this.gone) { this.obj.visible = this.segs.visible = this.beam.visible = this.rayMesh.visible = false; if (this.smooth) this.smooth.mesh.visible = false; return; }
     const P = this.obj, wreck = this.state === 'wreck' || this.state === 'fall';
     P.position.set(this.x, this.y, this.z);
     P.rotation.set(wreck ? Math.min(0.5, (this.ft || 0) * 0.25) : Math.sin(this.t * 1.3) * 0.04, -this.yaw, wreck ? Math.min(0.35, (this.ft || 0) * 0.15) : Math.cos(this.t * 1.1) * 0.03);
     // legs: a cubic curve from the hip, bowing out and up, down to the foot, rippling along its length
     const m = this._m, q = this._q, v = this._v, A = this._a;
     let n = 0;
+    const pts = this._pts || (this._pts = []); let np = 0; // every joint, for the smooth legs
     const put = (p0, p1, r) => {
+      if (!pts[np]) pts[np] = [0, 0, 0, 0, 0, 0]; const e = pts[np++]; e[0] = p0[0]; e[1] = p0[1]; e[2] = p0[2]; e[3] = p1[0]; e[4] = p1[1]; e[5] = p1[2];
       v.set(p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]); const len = v.length() || 0.01; v.multiplyScalar(1 / len);
       q.setFromUnitVectors(this._up, v);
       m.compose(this._p.set((p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2, (p0[2] + p1[2]) / 2), q, this._s.set(r, len * 1.18, r));
@@ -382,6 +407,7 @@ export class Tripod {
       }
     }
     this.segs.count = n; this.segs.instanceMatrix.needsUpdate = true;
+    this.smoothLegs(n);
     // the heat ray from the eye
     const R = this.ray;
     if (R && R.ex != null) {
@@ -410,7 +436,7 @@ export class Tripod {
   dispose() {
     const { scene, people } = this.D.ctx;
     for (const j of this.lift) if (people.st[j] === ST.EXT) people.fling(j, 0, 0, 0);
-    scene.remove(this.obj, this.segs, this.beam, this.rayMesh, this.gore.points);
+    scene.remove(this.obj, this.segs, this.beam, this.rayMesh, this.gore.points); if (this.smooth) { scene.remove(this.smooth.mesh); this.smooth.body.geo.dispose(); }
     this.segs.dispose(); this.beam.material.dispose(); this.glassMat.dispose(); this.meatMat.dispose(); this.chunks.dispose(); this.gore.points.geometry.dispose(); this.gore.mat.dispose();
   }
 }

@@ -74,10 +74,13 @@ function tex(data, srgb) {
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
   t.needsUpdate = true; return t;
 }
-const GREENS = [[40, 64, 34], [54, 70, 36], [30, 56, 44], [26, 40, 24], [46, 66, 30]];
-let TEX = null;
-export function hideTextures() {
-  if (TEX) return TEX;
+// the kaiju's colours: dark green scale plates, dark red flesh between and below. Another palette (the worm's) paints
+// the same hide in other colours
+export const RED_GREEN = { key: 'rg', scales: [[40, 64, 34], [54, 70, 36], [30, 56, 44], [26, 40, 24], [46, 66, 30]], gap: [76, 13, 15], base: [92, 18, 20], light: [130, 38, 34], bruise: [50, 12, 26], vein: [48, 10, 32], small: [50, 74, 40] };
+const TEX = new Map();
+export function hideTextures(pal = RED_GREEN) {
+  if (TEX.has(pal.key)) return TEX.get(pal.key);
+  const dry = pal.dry || 0, GREENS = pal.scales, [gr, gg, gb] = pal.gap, [b0r, b0g, b0b] = pal.base, [l0r, l0g, l0b] = pal.light, [brr, brg, brb] = pal.bruise, [vr, vg, vb] = pal.vein, [smr, smg, smb] = pal.small;
   const mot = field(4, 4, 11), mot2 = field(8, 3, 23), v1 = field(4, 4, 37), v2 = field(8, 3, 41), warp = field(4, 3, 53), fine = field(128, 1, 67);
   // the scale plates: domed, each rising towards its trailing edge so they lap like shingles; red flesh in the cracks between
   const G = 12, A = cells(G, 0.55, 5, 1.15), scol = new Uint8Array(N * N * 4), srgh = new Uint8Array(N * N * 4), sh = new Float32Array(N * N);
@@ -86,8 +89,8 @@ export function hideTextures() {
     sh[k] = (0.35 + 0.4 * dome + 0.25 * sg) * (1 - gap) + 0.04 * fine[k];
     const g = GREENS[Math.floor(hash(id, 3, 9) * GREENS.length)], lit = (0.7 + 0.4 * dome) * (0.55 + 0.45 * sstep(0, 0.22, e)) * (0.76 + 0.48 * mot[k]) * (0.92 + 0.16 * fine[k]) * (0.85 + 0.3 * hash(id, 5, 2));
     const deep = 0.4 + 0.6 * sstep(0, 0.19, e), i = k * 4;
-    scol[i] = g[0] * lit * (1 - gap) + 76 * deep * gap; scol[i + 1] = g[1] * lit * (1 - gap) + 13 * deep * gap; scol[i + 2] = g[2] * lit * (1 - gap) + 15 * deep * gap; scol[i + 3] = 255;
-    srgh[i + 1] = 255 * ((0.62 - 0.16 * dome + 0.12 * (mot2[k] - 0.5)) * (1 - gap) + 0.36 * gap); srgh[i + 3] = 255;
+    scol[i] = g[0] * lit * (1 - gap) + gr * deep * gap; scol[i + 1] = g[1] * lit * (1 - gap) + gg * deep * gap; scol[i + 2] = g[2] * lit * (1 - gap) + gb * deep * gap; scol[i + 3] = 255;
+    srgh[i + 1] = 255 * clamp01((0.62 - 0.16 * dome + 0.12 * (mot2[k] - 0.5) + dry) * (1 - gap) + (0.36 + dry * 1.6) * gap); srgh[i + 3] = 255;
   }
   // the bare flesh: mottled and bruised, veined, creased across, with a scattering of small scales
   const B = cells(24, 0.7, 13, 1), fcol = new Uint8Array(N * N * 4), frgh = new Uint8Array(N * N * 4), fh = new Float32Array(N * N);
@@ -96,29 +99,34 @@ export function hideTextures() {
     const vein = Math.max(1 - sstep(0.004, 0.02, Math.abs(v1[k] - 0.5)), 0.7 * (1 - sstep(0.003, 0.012, Math.abs(v2[k] - 0.5))));
     const crease = sstep(0.8, 0.97, 0.5 + 0.5 * Math.sin((y / N * 18 + warp[k] * 3) * TAU));
     const small = hash(B.ID[k], 1, 4) < 0.24 ? 1 - sstep(0.3, 0.42, B.F1[k]) : 0, d2 = 1 - Math.min(1, B.F1[k] / 0.42) ** 2;
-    let r = 92 + (130 - 92) * sstep(0.35, 0.75, m), g = 18 + (38 - 18) * sstep(0.35, 0.75, m), b = 20 + (34 - 20) * sstep(0.35, 0.75, m);
-    r += (50 - r) * br * 0.75; g += (12 - g) * br * 0.75; b += (26 - b) * br * 0.75;
-    r += (48 - r) * vein * 0.8; g += (10 - g) * vein * 0.8; b += (32 - b) * vein * 0.8;
+    const lm = sstep(0.35, 0.75, m); let r = b0r + (l0r - b0r) * lm, g = b0g + (l0g - b0g) * lm, b = b0b + (l0b - b0b) * lm;
+    r += (brr - r) * br * 0.75; g += (brg - g) * br * 0.75; b += (brb - b) * br * 0.75;
+    r += (vr - r) * vein * 0.8; g += (vg - g) * vein * 0.8; b += (vb - b) * vein * 0.8;
     const c = (1 - 0.4 * crease) * (0.9 + 0.12 * fine[k]);
     r *= c; g *= c; b *= c;
-    const sl = 0.8 + 0.35 * d2; r += (50 * sl - r) * small; g += (74 * sl - g) * small; b += (40 * sl - b) * small;
+    const sl = 0.8 + 0.35 * d2; r += (smr * sl - r) * small; g += (smg * sl - g) * small; b += (smb * sl - b) * small;
     const i = k * 4; fcol[i] = r; fcol[i + 1] = g; fcol[i + 2] = b; fcol[i + 3] = 255;
     fh[k] = 0.5 + 0.12 * m + 0.3 * vein - 0.4 * crease + 0.25 * d2 * small + 0.05 * fine[k];
-    frgh[i + 1] = 255 * clamp01(0.56 + 0.16 * (m - 0.5) - 0.14 * vein + 0.12 * crease - 0.06 * small); frgh[i + 3] = 255;
+    frgh[i + 1] = 255 * clamp01(0.56 + dry + 0.16 * (m - 0.5) - 0.14 * vein + 0.12 * crease - 0.06 * small); frgh[i + 3] = 255;
   }
-  TEX = { scaleCol: tex(scol, true), scaleNrm: tex(normalMap(sh, 7), false), scaleRgh: tex(srgh, false), fleshCol: tex(fcol, true), fleshNrm: tex(normalMap(fh, 5), false), fleshRgh: tex(frgh, false) };
-  return TEX;
+  const T = { scaleCol: tex(scol, true), scaleNrm: tex(normalMap(sh, 7), false), scaleRgh: tex(srgh, false), fleshCol: tex(fcol, true), fleshNrm: tex(normalMap(fh, 5), false), fleshRgh: tex(frgh, false) };
+  TEX.set(pal.key, T);
+  return T;
 }
 // the hide material: scales where aMask is 1, flesh where it is 0; vertex colours for creases and claws; a rim of
-// red light at the silhouette, scaled by the ambient light, standing in for light scattering through the skin
+// red light at the silhouette, scaled by the ambient light, standing in for light scattering through the skin.
+// o.mask: one value for the whole mesh instead of the aMask attribute; o.vertexColors false and o.color for a mesh
+// without colours; o.repeat: the scales that many times smaller (the maps cloned, sharing their pixels)
 export function hideMaterial(o = {}) {
-  const T = hideTextures();
-  const m = new THREE.MeshStandardMaterial({ map: T.scaleCol, normalMap: T.scaleNrm, roughnessMap: T.scaleRgh, roughness: 1, metalness: 0, vertexColors: true, normalScale: new THREE.Vector2(o.normal ?? 1.3, o.normal ?? 1.3) });
+  const T0 = hideTextures(o.palette), rep = o.repeat || 1;
+  const T = rep === 1 ? T0 : Object.fromEntries(Object.entries(T0).map(([k, t]) => { const c = t.clone(); c.repeat.set(rep, rep); c.needsUpdate = true; return [k, c]; }));
+  const cm = o.mask, vc = o.vertexColors ?? true;
+  const m = new THREE.MeshStandardMaterial({ color: o.color ?? '#ffffff', map: T.scaleCol, normalMap: T.scaleNrm, roughnessMap: T.scaleRgh, roughness: 1, metalness: 0, vertexColors: vc, normalScale: new THREE.Vector2(o.normal ?? 1.3, o.normal ?? 1.3) });
   const rim = { value: new THREE.Color(...(o.rim ?? [0.07, 0.012, 0.01])) };
   const nm = THREE.ShaderChunk.normal_fragment_maps.replace('vec3 mapN = texture2D( normalMap, vNormalMapUv ).xyz * 2.0 - 1.0;', 'vec3 mapN = mix( texture2D( fleshNrm, vNormalMapUv ).xyz, texture2D( normalMap, vNormalMapUv ).xyz, vMask ) * 2.0 - 1.0;');
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, { fleshMap: { value: T.fleshCol }, fleshNrm: { value: T.fleshNrm }, fleshRgh: { value: T.fleshRgh }, rimCol: rim });
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float aMask;\nvarying float vMask;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvMask = aMask;');
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\n' + (cm == null ? 'attribute float aMask;\n' : '') + 'varying float vMask;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvMask = ' + (cm == null ? 'aMask' : cm.toFixed(3)) + ';');
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', '#include <common>\nuniform sampler2D fleshMap;\nuniform sampler2D fleshNrm;\nuniform sampler2D fleshRgh;\nuniform vec3 rimCol;\nvarying float vMask;')
       .replace('#include <map_fragment>', 'diffuseColor *= mix( texture2D( fleshMap, vMapUv ), texture2D( map, vMapUv ), vMask );')
@@ -128,9 +136,22 @@ export function hideMaterial(o = {}) {
         'float ambL = dot( reflectedLight.indirectDiffuse, vec3( 0.299, 0.587, 0.114 ) ) / max( dot( diffuseColor.rgb, vec3( 0.299, 0.587, 0.114 ) ), 0.03 );\n' +
         'outgoingLight += rimCol * rimF * min( ambL, 3.0 );\n#include <opaque_fragment>');
   };
-  m.customProgramCacheKey = () => 'hide-1';
+  m.customProgramCacheKey = () => 'hide-1-' + (o.palette ? o.palette.key : 'rg') + (cm == null ? '' : '-m' + cm);
   m.userData.rim = rim;
   return m;
+}
+
+// sweep every tube of a body through its rig: control points given as [object, x, y, z] in that object's space
+// (tube.src) and an up direction as [object or null, x, y, z] (tube.refSrc), all brought into space's own space
+const _sinv = new THREE.Matrix4();
+export function sweepTubes(space, body, time = 0) {
+  _sinv.copy(space.matrixWorld).invert();
+  for (const T of body.tubes) {
+    if (T.src) T.src.forEach(([obj, x, y, z], i) => T.P[i].set(x, y, z).applyMatrix4(obj.matrixWorld).applyMatrix4(_sinv));
+    if (T.refSrc) { const [ro, rx, ry, rz] = T.refSrc; T.ref.set(rx, ry, rz); if (ro) T.ref.transformDirection(ro.matrixWorld).transformDirection(_sinv); }
+    T.update(time);
+  }
+  body.commit();
 }
 
 // One mesh holding many tubes. Add the tubes, build(), then each frame set each tube's control points (tube.P,

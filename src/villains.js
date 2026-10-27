@@ -12,8 +12,10 @@ import { Splash } from './water.js';
 import { ST } from './people.js';
 import { roofTop } from './tripod.js';
 import { tossStep } from './brawl.js';
+import { Body, sweepTubes } from './flesh.js';
 
 const S = 2.2; // a villain stands a bit over twice as tall as a person, so you can pick them out from above
+const NEAR = 330; // closer than this to the camera, a figure has its smooth body
 const G = 9.8, HANDS = 4.9; // gravity; hands raised overhead, metres above the feet
 const DRIVE = 0, REST = 2, EXT = 4, AIR = 5; // car modes (traffic.js)
 const now = () => performance.now();
@@ -80,7 +82,7 @@ class Cape {
 // a figure about 1.8 m tall (before scaling) facing +z, feet at the origin; every limb a pivot
 export function rig(o = {}) {
   const m = kit(), mt = o.mats || m, root = new THREE.Group(), body = new THREE.Group(); root.add(body); body.scale.setScalar(S);
-  const part = (g, mat, sx, sy, sz, x, y, z, parent) => { const me = new THREE.Mesh(g, mat); me.scale.set(sx, sy, sz); me.position.set(x, y, z); me.castShadow = true; parent.add(me); return me; };
+  const parts = [], part = (g, mat, sx, sy, sz, x, y, z, parent) => { const me = new THREE.Mesh(g, mat); me.scale.set(sx, sy, sz); me.position.set(x, y, z); me.castShadow = true; parent.add(me); parts.push(me); return me; };
   const pivot = (parent, x, y, z) => { const p = new THREE.Group(); p.position.set(x, y, z); parent.add(p); return p; };
   const hips = pivot(body, 0, 0.94, 0);
   const sl = o.slim ? 0.88 : 1;
@@ -98,9 +100,9 @@ export function rig(o = {}) {
   const head = pivot(torso, 0, 0.7, 0);
   part(m.ball, mt.skin, 0.11, 0.13, 0.115, 0, 0, 0, head);
   part(m.ball, mt.hair, 0.117, 0.085, 0.122, 0, 0.055, -0.014, head); // the hair
-  if (o.longHair) part(m.box, mt.hair, 0.12, 0.26, 0.06, 0, -0.1, -0.1, head); // a long ponytail down the back
+  if (o.longHair) part(m.box, mt.hair, 0.12, 0.26, 0.06, 0, -0.1, -0.1, head).userData.keep = true; // a long ponytail down the back
   part(m.box, mt.skin, 0.06, 0.08, 0.06, 0, -0.13, 0, head); // neck
-  const eyes = o.eyes ? [-1, 1].map(sx => part(m.ball, mt.eye || m.eye, 0.024, 0.02, 0.016, sx * 0.042, 0.015, 0.104, head)) : null;
+  const eyes = o.eyes ? [-1, 1].map(sx => { const e = part(m.ball, mt.eye || m.eye, 0.024, 0.02, 0.016, sx * 0.042, 0.015, 0.108, head); e.userData.keep = true; return e; }) : null;
   const arms = [];
   (o.arms === 6 ? [0.48, 0.34, 0.2] : [0.48]).forEach((y, row) => {
     for (const sx of [-1, 1]) {
@@ -110,7 +112,42 @@ export function rig(o = {}) {
     }
   });
   const cape = new Cape(torso, o.capeLen ?? 1.15, mt.cape);
-  return { root, body, hips, torso, head, legs, arms, eyes, cape };
+  return { root, body, hips, torso, head, legs, arms, eyes, cape, parts, mt, o };
+}
+// the close-up body: smooth tubes swept through the same joints (flesh.js), each part in its own colour - a suit with
+// a belt and an emblem, boots, gloves, a head with hair over the crown. Built the first time a figure comes near
+function smoothBody(r) {
+  const mt = r.mt, o = r.o, sl = o.slim ? 0.88 : 1, col = (mm, d = [1, 1, 1]) => (mm && mm.color ? [mm.color.r, mm.color.g, mm.color.b] : d);
+  const suit = col(mt.suit), skin = col(mt.skin), boot = col(mt.boot || mt.suit), glove = col(mt.glove || mt.skin), hair = col(mt.hair), belt = mt.belt ? col(mt.belt) : null, badge = mt.badge ? col(mt.badge) : null;
+  const body = new Body(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: mt.suit.roughness ?? 0.45, metalness: mt.suit.metalness ?? 0.05 }));
+  const T = (q, pts, ref) => { const t = body.add({ lumps: 0, tile: 0.3, ...q }); t.src = pts; t.refSrc = ref; };
+  const H = r.hips, Tq = r.torso, Hd = r.head;
+  T({ rings: 16, cols: 14, len: 0.8, radii: [0.12, 0.15, 0.14, 0.17, 0.21, 0.1].map(v => v * sl), bulge: [0, 0, 0.012, 0.01, 0], capStart: true, capEnd: true, shape: (u, c, s) => 1 / Math.sqrt((c / 0.62) ** 2 + s * s),
+    tint: (u, c, s) => (belt && u > 0.24 && u < 0.3 ? belt : badge && c > 0.75 && u > 0.6 && u < 0.72 && Math.abs(s) < 0.4 ? badge : suit) },
+    [[H, 0, -0.08, 0], [H, 0, 0.02, 0], [Tq, 0, 0.12, 0], [Tq, 0, 0.32, 0], [Tq, 0, 0.5, 0], [Tq, 0, 0.6, 0]], [Tq, 0, 0, 1]);
+  T({ rings: 14, cols: 12, len: 0.4, radii: [0.05, 0.045, 0.085, 0.112, 0.06], capStart: true, capEnd: true, shape: (u, c, s) => 1 / Math.sqrt((c / 1.05) ** 2 + (s / 0.93) ** 2),
+    tint: (u, c) => (u > 0.72 || (u > 0.5 && c < -0.2) ? hair : skin) }, // hair over the crown and down the back
+    [[Tq, 0, 0.58, 0], [Hd, 0, -0.12, 0], [Hd, 0, -0.06, 0.012], [Hd, 0, 0.03, 0], [Hd, 0, 0.14, -0.01]], [Hd, 0, 0, 1]);
+  for (const L of r.legs) {
+    const sx = Math.sign(L.hip.position.x) || 1;
+    T({ rings: 16, cols: 10, len: 1.0, radii: [0.085 * sl, 0.08 * sl, 0.058 * sl, 0.045, 0.045, 0.035], bulge: [0, 0.014, 0.012, 0, 0], capStart: true, capEnd: true, tint: (u) => (u > 0.72 ? boot : suit) },
+      [[H, sx * 0.06, 0.02, 0], [L.hip, 0, 0, 0], [L.knee, 0, 0, 0], [L.knee, 0, -0.4, 0], [L.knee, 0, -0.45, 0.06], [L.knee, 0, -0.46, 0.15]], [H, 0, 0, 1]);
+  }
+  for (const A of r.arms) {
+    T({ rings: 14, cols: 9, len: 0.75, radii: [0.07 * sl, 0.058 * sl, 0.046 * sl, 0.04, 0.045, 0], bulge: [0, 0.01, 0.008, 0, 0], capStart: true, capEnd: true, tint: (u) => (u > 0.8 ? glove : suit) },
+      [[Tq, A.sx * 0.13 * sl, A.sh.position.y, 0], [A.sh, 0, 0, 0], [A.el, 0, 0, 0], [A.el, 0, -0.26, 0], [A.el, 0, -0.31, 0], [A.el, 0, -0.36, 0]], [Tq, 0, 0, 1]);
+  }
+  const mesh = body.build([0, 1, 0], 2.2); mesh.visible = false; r.body.add(mesh);
+  return { body, mesh };
+}
+// close up (or always, for the roster) the smooth body; further off the boxy figure, a few pixels tall, where the
+// extra detail would cost frames and show nothing. Call after the pose is set
+export function detail(r, D, always = false) {
+  const cam = D && D.ctx.camera, near = always || (cam && cam.position.distanceToSquared(r.root.position) < NEAR * NEAR);
+  if (near && !r.smooth) r.smooth = smoothBody(r);
+  if (!r.smooth) return;
+  if (near !== !!r.smoothOn) { r.smoothOn = near; r.smooth.mesh.visible = near; for (const p of r.parts) if (!p.userData.keep) p.visible = !near; }
+  if (near) { r.root.updateMatrixWorld(true); sweepTubes(r.body, r.smooth.body); }
 }
 // a hand's place in the world (call after the pose is set and the matrices updated)
 export const handAt = (arm, out) => arm.el.localToWorld(out.set(0, -0.3, 0));
@@ -214,7 +251,7 @@ export function villainModel(name) {
     for (const L of r.legs) L.knee.rotation.x = 2.0;
     for (const a of r.arms) { a.sh.rotation.set(-0.7 + a.row * 0.55, 0, a.sx * (0.95 + a.row * 0.2)); a.el.rotation.set(-1.0, 0, -a.sx * 0.3); }
   } else handsOnHips(r);
-  r.root.userData.tick = (dt) => r.cape.update(dt, 0.12, 0.35); r.cape.update(0.1, 0.12, 0.35);
+  r.root.userData.tick = (dt) => r.cape.update(dt, 0.12, 0.35); r.cape.update(0.1, 0.12, 0.35); detail(r, null, true);
   return r.root;
 }
 
@@ -320,7 +357,7 @@ class Blur extends Villain {
     if (k > 0.02) { run(r, this.ph, k); r.torso.rotation.x = 0.55 * k; r.body.rotation.x = 0.12 * k; r.head.rotation.x = -0.4 * k; }
     else { handsOnHips(r); r.torso.rotation.x = Math.sin(this.t * 1.6) * 0.02; r.head.rotation.y = Math.sin(this.t * 0.7) * 0.5; } // between runs, weighing up where to go next
     if (this.tossed || this.gripped || this.spinning) tumble(r, this.t, this.spinning);
-    r.cape.update(dt, Math.min(1, this.speed / 35), Math.min(1, this.speed / 25) + 0.15);
+    r.cape.update(dt, Math.min(1, this.speed / 35), Math.min(1, this.speed / 25) + 0.15); detail(r, this.D);
   }
   dispose() { super.dispose(); this.trail.dispose(this.V.scene); }
 }
@@ -615,7 +652,7 @@ class Tyrant extends Villain {
     this.pitch += (pitch - this.pitch) * Math.min(1, dt * 3); r.body.rotation.x = this.pitch; r.head.rotation.x = -this.pitch * 0.6;
     if (flying) r.body.position.y = Math.sin(this.t * 2) * 0.25;
     if (this.tossed || this.gripped || this.spinning) tumble(r, this.t, this.spinning);
-    r.cape.update(dt, this.pitch > 0.5 ? 0.12 : Math.min(0.6, this.hs / 30), 0.3 + Math.min(0.7, this.hs / 20));
+    r.cape.update(dt, this.pitch > 0.5 ? 0.12 : Math.min(0.6, this.hs / 30), 0.3 + Math.min(0.7, this.hs / 20)); detail(r, this.D);
     const R = this.ray;
     if (R && r.eyes) {
       r.root.updateMatrixWorld(true);
@@ -837,7 +874,7 @@ class Weaver extends Villain {
     }
     if (!hanging && this.yanked && !this.yanked.car.gone) { r.root.updateMatrixWorld(true); handAt(A[1], _w); const c = this.yanked.car; aim(this.line, _w.x, _w.y, _w.z, c.x, (c.y || 0) + 1, c.z, 0.07); this.line.visible = true; }
     if (this.tossed || this.gripped || this.spinning) tumble(r, this.t, this.spinning);
-    r.cape.update(dt, Math.min(0.85, this.speed / 30), 0.2 + Math.min(0.8, this.speed / 25));
+    r.cape.update(dt, Math.min(0.85, this.speed / 30), 0.2 + Math.min(0.8, this.speed / 25)); detail(r, this.D);
   }
   dispose() { super.dispose(); this.V.scene.remove(this.line); for (const w of this.webs) { w.release(); w.dispose(); } this.webs.length = 0; }
 }
