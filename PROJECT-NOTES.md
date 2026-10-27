@@ -238,6 +238,9 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 - Rust patches are now 14 cm raised slabs, garden lawns sit in 32 cm planters, cornices stop 8 cm under the roof. The camera near plane follows the zoom (max(10, 0.2 x distance), main.js), about 9-22x more depth precision. Same RNG order, so the city layout is unchanged.
 - Rule: keep any flat detail at least ~10 cm off the surface under it, never coplanar.
 
+## Sandbox zombies in the Disasters menu
+- The Shambler button is gone from the bottom bar. "Zombies · N" is the first entry in the Disasters menu: pick it and every tap on a street drops a Shambler until the 3 run out or you tap Done. A tap with nothing picked only shows a hint.
+
 ## Next
 - Sean tests v1.3 on his phone; tune from his notes. Candidates: Be The Disaster score scales and ranks once real scores come in, the saucer size at close zoom, how often zombie outbreaks turn up in Commander, incident pacing, card bar height on the phone.
 

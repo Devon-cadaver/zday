@@ -98,6 +98,8 @@ const CSS = `
 #zd-dis .g.w{grid-template-columns:repeat(4,1fr);margin-bottom:0}
 #zd-dis .zd-btn{padding:10px 4px;min-width:0;font-size:11px;letter-spacing:.03em;text-transform:none}
 #zd-dis .zd-btn.sel{border-color:#a6ff4d;color:#a6ff4d}
+#zd-dis .zd-btn.zb{color:#a6ff4d;border-color:rgba(166,255,77,.35)}
+#zd-dis .zd-btn.zb.empty{opacity:.5}
 #zd-disb.on{border-color:#ff9a5a;color:#ffb070}
 @media (prefers-reduced-motion: reduce){#zd-toast{transition:none}}
 `;
@@ -365,24 +367,28 @@ class Sandbox {
       h: g.addPill('zd-h', 'Humans'), i: g.addPill('zd-i', 'Infected'), z: g.addPill('zd-z', 'Zombies'), d: g.addPill('zd-d', 'Dead'),
       clock: g.addPill('', '', 'zd-clock'),
     };
-    this.el.drop = g.addButton('zd-drop', 'Shambler <span class="n" id="zd-n">3</span>', () => g.toast(this.dropsLeft > 0 ? 'Tap any street on the map to drop it' : 'No Shamblers left. Tap Reset to start over'));
-    this.el.n = this.el.drop.querySelector('#zd-n');
     g.followBtn = g.addButton('zd-find', 'Follow', () => g.cycleFollow());
     g.addSpeedButton();
     this.disBtn = g.addButton('zd-disb', 'Disasters', () => {
-      if (this.pending) { this.pending = null; this.gauge.cancel(); this.close(); g.toast('Cancelled'); return; } // the button cancels a disaster waiting to be placed
+      if (this.pending) { const was = this.pending; this.pending = null; this.gauge.cancel(); this.close(); g.toast(was === 'zombies' ? 'Done dropping zombies' : 'Cancelled'); return; } // the button cancels a disaster waiting to be placed
       this.panel.style.bottom = (g.bar.offsetHeight + 8) + 'px'; this.panel.hidden = !this.panel.hidden; this.disBtn.classList.toggle('on', !this.panel.hidden); });
     g.addButton('zd-reset', 'Reset', () => this.reset());
     g.addButton('zd-menu-btn', 'Menu', () => { location.href = location.pathname; });
     this.buildPanel(); this.bindHold();
     this.dropsLeft = START_DROPS; this.clock = -1; this.milestone = 0;
-    g.toast('Tap a street to drop a Shambler zombie', 4500);
+    g.toast('Open Disasters to drop zombies or unleash a disaster', 4500);
   }
   buildPanel() {
     const g = this.g, d = document.createElement('div'); d.id = 'zd-dis'; d.hidden = true;
-    d.innerHTML = '<div class="h">Disasters</div><div class="g">' + Object.keys(HAZARDS).map(h => '<button class="zd-btn" type="button" data-hz="' + h + '">' + HAZARDS[h].name + '</button>').join('') + '</div>' +
+    d.innerHTML = '<div class="h">Disasters</div><div class="g"><button class="zd-btn zb" type="button" data-zb>Zombies · ' + START_DROPS + '</button>' + Object.keys(HAZARDS).map(h => '<button class="zd-btn" type="button" data-hz="' + h + '">' + HAZARDS[h].name + '</button>').join('') + '</div>' +
       '<div class="h">Weather</div><div class="g w">' + Object.keys(WEATHER).map(w => '<button class="zd-btn" type="button" data-wx="' + w + '">' + WEATHER[w].name.replace('Thunderstorm', 'Storm') + '</button>').join('') + '</div>';
-    document.body.appendChild(d); this.panel = d;
+    document.body.appendChild(d); this.panel = d; this.zbBtn = d.querySelector('[data-zb]');
+    this.zbBtn.onclick = () => { // armed until the Shamblers run out or you tap Done: every tap on a street drops one
+      if (this.dropsLeft <= 0) { g.toast('No Shamblers left. Tap Reset to start over'); return; }
+      this.pending = 'zombies'; d.querySelectorAll('[data-hz]').forEach(o => o.classList.remove('sel'));
+      this.panel.hidden = true; this.zombieLabel();
+      g.toast('Tap streets to drop Shambler zombies (' + this.dropsLeft + ' left)', 4000);
+    };
     d.querySelectorAll('[data-hz]').forEach(b => { b.onclick = () => {
       const h = b.dataset.hz;
       if (HAZARDS[h].tap) { // out of the way so you can see where it goes
@@ -395,6 +401,10 @@ class Sandbox {
       g.disasters.start(h); this.close(); if (this.clock < 0) this.clock = 0;
     }; });
     d.querySelectorAll('[data-wx]').forEach(b => { b.onclick = () => { g.disasters.weather.set(b.dataset.wx); g.toast('Weather: ' + WEATHER[b.dataset.wx].name); this.close(); }; });
+  }
+  zombieLabel() {
+    if (this.zbBtn) { this.zbBtn.textContent = 'Zombies · ' + this.dropsLeft; this.zbBtn.classList.toggle('empty', this.dropsLeft <= 0); }
+    if (this.pending === 'zombies') this.disBtn.textContent = 'Done · ' + this.dropsLeft + ' left';
   }
   close() { this.panel.hidden = true; this.disBtn.classList.remove('on'); this.disBtn.textContent = 'Disasters'; if (!this.gauge.active) this.g.controls.enabled = true; }
   // meteors, tornadoes, black holes, volcanoes, sinkholes and warheads: press, hold to size it (drag to aim), let go and it lands
@@ -420,24 +430,26 @@ class Sandbox {
   tap(x, z) {
     const g = this.g;
     if (this.gauge.active || performance.now() < (this.noTapUntil || 0)) return; // that press was sizing a disaster
+    if (this.pending === 'zombies') {
+      const i = g.people.drop(x, z);
+      if (i < 0) { g.toast('Too far from a street. Tap closer to a road'); return; }
+      this.dropsLeft--; if (this.clock < 0) this.clock = 0;
+      if (this.dropsLeft <= 0) { this.pending = null; this.close(); g.toast('That was the last Shambler'); }
+      this.zombieLabel();
+      return;
+    }
     if (this.pending) {
       const h = this.pending; this.pending = null; this.panel.querySelectorAll('[data-hz]').forEach(o => o.classList.remove('sel'));
       g.disasters.start(h, x, z); this.close(); if (this.clock < 0) this.clock = 0;
       return;
     }
-    if (this.dropsLeft <= 0) { g.toast('No Shamblers left. Tap Reset to start over'); return; }
-    const i = g.people.drop(x, z);
-    if (i < 0) { g.toast('Too far from a street. Tap closer to a road'); return; }
-    this.dropsLeft--;
-    this.el.n.textContent = this.dropsLeft;
-    this.el.drop.classList.toggle('empty', this.dropsLeft <= 0);
-    if (this.clock < 0) this.clock = 0;
+    if (performance.now() > (this.hintAt || 0)) { this.hintAt = performance.now() + 5000; g.toast('Open Disasters to drop zombies or unleash a disaster'); }
   }
   reset() {
     this.g.resetWorld();
-    this.dropsLeft = START_DROPS; this.el.n.textContent = START_DROPS; this.el.drop.classList.remove('empty');
+    this.dropsLeft = START_DROPS; if (this.pending === 'zombies') { this.pending = null; this.close(); } this.zombieLabel();
     this.clock = -1; this.milestone = 0;
-    this.g.toast('City reset. Tap a street to drop a Shambler');
+    this.g.toast('City reset. Open Disasters to drop zombies or unleash a disaster');
   }
   phase() { return (Math.max(0, this.clock) / 600) % 1; }
   update(sdt, dt) {
