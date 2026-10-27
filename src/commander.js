@@ -101,7 +101,7 @@ export class Commander {
     if (g.helis) g.helis.doubleDrop = this.pr.has('doubledrop');
     for (const o of [...(this.works || []), ...(this.camps || []), ...(this.hazmats || [])]) o.dispose();
     this.works = []; this.camps = []; this.hazmats = []; this.buildTo = new Set();
-    this.rebuiltN = 0; this.crews = 0; this.campsSent = 0; this.sheltered = 0; this.hazSent = 0; this.cleanups = 0; this.jailBuses = 0; this.heroCalls = 0;
+    this.rebuiltN = 0; this.crews = 0; this.campsSent = 0; this.sheltered = 0; this.hazSent = 0; this.cleanups = 0; this.jailBuses = 0; this.heroCalls = 0; this.villainsBeaten = 0;
     g.resetWorld(); g.setSpeed(1);
     this.t = 0; this.rp = START_RP; this.earned = 0; this.alert = 0; this.blocksInf = 0; this.fires = 0; this.ended = false;
     this.sel = null; this.cool = {}; for (const u of UNITS) this.cool[u.id] = 0;
@@ -518,7 +518,9 @@ export class Commander {
     if (e.type === 'saucerdown') { this.saucers++; this.rp += 500; this.earned += 500; }
     if (e.type === 'tripoddown') { this.tripods = (this.tripods || 0) + 1; this.rp += 800; this.earned += 800; }
     if (e.type === 'riotend' && e.broken) { this.riotsBroken++; this.rp += 100; this.earned += 100; }
+    if (e.type === 'villainbeaten') { this.villainsBeaten++; this.rp += 300; this.earned += 300; }
     if (e.type === 'warn') {
+      if (e.hazard === 'villains' && !this.ended) setTimeout(() => this.g.toast(this.cards.heroes ? 'Only the super heroes can beat them: use the Hero signal' : 'Police cannot stop them. Hold out until they leave', 4500), 4500);
       this.alertFloor = Math.max(this.alertFloor, e.hazard === 'aliens' || e.hazard === 'volcano' || e.hazard === 'meteor' || e.hazard === 'nuclear' || e.hazard === 'meltdown' || e.hazard === 'blackhole' ? 3 : e.hazard === 'riot' ? 1 : 2); // disasters open up the units you need
       if (e.x != null && !this.ended) { this.report(e.x, e.z, e.text, e.r || 60, e.exact); return true; }
     }
@@ -662,7 +664,7 @@ export class Commander {
       ['Incidents', this.hit.map(threatName).join(', ') || 'none'],
       ...(this.hit.some(h => h !== 'zombies') ? [['Killed by disasters', (s.disasterCiv + s.drowned).toLocaleString()]] : []),
       ...(s.arrests ? [['Rioters arrested / taken away', s.arrests + ' / ' + s.jailed]] : []),
-      ...(this.heroCalls ? [['Hero signals', this.heroCalls]] : []),
+      ...(this.heroCalls || this.hit.includes('villains') ? [['Hero signals / villains beaten', this.heroCalls + ' / ' + this.villainsBeaten]] : []),
       ...(this.crews || this.campsSent || this.hazSent ? [['Buildings rebuilt', this.rebuiltN], ['Sheltered in camps / bites treated', this.sheltered + ' / ' + s.treated], ['Hazmat clean-ups', this.cleanups]] : []),
       ...(this.hit.includes('aliens') ? [['Saucers / tripods downed', this.saucers + ' / ' + (this.tripods || 0)], ['Aliens killed', s.aliensKilled], ['Abducted', s.abducted]] : []),
       ['Time', Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0')],

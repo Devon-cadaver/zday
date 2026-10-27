@@ -264,6 +264,10 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 - Villains.beat(v, hero): v.leave() with a toast; the Villains event ends when all are gone. Heroes leave after 40 s with nothing to do. Commander.quiet() ignores the heroes event.
 - Hero look: peach skin, white suit, boots and cape, gold belt and chest emblem (rig() in villains.js now takes mats, slim, longHair).
 
+## Unlocks page
+- Units are listed by unlock level with a one-line description each (UNIT_DESC in game.js); the hero signal row is "Super heroes (hero signal)" (L4).
+- Super villains are a Commander threat from level 5 (HAZARD_LEVEL.villains) with a hint that only the heroes can beat them; each villain beaten is +300 pts.
+
 ## Next
 - Sean tests v1.3 on his phone; tune from his notes. Candidates: Be The Disaster score scales and ranks once real scores come in, the saucer size at close zoom, how often zombie outbreaks turn up in Commander, incident pacing, card bar height on the phone.
 

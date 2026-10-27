@@ -9,7 +9,7 @@ export const MAX_LEVEL = LEVELS.length;
 export const UNLOCK = { build: 1, camp: 2, hazmat: 3, heroes: 4, police: 1, bus: 1, chaser: 2, boat: 2, fire: 2, seeder: 3, water: 3, rescue: 3, apc: 4, strike: 5, nuke: 6 };
 
 // level from which each kind of incident and weather can turn up in a Commander round
-export const HAZARD_LEVEL = { zombies: 1, quake: 1, riot: 1, flood: 2, sinkhole: 2, tornado: 3, coldwave: 3, tsunami: 4, haboob: 4, aliens: 5, solar: 6, volcano: 7, meteor: 8, nuclear: 9, meltdown: 10, blackhole: 11 };
+export const HAZARD_LEVEL = { zombies: 1, quake: 1, riot: 1, flood: 2, sinkhole: 2, tornado: 3, coldwave: 3, tsunami: 4, haboob: 4, aliens: 5, villains: 5, solar: 6, volcano: 7, meteor: 8, nuclear: 9, meltdown: 10, blackhole: 11 };
 export const WEATHER_LEVEL = { clear: 1, rain: 2, fog: 2, storm: 4, snow: 4, heat: 5, sand: 5 };
 
 // Be The Disaster: the level at which each disaster can be played

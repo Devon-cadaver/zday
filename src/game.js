@@ -109,7 +109,13 @@ const CSS = `
 @media (prefers-reduced-motion: reduce){#zd-toast{transition:none}}
 `;
 
-const UNIT_NAMES = { heroes: 'Hero signal', build: 'Construction crew', camp: 'Medical camp', hazmat: 'Hazmat team', police: 'Police cruiser', bus: 'Evacuation bus', chaser: 'Storm chaser', seeder: 'Cloud seeder', boat: 'Rescue boat', fire: 'Fire truck', water: 'Water helicopter', rescue: 'Rescue helicopter', apc: 'Army APC', strike: 'Airstrike', nuke: 'Nuke' };
+// what each unit does, for the unlocks page
+const UNIT_DESC = { police: 'Officers who fight zombies and arrest rioters', bus: 'Takes people out of a dangerous street', build: 'Rebuilds a fallen building', camp: 'Shelters people nearby until the rebuilding is done',
+  chaser: 'Spots tornadoes and aliens and calls in help', boat: 'Pulls people out of flood water', fire: 'Puts out burning buildings', hazmat: 'Clears radiation so rebuilding can start', seeder: 'Weakens tornadoes and breaks up storms',
+  water: 'Drops water on a fire', rescue: 'Lifts survivors off a rooftop', heroes: 'Dragonfly, Nova and Tempo: they beat super villains and throw meteors and missiles into space',
+  apc: 'A squad of soldiers to hold a crossing', strike: 'Bombs one spot', nuke: 'Wipes out a whole district' };
+const THREAT_HINT = { villains: 'Blur, Tyrant and Weaver. Only the super heroes can beat them' };
+const UNIT_NAMES = { heroes: 'Super heroes (hero signal)', build: 'Construction crew', camp: 'Medical camp', hazmat: 'Hazmat team', police: 'Police cruiser', bus: 'Evacuation bus', chaser: 'Storm chaser', seeder: 'Cloud seeder', boat: 'Rescue boat', fire: 'Fire truck', water: 'Water helicopter', rescue: 'Rescue helicopter', apc: 'Army APC', strike: 'Airstrike', nuke: 'Nuke' };
 
 // the city runs on its own behind the menu
 class Idle {
@@ -173,9 +179,9 @@ export class Game {
         }).join('') + '</div>' +
         '<div class="btns back"><button class="zd-btn" type="button" data-go="main">Back</button></div>';
     } else {
-      const units = Object.keys(UNIT_NAMES).map(id => {
+      const units = Object.keys(UNIT_NAMES).sort((a, b) => UNLOCK[a] - UNLOCK[b]).map(id => {
         const need = UNLOCK[id], ok = lvl >= need;
-        return '<div class="row' + (ok ? '' : ' locked') + '"><div><div class="n">' + UNIT_NAMES[id] + '</div><div class="d">' + (ok ? 'Unlocked' : 'Unlocks at level ' + need) + '</div></div><span class="s">' + (ok ? '✓' : 'L' + need) + '</span></div>';
+        return '<div class="row' + (ok ? '' : ' locked') + '"><div><div class="n">' + UNIT_NAMES[id] + '</div><div class="d">' + (UNIT_DESC[id] || '') + (ok ? '' : (UNIT_DESC[id] ? ' · ' : '') + 'unlocks at level ' + need) + '</div></div><span class="s">' + (ok ? '✓' : 'L' + need) + '</span></div>';
       }).join('');
       const ups = UPGRADES.map(u => {
         const own = pr.has(u.id), can = pr.canBuy(u.id), locked = lvl < u.level;
@@ -184,7 +190,7 @@ export class Game {
       }).join('');
       body = '<h1>UNLOCKS</h1><div class="tag">' + pr.bank.toLocaleString() + ' XP to spend</div>' + rank +
         '<div class="list">' + units + '</div><div class="tag" style="margin-top:16px">Upgrades</div><div class="list">' + ups + '</div>' +
-        '<div class="tag" style="margin-top:16px">Threats</div><div class="list">' + Object.keys(HAZARD_LEVEL).map(h => '<div class="row' + (lvl >= HAZARD_LEVEL[h] ? '' : ' locked') + '"><div><div class="n">' + threatName(h) + '</div><div class="d">' + (lvl >= HAZARD_LEVEL[h] ? 'Can strike during a round' : 'Starts at level ' + HAZARD_LEVEL[h]) + '</div></div><span class="s">L' + HAZARD_LEVEL[h] + '</span></div>').join('') + '</div>' +
+        '<div class="tag" style="margin-top:16px">Threats</div><div class="list">' + Object.keys(HAZARD_LEVEL).map(h => '<div class="row' + (lvl >= HAZARD_LEVEL[h] ? '' : ' locked') + '"><div><div class="n">' + threatName(h) + '</div><div class="d">' + (THREAT_HINT[h] ? THREAT_HINT[h] + ' · ' : '') + (lvl >= HAZARD_LEVEL[h] ? 'Can strike during a round' : 'Starts at level ' + HAZARD_LEVEL[h]) + '</div></div><span class="s">L' + HAZARD_LEVEL[h] + '</span></div>').join('') + '</div>' +
         '<div class="btns back"><button class="zd-btn" type="button" data-go="main">Back</button></div>';
     }
     this.menu.innerHTML = '<div class="box">' + body + '</div>';
