@@ -339,7 +339,7 @@ class Tyrant extends Villain {
   zap(car, done) { if (this.ray || this.state !== 'fly' || this.held) return false; this.ray = { car, done, t: 0, dur: 0.45, ex: car.x, ey: car.y || 0, ez: car.z }; return true; }
   flyY() {
     const city = this.D.ctx.city;
-    if (this.held && this.held.shell) return Math.max(24, roofTop(city, this.x, this.z, this.held.half + 8).top + 1.5); // the building overhead clears the roofs below
+    if (this.held && this.held.shell) { const r = this.held.half + 8; return Math.max(24, roofTop(city, this.x, this.z, r).top + 1.5, roofTop(city, this.x + this.vx * 1.5, this.z + this.vz * 1.5, r).top + 1.5); } // the building overhead clears the roofs below, and those just ahead
     return Math.max(28, roofTop(city, this.x, this.z, 12).top + 10);
   }
   update(h) {
@@ -454,8 +454,19 @@ class Tyrant extends Villain {
       H.t = Math.min(1, H.t + h * 2.5); c.x = this.x; c.z = this.z; c.y = lerp(H.y0, this.y + HANDS, H.t); c.yaw = -this.yaw; c.roll = 0; c.pitch = 0;
       return;
     }
-    H.t = Math.min(1, H.t + h / 1.5); const k = H.t * H.t * (3 - 2 * H.t);
-    H.shell.position.set(lerp(H.ox, this.x, k), lerp(0, this.y + HANDS - H.base, k), lerp(H.oz, this.z, k)); H.shell.rotation.y += h * 0.15;
+    H.t = Math.min(1, H.t + h / 1.5);
+    const ss = (a, b, t) => { const u = clamp((t - a) / (b - a), 0, 1); return u * u * (3 - 2 * u); }, ky = ss(0, 0.55, H.t), kx = ss(0.35, 1, H.t); // straight up out of its plot first, then across to him
+    H.shell.position.set(lerp(H.ox, this.x, kx), lerp(0, this.y + HANDS - H.base, ky), lerp(H.oz, this.z, kx)); H.shell.rotation.y += h * 0.15;
+    // it never passes through another building: whatever it would touch it smashes into, and he heaves it up over
+    const city = this.D.ctx.city, sx = H.shell.position.x, sz = H.shell.position.z, bottom = H.shell.position.y + H.base;
+    let need = 0;
+    city.buildingsNear(sx, sz, H.half * 0.7, (k, d, b) => {
+      if (k === H.k || city.dead[k] || b.top <= bottom + 0.5) return;
+      need = Math.max(need, b.top - bottom + 1);
+      if (!H.scraped) H.scraped = new Set();
+      if (!H.scraped.has(k)) { H.scraped.add(k); this.smash(k, sx, b.top - 2, sz, this.vx, this.vz); }
+    });
+    if (need > 0) { this.y += need; H.shell.position.y += need; this.vy = Math.max(this.vy, 4); }
   }
   // what to throw it at: usually a building (the taller the better), sometimes a car
   pickThrow() {

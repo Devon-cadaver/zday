@@ -113,8 +113,12 @@ export class Invasion {
     if (!this.leaving && this.toLaunch > 0 && (this.launchT -= h) <= 0) { this.launchT = 2.2; this.toLaunch--; this.launch(); }
     if (!this.leaving && this.toDrop > 0 && (this.dropT -= h) <= 0) { // a tripod is lowered on cables
       this.dropT = 10; this.toDrop--;
-      const B = D.ctx.city.bounds, a = Math.random() * 6.28, r = 30 + Math.random() * 60;
-      const x = Math.max(B.x0 + 40, Math.min(B.x1 - 40, this.mx + Math.cos(a) * r)), z = Math.max(B.z0 + 40, Math.min(B.z1 - 40, this.mz + Math.sin(a) * r));
+      const B = D.ctx.city.bounds; let x = 0, z = 0;
+      for (let n = 0; n < 12; n++) { // somewhere clear of the tripods already down
+        const a = Math.random() * 6.28, r = 30 + Math.random() * (60 + n * 8);
+        x = Math.max(B.x0 + 40, Math.min(B.x1 - 40, this.mx + Math.cos(a) * r)); z = Math.max(B.z0 + 40, Math.min(B.z1 - 40, this.mz + Math.sin(a) * r));
+        if (this.tripods.every(t => t.gone || t.state === 'wreck' || Math.hypot(t.x - x, t.z - z) > 50)) break;
+      }
       this.tripods.push(new Tripod(D, x, z, { fromY: this.my - 30 }));
       D.emit({ type: 'tripodland', x, z, text: 'A tripod is coming down in the ' + D.district(x, z) + ' district!' });
     }
@@ -229,11 +233,11 @@ export class Invasion {
   spread(h) {
     const U = [];
     for (const s of this.saucers) if (s.state === 'cruise' || s.state === 'act') U.push({ o: s, r: 9, y: s.y });
-    for (const t of this.tripods) if (t.state === 'walk') U.push({ o: t, r: 13, y: t.y, t: true });
+    for (const t of this.tripods) if (t.state === 'walk') U.push({ o: t, r: 21, y: t.y, t: true }); // wide enough that two tripods' legs never cross
     for (let i = 0; i < U.length; i++) for (let j = i + 1; j < U.length; j++) {
       const a = U[i], b = U[j], dx = b.o.x - a.o.x, dz = b.o.z - a.o.z, d = Math.hypot(dx, dz) || 0.01, m = a.r + b.r;
       if (d >= m || Math.abs(a.y - b.y) > 14) continue;
-      const p = (m - d) * Math.min(1, h * 3) * 0.5, px = dx / d * p, pz = dz / d * p;
+      const p = (m - d) * Math.min(1, h * (a.t && b.t ? 6 : 3)) * 0.5, px = dx / d * p, pz = dz / d * p;
       if (!a.t || b.t) { a.o.x -= px; a.o.z -= pz; } if (!b.t || a.t) { b.o.x += px; b.o.z += pz; } // a saucer gives way to a tripod
     }
   }
