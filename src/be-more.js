@@ -238,3 +238,22 @@ export class TripodCtl {
   poi() { return { x: this.tp.x, z: this.tp.z, danger: 25, range: 320 }; }
   label() { return this.tp.eaten + ' eaten'; }
 }
+
+// Super villains: you control one at a time (the Switch button changes who); the other two carry on by themselves
+export class VillainsCtl {
+  constructor(be, x, z) {
+    this.be = be; this.ev = be.D.start('villains', x, z, { life: Infinity, quiet: true }); this.i = 0;
+    const old = document.getElementById('zd-swap'); if (old) old.remove();
+    this.btn = be.g.addButton('zd-swap', 'Switch', () => this.swap());
+    this.take(0);
+    be.D.list.push(wrap(this));
+  }
+  get who() { return this.ev.who[this.i]; }
+  take(i) { this.i = i % this.ev.who.length; this.ev.who.forEach((v, k) => v.setPlayer(k === this.i)); this.be.g.toast('You are ' + this.who.name + ': ' + this.who.hint, 4500); }
+  swap() { this.up(); this.take(this.i + 1); }
+  down(x, z) { this.who.pDown(x, z); } move(x, z) { this.who.pMove(x, z); } up() { this.who.pUp(); }
+  update() {}
+  dispose() { if (this.btn) this.btn.remove(); }
+  follow() { const v = this.who; return v.gone ? null : [v.x, v.z]; }
+  label() { return this.who.name; }
+}

@@ -241,6 +241,13 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 ## Sandbox zombies in the Disasters menu
 - The Shambler button is gone from the bottom bar. "Zombies · N" is the first entry in the Disasters menu: pick it and every tap on a street drops a Shambler until the 3 run out or you tap Done. A tap with nothing picked only shows a hint.
 
+## Super villains (villains.js)
+- Sean asked for three villains, pale white skin, all black, black capes. A first version with graphic effects on people was cut off by a safety filter; Sean then asked for a tamer version. Keep it tame: villains wreck cars and buildings, people scatter, get out of buildings first (destroyBuilding opts.spare + noCrush; people.clearBuilding 'spare'), or stick in webs; cars they throw land soft (car.soft skips crushNear).
+- Blur: 62 m/s straight dashes through buildings (bursts in and out, small ones collapse), flings cars aside, bowls people out of the way; red trail ribbon.
+- Tyrant: drops in with a shockwave, flies, lifts cars and buildings (city.extractBuilding shell) and throws them at buildings or cars; red laser eyes torch cars, char and ignite buildings, scorch streets.
+- Weaver: six arms, drops on a thread onto a roof, swings roof to roof on arcs kept clear of roofs; web balls make ground webs (shader disc + guy lines) that stick people (people.web: FROZEN fx 7, silk look) and cars (car.frozen + car.webbed) for 45 s; acid at stuck cars only (car.eaten, dark rust tint).
+- Sandbox: Super villains in the Disasters menu (tap to place); they leave after 200 s. Be The Disaster: Super villains (k 1, level 3), Switch button cycles who you control (VillainsCtl in be-more.js). A random-play run scored about 20k.
+
 ## Next
 - Sean tests v1.3 on his phone; tune from his notes. Candidates: Be The Disaster score scales and ranks once real scores come in, the saucer size at close zoom, how often zombie outbreaks turn up in Commander, incident pacing, card bar height on the phone.
 

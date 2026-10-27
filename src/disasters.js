@@ -16,6 +16,7 @@ import { SolarStorm } from './solar.js';
 import { BlackHole } from './blackhole.js';
 import { Boats } from './boats.js';
 import { Mushroom, NuclearStrike, Meltdown, nuclearDamage } from './nuke.js';
+import { Villains } from './villains.js';
 
 export const threatName = (h) => (h === 'zombies' ? 'Zombie outbreak' : HAZARDS[h].name);
 
@@ -35,6 +36,7 @@ export const HAZARDS = {
   nuclear: { name: 'Nuclear attack', tap: true },
   meltdown: { name: 'Plant meltdown', tap: false },
   blackhole: { name: 'Black hole', tap: true },
+  villains: { name: 'Super villains', tap: true },
 };
 export { WEATHER };
 
@@ -141,6 +143,7 @@ export class Disasters {
     else if (type === 'nuclear') ev = new NuclearStrike(this, x, z, opts);
     else if (type === 'meltdown') ev = new Meltdown(this, opts);
     else if (type === 'blackhole') ev = new BlackHole(this, x, z, opts);
+    else if (type === 'villains') ev = new Villains(this, x, z, opts);
     if (!ev) return null;
     this.list.push(ev); this.stats.hazards++;
     return ev;
@@ -168,7 +171,7 @@ export class Disasters {
     if (city.dead[k]) return false;
     const b = city.buildings[k], cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2, w = b.x1 - b.x0, d = b.z1 - b.z0;
     const hgt = b.top - b.baseY, wc = b.wallCol, hex = new THREE.Color(wc[0], wc[1], wc[2]).getHex();
-    people.clearBuilding(k, how === 'tear' ? 'tear' : 'crush');
+    people.clearBuilding(k, how === 'tear' ? 'tear' : opts.spare ? 'spare' : 'crush'); // spare: everyone gets out first
     fire.gone(k);
     if (opts.vanish) { people.clearBuilding(k, 'crush'); fire.gone(k); city.hideBuilding(k); this.stats.buildings++; this.emit({ type: 'collapse', k, how, x: cx, z: cz }); return true; } // vaporised: no shell, no debris
     const shell = city.extractBuilding(k); city.hideBuilding(k);

@@ -1185,6 +1185,7 @@ export class People {
       this.lvl[i] = -1;
       this.x[i] = b.x0 + this.r() * (b.x1 - b.x0); this.z[i] = b.z0 + this.r() * (b.z1 - b.z0);
       const p = this.snapWalkable(this.x[i], this.z[i], 15); if (p) { this.x[i] = p[0]; this.z[i] = p[1]; }
+      if (how === 'spare') { if (wasZ) { this.st[i] = S.ZOMBIE; this.wz[i] = 1; } else { this.st[i] = S.IDLE; this.panic(i, (b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2, -1); } continue; }
       if (wasZ) { this.st[i] = S.ZOMBIE; this.wz[i] = 1; if (this.r() < 0.7) this.kill(i, 0, 0, 'crush'); else { this.fx[i] = 2; this.t1[i] = 3; } }
       else { this.st[i] = S.IDLE; this.kill(i, 0, 0, 'crush'); }
     }
@@ -1221,12 +1222,12 @@ export class People {
     return true;
   }
   frozenStep(i, h) {
-    if (this.fx[i] >= 8) return; // dead in the ice (or an ash statue): nothing happens until the thaw
+    if (this.fx[i] >= 7) return; // stuck in a web (7), dead in the ice (9) or an ash statue (8): nothing happens until they are let go
     this.t1[i] += h;
     if (!this.wz[i] && this.t1[i] > 18) { this.fx[i] = 9; if (this.kind[i] === KIND.CIVILIAN) this.stats.disasterCiv++; this.events.push({ type: 'frozedead', i }); } // frozen to death, still standing
   }
   frozenLook(i) {
-    const A = this.fa.arrays, o = i * 3, ice = [0.62, 0.74, 0.86];
+    const A = this.fa.arrays, o = i * 3, ice = this.fx[i] === 7 ? [0.9, 0.89, 0.85] : [0.62, 0.74, 0.86]; // a web wraps them in white silk
     for (const key of ['shirt', 'pants', 'skin', 'accent', 'accent2']) for (let c = 0; c < 3; c++) A[key][o + c] = A[key][o + c] * 0.3 + ice[c] * 0.7;
     A.kit[i * 4 + 1] = (A.kit[i * 4 + 1] | 0) & ~FLAG.GLOW;
     this.lookDirty = true; this.dirty[i] = 4;
@@ -1237,6 +1238,20 @@ export class People {
       if (this.fx[i] === 9) { this.setLook(i, this.base[i]); this.st[i] = S.IDLE; this.fx[i] = 0; this.kill(i, 0, 0, 'thaw'); continue; } // the ice lets go and the body falls
       if (this.wz[i]) { this.st[i] = S.ZOMBIE; this.t1[i] = 0; } else { this.st[i] = S.IDLE; this.setLook(i, this.base[i]); this.dirty[i] = 0; }
     }
+  }
+  // caught in a super villain's web: stuck where they stand until the web lets go
+  web(i) {
+    const s = this.st[i];
+    if (!HITTABLE[s] || s === S.FROZEN || this.lvl[i] !== -1 || this.kind[i] === KIND.ALIEN) return false;
+    this.wz[i] = ZSTATE[s] || s === S.ZOMBIE ? 1 : 0;
+    if (s === S.GRABBED || s === S.TURNING) this.wz[i] = 0;
+    this.st[i] = S.FROZEN; this.t1[i] = 0; this.target[i] = -1; this.fx[i] = 7; this.bt[i] = -1; this.dirty[i] = 0;
+    return true;
+  }
+  unweb(i) {
+    if (this.st[i] !== S.FROZEN || this.fx[i] !== 7) return;
+    this.fx[i] = 0; this.t1[i] = 0; this.dirty[i] = 0;
+    if (this.wz[i]) this.st[i] = S.ZOMBIE; else { this.st[i] = S.IDLE; this.setLook(i, this.base[i]); }
   }
   // swallowed by the ground (a sinkhole, a crater): gone for good
   fallIn(j) {

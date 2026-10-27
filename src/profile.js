@@ -13,7 +13,7 @@ export const HAZARD_LEVEL = { zombies: 1, quake: 1, riot: 1, flood: 2, sinkhole:
 export const WEATHER_LEVEL = { clear: 1, rain: 2, fog: 2, storm: 4, snow: 4, heat: 5, sand: 5 };
 
 // Be The Disaster: the level at which each disaster can be played
-export const BE_LEVEL = { tornado: 1, sinkhole: 1, zombies: 1, riot: 2, quake: 2, flood: 3, meteor: 3, lava: 4, haboob: 4, coldwave: 5, tsunami: 5, saucer: 6, solar: 6, tripod: 7, volcano: 7, blackhole: 8, nuclear: 9, meltdown: 10 };
+export const BE_LEVEL = { tornado: 1, sinkhole: 1, zombies: 1, riot: 2, quake: 2, flood: 3, meteor: 3, lava: 4, haboob: 4, coldwave: 5, tsunami: 5, saucer: 6, solar: 6, tripod: 7, volcano: 7, blackhole: 8, nuclear: 9, meltdown: 10, villains: 3 };
 
 export const UPGRADES = [
   { id: 'squad4', name: 'Four-officer cruisers', cost: 3000, level: 7, desc: 'Every cruiser carries four officers instead of two.' },

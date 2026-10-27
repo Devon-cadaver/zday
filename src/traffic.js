@@ -121,7 +121,7 @@ export class Traffic {
     if (gy < -1) car.pitch = Math.max(-1.4, Math.min(1.4, car.pitch)); // nose first at the bottom of a pit
     else { car.roll = this.r() < 0.45 ? Math.PI : 0; car.pitch = (this.r() - 0.5) * 0.2; }
     if (!car.mission) this.tint(car, '#2a2622');
-    if (this.people) this.people.crushNear(car.x, car.z, 2.6);
+    if (this.people && !car.soft) this.people.crushNear(car.x, car.z, 2.6); // soft: thrown by a super villain, people get out of the way
     if (this.fire && this.r() < 0.35) { this.fire.carFire(car.x, car.z); car.burning = true; if (!car.mission) this.tint(car, '#1a1714'); }
     this.events.push({ type: 'carland', x: car.x, z: car.z });
   }
