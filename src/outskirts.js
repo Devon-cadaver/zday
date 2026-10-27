@@ -42,6 +42,8 @@ void main() {
   gl_FragColor = vec4(col, 1.0);
 }`;
 
+// what the land round a place leans to (east desert, south beach, north mountains, west forest): opts.land
+const LAND = { desert: [1, 0.02, 0.15, 0.01], forest: [0.02, 0.05, 1, 1], coast: [0.3, 3, 0.3, 0.6] };
 export function buildOutskirts(scene, city, opts = {}) {
   const B = city.bounds, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2, M = 30, low = !!opts.low;
   const group = new THREE.Group();
@@ -50,6 +52,7 @@ export function buildOutskirts(scene, city, opts = {}) {
   const plant = { x: B.x0 + (B.x1 - B.x0) * 0.22, z: B.z1 + 165 };
   const weights = (x, z) => {
     const th = Math.atan2(z - cz, x - cx), w = [Math.cos(th), Math.cos(th - Math.PI / 2), Math.cos(th + Math.PI / 2), Math.cos(th - Math.PI)].map(c => Math.pow(Math.max(0, c), 3) + 1e-4);
+    const bias = LAND[opts.land]; if (bias) for (let i = 0; i < 4; i++) w[i] *= bias[i]; // the place's own country
     const s = w[0] + w[1] + w[2] + w[3]; return w.map(v => v / s); // east desert, south beach, north mountains, west forest
   };
   const outside = (x, z) => Math.hypot(Math.max(B.x0 - M - x, 0, x - B.x1 - M), Math.max(B.z0 - M - z, 0, z - B.z1 - M));

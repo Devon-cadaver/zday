@@ -15,8 +15,8 @@ import { damageOf, craters, addCrater, sendMeteor } from './world.js';
 
 const R = 10;
 // the places' character on the map: what each one wants to be next to
-const WANTS = { metro: 'city', harbor: 'coast', dust: 'desert', pines: 'forest' }; // city: deep in a big landmass that reaches the sea
-const SIZE = { metro: [70, 0.55, 0.36], harbor: [26, 0.26, 0.1], dust: [18, 0.22, 0.06], pines: [14, 0.2, 0.08] }; // buildings, spread, tallest
+const WANTS = { metro: 'city', bayview: 'city', harbor: 'coast', dust: 'desert', mesa: 'desert', pines: 'forest', lakeside: 'forest' }; // city: deep in a big landmass that reaches the sea
+const SIZE = { metro: [70, 0.55, 0.36], bayview: [50, 0.45, 0.3], harbor: [26, 0.26, 0.1], lakeside: [18, 0.22, 0.07], dust: [18, 0.22, 0.06], mesa: [9, 0.14, 0.05], pines: [14, 0.2, 0.08] }; // buildings, spread, tallest
 const BIOME = { OCEAN: 0, COAST: 1, GRASS: 2, FOREST: 3, DESERT: 4, MOUNT: 5, ICE: 6 };
 
 // ---------- noise on the sphere
@@ -135,7 +135,7 @@ export class Globe {
     let total = 0; for (const k of keys) total += (SIZE[k] || SIZE.harbor)[0];
     const im = this.towns = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), new THREE.MeshStandardMaterial({ roughness: 0.7 }), total);
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), c = new THREE.Color(); let i = 0;
-    const TINT = { metro: ['#c9b9a0', '#9d9a92', '#b3664a', '#ddd2bb'], harbor: ['#f0ebe1', '#9fb0b8', '#d9a28a', '#ece5d8'], dust: ['#f7ecd6', '#a8733f', '#f0dcb4', '#8a5a30'], pines: ['#a65a3e', '#8e4a34', '#c07a5c'] };
+    const TINT = { metro: ['#c9b9a0', '#9d9a92', '#b3664a', '#ddd2bb'], harbor: ['#f0ebe1', '#9fb0b8', '#d9a28a', '#ece5d8'], dust: ['#f7ecd6', '#a8733f', '#f0dcb4', '#8a5a30'], bayview: ['#dfe7ea', '#9fb3bd', '#c4c0b5', '#7f9aa8'], lakeside: ['#a8b49a', '#d9a28a', '#c7a2a6', '#e2b98f'], mesa: ['#b8603a', '#d98a5a', '#8a4428'], pines: ['#a65a3e', '#8e4a34', '#c07a5c'] };
     for (const key of keys) {
       const [n, spread, tall] = SIZE[key] || SIZE.harbor, [lat, lon] = this.spots[key], cols = TINT[key] || TINT.metro;
       for (let k = 0; k < n; k++) {
