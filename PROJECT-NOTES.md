@@ -565,6 +565,10 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 - The band: in a village with no park of 22 m it takes one of 15 m; heard only looking right at the stage (near the middle of the view) with the point you look at within about a block (45 to 80 m) and the camera not far out (260 to 420 m).
 - Menu music by the side of the world in view (Sean): globe.onFacing (every 0.5 s on the menu: the town nearest the middle of the view) sets Music.setMenuSong: a Far East town, theme2, else theme; crossfaded (4 s, not back and forth faster than every 3 s); each theme song picks up where it was paused (Music.pos), round again at its end.
 
+- Menu planet (Sean: zoomed in on the pole; it should all show above the menu): the backdrop's camera placement had been commented out by a mid-line comment (fixed; today's changes scanned for more). Globe.menuFit: the camera far enough back (and the view shifted) for the whole planet to sit in the gap between the title and the menu card, measured from the page (a long panel leaving no gap: behind it all), eased to again when the card changes, left alone after so a pinch still zooms. The PLAY screen's logo and button sit low, under the planet.
+- The call sign (You're listening to K-D-I-S, Disaster Radio) only once, on the menu 2.5 s after PLAY, far off as if heard from space over the planet (radio.farIdent: no words on screen, a lowpass at 1.7 kHz, mostly a 3.6 s echo, quiet); no more at the start of a game.
+- Menu music far off too (Music.space: lowpass 2.6 kHz, dry 0.3, a 3.2 s echo at 0.5; the echo joined in only on the menus); close again in a town. Music.reverbIR makes the echo for both.
+
 ## Next
 - Sean tests v1.3 on his phone; tune from his notes. Candidates: Be The Disaster score scales and ranks once real scores come in, the saucer size at close zoom, how often zombie outbreaks turn up in Commander, incident pacing, card bar height on the phone.
 

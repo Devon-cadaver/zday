@@ -365,13 +365,23 @@ export class Globe {
     this.active = true; this.state = 'menu'; this.status = null; this.arrive = null; this.fly = this.rise = this.turn = null; this.armed = false;
     this.uiEl.style.display = 'none'; this.backBtn.style.display = 'none'; this.metBtn.style.display = 'none';
     this.here.visible = false; this.showRoad(true, null); this.relabel(); // the menu: the trail of the towns played in either mode
-    if (!was) { // looking at the middle of the road, from a little above
-      const [lat, lon] = this.spots[placeKey()]; // over where you are (the rest comes round as it turns) this.cam.position.copy(toVec(Math.min(1.1, lat + 0.35), lon, this.fit())); this.cam.lookAt(0, 0, 0); this.controls.target.set(0, 0, 0);
+    const mf = this.menuFit(); this.menuTo = mf.d; this.shiftTo = mf.shift;
+    if (!was) { // over where you are, from a little above (the rest comes round as it turns)
+      const [lat, lon] = this.spots[placeKey()];
+      this.cam.position.copy(toVec(Math.min(1.1, lat + 0.35), lon, mf.d)); this.cam.lookAt(0, 0, 0); this.controls.target.set(0, 0, 0);
     }
-    this.controls.maxDistance = Math.max(R * 5, this.fit() * 1.15);
+    this.controls.maxDistance = Math.max(R * 5, this.fit() * 1.15, mf.d * 1.3);
     this.controls.enabled = true; this.controls.autoRotate = true; this.controls.autoRotateSpeed = 0.45; this.controls.update();
-    this.shiftTo = innerHeight > innerWidth ? 0.14 : 0.08; // the planet sits above the menu
     document.body.classList.add('zd-globe-on');
+  }
+  // on the menu: how far back, and how far up the view, for the whole planet to sit in the gap between the title and the
+  // menu card (Sean: all of it in view above the menu); a long panel leaving no gap: the planet behind it all
+  menuFit() {
+    const H = innerHeight, t = document.querySelector('#zd-menu .mtitle'), b = document.querySelector('#zd-menu .box'), rt = t && t.getBoundingClientRect(), rb = b && b.getBoundingClientRect();
+    let y0 = rt && rt.height ? rt.bottom + 6 : 0, y1 = rb && rb.height ? rb.top - 6 : H;
+    if (y1 - y0 < H * 0.28) { y0 = 0; y1 = H; }
+    const d = R * 1.14 / ((y1 - y0) / H * Math.tan(16 * Math.PI / 180)); // its height into the gap (the camera's view is 32 degrees tall)
+    return { d: Math.max(d, this.fit() * 1.05), shift: 0.5 - (y0 + y1) / 2 / H }; // and its width onto the screen
   }
   // the menu reached up through the clouds from a town: start just over that town and pull back to where the menu looks from
   pullBack(key) {
@@ -454,6 +464,10 @@ export class Globe {
       const r = { x0: c.x - c.el._w / 2 - 3, x1: c.x + c.el._w / 2 + 3, y0: c.y - 42, y1: c.y - 12 };
       if (placed.some(q => r.x0 < q.x1 && r.x1 > q.x0 && r.y0 < q.y1 && r.y1 > q.y0)) { c.el.style.display = 'none'; continue; }
       placed.push(r); c.el.style.display = ''; c.el.style.left = c.x + 'px'; c.el.style.top = c.y + 'px';
+    }
+    if (this.state === 'menu') { // the menu card changed (another panel): the planet eased back into the gap; left alone once there, so a pinch still zooms
+      if ((this.fitT = (this.fitT || 0) - dt) <= 0) { this.fitT = 0.5; const mf = this.menuFit(); this.shiftTo = mf.shift; if (Math.abs(mf.d - (this.menuTo || 0)) > mf.d * 0.04) { this.menuTo = mf.d; this.controls.maxDistance = Math.max(this.controls.maxDistance, mf.d * 1.3); this.easing = true; } }
+      if (this.easing && !this.rise) { const L = this.cam.position.length(), L2 = L + (this.menuTo - L) * Math.min(1, dt * 2.5); this.cam.position.setLength(L2); if (Math.abs(this.menuTo - L2) < 0.05) this.easing = false; }
     }
     if (this.state === 'menu' && this.onFacing && (this.faceT = (this.faceT || 0) - dt) <= 0) { // the town nearest the middle of the view (the menu's song follows its side of the world)
       this.faceT = 0.5; let best = null, bd = -2;

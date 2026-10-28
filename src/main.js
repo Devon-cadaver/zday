@@ -217,7 +217,7 @@ if (viaSky) setTimeout(() => { if (globe.active) { sky.to(0, 0.8); return; } con
 if (!game.menu.hidden) { globe.backdrop(game.menuPanel === 'main'); game.dockSide(); if (viaSky) globe.pullBack(placeKey()); }
 // a fresh start on the menu: the title and a PLAY button over the turning planet first (Sean); the tap starts the music and the menu pops up
 if (!game.menu.hidden && !viaSky) {
-  const st = document.createElement('style'); st.textContent = '#zd-play{position:fixed;inset:0;z-index:45;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:30px;cursor:pointer;-webkit-tap-highlight-color:transparent}' +
+  const st = document.createElement('style'); st.textContent = '#zd-play{position:fixed;inset:0;z-index:45;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:max(48px,9vh);box-sizing:border-box;gap:30px;cursor:pointer;-webkit-tap-highlight-color:transparent}' +
     '#zd-play .t{font:900 46px/0.95 Impact,Futura-CondensedExtraBold,"Arial Black",sans-serif;letter-spacing:.04em;text-align:center;color:#f4eee4;text-shadow:3px 3px 0 #7a0d12,0 0 22px rgba(255,79,163,.55)}' +
     '#zd-play .s{margin-top:-18px;font:700 14px/1.3 system-ui,-apple-system,sans-serif;color:#ffd6ef;text-align:center;padding:0 24px;text-shadow:0 0 10px rgba(255,79,163,.7),0 1px 6px rgba(0,0,0,.8)}' +
     '#zd-play button{font:900 26px/1 Impact,Futura-CondensedExtraBold,"Arial Black",sans-serif;letter-spacing:.12em;color:#fff;padding:16px 58px;border-radius:32px;border:2px solid rgba(255,255,255,.35);background:linear-gradient(#ff4fa3,#b3123f);box-shadow:0 6px 24px rgba(0,0,0,.5),0 0 26px rgba(255,79,163,.45);animation:zdBeat 1.1s ease-in-out infinite}' +
@@ -225,7 +225,7 @@ if (!game.menu.hidden && !viaSky) {
   document.head.appendChild(st);
   const gate = document.createElement('div'); gate.id = 'zd-play'; gate.innerHTML = '<div class="t">MY LITTLE<br>DISASTER</div><div class="s">Save it, wreck it, or sit back and bet on it!</div><button type="button">PLAY</button>';
   game.menu.style.visibility = 'hidden'; document.body.classList.add('zd-gate'); document.body.appendChild(gate);
-  const go = (e) => { if (e) e.stopPropagation(); gate.remove(); removeEventListener('keydown', key); document.body.classList.remove('zd-gate'); game.menu.style.visibility = ''; game.menu.classList.add('pop'); setTimeout(() => game.menu.classList.remove('pop'), 600); };
+  const go = (e) => { if (e) e.stopPropagation(); gate.remove(); removeEventListener('keydown', key); document.body.classList.remove('zd-gate'); game.menu.style.visibility = ''; game.menu.classList.add('pop'); setTimeout(() => game.menu.classList.remove('pop'), 600); setTimeout(() => game.radio.farIdent(), 2500); }; // the call sign, once, from far off
   const key = (e) => { if (e.key === 'Enter' || e.key === ' ') go(); };
   gate.onclick = go; addEventListener('keydown', key); // the tap itself has started the sound (audio.js: the first tap)
 } // the menu sits over the planet (come up from a town: pulling back off it)

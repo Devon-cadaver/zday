@@ -15,6 +15,13 @@ const THEMES = ['theme', 'theme2'];
 const LEVELS = [0, 0.2, 0.38, 0.62]; // off, quiet, medium, loud
 const FADE = 4, TAIL = 6, AFTER = 150; // a mood change; the loop back to the start; how long the clean-up music plays after a disaster
 
+// a long echo (a big space): noise dying away over secs, a little different in each ear, for a ConvolverNode
+export function reverbIR(c, secs = 3.2, decay = 2.4) {
+  const n = Math.floor(c.sampleRate * secs), b = c.createBuffer(2, n, c.sampleRate);
+  for (let ch = 0; ch < 2; ch++) { const d = b.getChannelData(ch); for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, decay); }
+  return b;
+}
+
 export class Music {
   constructor() {
     let lv = 2; try { const s = localStorage.getItem('zday_music2'); if (s != null) lv = +s; } catch (e) { /* no storage */ } // starts at medium (zday_music2: everyone back to it once)
@@ -42,7 +49,11 @@ export class Music {
   }
   attach(ctx, out) {
     this.ctx = ctx; this.out = ctx.createGain(); this.out.gain.value = LEVELS[this.level]; this.duckG = ctx.createGain();
-    this.duckG.connect(this.out); this.out.connect(out);
+    // the menus: everything far off, as if heard from up in space over the planet (Sean): the top taken off, a long echo, quieter
+    this.lp = ctx.createBiquadFilter(); this.lp.type = 'lowpass'; this.lp.frequency.value = 20000; this.dryG = ctx.createGain(); this.wetG = ctx.createGain(); this.wetG.gain.value = 0;
+    this.verb = ctx.createConvolver(); this.verb.buffer = reverbIR(ctx); this.verb.connect(this.wetG);
+    this.duckG.connect(this.lp); this.lp.connect(this.dryG); this.dryG.connect(this.out); this.wetG.connect(this.out); this.out.connect(out);
+    this.space(this.menuOn);
     this.bgG = ctx.createGain(); this.bgG.connect(this.duckG); // the background tracks, dropped back while the band is heard
     { const el = this.bandEl = document.createElement('audio'); el.preload = 'none'; el.loop = true; el.setAttribute('playsinline', ''); this.bandG = ctx.createGain(); this.bandG.gain.value = 0; ctx.createMediaElementSource(el).connect(this.bandG); this.bandG.connect(this.out); }
     for (let k = 0; k < 2; k++) {
@@ -85,8 +96,17 @@ export class Music {
     const bg = 1 - 0.8 * Math.min(1, (on ? k : 0) * 1.3);
     if (Math.abs(bg - (this.bgW ?? -1)) > 0.01) { this.bgW = bg; this.bgG.gain.setTargetAtTime(bg, t, 0.5); }
   }
+  // far off on the menus, close in a town: the echo only joined in while it is wanted (it costs a little all the time)
+  space(on) {
+    if (!this.lp) return;
+    const t = this.ctx.currentTime;
+    if (on && !this.verbOn) { this.lp.connect(this.verb); this.verbOn = true; }
+    this.lp.frequency.setTargetAtTime(on ? 2600 : 20000, t, 0.5); this.dryG.gain.setTargetAtTime(on ? 0.3 : 1, t, 0.5); this.wetG.gain.setTargetAtTime(on ? 0.5 : 0, t, 0.5);
+    clearTimeout(this.verbT); if (!on && this.verbOn) this.verbT = setTimeout(() => { if (!this.menuOn && this.verbOn) { this.lp.disconnect(this.verb); this.verbOn = false; } }, 5000);
+  }
   // the menus: the theme song for the side of the world in view (setMenuSong)
   setMenu(on) {
+    if (on !== this.menuOn) this.space(on);
     this.menuOn = on;
     if (on) { this.setBand(0, true); if (this.ctx && this.level && !THEMES.includes(this.mood) && this.players.some(p => p.primed)) this.play(this.menuSong); else if (!THEMES.includes(this.mood)) this.mood = this.menuSong; }
   }
