@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { cutGround } from './holes.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { rng } from './textures.js';
+import { townMask } from './shapes.js';
 
 export const RW = 10;          // road width (curb to curb)
 export const SW = 3;           // sidewalk width
@@ -19,7 +20,7 @@ const toWhite = (c, k) => [c[0] + (1 - c[0]) * k, c[1] + (1 - c[1]) * k, c[2] + 
 
 const ROOFS = ['#d3c7b0', '#c8b99d', '#d9cbae', '#bfae92', '#cdbda3', '#8d877c', '#77726a', '#a39c8e', '#6d6a64', '#b0a898'];
 // what real city blocks are built of; districts mix them differently (see wallColor)
-const MATERIALS = {
+export const MATERIALS = {
   brick: ['#a65a3e', '#9a4f37', '#b3664a', '#8e4a34', '#b97257', '#a35f44', '#c07a5c', '#8a3f2e'],
   brown: ['#7b5a45', '#86644c', '#6e5040', '#93705a'],
   stone: ['#ddd2bb', '#e4dac6', '#d2c5aa', '#e9e1cf', '#cbbd9f'],
@@ -108,7 +109,9 @@ function crownGeometry() {
 
 // opts (all optional; the defaults build the big city): seed, blocks (blocks a side), maxFloors, tall (how often a
 // building is 7-12 storeys), landmarks (which of spire, deco, dome, stadium), centers (downtown clusters), diag (the
-// diagonal avenue), tint (extra weight for wall materials, e.g. { sand: 12 } for a desert town)
+// diagonal avenue), tint (extra weight for wall materials, e.g. { sand: 12 } for a desert town), shape (the town's
+// outline, shapes.js: the blocks outside it are open land with the roads running on through), land (desert, forest,
+// coast: what that land is like)
 export function buildCity(tex, opts = {}) {
   const r = rng(opts.seed ?? 20261025);
   const NB = opts.blocks ?? 12;
@@ -123,6 +126,8 @@ export function buildCity(tex, opts = {}) {
   // ---- layout variety: a diagonal avenue that cuts blocks into triangles, roundabouts (the first a big
   // circus), and pairs of blocks merged into superblocks (some become parks or civic plazas)
   const NZ = NB + 1, nid = (i, j) => i * NZ + j, ekey = (a, b) => (a < b ? a + '-' + b : b + '-' + a);
+  const inTown = townMask(opts.shape, NB, opts.seed ?? 20261025), land = (i, j) => i < 0 || j < 0 || i >= NB || j >= NB || !inTown(i, j);
+  const rl = rng((opts.seed ?? 20261025) + 77); // the open land's own dice, so it does not shift the town's
   const layout = { removed: new Set(), rounds: [], diags: [], superblocks: [] };
   const splitBlk = new Map(), roundAt = new Map(), owner = new Map();
   if (opts.diag !== false) { // the diagonal avenue runs corner to corner through k blocks
@@ -155,7 +160,7 @@ export function buildCity(tex, opts = {}) {
       const i = Math.floor(r() * NB), j = Math.floor(r() * NB), horiz = r() < 0.5, i2 = horiz ? i + 1 : i, j2 = horiz ? j : j + 1;
       if (i2 >= NB || j2 >= NB) continue;
       const k1 = i + ',' + j, k2 = i2 + ',' + j2;
-      if (owner.has(k1) || owner.has(k2) || splitBlk.has(k1) || splitBlk.has(k2)) continue;
+      if (owner.has(k1) || owner.has(k2) || splitBlk.has(k1) || splitBlk.has(k2) || land(i, j) || land(i2, j2)) continue;
       const a = horiz ? nid(i + 1, j) : nid(i, j + 1), b = nid(i + 1, j + 1);
       if (diagNodes.has(a) || diagNodes.has(b) || roundAt.has(a) || roundAt.has(b) || cornersOf(i, j, i2, j2).some(c => roundAt.has(c)) || dg(a) < 3 || dg(b) < 3) continue;
       deg.set(a, dg(a) - 1); deg.set(b, dg(b) - 1);
@@ -181,6 +186,8 @@ export function buildCity(tex, opts = {}) {
   // downtown clusters
   const centers = [];
   for (let k = 0; k < (opts.centers ?? 3); k++) centers.push([(r() - 0.5) * sx[NB] * 1.2, (r() - 0.5) * sz[NB] * 1.2, (90 + r() * 90) * Math.min(1, NB / 12)]);
+  const blockAt = (v, lines) => { for (let k = 0; k < NB; k++) if (v < lines[k + 1]) return k; return NB - 1; };
+  for (const c of centers) for (let t = 0; t < 8 && land(blockAt(c[0], sx), blockAt(c[1], sz)); t++) { c[0] *= 0.7; c[1] *= 0.7; } // drawn in until it is on built ground
   const heightAt = (x, z) => {
     let h = 0;
     for (const [cx, cz, s] of centers) h = Math.max(h, Math.exp(-((x - cx) ** 2 + (z - cz) ** 2) / (2 * s * s)));
@@ -572,6 +579,17 @@ export function buildCity(tex, opts = {}) {
     }
   }
 
+  // a block outside the town: open land up to the road edge, grass and woods, or desert scrub
+  function landBlock(sw) {
+    const kind = opts.land || 'grass', desert = kind === 'desert';
+    top(B.grass, sw, 0.05, lin(desert ? '#f0cf94' : kind === 'forest' ? '#d8e4c8' : '#ffffff'), 6);
+    const area = (sw.x1 - sw.x0) * (sw.z1 - sw.z0), n = Math.floor(area / (desert ? 420 : kind === 'forest' ? 55 : 160));
+    for (let k = 0; k < n; k++) {
+      const x = sw.x0 + 3 + rl() * (sw.x1 - sw.x0 - 6), z = sw.z0 + 3 + rl() * (sw.z1 - sw.z0 - 6), s = desert ? 0.6 + rl() * 0.6 : 1.5 + rl() * 1.6, h = desert ? 0.5 + rl() * 0.5 : 2 + rl() * 2.4;
+      trunks.push({ x, z, y: 0.05, h, s: s * 0.5, b: -1 });
+      crowns.push({ x, y: 0.05 + h + s * 0.75, z, s, col: desert ? (rl() < 0.5 ? '#8f8a52' : '#a39a5e') : GREENS[Math.floor(rl() * GREENS.length)], b: -1 });
+    }
+  }
   // a big park across a superblock: lawns, two crossing paths, a fountain in the middle, plenty of trees
   function bigPark(blk) {
     top(B.grass, blk, CURB + 0.04, lin('#ffffff'), 6);
@@ -597,7 +615,7 @@ export function buildCity(tex, opts = {}) {
     const cand = [];
     for (let i = 1; i < NB - 1; i++) for (let j = 1; j < NB - 1; j++) {
       const key = i + ',' + j;
-      if (owner.get(key) || splitBlk.get(key) || cornersOf(i, j).some(c => roundAt.get(c))) continue;
+      if (owner.get(key) || splitBlk.get(key) || land(i, j) || cornersOf(i, j).some(c => roundAt.get(c))) continue;
       const x = (sx[i] + sx[i + 1]) / 2, z = (sz[j] + sz[j + 1]) / 2;
       cand.push({ key, x, z, s: heightAt(x, z) + r() * 0.35 });
     }
@@ -619,6 +637,7 @@ export function buildCity(tex, opts = {}) {
       const sw = { x0: blk.x0 - SW, x1: blk.x1 + SW, z0: blk.z0 - SW, z1: blk.z1 + SW };
       const diag = splitBlk.get(key) || null;
       const cuts = own ? [] : cornersOf(i, j).map(c => roundAt.get(c)).filter(Boolean);
+      if (!own && !diag && !cuts.length && land(i, j)) { landBlock(sw); continue; } // outside the town
       if (diag) { // two triangle halves either side of the avenue
         const P = rectPoly(sw);
         slab(clip(P, (x, z) => diagDist(diag, x, z).d - RW / 2));
@@ -665,20 +684,21 @@ export function buildCity(tex, opts = {}) {
   // ---- street furniture
   const nearNode = (v, lines) => lines.some(l => Math.abs(v - l) < HALF + 2.5);
   const skip = (x, z) => nearRound(x, z, 1.5) || nearDiag(x, z, 0.6);
+  const ruralV = (i, z) => { const j = blockAt(z, sz); return land(i - 1, j) && land(i, j); }, ruralH = (j, x) => { const i = blockAt(x, sx); return land(i, j - 1) && land(i, j); }; // a road with open land both sides
   const lo = sx[0], hi = sx[NB], loz = sz[0], hiz = sz[NB];
   for (let i = 0; i <= NB; i++) {
     const boulevard = r() < 0.5;
     for (const side of [-1, 1]) {
       const off = side * (RW / 2 + 1.1);
       for (let z = loz; z <= hiz; z += 7 + r() * 4) {
-        if (nearNode(z, sz) || vGone(i, z) || skip(sx[i] + off, z)) continue;
+        if (nearNode(z, sz) || vGone(i, z) || skip(sx[i] + off, z) || (ruralV(i, z) && rl() < 0.85)) continue;
         if (boulevard && r() < 0.85) addTree(sx[i] + off, z, CURB, 1.5 + r() * 0.9, 2.2 + r() * 1.5);
         else if (r() < 0.12) addTree(sx[i] + off, z, CURB, 1.4 + r() * 0.8, 2.2 + r());
       }
-      for (let z = loz + 12; z <= hiz; z += 32) if (!nearNode(z, sz) && !vGone(i, z) && !skip(sx[i] + side * 5.4, z)) lamps.push({ x: sx[i] + side * (RW / 2 + 0.4), z, arm: [-side, 0] });
+      for (let z = loz + 12; z <= hiz; z += 32) if (!nearNode(z, sz) && !vGone(i, z) && !skip(sx[i] + side * 5.4, z) && !ruralV(i, z)) lamps.push({ x: sx[i] + side * (RW / 2 + 0.4), z, arm: [-side, 0] });
       // parked cars
       for (let z = loz; z <= hiz; z += 5.6) {
-        if (nearNode(z, sz) || r() < 0.55 || vGone(i, z) || skip(sx[i] + side * 4.35, z)) continue;
+        if (nearNode(z, sz) || r() < 0.55 || vGone(i, z) || skip(sx[i] + side * 4.35, z) || ruralV(i, z)) continue;
         parked.push({ x: sx[i] + side * 4.35, z, y: 0, rot: Math.PI / 2 + (side > 0 ? Math.PI : 0) });
       }
     }
@@ -688,13 +708,13 @@ export function buildCity(tex, opts = {}) {
     for (const side of [-1, 1]) {
       const off = side * (RW / 2 + 1.1);
       for (let x = lo; x <= hi; x += 7 + r() * 4) {
-        if (nearNode(x, sx) || hGone(j, x) || skip(x, sz[j] + off)) continue;
+        if (nearNode(x, sx) || hGone(j, x) || skip(x, sz[j] + off) || (ruralH(j, x) && rl() < 0.85)) continue;
         if (boulevard && r() < 0.85) addTree(x, sz[j] + off, CURB, 1.5 + r() * 0.9, 2.2 + r() * 1.5);
         else if (r() < 0.12) addTree(x, sz[j] + off, CURB, 1.4 + r() * 0.8, 2.2 + r());
       }
-      for (let x = lo + 12; x <= hi; x += 32) if (!nearNode(x, sx) && !hGone(j, x) && !skip(x, sz[j] + side * 5.4)) lamps.push({ x, z: sz[j] + side * (RW / 2 + 0.4), arm: [0, -side] });
+      for (let x = lo + 12; x <= hi; x += 32) if (!nearNode(x, sx) && !hGone(j, x) && !skip(x, sz[j] + side * 5.4) && !ruralH(j, x)) lamps.push({ x, z: sz[j] + side * (RW / 2 + 0.4), arm: [0, -side] });
       for (let x = lo; x <= hi; x += 5.6) {
-        if (nearNode(x, sx) || r() < 0.55 || hGone(j, x) || skip(x, sz[j] + side * 4.35)) continue;
+        if (nearNode(x, sx) || r() < 0.55 || hGone(j, x) || skip(x, sz[j] + side * 4.35) || ruralH(j, x)) continue;
         parked.push({ x, z: sz[j] + side * 4.35, y: 0, rot: side > 0 ? 0 : Math.PI });
       }
     }
@@ -709,7 +729,7 @@ export function buildCity(tex, opts = {}) {
   }
   // crosswalks (pushed out past the ring at a roundabout; none where the avenue crosses)
   for (let i = 0; i <= NB; i++) for (let j = 0; j <= NB; j++) {
-    if (r() > 0.45 || diagNodes.has(nid(i, j))) continue;
+    if (r() > 0.45 || diagNodes.has(nid(i, j)) || (land(i - 1, j - 1) && land(i, j - 1) && land(i - 1, j) && land(i, j))) continue;
     const X = sx[i], Z = sz[j], rd = roundAt.get(nid(i, j)), off = rd ? rd.ro + 2 : HALF + 1.6;
     for (const sd of [-1, 1]) {
       // across the road running along x (bars along x, spread along z)

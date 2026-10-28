@@ -7,6 +7,7 @@ let W = null;
 function load() {
   if (W) return W;
   try { W = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { W = {}; }
+  if (W.v !== 2) { W.places = {}; W.pending = {}; W.v = 2; } // version 2: the towns got their outlines (building numbers moved)
   W.places = W.places || {}; W.craters = W.craters || []; W.pending = W.pending || {};
   return W;
 }

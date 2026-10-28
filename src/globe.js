@@ -13,14 +13,22 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { PLACES, PATH, placeKey, travel } from './places.js';
+import { townMask } from './shapes.js';
+import { MATERIALS } from './city.js';
 import { damageOf, craters, addCrater, sendMeteor } from './world.js';
 import { sideButton } from './ui.js';
 import { Sky } from './sky.js';
 
 const R = 10;
 // the places' character on the map: what each one wants to be next to
-const WANTS = { metro: 'city', bayview: 'city', harbor: 'coast', dust: 'desert', mesa: 'desert', pines: 'forest', lakeside: 'forest' }; // city: deep in a big landmass that reaches the sea
-const SIZE = { metro: [70, 0.55, 0.36], bayview: [50, 0.45, 0.3], harbor: [26, 0.26, 0.1], lakeside: [18, 0.22, 0.07], dust: [18, 0.22, 0.06], mesa: [9, 0.14, 0.05], pines: [14, 0.2, 0.08] }; // buildings, spread, tallest
+const WANTS = { metro: 'city', bayview: 'city', harbor: 'coast', dust: 'desert', mesa: 'desert', sunvale: 'desert', pines: 'forest', lakeside: 'forest', northgate: 'forest', crossing: 'grass', ironside: 'grass' }; // city: deep in a big landmass that reaches the sea
+// a place's wall colours, as its city builder leans them (an even mix, plus the place's tint)
+function palette(P) {
+  const w = { stone: 3, concrete: 3, brick: 3, white: 2, glass: 1 }, out = [];
+  if (P.tint) for (const k in P.tint) w[k] = (w[k] || 0) + P.tint[k];
+  for (const k in w) if (MATERIALS[k]) for (let n = 0; n < Math.round(w[k]); n++) out.push(MATERIALS[k][n % MATERIALS[k].length]);
+  return out;
+}
 const BIOME = { OCEAN: 0, COAST: 1, GRASS: 2, FOREST: 3, DESERT: 4, MOUNT: 5, ICE: 6 };
 
 // ---------- noise on the sphere
@@ -130,28 +138,55 @@ export class Globe {
         let sc = want === 'city' ? (sea(0.03) + sea(0.06) === 0 ? 10 : -20) + (sea(0.12) >= 2 && sea(0.12) <= 9 ? 8 : 0) + (b === BIOME.GRASS ? 3 : 0)
           : want === 'coast' ? (sea(0.022) === 0 ? 6 : -20) + Math.min(6, sea(0.05)) * 1.5 + (b === BIOME.GRASS || b === BIOME.COAST ? 2 : 0)
           : want === 'desert' ? (b === BIOME.DESERT ? 8 : 0) + near(lat, lon, BIOME.DESERT, 0.05) - sea(0.03) * 3
+          : want === 'grass' ? (b === BIOME.GRASS ? 8 : 0) + near(lat, lon, BIOME.GRASS, 0.05) - sea(0.03) * 3
           : (b === BIOME.FOREST ? 8 : 0) + near(lat, lon, BIOME.FOREST, 0.05) - sea(0.03) * 3;
         for (const q of taken) { const dd = Math.acos(Math.min(1, Math.sin(lat) * Math.sin(q[0]) + Math.cos(lat) * Math.cos(q[0]) * Math.cos(lon - q[1]))); if (dd < 0.18) sc -= 100; else if (dd < 0.7) sc += 2; } // apart, but not too far
         if (sc > bs) { bs = sc; best = [lat, lon]; }
       }
       taken.push(best); this.spots[key] = best;
     }
-    // each place: a little cluster of buildings standing on the surface, coloured like the place
-    let total = 0; for (const k of keys) total += (SIZE[k] || SIZE.harbor)[0];
-    const im = this.towns = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), new THREE.MeshStandardMaterial({ roughness: 0.7 }), total);
-    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), c = new THREE.Color(); let i = 0;
-    const TINT = { metro: ['#c9b9a0', '#9d9a92', '#b3664a', '#ddd2bb'], harbor: ['#f0ebe1', '#9fb0b8', '#d9a28a', '#ece5d8'], dust: ['#f7ecd6', '#a8733f', '#f0dcb4', '#8a5a30'], bayview: ['#dfe7ea', '#9fb3bd', '#c4c0b5', '#7f9aa8'], lakeside: ['#a8b49a', '#d9a28a', '#c7a2a6', '#e2b98f'], mesa: ['#b8603a', '#d98a5a', '#8a4428'], pines: ['#a65a3e', '#8e4a34', '#c07a5c'] };
+    // each place in little, from its own street grid and outline (shapes.js): asphalt under the blocks inside the
+    // outline, a pale pavement on each, four buildings a block in the place's own wall colours (taller towards the
+    // middle of a city's downtowns, low and even in a town), its dome, stadium or tower near the middle
+    const lots = [], pads = [], domes = [], rings = [];
+    this.extent = {};
     for (const key of keys) {
-      const [n, spread, tall] = SIZE[key] || SIZE.harbor, [lat, lon] = this.spots[key], cols = TINT[key] || TINT.metro;
-      for (let k = 0; k < n; k++) {
-        const r = Math.sqrt(rnd()) * spread, a = rnd() * Math.PI * 2, la = lat + Math.cos(a) * r / R, lo = lon + Math.sin(a) * r / (R * Math.cos(lat));
-        const p = toVec(la, lo, R * 0.998), nrm = p.clone().normalize(), h = tall * (0.25 + Math.pow(rnd(), 3) * (1 - r / spread) * 1.6), w = 0.05 + rnd() * 0.05;
-        q.setFromUnitVectors(up, nrm); m.compose(p, q, new THREE.Vector3(w, h, w)); im.setMatrixAt(i, m); im.setColorAt(i, c.set(cols[k % cols.length])); i++;
+      const P = PLACES[key], NB = Math.min(P.blocks ?? 12, 12), seed = P.seed ?? 20261025, mask = townMask(P.shape, NB, seed), [lat, lon] = this.spots[key];
+      const c = toVec(lat, lon, 1).normalize(), east = new THREE.Vector3(0, 1, 0).cross(c).normalize(), south = east.clone().cross(c);
+      const half = 0.045 * NB, pitch = half * 2 / NB, floors = P.maxFloors ?? 16, hmax = 0.021 * floors, cols = palette(P), basis = [east, c, south];
+      let s2 = seed % 2147483646 + 1; const rr = () => (s2 = (s2 * 16807) % 2147483647) / 2147483647;
+      const cen = []; for (let k = 0; k < (P.centers ?? 3); k++) cen.push([(rr() - 0.5) * (P.shape === 'twin' ? 1.4 : 0.9), (rr() - 0.5) * 0.9]);
+      const at = (u, v, r0) => c.clone().multiplyScalar(R).addScaledVector(east, u * half).addScaledVector(south, v * half).normalize().multiplyScalar(r0);
+      this.extent[key] = half;
+      for (let i = 0; i < NB; i++) for (let j = 0; j < NB; j++) {
+        if (!mask(i, j)) continue;
+        const u = ((i + 0.5) / NB) * 2 - 1, v = ((j + 0.5) / NB) * 2 - 1;
+        pads.push({ p: at(u, v, R * 0.9995), basis, w: pitch * 1.02, h: 0.003, col: '#5f5b55' }, { p: at(u, v, R * 0.9995), basis, w: pitch * 0.8, h: 0.006, col: '#b9b0a0' });
+        let core = 0; for (const [cu, cv] of cen) core = Math.max(core, Math.exp(-((u - cu) ** 2 + (v - cv) ** 2) / 0.2));
+        for (let q = 0; q < 4; q++) {
+          const du = (q % 2 ? 0.19 : -0.19) * 2 / NB, dv = (q < 2 ? -0.19 : 0.19) * 2 / NB;
+          const h = hmax * (floors > 8 ? 0.12 + 0.88 * core * (0.4 + rr() * 0.8) : 0.45 + rr() * 0.55);
+          lots.push({ p: at(u + du, v + dv, R * 0.9995), basis, w: pitch * 0.33, h: Math.max(0.014, h), col: cols[Math.floor(rr() * cols.length)] });
+        }
+      }
+      for (const lm of P.landmarks ?? ['spire', 'deco', 'dome', 'stadium']) { // near the middle
+        const u = (rr() - 0.5) * 0.5, v = (rr() - 0.5) * 0.5, p = at(u, v, R * 1.0003);
+        if (lm === 'dome') domes.push({ p, basis, w: pitch * 0.34, h: pitch * 0.34, col: '#ece4d2' });
+        else if (lm === 'stadium') rings.push({ p, basis, w: pitch * 0.5, h: pitch * 0.5, col: '#cfc7b8' });
+        else lots.push({ p, basis, w: pitch * 0.28, h: hmax * 1.3, col: '#ddd2bb' });
       }
     }
-    this.scene.add(im);
+    const inst = (geo, list, rough) => {
+      const im = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ roughness: rough }), list.length), m = new THREE.Matrix4(), sc = new THREE.Vector3(), col = new THREE.Color();
+      list.forEach((o, k) => { m.makeBasis(...o.basis); m.scale(sc.set(o.w, o.h, o.w)); m.setPosition(o.p); im.setMatrixAt(k, m); im.setColorAt(k, col.set(o.col)); });
+      this.scene.add(im); return im;
+    };
+    const box = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0);
+    inst(box, pads, 0.95); this.towns = inst(box, lots, 0.7);
+    if (domes.length) inst(new THREE.SphereGeometry(0.5, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), domes, 0.6);
+    if (rings.length) inst(new THREE.TorusGeometry(0.42, 0.14, 4, 20).rotateX(Math.PI / 2).translate(0, 0.07, 0), rings, 0.8);
     this.here = new THREE.Mesh(new THREE.RingGeometry(0.62, 0.7, 48), new THREE.MeshBasicMaterial({ color: '#ffe08a', transparent: true, side: THREE.DoubleSide, depthWrite: false })); // a ring round where you are
-    const hs = this.spots[placeKey()], hp = toVec(hs[0], hs[1], R * 1.003); this.here.position.copy(hp); this.here.lookAt(hp.clone().multiplyScalar(2)); this.scene.add(this.here);
+    const hs = this.spots[placeKey()], hp = toVec(hs[0], hs[1], R * 1.003); this.here.position.copy(hp); this.here.lookAt(hp.clone().multiplyScalar(2)); this.here.scale.setScalar(this.extent[placeKey()] * 1.6 / 0.66); this.scene.add(this.here);
   }
   // the road through the towns (PATH), along the surface from each to the next
   buildRoad() {
