@@ -54,13 +54,14 @@ export class Music {
       p.el.play().then(() => { if (this.players[this.cur] !== p) p.el.pause(); }).catch(() => { p.primed = false; });
     });
   }
-  // what the moment calls for: the storm while any disaster is on (or a real outbreak), the clean-up for a while after, calm otherwise
+  // what the moment calls for: the storm while any other disaster is on; the clean-up through a zombie outbreak (Sean: the
+  // action music did not suit it) and for a while after anything; calm otherwise
   update(dt, g) {
     if (!this.ctx || !this.players.length) return;
     this.t += dt;
-    const D = g.disasters, storm = (D && D.list.some(e => e.alive && e.type !== 'heroes')) || g.people.stats.zombies > 12;
-    if (storm) this.stormEnd = this.t;
-    const mood = storm ? 'storm' : this.t - this.stormEnd < AFTER ? 'rebuild' : 'calm', p = this.players[this.cur];
+    const D = g.disasters, storm = D && D.list.some(e => e.alive && e.type !== 'heroes' && e.type !== 'spill'), outbreak = g.people.stats.zombies > 0 || (D && D.list.some(e => e.alive && e.type === 'spill'));
+    if (storm || outbreak) this.stormEnd = this.t;
+    const mood = storm ? 'storm' : outbreak || this.t - this.stormEnd < AFTER ? 'rebuild' : 'calm', p = this.players[this.cur];
     if (!this.level) { this.mood = mood; return; }
     if (mood !== this.mood && this.cur >= 0) this.play(mood);
     else if (p && p.el.duration && !p.el.paused && p.el.currentTime > p.el.duration - TAIL) this.play(mood, true); // nearly at its ending: round again, crossfaded
