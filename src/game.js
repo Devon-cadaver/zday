@@ -235,6 +235,7 @@ const MICON = {
   tv: svg('<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 3l4 4 4-4"/>'),
 };
 ICON['zd-tvnext'] = svg('<path d="M5 5l9 7-9 7zM17 5v14"/>');
+ICON['zd-tvcam'] = svg('<rect x="3" y="7" width="13" height="10" rx="2"/><path d="M16 10l5-3v10l-5-3"/>');
 ICON['zd-tvtown'] = svg('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>');
 const EXTRA = new Set(['zd-help']); // shown above the bar only when they are wanted
 
@@ -767,7 +768,11 @@ export class Game {
     p.uTime.value = this.realT;
     if (stepped) this.traffic.sync(this.realT); // cars and people only move on a step (30 a second): no need to rebuild their matrices on the frames between
     if (this.helis) this.helis.sync(sdt);
-    if (this.daylight) { this.daylight.set(this.mode.phase ? this.mode.phase() : 0); if (this.disasters) { this.disasters.weather.apply(dt); this.disasters.afterLight(); } this.daylight.update(); }
+    if (this.daylight) {
+      const want = this.mode.phase ? this.mode.phase() : 0;
+      if (this.dayP == null || this.dayMode !== this.mode) { this.dayP = want; this.dayMode = this.mode; } // a new mode starts at its own hour
+      else { const d = ((want - this.dayP) % 1 + 1.5) % 1 - 0.5; this.dayP = Math.abs(d) < 0.004 ? want : (this.dayP + Math.sign(d) * Math.min(Math.abs(d), dt * 0.035) + 1) % 1; } // a jump (a new run, a new round, a new town) rolls round over a few seconds, never in one frame (Sean)
+      this.daylight.set(this.dayP); if (this.disasters) { this.disasters.weather.apply(dt); this.disasters.afterLight(); } this.daylight.update(); }
     this.fire.update(sdt, this.realT, this.camera, this.renderer);
     if (stepped || p.lookDirty) p.sync();
     if (this.disasters) this.disasters.sync(sdt, this.realT);
