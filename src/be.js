@@ -287,6 +287,8 @@ export class BeTheDisaster {
   start() {
     const g = this.g, D = g.disasters, B = g.city.bounds, p = g.people, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2;
     this.end.hidden = true; this.ended = false; g.profile.played('be', placeKey()); // where you left off
+    if (g.radio && this.started) g.radio.cue(this.kind); // on the air (the first time, radio.begin does it)
+    this.started = true;
     if (this.gauge) this.gauge.cancel();
     g.resetWorld(); g.setSpeed(1); D.boats.auto = false; // nobody comes to the rescue
     this.t = 0; this.score = 0; this.tick = 0;

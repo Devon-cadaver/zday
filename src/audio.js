@@ -102,6 +102,7 @@ function glass(size) {
 }
 // a car crash: the bang of two tonnes meeting (a broadband slap over a low thud), sheet metal tearing and folding (dense,
 // gritty noise that falls off fast), the windscreen going, then bits of plastic and trim clattering down
+let crashN = 0;
 function crash() {
   const L = 1.8, x = len(L);
   thump(x, 0, 95, 45, 0.03, 0.08, 1.2);
@@ -111,7 +112,7 @@ function crash() {
   for (let i = 0; i < crum.length; i++) { if (i >= blk) { blk = i + Math.ceil((0.002 + rnd() * 0.006) * SR); g = Math.pow(rnd(), 2); } const t = i / SR; crum[i] *= g * Math.exp(-t / 0.13); }
   add(x, crum, 0.004, 1.5);
   for (let s = 0; s < 4; s++) { const t = rnd() * 0.08; for (let m = 0; m < 6; m++) ping(x, t, 500 + rnd() * 3000, 0.008 + rnd() * 0.025, 0.12); } // a hard metallic edge, gone at once
-  add(x, glass(0), 0.008, 0.6); // the windscreen and a headlamp
+  if (crashN++ % 3 === 0) add(x, glass(0), 0.008, 0.28); // now and then the windscreen (Sean: too much glass)
   for (let k = 0; k < 18; k++) { const t = 0.15 + rnd() * 1.1; grain(x, t, 0.01 + rnd() * 0.02, 800 + rnd() * 2400, 1.2, 0.3 * (1.3 - t)); } // trim and plastic clattering down
   for (let k = 0; k < 3; k++) thump(x, 0.25 + rnd() * 0.7, 150, 80, 0.01, 0.025, 0.25); // heavier parts landing
   return norm(clip(x, 2), 0.95);
@@ -234,11 +235,11 @@ const ONE = [['crash', crash, 3], ['glass', () => glass(0), 3], ['glassBig', () 
 // how far each carries (m; full volume closer than this), how loud, the least time between two, the most at once
 const REACH = { boom: 700, boomBig: 1300, nuke: 4000, crash: 340, glass: 260, glassBig: 420, collapse: 900, shot: 380, rifle: 520, thunder: 3000, whoomph: 300, splash: 400, splashBig: 1200, zap: 260, thud: 200,
   laser: 420, web: 220, whoosh: 260, warp: 320, roar: 1600, roarDeep: 1600, horn: 2200 };
-const VOL = { boom: 0.9, boomBig: 1, nuke: 1, crash: 0.75, glass: 0.55, glassBig: 0.6, collapse: 0.85, shot: 0.45, rifle: 0.5, thunder: 0.8, whoomph: 0.5, splash: 0.6, splashBig: 0.8, zap: 0.35, thud: 0.5,
+const VOL = { boom: 0.9, boomBig: 1, nuke: 1, crash: 0.6, glass: 0.32, glassBig: 0.4, collapse: 0.85, shot: 0.45, rifle: 0.5, thunder: 0.8, whoomph: 0.5, splash: 0.6, splashBig: 0.8, zap: 0.35, thud: 0.5,
   laser: 0.5, web: 0.45, whoosh: 0.55, warp: 0.5, roar: 0.9, roarDeep: 0.9, horn: 0.75 };
-const GAP = { nuke: 2, thunder: 0.4, splashBig: 1, glass: 0.07, glassBig: 0.12, crash: 0.1, collapse: 0.3, shot: 0.04, rifle: 0.05, boom: 0.08, boomBig: 0.12, thud: 0.06, zap: 0.05, whoomph: 0.2,
+const GAP = { nuke: 2, thunder: 0.4, splashBig: 1, glass: 0.9, glassBig: 1.4, crash: 0.3, collapse: 0.3, shot: 0.04, rifle: 0.05, boom: 0.08, boomBig: 0.12, thud: 0.06, zap: 0.05, whoomph: 0.2,
   laser: 0.3, web: 0.15, whoosh: 0.5, warp: 0.4, roar: 1.5, roarDeep: 1.5, horn: 3 };
-const CAP = { shot: 5, rifle: 5, glass: 4, crash: 4, collapse: 3, zap: 3, laser: 3 };
+const CAP = { shot: 5, rifle: 5, glass: 1, glassBig: 1, crash: 2, collapse: 3, zap: 3, laser: 3 };
 const DUCK = { nuke: 0.85, boomBig: 0.45, collapse: 0.3, roar: 0.35, roarDeep: 0.35 }; // the music dips under these
 const MAXV = 22;
 const LEVELS = [0, 0.3, 0.55, 0.85]; // the sound button: off, quiet, medium, loud

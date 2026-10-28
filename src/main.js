@@ -19,6 +19,7 @@ import { CURVE, curveFrame } from './curve.js';
 import { PLACES, placeKey } from './places.js';
 import { Globe } from './globe.js';
 import { Sky } from './sky.js';
+import { Radio } from './radio.js';
 import { damageOf, rememberDamage, takeMeteor } from './world.js';
 
 const P = new URLSearchParams(location.search);
@@ -163,6 +164,8 @@ disasters.sirens = sirens;
 const game = new Game({ people, traffic, fire, city, camera, controls, renderer, mode, daylight, helis, post, disasters });
 const searchlights = new Searchlights(scene, { game, traffic, helis, city, daylight }); // beams at night on the trouble
 game.audio = new Audio(camera, controls); // sound: switched on by the first tap
+game.radio = new Radio(game.audio); // the announcer
+if (game.menu.hidden) game.radio.begin(game.modeName === 'be' && game.mode ? game.mode.kind : null);
 const globe = game.globe = new Globe(renderer); let globeWas = false; // the world from orbit: the big city and the towns
 globe.statusFor = () => game.townStatus(game.modeName); // Commander and Be The Disaster: towns further down the road are locked
 globe.sky = sky;

@@ -253,6 +253,7 @@ export class Game {
     this.menu.hidden = true; this.menuOff(); this.modeName = which;
     this.top.innerHTML = ''; this.bar.innerHTML = ''; this.followChip = this.stopBtn = null;
     this.mode = which === 'sandbox' ? new Sandbox(this) : which === 'be' ? new BeTheDisaster(this, kind) : new Commander(this);
+    if (this.radio) this.radio.begin(which === 'be' ? this.mode.kind : null);
   }
 
   // ---------- main menu and unlocks
@@ -731,6 +732,7 @@ export class Game {
     }
     this.mode.update(sdt, dt);
     if (this.audio) this.audio.update(dt, this);
+    if (this.radio) this.radio.update(dt, this);
     if (this.flash > 0) { this.flash = Math.max(0, this.flash - dt * 0.6); this.post.opts.flash = Math.min(1, this.flash * this.flash); } else this.post.opts.flash = 0;
     if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 1.2);
     if (fps) this.el.fps.textContent = fps + ' fps';

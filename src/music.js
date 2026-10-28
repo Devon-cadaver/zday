@@ -77,6 +77,12 @@ export class Music {
       setTimeout(() => { if (this.players[this.cur] !== old) old.el.pause(); }, (f + 0.5) * 1000);
     }
   }
+  // the announcer talking: the music held down for secs, then back up
+  hold(k, secs) {
+    if (!this.duckG) return;
+    const t = this.ctx.currentTime, g = this.duckG.gain;
+    g.cancelScheduledValues(t); g.setValueAtTime(g.value, t); g.linearRampToValueAtTime(1 - k, t + 0.3); g.setValueAtTime(1 - k, t + secs); g.linearRampToValueAtTime(1, t + secs + 1.2);
+  }
   // a big bang: the music ducks out of the way and comes back up
   duck(k) {
     if (!this.duckG) return;
