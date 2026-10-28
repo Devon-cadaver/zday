@@ -133,15 +133,17 @@ function collapse() {
   for (let k = 0; k < 60; k++) { const t = 2.5 + rnd() * 2.8; grain(x, t, 0.003 + rnd() * 0.008, 1500 + rnd() * 3500, 1.5, 0.08); } // grit trickling down
   return norm(clip(x, 1.6), 0.92);
 }
-// a beam weapon: a buzzing, sizzling hum with a whine over it (Tyrant's eyes, a tripod's heat ray)
+// a beam weapon: a deep electric buzz with a slow throb under it and a low crackle where it burns, nothing high
+// (Sean: the whine was too shrill) (Tyrant's eyes, a tripod's heat ray)
 function laser() {
-  const L = 1.9, x = len(L), buzz = len(L); let ph = 0, ph2 = 0;
-  for (let i = 0; i < x.length; i++) { const t = i / SR; ph += 2 * Math.PI * (92 + Math.sin(t * 31) * 4) / SR; buzz[i] = ((ph / (2 * Math.PI)) % 1) * 2 - 1; }
-  biquad(buzz, 'bp', 1100, 0.5); add(x, buzz, 0, 1.4);
-  for (let i = 0; i < x.length; i++) { const t = i / SR; ph2 += 2 * Math.PI * (2350 + Math.sin(t * 9) * 70) / SR; x[i] += Math.sin(ph2) * 0.22; }
-  const siz = biquad(noise(x.length), 'hp', 3000); for (let i = 0; i < siz.length; i++) siz[i] *= rnd() < 0.08 ? 1 : 0.25; add(x, siz, 0, 0.45); // sizzling where it burns
+  const L = 1.9, x = len(L), buzz = len(L); let ph = 0;
+  for (let i = 0; i < x.length; i++) { const t = i / SR; ph += 2 * Math.PI * (88 + Math.sin(t * 31) * 4) / SR; buzz[i] = ((ph / (2 * Math.PI)) % 1) * 2 - 1; }
+  biquad(buzz, 'lp', 650); add(x, buzz, 0, 1.6);
+  for (let i = 0; i < x.length; i++) { const t = i / SR; x[i] += Math.sin(2 * Math.PI * 44 * t) * (0.45 + 0.15 * Math.sin(t * 7)); } // the throb
+  const crk = biquad(noise(x.length, 'brown'), 'lp', 900); for (let i = 0; i < crk.length; i++) crk[i] *= rnd() < 0.06 ? 1.6 : 0.35; add(x, crk, 0, 0.8); // burning
+  biquad(x, 'lp', 1400);
   for (let i = 0; i < x.length; i++) { const t = i / SR; x[i] *= Math.min(1, t / 0.05) * Math.min(1, (L - t) / 0.25); }
-  return norm(clip(x, 2.5), 0.8);
+  return norm(clip(x, 2.2), 0.8);
 }
 // a web shot: a sharp thwip and the strand twanging
 function web() { const x = len(0.4), n = sweep(noise(x.length), (t) => 900 + 9000 * Math.min(1, t / 0.08)); biquad(n, 'hp', 700); env(n, 0.004, 0.05); add(x, n, 0, 1.4); ping(x, 0.03, 720, 0.05, 0.35); ping(x, 0.03, 1450, 0.03, 0.15); return norm(x, 0.7); }
@@ -207,7 +209,7 @@ function whoomph() {
   return norm(clip(x, 1.3), 0.85);
 }
 // an alien zapper
-function zap() { const L = 0.35, x = len(L); let ph = 0; for (let i = 0; i < x.length; i++) { const t = i / SR, f = 300 + 1700 * Math.exp(-t / 0.08) + Math.sin(t * 260) * 60; ph += 2 * Math.PI * f / SR; x[i] = (Math.sin(ph) + 0.4 * Math.sign(Math.sin(ph * 0.5))) * Math.exp(-t / 0.1); } return norm(x, 0.6); }
+function zap() { const L = 0.38, x = len(L); let ph = 0; for (let i = 0; i < x.length; i++) { const t = i / SR, f = 120 + 650 * Math.exp(-t / 0.07) + Math.sin(t * 190) * 25; ph += 2 * Math.PI * f / SR; x[i] = (Math.sin(ph) + 0.3 * Math.sign(Math.sin(ph * 0.5))) * Math.exp(-t / 0.11); } biquad(x, 'lp', 1500); return norm(x, 0.6); } // the aliens' ray guns: a low falling pew (Sean: the lasers were too shrill)
 // a heavy splash: water dumped from the sky, a wave slamming into the street
 function splash(size) {
   const L = [1.2, 3][size], x = len(L), w = biquad(noise(x.length, 'pink'), 'bp', 900, 0.5); env(w, 0.02, [0.3, 0.9][size]); add(x, w, 0, 2.2);
