@@ -63,7 +63,8 @@ class Signal {
     this.D = D; this.t = 0; this.life = 14; this.alive = true;
     let best = -1, top = 0; city.buildingsNear(x, z, 90, (k, d, b) => { if (b.roofY > top && !b.landmark) { top = b.roofY; best = k; } });
     const b = best >= 0 ? city.buildings[best] : null;
-    this.lx = b ? (b.x0 + b.x1) / 2 : x; this.lz = b ? (b.z0 + b.z1) / 2 : z; this.ly = b ? b.roofY + 0.5 : 0.5; this.k = best;
+    const rp = b ? city.roofPoint(best, (b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2) : [x, z]; // on the roof, clear of its hut
+    this.lx = rp[0]; this.lz = rp[1]; this.ly = b ? b.roofY + 0.5 : 0.5; this.k = best;
     // the light is angled up towards the viewer so the peace sign lands in the sky at the top of the view
     const cam = D.ctx.camera, v = new THREE.Vector3(0, 0.55, 0.5).unproject(cam).sub(cam.position).normalize(), sy = Math.min(cam.position.y * 0.8, this.ly + 75), tt = v.y < -0.02 ? (sy - cam.position.y) / v.y : 300;
     this.sx = cam.position.x + v.x * tt; this.sy = cam.position.y + v.y * tt; this.sz = cam.position.z + v.z * tt;
@@ -167,7 +168,7 @@ class Hero {
   // nothing to do: hover by the signal, then land on its roof
   idle(h) {
     const s = this.H.home, i = this.H.who.indexOf(this), a = i * 2.1 + this.t * 0.15;
-    if (this.H.idleT > 6 && s.k >= 0) { const b = this.D.ctx.city.buildings[s.k]; if (b && !this.D.ctx.city.dead[s.k]) { const r = b.roof, px = clamp(s.x + (i - 1) * 3, r.x0 + 1, r.x1 - 1); this.fly(px, b.roofY, s.z, h, 20); this.landed = Math.abs(this.y - b.roofY) < 0.3; return; } }
+    if (this.H.idleT > 6 && s.k >= 0) { const b = this.D.ctx.city.buildings[s.k]; if (b && !this.D.ctx.city.dead[s.k]) { const [px, pz] = this.D.ctx.city.roofPoint(s.k, s.x + (i - 1) * 3, s.z); this.fly(px, b.roofY, pz, h, 20); this.landed = Math.abs(this.y - b.roofY) < 0.3; return; } }
     this.landed = false; this.fly(s.x + Math.cos(a) * 18, this.cruiseY(s.x, s.z), s.z + Math.sin(a) * 18, h, 25);
   }
   // an incoming meteor or warhead: get under it, Tempo slows it, the first there seizes it
@@ -384,7 +385,7 @@ class Hero {
       }
     }
     if (J.k == null || J.k < 0 || city.dead[J.k]) { J.k = this.roofFor(); if (J.k < 0) { for (const j of J.ppl) P.swim(j, 30); this.job = null; return; } }
-    const b = P.bld[J.k], rf = b.roof, cx = (rf.x0 + rf.x1) / 2, cz = (rf.z0 + rf.z1) / 2, hd = Math.hypot(cx - this.x, cz - this.z);
+    const b = P.bld[J.k], rf = b.roof, [cx, cz] = city.roofPoint(J.k, (rf.x0 + rf.x1) / 2, (rf.z0 + rf.z1) / 2), hd = Math.hypot(cx - this.x, cz - this.z);
     this.fly(cx, hd > 8 ? Math.max(b.roofY + 6, this.cruiseY(this.x, this.z)) : b.roofY + 1.9, cz, h, 55);
     if (hd < 3 && this.y < b.roofY + 3) { for (const j of J.ppl) P.toRoof(j, J.k); this.D.emit({ type: 'heroroof', n: J.ppl.length }); this.job = null; }
   }

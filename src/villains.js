@@ -741,7 +741,7 @@ class Weaver extends Villain {
   }
   roofNear(x, z, R) { let best = -1, bd = 1e9; this.D.ctx.city.buildingsNear(x, z, R, (k, d, b) => { if (b.roofY >= 9 && !b.landmark && d < bd) { bd = d; best = k; } }); return best; }
   // where to stand on roof k: at the edge facing (tx, tz)
-  spot(k, tx, tz) { const r = this.D.ctx.city.buildings[k].roof; return r.x1 > r.x0 + 1.2 && r.z1 > r.z0 + 1.2 ? [clamp(tx, r.x0 + 0.6, r.x1 - 0.6), clamp(tz, r.z0 + 0.6, r.z1 - 0.6)] : [(r.x0 + r.x1) / 2, (r.z0 + r.z1) / 2]; }
+  spot(k, tx, tz) { const city = this.D.ctx.city, r = city.buildings[k].roof; return r.x1 > r.x0 + 1.2 && r.z1 > r.z0 + 1.2 ? city.roofPoint(k, tx, tz) : [(r.x0 + r.x1) / 2, (r.z0 + r.z1) / 2]; }
   update(h) {
     this.t += h; this.act = Math.max(0, this.act - h); this.spat = Math.max(0, this.spat - h);
     for (let i = this.webs.length - 1; i >= 0; i--) { const w = this.webs[i]; w.update(h); if (!w.alive) { w.dispose(); this.webs.splice(i, 1); } }

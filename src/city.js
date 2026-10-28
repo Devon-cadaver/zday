@@ -843,6 +843,20 @@ export function buildCity(tex, opts = {}) {
     q.identity(); m4.compose(p.set(st.x, 0.02, st.z), q, s.set(st.w, 1, st.d));
   }, false);
 
+  // a spot to stand on building k's roof near (x, z): inside its edge and out of the stair hut (Sean: a hero landed
+  // inside one, his head showing over its parapet)
+  const roofPoint = (k, x, z) => {
+    const b = buildings[k], r = b.roof || b, hu = b.hut, m = 1.3, cl = (v, a, c) => Math.max(a, Math.min(c, v));
+    let px = cl(x, r.x0 + 0.8, r.x1 - 0.8), pz = cl(z, r.z0 + 0.8, r.z1 - 0.8);
+    if (hu && px > hu.x0 - m && px < hu.x1 + m && pz > hu.z0 - m && pz < hu.z1 + m) { // out of its nearest side that is still on the roof
+      const way = [[hu.x0 - m, pz, px - hu.x0 + m], [hu.x1 + m, pz, hu.x1 + m - px], [px, hu.z0 - m, pz - hu.z0 + m], [px, hu.z1 + m, hu.z1 + m - pz]]
+        .filter(([qx, qz]) => qx >= r.x0 + 0.4 && qx <= r.x1 - 0.4 && qz >= r.z0 + 0.4 && qz <= r.z1 - 0.4).sort((p, q) => p[2] - q[2]);
+      if (way.length) { px = way[0][0]; pz = way[0][1]; }
+      else { let bd = -1; for (const qx of [r.x0 + 0.4, r.x1 - 0.4]) for (const qz of [r.z0 + 0.4, r.z1 - 0.4]) { const d = Math.hypot(Math.max(hu.x0 - qx, 0, qx - hu.x1), Math.max(hu.z0 - qz, 0, qz - hu.z1)); if (d > bd) { bd = d; px = qx; pz = qz; } } } // a small roof: its corner furthest from the hut
+    }
+    return [px, pz];
+  };
+
   // ---------- destruction: buildings can be hidden, lifted out as a separate shell, and replaced by rubble
   const instMeshes = [...crownT.meshes, ...trunkT.meshes, ...tankT.meshes, ...lampT.meshes];
   for (const im of instMeshes) im.userData.orig = im.instanceMatrix.array.slice();
@@ -1007,7 +1021,7 @@ export function buildCity(tex, opts = {}) {
   return {
     buildings, char, uncharAll, lamps, mats,
     dead, buildingsNear, hideBuilding, extractBuilding, addRubble, clearRubble, restoreBuilding, takeStreetNear, restoreAll,
-    group, sx, sz, NB, parked, crowds, walkBlocks, open, layout, nid,
+    group, sx, sz, NB, parked, crowds, walkBlocks, open, layout, nid, roofPoint,
     bounds: { x0: sx[0], x1: sx[NB], z0: sz[0], z1: sz[NB] },
     stats: { crowns: crowns.length, tanks: tanks.length, parked: parked.length, verts: Object.values(B).flat().reduce((a, b) => a + b.v, 0) },
   };
