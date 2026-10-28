@@ -3,6 +3,7 @@
 // plazas, street trees, lamps and crosswalks.
 import * as THREE from 'three';
 import { cutGround } from './holes.js';
+import { seeThrough } from './see.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { rng } from './textures.js';
 import { townMask } from './shapes.js';
@@ -745,9 +746,9 @@ export function buildCity(tex, opts = {}) {
   const walls = (m) => { const prev = m.onBeforeCompile; m.onBeforeCompile = (sh, r) => { prev(sh, r); sh.fragmentShader = sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.rgb *= 0.74 + 0.26 * smoothstep(0.2, 6.0, vHoleW.y);'); }; return m; };
   const nrm = (k) => new THREE.Vector2(k, k);
   const mats = {
-    fac: tex.facades.map((m, k) => walls(std({ map: m, normalMap: tex.facadeRelief[k], normalScale: nrm(1.6), vertexColors: true, roughness: 0.85, emissiveMap: tex.facadesLit[k], emissive: '#ffffff', emissiveIntensity: 0 }))),
-    shop: walls(std({ map: tex.shop, normalMap: tex.shopRelief, normalScale: nrm(1.6), vertexColors: true, emissiveMap: tex.shopLit, emissive: '#ffffff', emissiveIntensity: 0 })),
-    roof: std({ map: tex.roof, normalMap: tex.roofRelief, normalScale: nrm(1.5), vertexColors: true }),
+    fac: tex.facades.map((m, k) => seeThrough(walls(std({ map: m, normalMap: tex.facadeRelief[k], normalScale: nrm(1.6), vertexColors: true, roughness: 0.85, emissiveMap: tex.facadesLit[k], emissive: '#ffffff', emissiveIntensity: 0 })))), // walls in the way of the action go see-through (see.js)
+    shop: seeThrough(walls(std({ map: tex.shop, normalMap: tex.shopRelief, normalScale: nrm(1.6), vertexColors: true, emissiveMap: tex.shopLit, emissive: '#ffffff', emissiveIntensity: 0 }))),
+    roof: seeThrough(std({ map: tex.roof, normalMap: tex.roofRelief, normalScale: nrm(1.5), vertexColors: true })),
     walk: std({ map: tex.sidewalk, vertexColors: true }),
     grass: std({ map: tex.grass, vertexColors: true, roughness: 1 }),
   };

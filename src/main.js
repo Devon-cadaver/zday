@@ -16,6 +16,7 @@ import { Sirens } from './sirens.js';
 import { Searchlights } from './searchlights.js';
 import { Audio } from './audio.js';
 import { CURVE, curveFrame } from './curve.js';
+import { seeFrame, SEE } from './see.js';
 import { PLACES, placeKey, settle } from './places.js';
 import { Globe } from './globe.js';
 import { Sky } from './sky.js';
@@ -181,6 +182,7 @@ function frame() {
   }
   sirens.update(time); W.searchlights.update(dt);
   curveFrame(scene, camera, tg); // the world curves away as you zoom out
+  seeFrame(camera, game.focusAt || tg, focus); // walls between the camera and the action go see-through, close in
   post.render(scene, camera, focus, time);
   camera.position.x -= jx; camera.position.y -= jy; camera.position.z -= jz;
 
@@ -218,7 +220,7 @@ function worldReady() {
   W.searchlights = new Searchlights(scene, { game, traffic, helis, city, daylight }); // beams at night on the trouble
   window.__lights = W.searchlights;
   for (const k of damageOf(placeKey())) if (city.buildings[k] && !city.dead[k]) { people.clearBuilding(k, 'spare'); city.hideBuilding(k); city.addRubble(k, 0.75); }
-  window.__z = { THREE, scene, camera, controls, renderer, post, city, traffic, people, fire, game, daylight, helis, disasters, outskirts, sirens, sun, hemi, setView, buildMs, audio: game.audio, info: () => renderer.info.render };
+  window.__z = { see: SEE, THREE, scene, camera, controls, renderer, post, city, traffic, people, fire, game, daylight, helis, disasters, outskirts, sirens, sun, hemi, setView, buildMs, audio: game.audio, info: () => renderer.info.render };
 }
 if (W) worldReady();
 else window.__z = { THREE, scene, camera, controls, renderer, post, game, sun, hemi, setView, audio: game.audio, buildWorld };
