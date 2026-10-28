@@ -20,6 +20,7 @@ const MISSION_KINDS = { police: { geo: () => cruiserGeometry(), cap: 12, cruise:
   build: { geo: () => VEHICLES.crane_truck.build(), cap: 8, cruise: 10 }, hazmat: { geo: () => VEHICLES.hazmat_truck.build(), cap: 4, cruise: 11 }, medic: { geo: () => VEHICLES.ambulance.build(), cap: 6, cruise: 13 }, jail: { geo: () => VEHICLES.police_bus.build(), cap: 4, cruise: 11 } };
 const tough = (car) => car.kind === 'apc' || car.kind === 'tank' || car.kind === 'build' || car.kind === 'hazmat'; // drive through traffic and wrecks, park right at the crossing
 const STOPLINE = 3.4; // car centre stops this far before the lane end
+const HALF_LEN = { police: 2.4, fire: 5.2, apc: 3.8, bus: 6, chaser: 3, tank: 4.6, build: 5.6, hazmat: 4.2, medic: 3.2, jail: 6 }; // half a rescue vehicle's length, for parking in a line
 
 const CAR_COLS = ['#f2efe8', '#f2efe8', '#f2efe8', '#e8e6e0', '#b8b8b4', '#9a9a98', '#2a2a2c', '#8c2a22', '#2f4566', '#d8c9a8', '#e0b030', '#5b6b4a'];
 
@@ -676,19 +677,34 @@ export class Traffic {
     car.x = 1e5; car.z = 1e5; this.pose(car);
   }
 
-  // pull over where it is and deploy
+  // pull over where it is and deploy (behind any unit already parked there, not inside it)
   park(car) {
-    car.mode = PARKED; car.v = 0; car.turn = false; this.pose(car);
+    car.mode = PARKED; car.v = 0; car.turn = false; car.s = this.clearOf(car, car.s); this.pose(car);
     this.release(this.nodes[car.b], car);
     if (car.onArrive) car.onArrive(car.x, car.z, car);
   }
 
-  // where on its final segment a mission car pulls over: beside the tap point
+  // where on its final segment a mission car pulls over: beside the tap point (the heavy ones right at the crossing),
+  // behind whatever is already parked in its lane
   stopAt(car) {
-    if (tough(car)) return car.len - 1; // right at the crossing
-    if (!car.to) return car.len - 7;
+    if (tough(car)) return this.clearOf(car, car.len - 1);
+    if (!car.to) return this.clearOf(car, car.len - 7);
     const s = (car.to[0] - car.p0x) * car.dx + (car.to[1] - car.p0z) * car.dz;
-    return Math.min(car.len - 7, Math.max(3, s));
+    return this.clearOf(car, Math.min(car.len - 7, Math.max(3, s)));
+  }
+  // the nearest place at or behind s on this lane clear of the rescue vehicles parked on it (Sean: they parked inside each other)
+  clearOf(car, s) {
+    const h = HALF_LEN[car.kind] || HALF_L;
+    for (let pass = 0; pass < 8; pass++) {
+      let moved = false;
+      for (const o of this.missions) {
+        if (o === car || o.gone || o.mode !== PARKED || o.a !== car.a || o.b !== car.b) continue;
+        const gap = (HALF_LEN[o.kind] || HALF_L) + h + 1.5;
+        if (Math.abs(o.s - s) < gap) { s = o.s - gap; moved = true; }
+      }
+      if (!moved) break;
+    }
+    return Math.max(1, s);
   }
 
   // route from a clear stretch of the city edge to (x,z) and send a cruiser
