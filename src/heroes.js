@@ -1,4 +1,5 @@
-// Super heroes: three of them, peach skin, white suits and white capes, called
+// Super heroes: three of them, peach skin, each in a neon suit and cape of their
+// own (Dragonfly green, Nova pink, Tempo cyan, lit from within), called
 // with the hero signal (a peace sign shone onto the clouds from a rooftop).
 // Dragonfly flies on four buzzing insect wings: he cuts people and cars free of
 // Weaver's webs and knocks Weaver off his perch. Nova flies and is the strongest:
@@ -51,6 +52,9 @@ function kit() {
     rock: new THREE.IcosahedronGeometry(1, 1),
     rockMat: new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 1.0, 0.3), fog: false }),
   };
+  // each their own neon, glowing a little, so they stand out from the town, from the villains and from each other
+  const neon = (hex) => { const c = new THREE.Color(hex); return { suit: std(hex, { roughness: 0.35, emissive: c, emissiveIntensity: 0.45 }), boot: std(hex, { roughness: 0.4, emissive: c, emissiveIntensity: 0.3 }), cape: std(hex, { side: THREE.DoubleSide, roughness: 0.55, emissive: c, emissiveIntensity: 0.3 }) }; };
+  HM.look = { Dragonfly: neon('#3dff5c'), Nova: neon('#ff3fcf'), Tempo: neon('#29e3ff') };
   return HM;
 }
 
@@ -122,7 +126,7 @@ class Hero {
     this.x = H.sig.sx + (Math.random() - 0.5) * 30; this.y = H.sig.sy + 20; this.z = H.sig.sz + (Math.random() - 0.5) * 30; this.vx = this.vy = this.vz = 0; this.hs = 0; this.yaw = 0; this.pitch = 0;
     this.side = 'hero'; this.busyT = 0;
     this.state = 'wait'; this.waitT = 2.5 + (o.delay || 0); this.job = null; this.cd = 0; this.gcd = 0; this.punchT = 0; this.castT = 0; this.carry = null;
-    this.rig = rig({ mats: { ...K, hair: K.hair[name] }, slim: o.slim, longHair: o.longHair, capeLen: 1.1 }); this.rig.root.visible = false; H.scene.add(this.rig.root);
+    this.rig = rig({ mats: { ...K, ...K.look[name], hair: K.hair[name] }, slim: o.slim, longHair: o.longHair, capeLen: 1.1 }); this.rig.root.visible = false; H.scene.add(this.rig.root);
     if (o.wings) { // four insect wings at the shoulder blades
       this.wings = [];
       for (const [sx, y, sweep] of [[1, 0.46, 0.25], [-1, 0.46, 0.25], [1, 0.38, 0.7], [-1, 0.38, 0.7]]) {
@@ -436,7 +440,7 @@ class Hero {
 
 // a hero on their own for the roster
 export function heroModel(name) {
-  const K = kit(), r = rig({ mats: { ...K, hair: K.hair[name] }, slim: name === 'Nova', longHair: name === 'Nova', capeLen: 1.1 }); relax(r); handsOnHips(r);
+  const K = kit(), r = rig({ mats: { ...K, ...K.look[name], hair: K.hair[name] }, slim: name === 'Nova', longHair: name === 'Nova', capeLen: 1.1 }); relax(r); handsOnHips(r);
   const wings = [];
   if (name === 'Dragonfly') for (const [sx, y, sweep] of [[1, 0.46, 0.25], [-1, 0.46, 0.25], [1, 0.38, 0.7], [-1, 0.38, 0.7]]) {
     const pv = new THREE.Group(); pv.position.set(sx * 0.06, y, -0.12); pv.scale.x = sx; pv.rotation.y = -sweep; r.torso.add(pv);

@@ -1,5 +1,6 @@
-// Super villains: three of them, chalk-white skin, dressed head to toe in black
-// with long black capes. Blur is so fast he runs straight through buildings and
+// Super villains: three of them, chalk-white skin, each dressed head to toe in a
+// dark colour of their own with a long cape to match (Blur maroon, Tyrant deep
+// purple, Weaver bottle green). Blur is so fast he runs straight through buildings and
 // sends cars spinning out of his way. Tyrant flies, lifts cars and whole buildings
 // and hurls them at each other, and his red laser eyes scorch the streets and set
 // things alight. Weaver has six arms and swings from roof to roof on a web line;
@@ -43,6 +44,15 @@ function kit() {
     disc: new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2),
   };
   return M;
+}
+
+// each villain's own dark colour, suit and cape (the heroes wear neon), so each can be told apart from above
+const LOOK = { Blur: ['#7a1229', '#560a1b'], Tyrant: ['#4d1672', '#340c4f'], Weaver: ['#155a33', '#0d3d22'] };
+const VM = {};
+function vmats(name) {
+  if (VM[name]) return VM[name];
+  const m = kit(), L = LOOK[name]; if (!L) return m;
+  return (VM[name] = { ...m, suit: new THREE.MeshStandardMaterial({ color: L[0], roughness: 0.42, metalness: 0.15 }), cape: new THREE.MeshStandardMaterial({ color: L[1], roughness: 0.6, side: THREE.DoubleSide }) });
 }
 
 const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
@@ -119,7 +129,8 @@ export function rig(o = {}) {
 // the close-up body: smooth tubes swept through the same joints (flesh.js), each part in its own colour - a suit with
 // a belt and an emblem, boots, gloves, a head with hair over the crown. Built the first time a figure comes near
 function smoothBody(r) {
-  const mt = r.mt, o = r.o, sl = o.slim ? 0.88 : 1, col = (mm, d = [1, 1, 1]) => (mm && mm.color ? [mm.color.r, mm.color.g, mm.color.b] : d);
+  const mt = r.mt, o = r.o, sl = o.slim ? 0.88 : 1, glo = (mm, c) => (mm.emissive ? mm.emissive[c] * (mm.emissiveIntensity ?? 1) : 0); // a neon suit keeps its glow up close
+  const col = (mm, d = [1, 1, 1]) => (mm && mm.color ? [mm.color.r + glo(mm, 'r'), mm.color.g + glo(mm, 'g'), mm.color.b + glo(mm, 'b')] : d);
   const suit = col(mt.suit), skin = col(mt.skin), boot = col(mt.boot || mt.suit), glove = col(mt.glove || mt.skin), hair = col(mt.hair), belt = mt.belt ? col(mt.belt) : null, badge = mt.badge ? col(mt.badge) : null;
   const body = new Body(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: mt.suit.roughness ?? 0.45, metalness: mt.suit.metalness ?? 0.05 }));
   const T = (q, pts, ref) => { const t = body.add({ lumps: 0, tile: 0.3, ...q }); t.src = pts; t.refSrc = ref; };
@@ -206,7 +217,7 @@ class Trail {
 class Villain {
   constructor(V, o) {
     this.V = V; this.D = V.D; this.x = o.x; this.z = o.z; this.y = o.y ?? 0; this.yaw = Math.random() * 6.28; this.t = Math.random() * 5; this.speed = 0; this.player = false; this.hp = 780; this.trapped = 0; this.side = 'villain'; this.busyT = 0;
-    this.rig = rig(o.rig); V.scene.add(this.rig.root);
+    this.rig = rig({ ...(o.rig || {}), mats: vmats(o.name) }); V.scene.add(this.rig.root);
   }
   face(dx, dz, h, k = 8) { if (Math.hypot(dx, dz) < 1e-4) return; let d = Math.atan2(dx, dz) - this.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); this.yaw += d * Math.min(1, h * k); }
   place() { const r = this.rig.root; r.position.set(this.x, this.y, this.z); r.rotation.y = this.yaw; }
@@ -247,7 +258,7 @@ class Villain {
 
 // a villain on its own for the roster: Blur and Tyrant hands on hips, Weaver crouched with his six arms out
 export function villainModel(name) {
-  const r = rig(name === 'Tyrant' ? { eyes: true } : name === 'Weaver' ? { arms: 6, capeLen: 1.05 } : {}); relax(r);
+  const r = rig({ ...(name === 'Tyrant' ? { eyes: true } : name === 'Weaver' ? { arms: 6, capeLen: 1.05 } : {}), mats: vmats(name) }); relax(r);
   if (name === 'Weaver') {
     r.hips.position.y = 0.6; r.torso.rotation.x = 0.55; r.head.rotation.x = -0.5; r.legs[0].hip.rotation.set(-1.2, 0, -0.35); r.legs[1].hip.rotation.set(-1.2, 0, 0.35);
     for (const L of r.legs) L.knee.rotation.x = 2.0;
@@ -262,7 +273,7 @@ class Blur extends Villain {
   constructor(V, x, z) {
     const B = V.D.ctx.city.bounds, e = Math.floor(Math.random() * 4);
     const sx = e === 0 ? B.x0 - 40 : e === 1 ? B.x1 + 40 : x, sz = e === 2 ? B.z0 - 40 : e === 3 ? B.z1 + 40 : z;
-    super(V, { x: sx, z: sz });
+    super(V, { x: sx, z: sz, name: 'Blur' });
     this.name = 'Blur'; this.hint = 'drag and he runs there, straight through everything in the way';
     this.frail = 2; // built for speed, not for taking a hit: a blow lands twice as hard on him
     this.state = 'dash'; this.goal = [x, z]; this.restT = 0; this.ph = 0; this.inB = -1; this.scareT = 0;
@@ -370,7 +381,7 @@ class Blur extends Villain {
 // ---------- Tyrant: flies, throws cars and buildings at each other, lasers from his eyes
 class Tyrant extends Villain {
   constructor(V, x, z) {
-    super(V, { x, z, y: 240, rig: { eyes: true } });
+    super(V, { x, z, y: 240, name: 'Tyrant', rig: { eyes: true } });
     this.name = 'Tyrant'; this.hint = 'tap a car or a building to grab it, tap again to throw it there; hold to fire his laser eyes';
     this.state = 'arrive'; this.vx = this.vy = this.vz = 0; this.plan = null; this.held = null; this.ray = null; this.rayT = 2.5; this.wind = 0; this.after = 0; this.flying = []; this.pitch = 0; this.hs = 0;
     this.beams = [0, 1].map(() => { const b = strand(V.scene, kit().laser); b.renderOrder = 8; return b; });
@@ -730,7 +741,7 @@ class Web {
 // ---------- Weaver: six arms, swings from roof to roof, webs the streets, acid on whatever cars get stuck
 class Weaver extends Villain {
   constructor(V, x, z) {
-    super(V, { x, z, rig: { arms: 6, capeLen: 1.05 } });
+    super(V, { x, z, name: 'Weaver', rig: { arms: 6, capeLen: 1.05 } });
     this.name = 'Weaver'; this.hint = 'tap the street to shoot a web there; hold and let go somewhere to swing that way. His acid eats the cars his webs catch';
     this.webs = []; this.webT = 1.5; this.spitT = 2.5; this.perchT = 7; this.swing = null; this.act = 0; this.spat = 0;
     this.line = strand(V.scene);
