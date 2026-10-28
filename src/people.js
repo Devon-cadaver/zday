@@ -821,13 +821,16 @@ export class People {
 
   // the nuke: everything within R dies, roofs included; the ground is scorched for the rest of the round
   nuke(x, z, R, byPlayer = true) { // byPlayer: the commander's own nuke (its civilian toll counts against them)
-    let zk = 0, ck = 0;
     const R2 = R * R;
+    return this.nukeIf((j) => (this.x[j] - x) ** 2 + (this.z[j] - z) ** 2 <= R2, x, z, R, byPlayer);
+  }
+  // everyone the test picks out burned where they stand (the mini nuke picks those inside its quarantine zone)
+  nukeIf(test, x, z, R, byPlayer = true) {
+    let zk = 0, ck = 0;
     for (let j = 0; j < this.active; j++) {
       const s = this.st[j];
-      if (s === S.DEAD || s === S.EVAC) continue;
+      if (s === S.DEAD || s === S.EVAC || !test(j)) continue;
       const dx = this.x[j] - x, dz = this.z[j] - z, d2 = dx * dx + dz * dz;
-      if (d2 > R2) continue;
       const wasZ = s === S.ZOMBIE || s === S.PILE || s === S.CLIMB || s === S.TURNING || s === S.FALLING;
       if (s === S.PILE || s === S.CLIMB) { const k = this.bt[j]; if (k >= 0) this.bPile[k] = 0; }
       if (s === S.INSIDE) { const k = this.bt[j]; if (k >= 0) this.bIn[k] = Math.max(0, this.bIn[k] - 1); }
@@ -1186,10 +1189,10 @@ export class People {
     if ((this.think[i] -= h) <= 0) {
       this.think[i] = 0.25;
       const sol = this.kind[i] === KIND.SOLDIER;
-      const mop = this.stats.zombies <= 12, R = mop ? 160 : sol ? 70 : 60; // few left: officers roam and hunt them down
+      const mop = this.stats.zombies <= 12 && !this.holdPosts, R = mop ? 160 : sol ? 70 : 60; // few left: officers roam and hunt them down (not while they hold a quarantine)
       let best = R * R, bi = -1, near = 0, clump = 0, cx = 0, cz = 0;
       this.around(x, z, R, (j, d2) => { if (!HOSTILE[this.st[j]]) return; if (d2 < 36) near++; if (d2 < best) { best = d2; bi = j; } if (sol && d2 > 100 && d2 < 900) { clump++; cx += this.x[j]; cz += this.z[j]; } });
-      if (!mop && bi >= 0 && Math.hypot(this.x[bi] - this.s[i], this.z[bi] - this.lat[i]) > (sol ? 45 : 100)) bi = -1; // too far from the post
+      if (!mop && bi >= 0 && Math.hypot(this.x[bi] - this.s[i], this.z[bi] - this.lat[i]) > (this.holdPosts ? 24 : sol ? 45 : 100)) bi = -1; // too far from the post (an outbreak on: they hold their street)
       this.target[i] = bi;
       if (sol && clump >= 6 && this.grenadeCd <= 0) { this.grenadeCd = 4; this.grenade(i, cx / clump, cz / clump); }
       if (bi < 0) { // nothing to shoot: pick a rioter to arrest

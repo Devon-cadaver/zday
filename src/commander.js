@@ -8,9 +8,11 @@ import { WEATHER, threatName } from './disasters.js';
 import { Site, Camp, Hazmat } from './rebuild.js';
 import { seedEffect, campSpot, custodyBuses } from './response.js';
 import { PLACES, PATH, placeKey } from './places.js';
+import { Quarantine } from './quarantine.js';
 
 export const UNITS = [
   { id: 'police', name: 'Police', cost: 50, cd: 20, alert: 0 },
+  { id: 'mininuke', name: 'Mini nuke', cost: 150, cd: 0, alert: 0 }, // clears a zombie outbreak once police have it boxed in (quarantine.js)
   { id: 'fire', name: 'Fire truck', cost: 80, cd: 30, alert: 0 }, // from the first round: riots and outbreaks start fires
   { id: 'bus', name: 'Evac bus', cost: 60, cd: 30, alert: 0 },
   { id: 'boat', name: 'Rescue boat', cost: 80, cd: 20, alert: 0 }, // only once the streets flood
@@ -73,6 +75,7 @@ export class Commander {
     };
     this.el.alertPill = this.el.alert.parentElement;
     this.pr = g.profile; this.diff = this.pr.difficulty();
+    this.quar = new Quarantine(g);
     this.cards = {};
     const row = g.addCardRow();
     for (const u of UNITS) {
@@ -107,6 +110,7 @@ export class Commander {
     this.works = []; this.camps = []; this.hazmats = []; this.buildTo = new Set();
     this.rebuiltN = 0; this.crews = 0; this.campsSent = 0; this.sheltered = 0; this.hazSent = 0; this.cleanups = 0; this.jailBuses = 0; this.heroCalls = 0; this.villainsBeaten = 0;
     g.resetWorld(); g.setSpeed(1);
+    this.quar.zones = []; this.quar.gaps = []; this.quar.seen = []; this.quar.told = []; this.quar.said = false; this.quar.t = 0; this.quar.draw(); this.minis = 0;
     this.t = 0; this.rp = START_RP; this.earned = 0; this.alert = 0; this.blocksInf = 0; this.fires = 0; this.ended = false;
     this.sel = null; this.cool = {}; for (const u of UNITS) this.cool[u.id] = 0;
     this.cdOf = (id) => id === 'police' ? this.diff.policeCd : id === 'fire' ? this.diff.fireCd : this.flooded() && FLOOD_CD[id] ? FLOOD_CD[id] : this.cards[id].u.cd;
@@ -202,10 +206,11 @@ export class Commander {
     if (id === 'coast' && !this.flooded()) { this.g.toast('The Coast Guard goes out once the streets flood'); return; }
     if (id === 'barrier' && !this.tsunami()) { this.g.toast('Flood barriers are for holding back a tsunami. Wait for a warning'); return; }
     if (GROUND.has(id) && this.flooded()) { this.g.toast('The streets are under water: nothing on wheels can get through. Send boats, helicopters or the heroes', 4000); return; }
+    if (id === 'mininuke' && !this.quar.zones.some(z => z.sealed)) { this.g.toast(this.g.people.stats.zombies ? 'Nothing is boxed in yet: put a police car on every amber ring round the outbreak, then the mini nuke can clear it' : 'The mini nuke is for a zombie outbreak that police have boxed in', 4500); return; }
     if (id === 'coast') { this.sendCoast(); return; } // no tap: they go where the most people are in the water
     for (const o of Object.values(this.cards)) o.btn.classList.remove('sel');
     this.sel = id; c.btn.classList.add('sel');
-    this.g.toast(id === 'heroes' ? 'Tap where to shine the hero signal' : id === 'barrier' ? 'Tap a street ahead of the wave: the barrier goes up across its path' : id === 'build' ? 'Tap a fallen building to rebuild it' : id === 'camp' ? 'Tap where the medical camp should go' : id === 'hazmat' ? 'Tap the area to decontaminate' : 'Tap the map where the ' + c.u.name.toLowerCase() + ' should go');
+    this.g.toast(id === 'heroes' ? 'Tap where to shine the hero signal' : id === 'barrier' ? 'Tap a street ahead of the wave: the barrier goes up across its path' : id === 'build' ? 'Tap a fallen building to rebuild it' : id === 'camp' ? 'Tap where the medical camp should go' : id === 'hazmat' ? 'Tap the area to decontaminate' : id === 'mininuke' ? 'Tap inside the red zone to clear it' : 'Tap the map where the ' + c.u.name.toLowerCase() + ' should go');
   }
 
   busy() { return !!this.sel || this.ended; } // a unit picked: taps send it (none: a tap on a person shows who they are)
@@ -221,6 +226,7 @@ export class Commander {
     else if (id === 'strike') this.sendStrike(x, z);
     else if (id === 'bus') this.sendBus(x, z);
     else if (id === 'nuke') this.sendNuke(x, z);
+    else if (id === 'mininuke') this.sendMini(x, z);
     else if (id === 'boat') this.sendBoat(x, z);
     else if (id === 'barrier') this.sendBarrier(x, z);
     else if (id === 'chaser') this.sendChaser(x, z);
@@ -314,13 +320,15 @@ export class Commander {
     const g = this.g, c = this.cards.police;
     const car = g.traffic.dispatchTo(x, z, {
       onArrive: (ax, az) => {
-        g.people.spawnOfficers(ax, az, this.pr.has('squad4') ? 4 : 2);
+        const near = Math.hypot(x - ax, z - az) < 40 && g.people.walkable(x, z); // the officers take up their posts at the spot (a roadblock there)
+        g.people.spawnOfficers(near ? x : ax, near ? z : az, this.pr.has('squad4') ? 4 : 2);
         const up = this.tsunami() ? g.people.alarmAt(ax, az, 90) : 0; // a wave coming: they get everyone round them up onto the roofs
         g.toast(up ? 'Officers in the ' + this.district(ax, az) + ' are getting ' + up + ' people up onto the rooftops' : 'Officers on scene in the ' + this.district(ax, az));
       },
       onLost: () => { this.lost++; g.toast('A cruiser was wrecked on the way'); },
     });
     if (!car) { g.toast(g.traffic.full('police') ? 'All 48 cruisers are out' : 'No road to that spot'); return; }
+    car.post = [x, z]; // the roadblock goes here (quarantine.js)
     this.spend('police'); this.sent++;
     g.toast('Cruiser dispatched, about ' + Math.ceil(car.eta) + ' s out');
   }
@@ -514,6 +522,14 @@ export class Commander {
     g.toast('Evacuation bus rolling, about ' + Math.ceil(car.eta) + ' s out');
   }
 
+  // the mini nuke: only into a zone the police have sealed; it clears the zone and nobody turns from it
+  sendMini(x, z) {
+    const g = this.g, Q = this.quar, zn = Q.zoneAt(x, z);
+    if (!zn) { g.toast('Tap inside a red quarantine zone'); return; }
+    if (zn.open) { g.toast('That outbreak is not boxed in: ' + (zn.gaps && zn.gaps.length ? zn.gaps.length + (zn.gaps.length === 1 ? ' street' : ' streets') + ' out still open (the amber rings)' : 'it has a way out'), 4000); return; }
+    const r = Q.nuke(zn); this.spend('mininuke'); this.minis++;
+    g.toast('Mini nuke: ' + r.zk + (r.zk === 1 ? ' zombie' : ' zombies') + ' gone' + (r.ck ? ', and ' + r.ck + (r.ck === 1 ? ' person' : ' people') + ' still inside' : '. Nobody else was in there'), 5000);
+  }
   sendNuke(x, z) {
     const g = this.g;
     this.nuked = true; this.nukeAt = { x, z };
@@ -583,6 +599,7 @@ export class Commander {
     if (this.ended) return;
     const g = this.g, p = g.people;
     this.t += sdt;
+    this.quar.step(sdt);
     for (const o of this.sites) {
       if (o.fired || this.t < o.at) continue;
       o.fired = true;

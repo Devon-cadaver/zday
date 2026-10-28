@@ -97,7 +97,7 @@ export class Radio {
     if (zom > 0 && !this.zed) { this.zed = true; this.say(FOR.zombies); } else if (zom === 0) this.zed = false;
     // all over: nothing left alive for a while after something was
     const live = D && D.list.some(e => e.alive && e.type !== 'heroes' && FOR[e.type]);
-    if (live || zom > 15) { this.hot = true; this.calm = 0; }
+    if (live || zom > 0 || (this.hot && p && p.stats.infected > 0)) { this.hot = true; this.calm = 0; } // an outbreak is not over while one zombie (or anyone bitten) is left
     else if (this.hot && (this.calm += dt) > 7) { this.hot = false; this.say(CLEAR[this.clearN++ % CLEAR.length]); }
     if (this.started >= 0 && !this.identDone && this.t - this.started > 3 && ((this.audio && this.audio.ctx) || this.t - this.started > 15)) { this.identDone = true; if (!this.queue.length && !this.speaking()) this.say(IDENT); }
     if (this.speaking() || !this.queue.length) { if (!this.speaking() && this.el.classList.contains('on') && this.t > this.until + 0.6) this.el.classList.remove('on'); return; }
