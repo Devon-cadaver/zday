@@ -74,6 +74,12 @@ export class Hits {
     if (o.big) this.moment('Big one!', 0.9);
   }
 
+  // a number of its own, straight away (a landmark's bonus)
+  pop(x, y, z, text, cls = 'b huge') {
+    const p = this.pool.find(q => q.life <= 0) || this.pool.reduce((a, q) => (q.life < a.life ? q : a));
+    p.x = x; p.y = y; p.z = z; p.life = p.max = 2.2; p.d.textContent = text; p.d.className = 'p ' + cls;
+  }
+
   // the combo runs out
   drop() { this.n = 0; this.mult = 1; this.pill.classList.remove('combo'); }
 

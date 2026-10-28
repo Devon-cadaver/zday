@@ -15,6 +15,7 @@ import { PLACES, PATH, placeKey } from './places.js';
 import { SEE } from './see.js';
 import { Hits } from './hits.js';
 import { Chain } from './chain.js';
+import { Targets } from './targets.js';
 const SEE_KINDS = new Set(['saucer', 'tripod', 'zombies', 'riot', 'villains', 'kaiju', 'worm']); // see-through helps: someone in the streets to keep in sight
 import { ZombiesCtl, RiotCtl, FloodCtl, VolcanoCtl, DustCtl, BlizzardCtl, SolarCtl, NukeCtl, ReactorCtl, RoamingHoleCtl, TripodCtl, VillainsCtl, WormCtl, KaijuCtl } from './be-more.js';
 
@@ -263,8 +264,9 @@ export class BeTheDisaster {
     this.g = g; this.D = g.disasters; this.kind = BE[kind] ? kind : 'tornado'; this.msgs = {};
     this.el = {
       score: g.addPill('zd-rp', 'Score'), what: g.addPill('zd-al', '', 'zd-ef'),
-      b: g.addPill('zd-d', 'Buildings'), p: g.addPill('zd-h', 'Victims'), c: g.addPill('', 'Cars'), clock: g.addPill('', '', 'zd-clock'),
+      b: g.addPill('zd-d', 'Buildings'), p: g.addPill('zd-h', 'Victims'), c: g.addPill('', 'Cars'), stars: g.addPill('zd-stars', ''), clock: g.addPill('', '', 'zd-clock'),
     };
+    this.targets = new Targets(g, this.el.stars); // three landmarks to bring down in each town
     this.hits = new Hits(g, this.el.score); // points popping up where things fall, combos, the big moments
     this.chain = new Chain(this.D, (text, slow) => this.hits.moment(text, slow)); // the town finishes what the disaster starts
     g.addButton('zd-restart', 'Restart', () => this.start());
@@ -305,7 +307,7 @@ export class BeTheDisaster {
     if (this.gauge) this.gauge.cancel();
     g.resetWorld(); g.setSpeed(1); D.boats.auto = false; // nobody comes to the rescue
     this.t = 0; this.score = 0; this.tick = 0; this.shown = 0; this.said10 = false;
-    this.hits.reset(); this.wrecked = new WeakSet(); this.chain.reset();
+    this.hits.reset(); this.wrecked = new WeakSet(); this.chain.reset(); this.extra = 0; this.targets.pick();
     { const hs = g.city.buildings.map(b => b.top - b.baseY).sort((a, b) => a - b); this.bigH = Math.max(30, hs[Math.floor(hs.length * 0.96)] || 30); } // the tallest few in this town are the big ones
     D.weather.set(this.kind === 'tornado' ? 'storm' : 'clear', true);
     // a few outbreaks already under way, for some extra chaos
@@ -337,11 +339,20 @@ export class BeTheDisaster {
     this.hits.say('Go!');
   }
 
+  // one of the town's three targets down: a star and a bonus of a tenth of the town's goal
+  landmark(k) {
+    const p = this.targets.hit(k); if (!p) return;
+    const bonus = Math.round(this.goal() * 0.1); this.extra += bonus;
+    this.hits.moment(p.name + ' down!', 0.9); this.hits.pop(p.x, p.y, p.z, '\u2605 +' + bonus.toLocaleString());
+    if (this.targets.got === this.targets.list.length) setTimeout(() => { if (!this.ended) this.hits.say('All three!', 'combo'); }, 1600);
+  }
+  goal() { return 30 * this.g.city.buildings.length; } // the win line
+
   // what the world reports: buildings down, fires, wrecked cars score where they happen (never people)
   onEvent(e) {
     const H = this.hits; if (!H || this.ended || !this.ctl) return;
     const k = BE[this.kind].k, c = this.g.city;
-    if (e.type === 'collapse') { const b = c.buildings[e.k]; if (b) H.hit('b', e.x, b.top, e.z, k, { big: b.top - b.baseY >= this.bigH }); this.chain.collapse(e.k, e.fall); }
+    if (e.type === 'collapse') { const b = c.buildings[e.k]; if (b) H.hit('b', e.x, b.top, e.z, k, { big: b.top - b.baseY >= this.bigH }); this.chain.collapse(e.k, e.fall); this.landmark(e.k); }
     else if (e.type === 'fire') { const b = c.buildings[e.k]; if (b && !c.dead[e.k]) H.hit('fire', (b.x0 + b.x1) / 2, b.top, (b.z0 + b.z1) / 2, k); this.chain.fire(e.k); }
     else if (e.type === 'carland' || e.type === 'carfire' || e.type === 'crash') for (const cr of [e.car, e.other]) if (cr && !cr.mission && !this.wrecked.has(cr)) { this.wrecked.add(cr); H.hit('car', cr.x, 2, cr.z, k); } // each car once
   }
@@ -381,11 +392,12 @@ export class BeTheDisaster {
       this.tick = 0.5;
       const m = this.measure(), b = this.base;
       this.got = { b: m.b - b.b, dead: m.dead - b.dead, abd: m.abd - b.abd, cars: m.cars - b.cars, fires: m.fires - b.fires, zom: BE[this.kind].zom ? Math.max(0, m.zom - b.zom) : 0 };
-      const G = this.got; this.score = Math.round(BE[this.kind].k * (150 * G.b + 12 * G.dead + 30 * G.abd + 40 * G.cars + 60 * G.fires + 12 * G.zom) + this.hits.bonus); // the zombie modes count their horde too; the combos on top
+      const G = this.got; this.score = Math.round(BE[this.kind].k * (150 * G.b + 12 * G.dead + 30 * G.abd + 40 * G.cars + 60 * G.fires + 12 * G.zom) + this.hits.bonus + this.extra); // the zombie modes count their horde too; the combos and landmarks on top
     }
     this.chain.step(sdt);
     if (!this.said10 && RUN - this.t <= 10) { this.said10 = true; this.hits.say('10 seconds!', 'small'); }
     if (this.t >= RUN) this.finish();
+    this.targets.frame();
     this.hud(dt);
   }
 
@@ -406,11 +418,13 @@ export class BeTheDisaster {
     this.gauge.cancel();
     if (this.ctl && this.ctl.up) this.ctl.up();
     if (this.ctl && this.ctl.finish) this.ctl.finish();
-    const goal = 30 * g.city.buildings.length, bar = goal * Math.pow(2167 / g.city.buildings.length, 0.6); // the win line is the goal; ranks are against a bar that is higher in small towns (one finger reaches a hamlet's every street, not a city's)
+    const goal = this.goal(), bar = goal * Math.pow(2167 / g.city.buildings.length, 0.6); // the win line is the goal; ranks are against a bar that is higher in small towns (one finger reaches a hamlet's every street, not a city's)
     let rank = 'F'; for (const [s, rk] of RANKS) if (this.score >= s * bar) rank = rk;
     const r = g.profile.addBe(this.kind, this.score), best = (g.profile.data.beBest || {})[this.kind] || 0;
     const H = this.hits; H.say('Time!');
     const lines = [['Buildings destroyed', G.b], ['Victims', (G.dead + G.abd).toLocaleString()], ['Cars wrecked', G.cars], ['Fires started', G.fires]];
+    const T = this.targets; if (T.list.length) lines.unshift(['Landmarks', '\u2605'.repeat(T.got) + '\u2606'.repeat(T.list.length - T.got) + ' (' + T.got + ' of ' + T.list.length + ')']);
+    T.clear();
     if (H.best > 1) lines.unshift(['Best combo', '\u00D7' + H.best + ' (' + H.bestN + ' hits)'], ['Combo bonus', '+' + Math.round(H.bonus).toLocaleString()]);
     // the road: wreck enough of this town (a score of 30 a building) and the next one opens
     const here = placeKey(), at = PATH.indexOf(here), opened = this.score >= goal ? g.profile.clear('be', here) : null;
