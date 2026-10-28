@@ -11,6 +11,7 @@
 import * as THREE from 'three';
 import { NOISE, FRONT, SweepFront, Splash } from './water.js';
 import { sfx } from './audio.js';
+import { Brace } from './brace.js';
 
 const FROST_VS = /* glsl */`
 varying vec3 vW;
@@ -309,6 +310,7 @@ export class Haboob {
     this.devils = new DustDevils(D, sw, D.ctx.low ? 4 : 7); this.bolts = new DustLightning(D, sw, this.wall);
     const { people } = D.ctx;
     this.hit = new Uint8Array(people.x.length); this.carsHit = new Set(); this.damaged = new Set(); this.stepN = 0;
+    this.brace = new Brace(D, (x, z) => (this.phase === 'sweep' ? sw.nearest(x, z) : null), { range: 260 }); // seen coming, curled up before it
     this.prevWeather = D.weather.type; this.sandOn = false; this.dustOn = false;
     if (!opts.quiet) people.alarm(20);
     if (!opts.quiet) D.emit({ type: 'warn', hazard: 'haboob', x: sw.origin.x + sw.dir.x * 80, z: sw.origin.y + sw.dir.y * 80, r: 120, exact: true, text: 'Dust storm! A wall of sand is rolling in from the ' + sw.coast + '. Get people indoors' });
@@ -321,15 +323,14 @@ export class Haboob {
       if (this.t > this.endT) { this.alive = false; D.weather.set(this.prevWeather === 'sand' ? 'clear' : this.prevWeather); D.emit({ type: 'haboobend', text: 'The dust is settling' }); }
       return;
     }
-    sw.advance(h);
+    sw.advance(h); this.brace.update(h);
     const band = (x, z) => { const b = sw.behind(x, z); return b > -1.5 && b < 3.5; };
     for (let i = 0; i < people.active; i++) {
       if (this.hit[i]) continue;
       const s = people.st[i];
-      if (s === 8 || s === 10 || s === 17 || s === 19 || s === 20 || people.lvl[i] !== -1 || !band(people.x[i], people.z[i])) continue;
+      if (s === 8 || s === 10 || s === 17 || s === 19 || s === 20 || (people.lvl[i] !== -1 && s !== 11) || !band(people.x[i], people.z[i])) continue; // in the street, or up on a roof
       this.hit[i] = 1;
-      if (Math.random() < 0.4) people.fling(i, d.x * (9 + Math.random() * 7), 5 + Math.random() * 6, d.y * (9 + Math.random() * 7));
-      else if (people.isCivilian(i)) people.panic(i, people.x[i] - d.x * 10, people.z[i] - d.y * 10, -1);
+      this.brace.wall(i, d.x, d.y, 15); // one in seven picked up and tumbled along with it; the rest stay curled up
     }
     for (const car of traffic.cars) {
       if (car.gone || this.carsHit.has(car) || car.mode === 4 || car.mode === 5 || !band(car.x, car.z)) continue;
@@ -380,6 +381,7 @@ export class ColdWave {
     this.wall = new DustWall(D, sw, { H: 190, lit: '#ffffff', shade: '#b4c3d6', dark: '#8797ad', pale: '#f2f6fb' }); // the dust storm's wall, in white (Sean)
     this.powder = new Splash(D.ctx.scene, 1600); this.powder.mat.uniforms.uColor.value.set('#f2f6fc');
     D.weather.snowBehind(sw); // the snow falls behind the front, never ahead of it
+    this.brace = new Brace(D, (x, z) => (this.phase === 'sweep' ? sw.nearest(x, z) : null), { range: 240 }); // seen coming, curled up before it
     const B = D.ctx.city.bounds, geo = new THREE.PlaneGeometry(B.x1 - B.x0 + 300, B.z1 - B.z0 + 300, 64, 64); geo.rotateX(-Math.PI / 2); // vertices enough to bend with the world's curve
     this.frostMat = new THREE.ShaderMaterial({ vertexShader: FROST_VS, fragmentShader: FROST_FS, transparent: true, depthWrite: false,
       uniforms: { uTime: { value: 0 }, uLight: { value: 1 }, uFade: { value: 1 }, uOrigin: { value: sw.origin }, uDir: { value: sw.dir }, uTan: { value: sw.tan }, uFront: { value: sw.F }, uPile: { value: sw.P }, uHalfW: { value: sw.halfW }, uSegW: { value: sw.segW } } });
@@ -402,7 +404,11 @@ export class ColdWave {
         D.emit({ type: 'coldend', text: 'The cold has broken. The frozen are thawing' });
       }
     } else {
-      sw.advance(h);
+      sw.advance(h); this.brace.update(h);
+      for (let i = 0; i < people.active; i++) { // the wall reaches them: one in seven blown away with it
+        const s = people.st[i]; if (s === 8 || s === 10 || s === 17 || s === 19 || s === 20 || s === 23 || (people.lvl[i] !== -1 && s !== 11)) continue;
+        const b = sw.behind(people.x[i], people.z[i]); if (b > -1.5 && b < 3.5) this.brace.wall(i, sw.dir.x, sw.dir.y, 12);
+      }
       if (!this.iceOn && sw.lead() > sw.extent * 0.25) { this.iceOn = true; traffic.gripK = 0.35; }
       // the sky closes in and it snows once the front has passed where you are looking (or has crossed the town)
       const tg = D.ctx.controls.target; if (!this.snowOn && (sw.behind(tg.x, tg.z) > 30 || sw.lead() > sw.extent)) { this.snowOn = true; D.weather.set('snow'); traffic.gripK = 0.35; }

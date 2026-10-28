@@ -35,6 +35,7 @@ const CIV = new Uint8Array(32); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.ROO
 const INHASH = new Uint8Array(32); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.ROOF, S.COP, S.FIREMAN, S.BOARD, S.RIOT, S.GRABBED, S.TURNING, S.ZOMBIE, S.ALIEN, S.FROZEN, S.FILM, S.HELD, S.PRAY, S.FIGHT, S.STEAL].forEach(s => { INHASH[s] = 1; });
 const HITTABLE = new Uint8Array(32); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.COP, S.FIREMAN, S.BOARD, S.RIOT, S.GRABBED, S.TURNING, S.ZOMBIE, S.ALIEN, S.FROZEN, S.FILM, S.HELD, S.PRAY, S.FIGHT, S.STEAL].forEach(s => { HITTABLE[s] = 1; });
 export const HOSTILE = new Uint8Array(32); HOSTILE[S.ZOMBIE] = 1; HOSTILE[S.ALIEN] = 1;
+const BRACE = new Uint8Array(32); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.GO, S.ROOF, S.FILM, S.PRAY, S.SEEK].forEach(s => { BRACE[s] = 1; }); // who can curl up in a ball where they are
 const GRABBABLE = new Uint8Array(32); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.ROOF, S.COP, S.FIREMAN, S.BOARD, S.RIOT, S.GRABBED, S.TURNING, S.ZOMBIE, S.ALIEN, S.PILE, S.CLIMB, S.FALLING, S.JUMP, S.FROZEN, S.FILM, S.HELD, S.PRAY, S.FIGHT, S.STEAL].forEach(s => { GRABBABLE[s] = 1; });
 const DISASTER_CAUSE = new Set(['fling', 'crush', 'drown', 'zap', 'bolt', 'freeze', 'burn', 'impact', 'rad']);
 const ZSTATE = new Uint8Array(32); [S.ZOMBIE, S.TURNING, S.PILE, S.CLIMB, S.FALLING].forEach(s => { ZSTATE[s] = 1; });
@@ -105,6 +106,7 @@ export class People {
     const F = () => new Float32Array(N);
     this.x = F(); this.z = F(); this.y = F(); this.t1 = F(); this.inc = F(); this.inc0 = F(); this.spd = F(); this.s = F(); this.lat = F();
     this.hx = F(); this.hz = F(); this.tx = F(); this.tz = F(); this.think = F(); this.wt = F(); this.hp = F();
+    this.braceT = new Float32Array(N); // curled up in a ball for this long, a storm wall about to hit (brace.js)
     this.wz = new Uint8Array(N); this.wet = new Float32Array(N); this.cuff = new Float32Array(N); // seconds spent handcuffing a rioter
     this.px = new Float32Array(N); this.pz = new Float32Array(N); this.watch = new Uint8Array(N); // what someone is watching (a disaster nearby)
     this.st = new Uint8Array(N); this.inf = new Uint8Array(N); this.dirty = new Uint8Array(N); this.fx = new Uint8Array(N); this.kind = new Uint8Array(N); this.zt = new Uint8Array(N);
@@ -305,6 +307,7 @@ export class People {
   }
 
   reset() {
+    this.braceT.fill(0);
     if (this.grid0) this.grid.set(this.grid0);
     this.doors.clear();
     const r = this.r = rng(this.opts.seed ?? 99);
@@ -945,6 +948,7 @@ export class People {
     if ((this.lifeT -= h) <= 0) { this.lifeT = 0.25; this.lives.tick(); } // a slice of the strollers think what to do next
     for (let i = 0; i < this.active; i++) {
       const s = this.st[i];
+      if (this.braceT[i] > 0) { this.braceT[i] -= h; if (BRACE[s]) continue; this.braceT[i] = 0; } // curled up where they are (anything else that happens to them ends it)
       switch (s) {
         case S.WALK: this.s[i] += this.spd[i] * h * ((this.waterAt || this.speedK !== 1) ? this.wk(this.x[i], this.z[i]) : 1); this.walkPos(i); break;
         case S.AIR: this.airStep(i, h); break;
@@ -1978,6 +1982,7 @@ export class People {
       else if (s === S.FIGHT) an = this.fx[i] ? 11 : this.target[i] >= 0 ? 2 : 7;
       else if (s === S.COP) an = this.fx[i] === 1 ? 7 : this.fx[i] === 2 ? 6 : 0;
       else if (s === S.FIREMAN) an = this.fx[i] === 1 ? 1 : this.fx[i] === 2 ? 6 : 0;
+      if (this.braceT[i] > 0 && BRACE[s]) an = 13; // curled up
       // rotation Ry(yaw) * Rz(tilt), column major
       const hx = this.hx[i], hz = this.hz[i], hl = Math.hypot(hx, hz) || 1;
       const c = hx / hl, sn = -hz / hl, ct = Math.cos(tilt), stt = Math.sin(tilt);

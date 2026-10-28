@@ -7,6 +7,7 @@
 // against buildings, and bursting into spray where it hits them.
 import * as THREE from 'three';
 import { Whirlpools } from './whirlpool.js';
+import { Brace } from './brace.js';
 
 export const NOISE = /* glsl */`
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -278,6 +279,8 @@ export class SweepFront {
   // how far behind the front (x, z) is (negative: not reached yet)
   behind(x, z) { const dx = x - this.origin.x, dz = z - this.origin.y; return this.frontAt(dx * this.tan.x + dz * this.tan.y) - (dx * this.dir.x + dz * this.dir.y); }
   lead() { let m = Infinity; for (let k = 0; k < FRONT_N; k++) m = Math.min(m, this.F[k]); return m; }
+  // for brace.js: [metres until the front reaches (x, z), the point of the front opposite it]
+  nearest(x, z) { const dx = x - this.origin.x, dz = z - this.origin.y, t = dx * this.tan.x + dz * this.tan.y, s = this.frontAt(t); return [(dx * this.dir.x + dz * this.dir.y) - s, this.origin.x + this.tan.x * t + this.dir.x * s, this.origin.y + this.tan.y * t + this.dir.y * s]; }
   tameRange(t0, t1) { for (let k = 0; k < FRONT_N; k++) { const t = -this.halfW + k * this.segW; if (t > t0 && t < t1) this.tame[k] = 1; } }
   tameAt(t) { return this.tame[Math.max(0, Math.min(FRONT_N - 1, Math.round((t + this.halfW) / this.segW)))] === 1; }
   advance(h) {
@@ -328,6 +331,7 @@ export class Tsunami {
     });
     this.wave = new THREE.Mesh(geo, this.mat); this.wave.visible = false; this.wave.frustumCulled = false; this.wave.renderOrder = 3;
     D.ctx.scene.add(this.wave);
+    this.brace = new Brace(D, (x, z) => (this.phase === 'wave' ? this.sw.nearest(x, z) : null), { range: 260 }); // seen coming, curled up before it
   }
 
   at(k, back = 0) { return this.sw.at(k, back); }
@@ -348,7 +352,7 @@ export class Tsunami {
       return;
     }
     if (this.phase === 'wave') {
-      this.advance(h);
+      this.advance(h); this.brace.update(h);
       D.shake(0.12);
       const o = this.origin, d = this.dir, tn = this.tan;
       const inBand = (x, z) => { const dx = x - o.x, dz = z - o.y, s = dx * d.x + dz * d.y, t = dx * tn.x + dz * tn.y, f = W.frontAt(t); return s > f - 3 && s < f + 1.5 && !this.sw.tameAt(t); }; // what spills over a barrier sweeps nobody away
@@ -356,7 +360,7 @@ export class Tsunami {
       for (let i = 0; i < people.active; i++) {
         const s = people.st[i];
         if (s === 8 || s === 10 || s === 17 || s === 19 || s === 20 || s === 29 || people.lvl[i] !== -1) continue;
-        if (inBand(people.x[i], people.z[i])) { const f = 6 + Math.random() * 6; people.fling(i, d.x * f, 3 + Math.random() * 3, d.y * f); } // tumbled over and down into the water behind the front (most come up again)
+        if (inBand(people.x[i], people.z[i])) this.brace.wall(i, d.x, d.y, 17, (j) => { const f = 2 + Math.random() * 3; people.fling(j, d.x * f, 2 + Math.random() * 2, d.y * f); }); // one in seven carried off on the wave; the rest knocked down into the water behind it (most come up again)
       }
       for (const car of traffic.cars) {
         if (car.gone || car.mode === 4 || car.mode === 5) continue;

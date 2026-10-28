@@ -4,6 +4,7 @@
 // interactions: people, cars, parked cars, trees and whole buildings are
 // pulled in, spun up the funnel and flung out.
 import * as THREE from 'three';
+import { Brace } from './brace.js';
 
 const NOISE = /* glsl */`
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -169,6 +170,7 @@ export class Twister {
   update(h) {
     const D = this.D, { people, traffic, city } = D.ctx;
     this.t += h;
+    if (this.phase === 'ground') (this.brace || (this.brace = new Brace(D, (x, z) => [Math.hypot(x - this.x, z - this.z) - this.reach * 2, this.x, this.z], { range: 300, curl: false }))).update(h); // seen coming: run, turn round and drive off
     // lifecycle
     if (this.phase === 'form') { this.fade = Math.min(1, this.fade + h / 3); this.descend = Math.min(1, Math.max(0, (this.t - 3) / 5)); if (this.descend >= 1) this.phase = 'ground'; }
     else if (this.phase === 'ground' && !this.player && this.t > this.life) { this.phase = 'rope'; this.ropeT = 0; }
