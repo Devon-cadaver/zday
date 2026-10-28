@@ -91,7 +91,8 @@ export class VolcanoCtl {
 
 // The dust storm: the wall surges towards your finger; a new one rolls in out of the desert when it has passed
 export class DustCtl {
-  follow() { const F = this.be.g.front(this.ev); return F && !F.gone ? [F.x, F.z] : null; } // the camera rides along the wall of dust
+  follow() { const F = this.be.g.front(this.ev); return F && !F.gone ? [F.x + F.dx * 40, F.z + F.dz * 40] : null; } // the camera rides just ahead of the wall of dust
+  heading() { const F = this.be.g.front(this.ev); return F && !F.gone ? Math.atan2(F.dz, F.dx) : null; } // and stands ahead of it, facing it, to watch it come (from behind it there is nothing but haze)
   constructor(be) { this.be = be; this.n = 0; this.next(); be.D.list.push(wrap(this)); }
   next() {
     this.n++; let me = null;
@@ -100,7 +101,8 @@ export class DustCtl {
       const sw = me.sw, dx = this.fx - sw.origin.x, dz = this.fz - sw.origin.y, d = Math.abs(t - (dx * sw.tan.x + dz * sw.tan.y));
       return d < 200 && dx * sw.dir.x + dz * sw.dir.y > F - 30 ? 0.55 + 2 * (1 - d / 200) : 0.55;
     };
-    me = this.ev = this.be.D.start('haboob', null, null, { side: this.n % 2 ? 2 : 3, pull, quiet: true });
+    me = this.ev = this.be.D.start('haboob', null, null, { side: this.n % 2 ? 2 : 3, pull, quiet: true, light: true }); // a light sandy haze, not the dark fog: the dust storm was nothing but brown
+    if (this.n === 1) this.be.D.weather.set('sand');
   }
   down(x, z) { this.held = true; this.fx = x; this.fz = z; } move(x, z) { this.fx = x; this.fz = z; } up() { this.held = false; }
   update() { const ev = this.ev; if (!ev.alive || (ev.phase === 'sweep' && ev.sw && ev.sw.lead() > ev.sw.extent * 0.6)) this.next(); } // the next wall once this one is most of the way across (it waited 50 s after each had gone)

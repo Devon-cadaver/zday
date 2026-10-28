@@ -35,11 +35,11 @@ export const BE = {
   solar: { name: 'Solar flare', k: 1.25, hint: 'Hold to charge a flare, let go to strike. The longer you hold, the wider it hits' },
   tripod: { name: 'Alien tripod', k: 7, hint: 'Drag to walk it. Hold under it to beam people up. Tap to sweep the heat ray' },
   volcano: { name: 'Volcano', k: 1.9, hint: 'Hold to size the volcano and let go where it bursts out. Then hold anywhere to rain lava bombs there' },
-  blackhole: { name: 'Black hole', k: 1.4, hint: 'Drag to move the black hole. It grows with everything it swallows' },
+  blackhole: { name: 'Black hole', k: 1.55, hint: 'Drag to move the black hole. It grows with everything it swallows' },
   nuclear: { name: 'Nuclear strike', k: 0.16, hint: 'Hold to set the yield, let go to launch. Three warheads, another every 30 seconds' },
-  meltdown: { name: 'Meltdown', k: 3, zom: true, hint: 'Hold to overload the reactor until it blows, then drag to steer the fallout over the city' },
-  worm: { name: 'Giant worm', k: 1.8, hint: 'Drag to steer it under the streets. Let go and it bursts out of the ground there' },
-  kaiju: { name: 'Kaiju', k: 5.5, hint: 'Drag to walk it. Tap a car to throw it, tap people to send a tentacle, tap a building to swipe it, tap open ground to roar' },
+  meltdown: { name: 'Meltdown', k: 3.3, zom: true, hint: 'Hold to overload the reactor until it blows, then drag to steer the fallout over the city' },
+  worm: { name: 'Giant worm', k: 2, hint: 'Drag to steer it under the streets. Let go and it bursts out of the ground there' },
+  kaiju: { name: 'Kaiju', k: 4.2, hint: 'Drag to walk it. Tap a car to throw it, tap people to send a tentacle, tap a building to swipe it, tap open ground to roar' },
   villains: { name: 'Super villains', k: 1.8, hint: 'Play as Blur, Tyrant or Weaver; Switch changes who. Blur runs where you drag, Tyrant grabs and throws what you tap, Weaver webs the street' },
 };
 
@@ -354,6 +354,12 @@ export class BeTheDisaster {
       const tg = g.controls.target, k = 1 - Math.exp(-dt * 2.2), dx = (f[0] - tg.x) * k, dz = (f[1] - tg.z) * k;
       tg.x += dx; tg.z += dz; g.camera.position.x += dx; g.camera.position.z += dz;
     }
+    const hd = this.ctl && this.ctl.heading && this.ctl.heading(); // a side to watch from (the dust storm: ahead of the wall, facing it): the camera swings round to it
+    if (hd != null) {
+      const tg = g.controls.target, c = g.camera.position, ox = c.x - tg.x, oz = c.z - tg.z, Hd = Math.hypot(ox, oz) || 1;
+      let a = Math.atan2(oz, ox); const d = ((hd - a) % (Math.PI * 2) + Math.PI * 3) % (Math.PI * 2) - Math.PI; a += Math.max(-dt * 0.9, Math.min(dt * 0.9, d));
+      c.x = tg.x + Math.cos(a) * Hd; c.z = tg.z + Math.sin(a) * Hd;
+    }
     if ((this.tick -= sdt) <= 0) {
       this.tick = 0.5;
       const m = this.measure(), b = this.base;
@@ -378,7 +384,7 @@ export class BeTheDisaster {
     this.gauge.cancel();
     if (this.ctl && this.ctl.up) this.ctl.up();
     if (this.ctl && this.ctl.finish) this.ctl.finish();
-    const goal = 30 * g.city.buildings.length, bar = goal * Math.pow(2167 / g.city.buildings.length, 0.4); // the win line is the goal; ranks are against a bar that is higher in small towns (one finger reaches a hamlet's every street, not a city's)
+    const goal = 30 * g.city.buildings.length, bar = goal * Math.pow(2167 / g.city.buildings.length, 0.6); // the win line is the goal; ranks are against a bar that is higher in small towns (one finger reaches a hamlet's every street, not a city's)
     let rank = 'F'; for (const [s, rk] of RANKS) if (this.score >= s * bar) rank = rk;
     const r = g.profile.addBe(this.kind, this.score), best = (g.profile.data.beBest || {})[this.kind] || 0;
     const lines = [['Buildings destroyed', G.b], ['Victims', (G.dead + G.abd).toLocaleString()], ['Cars wrecked', G.cars], ['Fires started', G.fires]];

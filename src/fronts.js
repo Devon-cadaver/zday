@@ -343,9 +343,9 @@ export class BillowWall {
 
 export class Haboob {
   constructor(D, opts = {}) {
-    this.type = 'haboob'; this.D = D; this.t = 0; this.alive = true; this.phase = 'sweep'; this.fade = 1;
+    this.type = 'haboob'; this.D = D; this.t = 0; this.alive = true; this.phase = 'sweep'; this.fade = 1; this.light = !!opts.light; // light: no dark fog after the wall (one storm after another, to watch)
     const side = opts.side ?? (Math.random() < 0.75 ? 2 : Math.floor(Math.random() * 4)), sw = this.sw = new SweepFront(D, side, { speed: 12, slow: 0.8, fast: 1.05, pile: 1.15, start: -90, pull: opts.pull });
-    this.wall = new DustWall(D, sw, { H: 280 });
+    this.wall = new DustWall(D, sw, { H: this.light ? 150 : 280 }); // light: low enough to see over from a playing camera
     this.walls = [];
     this.dust = new Splash(D.ctx.scene, 2000); this.dust.mat.uniforms.uColor.value.set('#b89670');
     this.devils = new DustDevils(D, sw, D.ctx.low ? 4 : 7); this.bolts = new DustLightning(D, sw, this.wall);
@@ -406,8 +406,8 @@ export class Haboob {
       }
     }
     // once the wall has rolled over where you are looking it is dark, dusty and thick as fog
-    if (!this.dustOn && sw.behind(D.ctx.controls.target.x, D.ctx.controls.target.z) > 20) { this.dustOn = true; D.weather.set('dust'); }
-    if (!this.sandOn && sw.lead() > sw.extent + 60) { this.sandOn = true; D.later(25, () => { if (this.alive) D.weather.set('sand'); }); }
+    if (!this.light && !this.dustOn && sw.behind(D.ctx.controls.target.x, D.ctx.controls.target.z) > 20) { this.dustOn = true; D.weather.set('dust'); }
+    if (!this.light && !this.sandOn && sw.lead() > sw.extent + 60) { this.sandOn = true; D.later(25, () => { if (this.alive) D.weather.set('sand'); }); }
     if (sw.lead() > sw.extent + 160) { this.phase = 'after'; this.endT = this.t + 50; }
   }
   poi(x, z) { return this.phase === 'after' ? null : (() => { const dx = x - this.sw.origin.x, dz = z - this.sw.origin.y, t = dx * this.sw.tan.x + dz * this.sw.tan.y, s = this.sw.frontAt(t); return { x: this.sw.origin.x + this.sw.tan.x * t + this.sw.dir.x * s, z: this.sw.origin.y + this.sw.tan.y * t + this.sw.dir.y * s, danger: 30, range: 480 }; })(); }
