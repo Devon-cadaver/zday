@@ -1,4 +1,5 @@
-// Music: Sean's three tracks (made with Suno) - Calm Before the Storm while the
+// Music: the theme, My Little Disaster, on the menus (and played live by the band in the town: band.js, through
+// a player of its own whose volume the band sets from where you are looking); Sean's three tracks (made with Suno) - Calm Before the Storm while the
 // city is quiet, Desert Pursuit while disaster strikes, After the Storm for the
 // clean-up afterwards - crossfaded as things change, each faded back into its
 // own start a few seconds before its ending so it carries on, and dipped under
@@ -7,7 +8,7 @@
 // master volume. The note button steps loud, medium, quiet, off.
 import { sideButton } from './ui.js';
 const BASE = import.meta.env.BASE_URL || './';
-const TRACKS = { calm: 'music/calm.mp3', storm: 'music/storm.mp3', rebuild: 'music/rebuild.mp3' };
+const TRACKS = { calm: 'music/calm.mp3', storm: 'music/storm.mp3', rebuild: 'music/rebuild.mp3', theme: 'music/theme.mp3' };
 const LEVELS = [0, 0.2, 0.38, 0.62]; // off, quiet, medium, loud
 const FADE = 4, TAIL = 6, AFTER = 150; // a mood change; the loop back to the start; how long the clean-up music plays after a disaster
 
@@ -38,21 +39,49 @@ export class Music {
   attach(ctx, out) {
     this.ctx = ctx; this.out = ctx.createGain(); this.out.gain.value = LEVELS[this.level]; this.duckG = ctx.createGain();
     this.duckG.connect(this.out); this.out.connect(out);
+    this.bgG = ctx.createGain(); this.bgG.connect(this.duckG); // the background tracks, dropped back while the band is heard
+    { const el = this.bandEl = document.createElement('audio'); el.preload = 'none'; el.loop = true; el.setAttribute('playsinline', ''); this.bandG = ctx.createGain(); this.bandG.gain.value = 0; ctx.createMediaElementSource(el).connect(this.bandG); this.bandG.connect(this.out); }
     for (let k = 0; k < 2; k++) {
       const el = document.createElement('audio'); el.preload = 'auto'; el.setAttribute('playsinline', '');
-      const g = ctx.createGain(); g.gain.value = 0; ctx.createMediaElementSource(el).connect(g); g.connect(this.duckG);
+      const g = ctx.createGain(); g.gain.value = 0; ctx.createMediaElementSource(el).connect(g); g.connect(this.bgG);
       this.players.push({ el, g, primed: false });
     }
   }
   // phones only let a player start on its own once it has been started from a tap: the first taps do that for both
   prime() {
     if (!this.ctx || !this.level) return;
+    this.primeBand();
     this.players.forEach((p, k) => {
       if (p.primed) return; p.primed = true;
-      if (this.cur < 0 && k === 0) { this.play(this.mood || 'calm'); return; }
+      if (this.cur < 0 && k === 0) { this.play(this.mood || (this.menuOn ? 'theme' : 'calm')); return; }
       if (!p.el.src) p.el.src = BASE + TRACKS.calm;
       p.el.play().then(() => { if (this.players[this.cur] !== p) p.el.pause(); }).catch(() => { p.primed = false; });
     });
+  }
+  // the band's player too: started from a tap, then held until the band is heard
+  primeBand() {
+    const el = this.bandEl; if (!el || this.bandPrimed || !this.level) return; this.bandPrimed = true;
+    el.src = BASE + TRACKS.theme; el.play().then(() => { if (!(this.bandK > 0.02)) el.pause(); }).catch(() => { this.bandPrimed = false; });
+  }
+  // the band (band.js): k 0..1, how much of it is heard where you are looking; stop: cut it dead (the stage wrecked). The song runs on
+  // its own clock, so coming back to the show you hear it further on, as if it never stopped
+  setBand(k, stop = false) {
+    if (!this.ctx || !this.bandEl) return;
+    const el = this.bandEl, t = this.ctx.currentTime, now = performance.now(), on = k > 0.02 && this.level > 0 && !document.hidden;
+    if (this.songAt == null) this.songAt = now;
+    this.bandK = on ? k : 0;
+    if (on) { this.bandLast = now; if (el.paused) { if (!el.src) el.src = BASE + TRACKS.theme; if (el.duration) { try { el.currentTime = ((now - this.songAt) / 1000) % el.duration; } catch (e) { /* not ready */ } } el.play().catch(() => {}); } }
+    else if (!el.paused && now - (this.bandLast || 0) > 4000) el.pause(); // not heard for a while: stop streaming it
+    const want = on ? k * 0.55 : 0; // not loud
+    if (stop) { this.bandG.gain.cancelScheduledValues(t); this.bandG.gain.setValueAtTime(this.bandG.gain.value, t); this.bandG.gain.linearRampToValueAtTime(0, t + 0.08); this.bandW = 0; }
+    else if (Math.abs(want - (this.bandW ?? -1)) > 0.01) { this.bandW = want; this.bandG.gain.setTargetAtTime(want, t, 0.3); }
+    const bg = 1 - 0.8 * Math.min(1, (on ? k : 0) * 1.3);
+    if (Math.abs(bg - (this.bgW ?? -1)) > 0.01) { this.bgW = bg; this.bgG.gain.setTargetAtTime(bg, t, 0.5); }
+  }
+  // the menus: the theme
+  setMenu(on) {
+    this.menuOn = on;
+    if (on) { this.setBand(0, true); if (this.ctx && this.level && this.mood !== 'theme' && this.players.some(p => p.primed)) this.play('theme'); else this.mood = 'theme'; }
   }
   // what the moment calls for: the storm while any other disaster is on; the clean-up through a zombie outbreak (Sean: the
   // action music did not suit it) and for a while after anything; calm otherwise
@@ -61,15 +90,16 @@ export class Music {
     this.t += dt;
     const D = g.disasters, storm = D && D.list.some(e => e.alive && e.type !== 'heroes' && e.type !== 'spill'), outbreak = g.people.stats.zombies > 0 || (D && D.list.some(e => e.alive && e.type === 'spill'));
     if (storm || outbreak) this.stormEnd = this.t;
-    const mood = storm ? 'storm' : outbreak || this.t - this.stormEnd < AFTER ? 'rebuild' : 'calm', p = this.players[this.cur];
+    const mood = this.menuOn ? 'theme' : storm ? 'storm' : outbreak || this.t - this.stormEnd < AFTER ? 'rebuild' : 'calm', p = this.players[this.cur];
     if (!this.level) { this.mood = mood; return; }
-    if (mood !== this.mood && this.cur >= 0) this.play(mood);
+    if (mood !== this.mood && this.cur >= 0) this.play(mood); // out of the menus the theme gives way to the game's own
     else if (p && p.el.duration && !p.el.paused && p.el.currentTime > p.el.duration - TAIL) this.play(mood, true); // nearly at its ending: round again, crossfaded
   }
   play(mood, again = false) {
     const c = this.ctx, t = c.currentTime, f = again ? TAIL - 1 : FADE, old = this.players[this.cur], k = (this.cur + 1) % 2, p = this.players[k];
     this.mood = mood; this.cur = k;
     if (!p.el.src.endsWith(TRACKS[mood])) p.el.src = BASE + TRACKS[mood];
+    p.el.loop = mood === 'theme'; // the menus may sit a while: the theme goes round
     try { p.el.currentTime = 0; } catch (e) { /* not loaded yet */ }
     p.el.play().catch(() => {});
     p.g.gain.cancelScheduledValues(t); p.g.gain.setValueAtTime(0, t); p.g.gain.linearRampToValueAtTime(1, t + f);

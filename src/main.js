@@ -17,6 +17,7 @@ import { Searchlights } from './searchlights.js';
 import { Audio } from './audio.js';
 import { CURVE, curveFrame } from './curve.js';
 import { seeFrame, SEE, seeButton } from './see.js';
+import { Band } from './band.js';
 import { PLACES, placeKey, settle } from './places.js';
 import { Globe } from './globe.js';
 import { Sky } from './sky.js';
@@ -118,6 +119,7 @@ function buildWorld() {
 // shared textures stay for the next), then the next one built and the view put back over its middle
 function moveWorld(key, m, kind) {
   if (W) {
+    if (W.band) W.band.dispose();
     keepDamage(); game.leaveWorld();
     const keep = new Set([sun, sun.target, hemi]);
     for (const o of [...scene.children]) {
@@ -180,7 +182,7 @@ function frame() {
     jx = (Math.random() - 0.5) * k; jy = (Math.random() - 0.5) * k * 0.5; jz = (Math.random() - 0.5) * k;
     camera.position.x += jx; camera.position.y += jy; camera.position.z += jz;
   }
-  sirens.update(time); W.searchlights.update(dt);
+  sirens.update(time); W.searchlights.update(dt); if (W.band) W.band.update(dt);
   curveFrame(scene, camera, tg); // the world curves away as you zoom out
   seeFrame(camera, game.focusAt || tg, focus); // walls between the camera and the action go see-through, close in
   post.render(scene, camera, focus, time);
@@ -197,6 +199,7 @@ game.buildWorld = buildWorld; // the menu builds the place it picks, here
 game.moveWorld = moveWorld;
 game.audio = new Audio(camera, controls); // sound: switched on by the first tap
 game.radio = new Radio(game.audio); // the announcer
+if (!game.menu.hidden) game.audio.music.setMenu(true); // the theme on the menus
 seeButton((on) => game.toast('See through buildings: ' + (on ? 'on' : 'off'))); // the eye: walls between you and the action fade, or not
 if (game.menu.hidden) game.radio.begin(game.modeName === 'be' && game.mode ? game.mode.kind : null);
 const globe = game.globe = new Globe(renderer); let globeWas = false; // the world from orbit: the big city and the towns
@@ -220,6 +223,7 @@ function worldReady() {
   if (!game.people) game.attachWorld(W);
   W.searchlights = new Searchlights(scene, { game, traffic, helis, city, daylight }); // beams at night on the trouble
   window.__lights = W.searchlights;
+  W.band = game.band = new Band({ scene, game, city, people, traffic, fire, disasters, camera, controls, get music() { return game.audio && game.audio.music; } }); // the house band, playing the theme
   for (const k of damageOf(placeKey())) if (city.buildings[k] && !city.dead[k]) { people.clearBuilding(k, 'spare'); city.hideBuilding(k); city.addRubble(k, 0.75); }
   window.__z = { see: SEE, THREE, scene, camera, controls, renderer, post, city, traffic, people, fire, game, daylight, helis, disasters, outskirts, sirens, sun, hemi, setView, buildMs, audio: game.audio, info: () => renderer.info.render };
 }

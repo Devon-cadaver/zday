@@ -297,7 +297,7 @@ export class Game {
   leaveWorld() {
     this.endMode();
     this.pendingFires = []; this.simT = 0; this.acc = 0; this.seen = {}; this.zoomTo = 0; this.flash = 0; this.shake = 0; this.focusAt = null;
-    this.people = this.traffic = this.fire = this.city = this.daylight = this.helis = this.disasters = null;
+    this.people = this.traffic = this.fire = this.city = this.daylight = this.helis = this.disasters = this.band = null;
   }
   startMode(which, kind) {
     this.menu.hidden = true; this.menuOff(); this.modeName = which;
@@ -308,6 +308,7 @@ export class Game {
 
   // ---------- main menu and unlocks
   showMenu(panel = 'main') {
+    if (this.audio && this.audio.music) this.audio.music.setMenu(true); // the theme on the menus
     if (!this.mode || this.mode instanceof Idle) this.profile.mode = panel === 'be' ? 'be' : panel === 'commander' || panel === 'main' ? 'commander' : null; // the level shown is that mode's (it keeps step with its road)
     const pr = this.profile, lvl = pr.level, next = pr.nextXp;
     const rank = '<div class="rank"><span>Commander level <b>' + lvl + '</b></span><span>' + pr.xp.toLocaleString() + ' XP' + (next ? ' / ' + next.toLocaleString() : '') + '</span></div>' +
@@ -382,7 +383,7 @@ export class Game {
     dragScroll(el.querySelector('.box'), 'y');
   }
   stopRoster() { if (this.roster) { this.roster.stop(); this.roster = null; } }
-  menuOff() { this.stopRoster(); document.body.classList.remove('zd-menu-on'); const side = document.getElementById('zd-side'); if (side && side.parentNode !== document.body) document.body.appendChild(side); }
+  menuOff() { if (this.audio && this.audio.music) this.audio.music.setMenu(false); this.stopRoster(); document.body.classList.remove('zd-menu-on'); const side = document.getElementById('zd-side'); if (side && side.parentNode !== document.body) document.body.appendChild(side); }
   // from the menu: Commander and Be The Disaster head for the town where you left off (the first town the first time),
   // Sandbox lets you pick any place on the globe; the menu drops away first
   playMode(which, kind) {
@@ -565,6 +566,7 @@ export class Game {
     this.fire.reset(); this.city.uncharAll(); this.traffic.reset(); this.pendingFires.length = 0; if (this.helis) this.helis.reset();
     this.city.restoreAll();
     this.people.reset();
+    if (this.band) this.band.reset(); // the show back on
     this.simT = 0; this.shake = 0; this.seen = {}; this.setFollow(-1);
   }
 
