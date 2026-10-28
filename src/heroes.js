@@ -14,6 +14,7 @@
 import * as THREE from 'three';
 import { rig, relax, handsOnHips, tumble, detail } from './villains.js';
 import { tossStep, toss } from './brawl.js';
+import { fightPose } from './melee.js';
 const up = (v) => v && !v.gone && !v.beaten;
 import { roofTop } from './tripod.js';
 import { ST } from './people.js';
@@ -233,12 +234,13 @@ class Hero {
       if (d < 9) { shell.caught = true; ty.flying.splice(ty.flying.indexOf(shell), 1); this.job = { kind: 'return', shell: shell.shell, k: shell.k, base: shell.base, half: shell.half }; this.D.emit({ type: 'herocatch2', text: 'Nova caught the building in mid-air!' }); }
       return;
     }
-    if (Math.hypot(ty.x - this.x, ty.z - this.z) > 28 && (this.carT = (this.carT ?? 2) - h) <= 0) { this.carT = 5; if (this.fetch(ty, J)) return; } // from a distance: a car at him
+    if (Math.hypot(ty.x - this.x, ty.z - this.z) > 28 && (this.carT = (this.carT ?? 2) - h) <= 0) { this.carT = 5; if (Math.random() < 0.35 && this.D.brawl.melee.clash(this, ty)) return; if (this.fetch(ty, J)) return; } // from a distance: beam against beam, or a car at him
     const d = this.fly(ty.x, ty.y + 2, ty.z, h, 60, 15);
     if (d < 5 && this.cd <= 0) {
       const r = Math.random();
-      if (r < 0.3 && !ty.gripped && !ty.tossed) { this.cd = 2; this.D.brawl.grab(this, ty); return; } // grabs him and hurls him through a building
-      if (r < 0.5 && !ty.gripped && !ty.tossed && this.D.brawl.drag(this, ty)) { this.cd = 3; return; } // or by the throat, down the street
+      if (r < 0.45 && this.D.brawl.melee.start(this, ty)) { this.cd = 2; return; } // toe to toe, punches and kicks
+      if (r < 0.6 && !ty.gripped && !ty.tossed) { this.cd = 2; this.D.brawl.grab(this, ty); return; } // grabs him and hurls him through a building
+      if (r < 0.72 && !ty.gripped && !ty.tossed && this.D.brawl.drag(this, ty)) { this.cd = 3; return; } // or by the throat, down the street
       this.cd = 1.1; this.punchT = 0.35;
       const dx = ty.x - this.x, dz = ty.z - this.z, dl = Math.hypot(dx, dz) || 1;
       ty.hp -= 25; ty.vx += dx / dl * 22; ty.vz += dz / dl * 22; ty.vy += 8; ty.ray = null; ty.wind = 0; sfx('thud', ty.x, ty.y + 2, ty.z, { gain: 1.2 });
@@ -265,8 +267,9 @@ class Hero {
     const d = this.fly(wv.x, wv.y + 2, wv.z, h, 65, 20);
     if (d < 4.5 && this.cd <= 0) {
       const r = Math.random();
-      if (r < 0.3 && !wv.gripped && !wv.tossed) { this.cd = 2; this.D.brawl.grab(this, wv); return; }
-      if (r < 0.5 && !wv.gripped && !wv.tossed && this.D.brawl.drag(this, wv)) { this.cd = 3; return; }
+      if (r < 0.45 && this.D.brawl.melee.start(this, wv)) { this.cd = 2; return; }
+      if (r < 0.6 && !wv.gripped && !wv.tossed) { this.cd = 2; this.D.brawl.grab(this, wv); return; }
+      if (r < 0.72 && !wv.gripped && !wv.tossed && this.D.brawl.drag(this, wv)) { this.cd = 3; return; }
       this.cd = 1.3; this.punchT = 0.35; wv.hp -= 34; sfx('thud', wv.x, wv.y + 2, wv.z, { gain: 1.2 });
       this.D.ctx.fire.burst(wv.x, wv.y + 3, wv.z, 12, 1.6);
       if (wv.state === 'perch') wv.hop(true);
@@ -283,7 +286,8 @@ class Hero {
     if (d < 5 && this.gcd <= 0) {
       this.gcd = 1.5; const B = this.D.brawl, r = Math.random();
       if (!this.H.saidBlur) { this.H.saidBlur = true; this.D.emit({ type: 'heroblur', text: (held ? 'Blur is frozen in time, and ' : 'Blur is seeing stars, and ') + this.name + ' got hold of him!' }); }
-      if (r < 0.5) B.grab(this, bl); // round once and through a building
+      if (r < 0.35 && B.melee.start(this, bl)) return; // toe to toe while he is slow enough to hit
+      if (r < 0.6) B.grab(this, bl); // round once and through a building
       else if (!(r < 0.8 && B.drag(this, bl))) { // or by the throat down the street, or a punch that knocks him flat
         this.punchT = 0.35; const dx = bl.x - this.x, dz = bl.z - this.z, dl = Math.hypot(dx, dz) || 1;
         toss(bl, dx / dl * 16, 7, dz / dl * 16); B.hurt(bl, 25, this); this.D.ctx.fire.burst(bl.x, 3, bl.z, 12, 1.8);
@@ -430,6 +434,7 @@ class Hero {
     else { for (const a of A) a.sh.rotation.set(0.1, 0, a.sx * 0.3); for (const L of r.legs) { L.hip.rotation.x = 0.1; L.knee.rotation.x = 0.25; } }
     this.pitch += (pitch - this.pitch) * Math.min(1, dt * 3); r.body.rotation.x = this.pitch; r.head.rotation.x = -this.pitch * 0.6;
     if (!this.landed && this.hs < 10) r.body.position.y = Math.sin(this.t * 2) * 0.2;
+    fightPose(r, this); // squared up, a punch or a kick, a block, reeling; or leaning into a beam clash
     if (this.tossed || this.gripped || this.spinning) tumble(r, this.t, this.spinning);
     r.cape.update(dt, this.pitch > 0.5 ? 0.12 : Math.min(0.6, this.hs / 30), 0.3 + Math.min(0.7, this.hs / 20)); detail(r, this.D);
     if (this.wings) { const fl = this.landed ? 0 : 1; this.wings.forEach((w, i) => { w.rotation.z = fl ? Math.sin(this.t * 55 + i * 1.3) * 0.45 + 0.15 : -0.15; w.rotation.y = -(i < 2 ? 0.25 : 0.7) - (fl ? 0 : 0.6); }); }

@@ -16,6 +16,7 @@ import { tossStep } from './brawl.js';
 import { Body, sweepTubes } from './flesh.js';
 import { sfx } from './audio.js';
 import { heroesWin } from './heroes.js';
+import { fightPose } from './melee.js';
 
 const S = 2.2; // a villain stands a bit over twice as tall as a person, so you can pick them out from above
 const NEAR = 330; // closer than this to the camera, a figure has its smooth body
@@ -372,6 +373,7 @@ class Blur extends Villain {
     if (k > 0.02) { run(r, this.ph, k); r.torso.rotation.x = 0.55 * k; r.body.rotation.x = 0.12 * k; r.head.rotation.x = -0.4 * k; }
     else if (this.dazed > 0) { r.body.rotation.z = Math.sin(this.t * 4) * 0.12; r.torso.rotation.x = 0.35; r.head.rotation.set(0.3, Math.sin(this.t * 3) * 0.4, Math.sin(this.t * 6) * 0.3); for (const a of r.arms) { a.sh.rotation.set(-0.3, 0, a.sx * 0.5); a.el.rotation.set(-0.6, 0, 0); } } // seeing stars, swaying on his feet
     else { handsOnHips(r); r.torso.rotation.x = Math.sin(this.t * 1.6) * 0.02; r.head.rotation.y = Math.sin(this.t * 0.7) * 0.5; } // between runs, weighing up where to go next
+    fightPose(r, this);
     if (this.tossed || this.gripped || this.spinning) tumble(r, this.t, this.spinning);
     r.cape.update(dt, Math.min(1, this.speed / 35), Math.min(1, this.speed / 25) + 0.15); detail(r, this.D);
   }
@@ -668,6 +670,7 @@ class Tyrant extends Villain {
     if (flying && pitch < 0.5) { for (const L of r.legs) { L.hip.rotation.x = 0.12; L.knee.rotation.x = 0.3; } r.legs[1].hip.rotation.x = 0.2; }
     this.pitch += (pitch - this.pitch) * Math.min(1, dt * 3); r.body.rotation.x = this.pitch; r.head.rotation.x = -this.pitch * 0.6;
     if (flying) r.body.position.y = Math.sin(this.t * 2) * 0.25;
+    fightPose(r, this);
     if (this.tossed || this.gripped || this.spinning) tumble(r, this.t, this.spinning);
     r.cape.update(dt, this.pitch > 0.5 ? 0.12 : Math.min(0.6, this.hs / 30), 0.3 + Math.min(0.7, this.hs / 20)); detail(r, this.D);
     const R = this.ray;
@@ -890,6 +893,7 @@ class Weaver extends Villain {
       aim(this.line, _w.x, _w.y, _w.z, an[0], an[1], an[2], 0.09); this.line.visible = true;
     }
     if (!hanging && this.yanked && !this.yanked.car.gone) { r.root.updateMatrixWorld(true); handAt(A[1], _w); const c = this.yanked.car; aim(this.line, _w.x, _w.y, _w.z, c.x, (c.y || 0) + 1, c.z, 0.07); this.line.visible = true; }
+    fightPose(r, this);
     if (this.tossed || this.gripped || this.spinning) tumble(r, this.t, this.spinning);
     r.cape.update(dt, Math.min(0.85, this.speed / 30), 0.2 + Math.min(0.8, this.speed / 25)); detail(r, this.D);
   }
