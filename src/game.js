@@ -727,6 +727,8 @@ export class Game {
 
   update(dt, fps) {
     const p = this.people, h = 1 / 30, run = this.paused ? 0 : 1;
+    { const ph = this.mode.phase ? this.mode.phase() : 0; p.hour = (6 + ((ph - 0.9) % 1 + 1) % 1 * 24) % 24; } // their day runs on the same clock as the sun
+    p.danger = !!this.disasters && this.disasters.list.some(e => e.alive && e.type !== 'heroes' && e.type !== 'spill'); // a disaster on: no errands, and those indoors stay in (an outbreak creeps up on people: they carry on)
     const sdt = dt * this.speed * run;
     this.acc = Math.min(this.acc + sdt, h * 12);
     let stepped = false;

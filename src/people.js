@@ -11,9 +11,10 @@ import * as THREE from 'three';
 import { cutGround } from './holes.js';
 import { HALF, RW, SW, CURB } from './city.js';
 import { rng } from './textures.js';
-import { figureGeometry, figureMaterial, figureAttributes, rollArchetype, OFFICER_LOOK, FIREFIGHTER_LOOK, SOLDIER_LOOK, ALIEN_LOOK, ZTYPES, rollZombieType, ZSKIN, FLAG, HAT, RADIOACTIVE } from './figures.js';
+import { Lives } from './lives.js';
+import { ARCHETYPES, figureGeometry, figureMaterial, figureAttributes, rollArchetype, OFFICER_LOOK, FIREFIGHTER_LOOK, SOLDIER_LOOK, ALIEN_LOOK, ZTYPES, rollZombieType, ZSKIN, FLAG, HAT, RADIOACTIVE } from './figures.js';
 
-export const ST = { WALK: 0, IDLE: 1, FLEE: 2, RETURN: 3, GRABBED: 4, TURNING: 5, ZOMBIE: 6, FALLING: 7, DEAD: 8, SEEK: 9, INSIDE: 10, ROOF: 11, PILE: 12, CLIMB: 13, JUMP: 14, COP: 15, FIREMAN: 16, EVAC: 17, BOARD: 18, EXT: 19, AIR: 20, RIOT: 21, ALIEN: 22, FROZEN: 23, FILM: 24, HELD: 25, PRAY: 26, FIGHT: 27, STEAL: 28, SWIM: 29 };
+export const ST = { WALK: 0, IDLE: 1, FLEE: 2, RETURN: 3, GRABBED: 4, TURNING: 5, ZOMBIE: 6, FALLING: 7, DEAD: 8, SEEK: 9, INSIDE: 10, ROOF: 11, PILE: 12, CLIMB: 13, JUMP: 14, COP: 15, FIREMAN: 16, EVAC: 17, BOARD: 18, EXT: 19, AIR: 20, RIOT: 21, ALIEN: 22, FROZEN: 23, FILM: 24, HELD: 25, PRAY: 26, FIGHT: 27, STEAL: 28, SWIM: 29, GO: 30 }; // GO: on the way somewhere in their day (lives.js)
 // how someone takes danger when it comes: most run or hide, some fight back, some go for a car, some kneel and pray
 export const TRAIT = { NONE: 0, FIGHTER: 1, DRIVER: 2, FAITHFUL: 3 };
 export const KIND = { CIVILIAN: 0, OFFICER: 1, FIREFIGHTER: 2, SOLDIER: 3, ALIEN: 4 };
@@ -42,6 +43,7 @@ ANIM[S.WALK] = 1; ANIM[S.FLEE] = 2; ANIM[S.RETURN] = 1; ANIM[S.TURNING] = 5; ANI
 // afloat in deep water (SWIM): in the hash, can be pulled out (hittable, grabbable), waving for help (anim 12); not
 // a civilian on foot, so crowds, zombies and sirens leave them be
 INHASH[S.SWIM] = HITTABLE[S.SWIM] = GRABBABLE[S.SWIM] = 1; ANIM[S.SWIM] = 12;
+CIV[S.GO] = INHASH[S.GO] = HITTABLE[S.GO] = GRABBABLE[S.GO] = 1; ANIM[S.GO] = 1; // on the way somewhere: a civilian on foot like any other
 ANIM[S.DEAD] = 4; ANIM[S.SEEK] = 2; ANIM[S.PILE] = 5; ANIM[S.CLIMB] = 5; ANIM[S.JUMP] = 2; ANIM[S.BOARD] = 2; ANIM[S.EXT] = 2; ANIM[S.AIR] = 2; ANIM[S.RIOT] = 1; ANIM[S.ALIEN] = 7; ANIM[S.HELD] = 0; ANIM[S.PRAY] = 10; ANIM[S.FIGHT] = 7; ANIM[S.STEAL] = 2;
 
 // a tangle of bodies: limbs and torsos in zombie greens, rags and shadow
@@ -111,6 +113,7 @@ export class People {
     this.blk = new Int16Array(N); this.lvl = new Int16Array(N); this.bt = new Int16Array(N);
     this.target = new Int32Array(N);
     this.base = new Array(N); this.trait = new Uint8Array(N);
+    this.lives = new Lives(this, S, KIND); this.hour = 8.4; this.danger = false; this.lifeT = 0; // homes, jobs, characters, their day (the game sets the hour)
 
     const B = city.bounds;
     this.hx0 = B.x0 - HALF; this.hz0 = B.z0 - HALF;
@@ -324,7 +327,7 @@ export class People {
     for (let i = 0; i < this.N; i++) {
       this.think[i] = r() * 0.4;
       const a = r() * Math.PI * 2; this.hx[i] = Math.cos(a); this.hz[i] = Math.sin(a);
-      const A = rollArchetype(r); this.base[i] = A.roll(r);
+      const A = rollArchetype(r); this.base[i] = A.roll(r); this.lives.arch[i] = ARCHETYPES.indexOf(A);
       this.setLook(i, this.base[i]);
       // temperament, from a hash of the index so the crowd looks the same as before: builders and off-duty cops fight, business types grab a car, the homeless pray
       const q = (((i + 1) * 2654435761) >>> 0) / 4294967296, fight = A.id === 'construction' || A.id === 'offduty' ? 0.45 : 0.07, drive = A.id === 'business' ? 0.18 : 0.06, pray = A.id === 'homeless' ? 0.3 : 0.08;
@@ -342,6 +345,7 @@ export class People {
     this.events = [];
     this.flashList.length = 0; this.grenades.length = 0; this.grenadeCd = 0;
     for (const d of this.dust) { d.m.visible = false; d.t = 1; }
+    this.lives.reset(this.opts.seed ?? 99);
     this.sync(300);
   }
 
@@ -760,7 +764,7 @@ export class People {
   // evacuation bus parked at (x,z): up to n street civilians within R run for its door
   callToBus(x, z, R, n, busId) {
     const c = [], D = this.busDoor(busId); if (D) { x = D.d[0]; z = D.d[1]; }
-    this.around(x, z, R, (j, d2) => { if (this.kind[j] === 0 && !this.inf[j] && (this.st[j] === S.WALK || this.st[j] === S.IDLE || this.st[j] === S.FLEE || this.st[j] === S.RETURN)) c.push([d2, j]); });
+    this.around(x, z, R, (j, d2) => { if (this.kind[j] === 0 && !this.inf[j] && (this.st[j] === S.WALK || this.st[j] === S.IDLE || this.st[j] === S.FLEE || this.st[j] === S.RETURN || this.st[j] === S.GO)) c.push([d2, j]); });
     c.sort((a, b) => a[0] - b[0]);
     let k = 0;
     for (const [, j] of c) {
@@ -920,6 +924,7 @@ export class People {
     this.buildHash();
     if ((this.specT -= h) <= 0) { this.specT = 0.5; this.specials(); }
     if ((this.hordeT -= h) <= 0) { this.hordeT = 1; this.hordeTick(); }
+    if ((this.lifeT -= h) <= 0) { this.lifeT = 0.25; this.lives.tick(); } // a slice of the strollers think what to do next
     for (let i = 0; i < this.active; i++) {
       const s = this.st[i];
       switch (s) {
@@ -939,6 +944,7 @@ export class People {
           break;
         }
         case S.SEEK: this.seekStep(i, h); break;
+        case S.GO: this.lives.goStep(i, h); break;
         case S.INSIDE: this.insideStep(i, h); break;
         case S.ROOF: this.roofStep(i, h); break;
         case S.COP: this.copStep(i, h); break;
@@ -1037,7 +1043,7 @@ export class People {
       const full = this.bIn[k] + this.bRoofAll[k] >= this.bCap[k];
       const blocked = this.bBreach[k] || (this.fire && this.fire.bFire[k]) || full || (this.bBarr[k] && this.zombiesNear(b.door[0], b.door[1], 4) > 0);
       if (blocked) { this.st[i] = S.IDLE; this.panic(i, b.wall[0], b.wall[1], -1); return; }
-      this.st[i] = S.INSIDE; this.lvl[i] = -2; this.bIn[k]++; this.bBarr[k] = 1;
+      this.st[i] = S.INSIDE; this.lvl[i] = -2; this.bIn[k]++; this.bBarr[k] = 1; this.fx[i] = 0; // sheltering (fx 9 is the routine)
       this.t1[i] = 3 + (b.roofY - b.baseY) / 5 + this.r() * 2;
       return;
     }
@@ -1054,6 +1060,7 @@ export class People {
   }
 
   insideStep(i, h) {
+    if (this.fx[i] === 9) { this.lives.indoorStep(i, h); return; } // at home, at work, in a shop
     if ((this.t1[i] -= h) > 0) return;
     const k = this.bt[i], rf = this.bld[k].roof;
     this.bIn[k] = Math.max(0, this.bIn[k] - 1);
@@ -1121,7 +1128,7 @@ export class People {
     const sl = this.watchSlice = (this.watchSlice + 1) % 6;
     for (let i = sl; i < this.active; i += 6) {
       const s = this.st[i];
-      if ((s !== S.WALK && s !== S.IDLE && s !== S.RETURN) || this.inf[i] || this.kind[i] !== KIND.CIVILIAN || this.lvl[i] !== -1) continue;
+      if ((s !== S.WALK && s !== S.IDLE && s !== S.RETURN && s !== S.GO) || this.inf[i] || this.kind[i] !== KIND.CIVILIAN || this.lvl[i] !== -1) continue;
       const p = this.poi(this.x[i], this.z[i]);
       if (!p || this.r() > 0.35) continue;
       const d = Math.hypot(p.x - this.x[i], p.z - this.z[i]);
@@ -1405,7 +1412,7 @@ export class People {
   // police on the spot before a flood: everyone on the street near (x, z) heads up onto the rooftops. How many went
   alarmAt(x, z, R) {
     let n = 0;
-    this.around(x, z, R, (i) => { const s = this.st[i]; if (this.kind[i] === KIND.CIVILIAN && !this.inf[i] && (s === S.WALK || s === S.IDLE || s === S.RETURN || s === S.FLEE || s === S.FILM) && this.trySeek(i)) n++; });
+    this.around(x, z, R, (i) => { const s = this.st[i]; if (this.kind[i] === KIND.CIVILIAN && !this.inf[i] && (s === S.WALK || s === S.IDLE || s === S.RETURN || s === S.GO || s === S.FLEE || s === S.FILM) && this.trySeek(i)) n++; });
     return n;
   }
   // tsunami and flood sirens: civilians head for the rooftops
@@ -1414,7 +1421,7 @@ export class People {
     for (let i = 0; i < this.nHuman; i++) {
       const s = this.st[i];
       if (this.kind[i] !== KIND.CIVILIAN || this.inf[i]) continue;
-      if ((s === S.WALK || s === S.IDLE || s === S.RETURN || s === S.FLEE) && this.r() < 0.8) this.trySeek(i) || this.panic(i, this.x[i] + 1, this.z[i], -1);
+      if ((s === S.WALK || s === S.IDLE || s === S.RETURN || s === S.GO || s === S.FLEE) && this.r() < 0.8) this.trySeek(i) || this.panic(i, this.x[i] + 1, this.z[i], -1);
     }
   }
   // ---------- cold: frozen solid where they stood. Civilians die after a while; zombies thaw when the cold passes
@@ -1489,7 +1496,7 @@ export class People {
     const c = [];
     this.around(x, z, R, (j, d2) => {
       const s = this.st[j];
-      if (this.kind[j] !== KIND.CIVILIAN || (s !== S.WALK && s !== S.IDLE && s !== S.FLEE && s !== S.RETURN && s !== S.FILM)) return;
+      if (this.kind[j] !== KIND.CIVILIAN || (s !== S.WALK && s !== S.IDLE && s !== S.FLEE && s !== S.RETURN && s !== S.GO && s !== S.FILM)) return;
       if (this.inf[j] && this.inc[j] < this.inc0[j] * 0.5) return; // too far gone to help
       c.push([d2, j]);
     });
@@ -1531,7 +1538,7 @@ export class People {
   startRiot(x, z, n, mob) {
     const c = [];
     this.buildHash();
-    this.around(x, z, 45, (j, d2) => { const s = this.st[j]; if (this.kind[j] === KIND.CIVILIAN && !this.inf[j] && (s === S.WALK || s === S.IDLE || s === S.RETURN)) c.push([d2, j]); });
+    this.around(x, z, 45, (j, d2) => { const s = this.st[j]; if (this.kind[j] === KIND.CIVILIAN && !this.inf[j] && (s === S.WALK || s === S.IDLE || s === S.RETURN || s === S.GO)) c.push([d2, j]); });
     c.sort((a, b) => a[0] - b[0]);
     const out = [];
     for (const [, j] of c) {
@@ -1913,6 +1920,7 @@ export class People {
       const s = this.st[i];
       const o = i * 16;
       let an = ANIM[s];
+      if (s === S.GO && (this.fx[i] === 8 || this.fx[i] === 7)) an = 0; // standing about at a park or a square, waiting at the kerb
       if (s === S.INSIDE || s === S.EVAC) { arr.fill(0, o, o + 16); if (s === S.INSIDE) { if (this.inf[i]) infected++; else if (this.kind[i] === KIND.CIVILIAN) humans++; } continue; } // sheltering indoors still counts as alive
       if (s === S.ALIEN) aliens++;
       let tilt = 0, y = this.y[i];
