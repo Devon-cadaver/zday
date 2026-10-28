@@ -1,9 +1,9 @@
-# My Tiny Disaster (was Z-Day): project notes
+# My Little Disaster (was My Tiny Disaster, Z-Day): project notes
 
 READ THIS FIRST after a compaction. Current as of 2026-10-26.
 
 ## Where things stand (summary for picking up after a compact)
-- The game is **My Tiny Disaster** (renamed from Z-Day on 2026-10-26; the repo and URL stay devon-cadaver/zday, the save key stays zday_profile so progress is kept).
+- The game is **My Little Disaster** (renamed from Z-Day on 2026-10-26, then from My Tiny Disaster on 2026-10-28; the repo and URL stay devon-cadaver/zday, the save key stays zday_profile so progress is kept).
 - A warm sepia tilt-shift miniature city (procedural Three.js) that disasters hit. Sean plays on an older iPhone through GitHub Pages and wants finished, pushed work with screenshots sent via SendUserFile.
 - Modes (menu = default page):
   - **Commander** (main game): each 10 minute round is a run of 2 to 5 random incidents (zombie outbreak, quake, riot, flood... up to meltdown as you level) that the player answers with rescue units (police, evacuation bus, fire truck, water and rescue helicopters, army APC, airstrike, nuke). The next incident comes early once the city is quiet; clearing them all secures the city. XP, levels (12), unlocks, upgrades, stars.

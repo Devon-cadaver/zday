@@ -1,4 +1,4 @@
-# My Tiny Disaster (was Z-Day): Commander mode design
+# My Little Disaster (was My Tiny Disaster, Z-Day): Commander mode design
 
 Written 2026-10-25 from Sean's brief. The player stops dropping zombies and becomes the hero: the city's emergency commander,
 dispatching police, fire crews, helicopters, the army and, as a last resort, a nuke. Everything built in the sandbox (infection,

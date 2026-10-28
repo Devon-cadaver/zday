@@ -341,7 +341,7 @@ export class Game {
         '<div class="btns back"><button class="zd-btn" type="button" data-go="main">Back</button></div>';
     }
     this.stopRoster(); this.menuPanel = panel;
-    this.menu.innerHTML = '<div class="mtitle"><h1>MY TINY<br>DISASTER</h1><div class="tag">Save the city, or be the disaster</div></div><div class="box' + (panel === 'roster' ? ' tall' : '') + '">' + head + '<div class="mbody">' + body + '</div></div>';
+    this.menu.innerHTML = '<div class="mtitle"><h1>MY LITTLE<br>DISASTER</h1><div class="tag">Save the city, or be the disaster</div></div><div class="box' + (panel === 'roster' ? ' tall' : '') + '">' + head + '<div class="mbody">' + body + '</div></div>';
     if (panel === 'roster') {
       const cv = document.createElement('canvas'); cv.className = 'rgl'; this.menu.appendChild(cv);
       import('./roster.js').then(m => { if (!cv.isConnected) return; const sec = this.menu.querySelector('.rsec'); sec.innerHTML = ''; this.roster = m.startRoster({ canvas: cv, list: this.menu.querySelector('.mbody'), root: sec }); });

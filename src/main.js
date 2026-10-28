@@ -1,4 +1,4 @@
-// My Tiny Disaster: a miniature tilt-shift city with traffic and crowds, hit by disasters.
+// My Little Disaster: a miniature tilt-shift city with traffic and crowds, hit by disasters.
 import * as THREE from 'three';
 import { MapControls } from 'three/addons/controls/MapControls.js';
 import { makeTextures } from './textures.js';

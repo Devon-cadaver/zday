@@ -2,7 +2,7 @@
   "name": "zday",
   "version": "0.1.0",
   "private": true,
-  "description": "My Tiny Disaster: a living miniature city hit by disasters (Three.js + Vite)",
+  "description": "My Little Disaster: a living miniature city hit by disasters (Three.js + Vite)",
   "type": "module",
   "scripts": {
     "dev": "vite",
