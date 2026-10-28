@@ -377,7 +377,7 @@ export class Globe {
       this.cam.position.copy(dir.multiplyScalar(r)); this.cam.lookAt(0, 0, 0);
       if (k >= 1) {
         const key = F.key; this.fly = null;
-        if (this.arrive) { const a = this.arrive; if (key !== placeKey()) this.travelling(key); a(key); }
+        if (this.arrive) this.arrive(key); // the menu's modes: built here, or travelling (they call travelling)
         else if (key === placeKey()) this.close();
         else { this.travelling(key); travel(key, new URLSearchParams(location.search).get('mode') || 'sandbox'); }
       }

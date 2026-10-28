@@ -10,7 +10,7 @@ import { BeTheDisaster, BE } from './be.js';
 import { Gauge, SIZED } from './gauge.js';
 import { Responders } from './response.js';
 import { curvedHit } from './curve.js';
-import { PLACES, PATH, placeKey, travel } from './places.js';
+import { PLACES, PATH, placeKey, travel, settle } from './places.js';
 import { dragScroll } from './ui.js';
 
 const CSS = `
@@ -183,6 +183,7 @@ body.zd-menu-on #zd-compass,body.zd-panel #zd-compass{display:none}
 #zd-pause svg{width:18px;height:18px;display:block;margin:auto;fill:currentColor}
 #zd-pause.on{border-color:#ffc233;color:#ffc233}
 body.zd-menu-on #zd-pause,body.zd-panel #zd-pause{display:none}
+body.zd-globe-on #zd-compass,body.zd-globe-on #zd-pause{display:none}
 #zd-paused{position:fixed;left:0;right:0;margin:0 auto;width:max-content;top:calc(50% - 20px);z-index:29;padding:8px 16px;border-radius:12px;background:rgba(18,14,10,.78);border:1px solid rgba(255,194,51,.45);
   color:#ffc233;font:800 14px/1.2 system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:.2em;pointer-events:none}
 #zd-paused[hidden]{display:none}
@@ -240,14 +241,12 @@ class Idle {
 }
 
 export class Game {
-  constructor({ people, traffic, fire, city, camera, controls, renderer, mode, daylight, helis, post, disasters }) {
-    Object.assign(this, { people, traffic, fire, city, camera, controls, renderer, daylight, helis, post, disasters });
+  constructor({ camera, controls, renderer, mode, post, world }) {
+    Object.assign(this, { camera, controls, renderer, post });
     this.flash = 0; this.shake = 0;
-    if (disasters) disasters.ctx.game = this;
     this.followSub = null; this.focusAt = null; this._off = new THREE.Vector3(); this._fp = new THREE.Vector3();
     this.pendingFires = []; this.simT = 0; this.realT = 0; this.acc = 0; this.speed = 1; this.follow = -1; this.seen = {};
-    people.fire = fire; traffic.people = people; traffic.fire = fire; people.traffic = traffic;
-    people.onOverrun = (k, why) => { if (Math.random() < (why === 'breach' ? 0.25 : 0.3)) this.pendingFires.push({ k, t: this.simT + 3 + Math.random() * 8 }); };
+    if (world) this.attachWorld(world);
     this.profile = new Profile();
     this.buildUI();
     this.bindInput();
@@ -263,6 +262,13 @@ export class Game {
     } else { this.mode = new Idle(); this.showMenu(); }
   }
 
+  // the place's city and everything in it (main.js builds it: straight away for a game, once a place is picked from the menu)
+  attachWorld({ people, traffic, fire, city, daylight, helis, disasters }) {
+    Object.assign(this, { people, traffic, fire, city, daylight, helis, disasters });
+    if (disasters) disasters.ctx.game = this;
+    people.fire = fire; traffic.people = people; traffic.fire = fire; people.traffic = traffic;
+    people.onOverrun = (k, why) => { if (Math.random() < (why === 'breach' ? 0.25 : 0.3)) this.pendingFires.push({ k, t: this.simT + 3 + Math.random() * 8 }); };
+  }
   startMode(which, kind) {
     this.menu.hidden = true; this.menuOff(); this.modeName = which;
     this.top.innerHTML = ''; this.bar.innerHTML = ''; this.followChip = this.stopBtn = null; this.el.chip = null; this.setPaused(false);
@@ -352,7 +358,11 @@ export class Game {
     if (!G || !G.active) { this.startMode(which, kind); return; }
     this.menu.classList.add('gone'); clearTimeout(this._gone); this._gone = setTimeout(() => { this.menu.hidden = true; this.menu.classList.remove('gone'); }, 350);
     this.menuOff();
-    const arrive = (key) => { if (key === placeKey()) { G.close(); this.startMode(which, kind); } else travel(key, which, kind ? { kind } : null); };
+    const arrive = (key) => {
+      if (!this.people && this.buildWorld) { settle(key, which, kind ? { kind } : null); this.buildWorld(); G.close(); this.startMode(which, kind); return; } // under the clouds: no page load, so the sound carries on
+      if (key === placeKey()) { G.close(); this.startMode(which, kind); return; }
+      G.travelling(key); travel(key, which, kind ? { kind } : null);
+    };
     if (which === 'sandbox') { G.choose({ title: 'SANDBOX', sub: 'Pick a city: tap it to play there', arrive, back: () => this.showMenu() }); return; }
     const key = this.profile.town(which);
     G.choose({ title: (which === 'be' ? 'BE THE DISASTER' : 'COMMANDER') + ' \u00B7 LEVEL ' + (PATH.indexOf(key) + 1), sub: PLACES[key].name, key, road: true, status: this.townStatus(which), arrive });

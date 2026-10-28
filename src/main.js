@@ -80,28 +80,42 @@ sun.shadow.bias = -0.0003;
 sun.shadow.normalBias = 0.35;
 scene.add(sun, sun.target);
 
-// world
-const t0 = performance.now();
-const tex = makeTextures(renderer);
-const place = PLACES[placeKey()]; // which place in the world this is (the big city unless ?place= says otherwise)
-const city = buildCity(tex, { ...place, seed: num('seed', place.seed ?? 20261025), blocks: Math.min(place.blocks ?? 12, low ? 10 : 12) });
-scene.add(city.group);
-const outskirts = buildOutskirts(scene, city, { low, land: place.land });
-const traffic = new Traffic(city, scene, { cars: Math.round((low ? 160 : 280) * (place.cars ?? 1)) });
-const people = new People(city, scene, { people: Math.round((low ? 2600 : 5200) * (place.people ?? 1)) });
-const fire = new Fire(scene, city, { low });
-const helis = new Helicopters(scene, city, fire, people);
-helis.traffic = traffic;
-const buildMs = Math.round(performance.now() - t0);
-
+// world: the place's city and everything in it. Built straight away for a game; behind the menu only once a place is
+// picked (under the clouds), so the first trip from the menu needs no page load and the sound the menu's taps turned on
+// keeps playing
 const post = new Post(renderer, { samples: low ? 0 : 4 });
-const daylight = new Daylight({ scene, sun, hemi, post, city, traffic, people });
-daylight.set(0);
-const disasters = new Disasters({ scene, city, people, traffic, fire, post, camera, controls, renderer, sun, hemi, low, outskirts });
-outskirts.steam(fire);
 if (P.has('blur')) post.opts.blurFrac = num('blur', 0.018);
 if (P.get('dof') === '0') post.opts.dof = false;
 if (P.get('grade') === '0') post.opts.grade = false;
+let W = null, tex = null;
+function buildWorld() {
+  const t0 = performance.now();
+  tex = tex || makeTextures(renderer);
+  const place = PLACES[placeKey()]; // which place in the world this is (the big city unless ?place= says otherwise)
+  const city = buildCity(tex, { ...place, seed: num('seed', place.seed ?? 20261025), blocks: Math.min(place.blocks ?? 12, low ? 10 : 12) });
+  scene.add(city.group);
+  const outskirts = buildOutskirts(scene, city, { low, land: place.land });
+  const traffic = new Traffic(city, scene, { cars: Math.round((low ? 160 : 280) * (place.cars ?? 1)) });
+  const people = new People(city, scene, { people: Math.round((low ? 2600 : 5200) * (place.people ?? 1)) });
+  const fire = new Fire(scene, city, { low });
+  const helis = new Helicopters(scene, city, fire, people);
+  helis.traffic = traffic;
+  const buildMs = Math.round(performance.now() - t0);
+  const daylight = new Daylight({ scene, sun, hemi, post, city, traffic, people });
+  daylight.set(0);
+  const disasters = new Disasters({ scene, city, people, traffic, fire, post, camera, controls, renderer, sun, hemi, low, outskirts });
+  outskirts.steam(fire);
+  helis.mushroom = (x, z, R) => disasters.mushroom(x, z, R); // the commander's nuke gets the full mushroom cloud
+  helis.nukeBlast = (x, z, R) => disasters.nukeBlast(x, z, R, { byPlayer: true }); // the commander's own nuke
+  const sirens = new Sirens(scene, { traffic, helis, boats: disasters.boats, daylight, fire }); // flashing lights on every rescue unit
+  disasters.sirens = sirens;
+  W = { city, outskirts, traffic, people, fire, helis, daylight, disasters, sirens, buildMs };
+  if (game) worldReady();
+  return W;
+}
+const needWorld = mode === 'commander' || mode === 'sandbox' || ((mode === 'be' || mode === 'storm') && (P.has('kind') || mode === 'storm'));
+let game = null;
+if (needWorld) buildWorld();
 
 addEventListener('resize', () => {
   globe.resize();
@@ -112,14 +126,15 @@ addEventListener('resize', () => {
 const clock = new THREE.Clock();
 renderer.shadowMap.autoUpdate = false; let shadowAt = -1; const camAt = new THREE.Vector3();
 let frames = 0, fpsT = 0, fps = 0, time = 0;
-const B = city.bounds, M = 10;
+const M = 10;
 
 function frame() {
   const dt = Math.min(0.05, clock.getDelta());
   time += dt;
   sky.update(dt);
-  if (globe.active) { controls.enabled = false; globe.frame(dt); frames++; fpsT += dt; requestAnimationFrame(frame); globeWas = true; return; } // up on the globe: the city waits
+  if (globe.active || !W) { controls.enabled = false; if (globe.active) globe.frame(dt); frames++; fpsT += dt; requestAnimationFrame(frame); globeWas = true; return; } // up on the globe (or nothing built yet): the city waits
   if (globeWas) { globeWas = false; controls.enabled = !sky.busy(); }
+  const { city, outskirts, daylight, disasters, sirens } = W, B = city.bounds;
   controls.update();
   // keep the view over the city
   const tg = controls.target;
@@ -146,7 +161,7 @@ function frame() {
     jx = (Math.random() - 0.5) * k; jy = (Math.random() - 0.5) * k * 0.5; jz = (Math.random() - 0.5) * k;
     camera.position.x += jx; camera.position.y += jy; camera.position.z += jz;
   }
-  sirens.update(time); searchlights.update(dt);
+  sirens.update(time); W.searchlights.update(dt);
   curveFrame(scene, camera, tg); // the world curves away as you zoom out
   post.render(scene, camera, focus, time);
   camera.position.x -= jx; camera.position.y -= jy; camera.position.z -= jz;
@@ -157,12 +172,8 @@ function frame() {
 }
 requestAnimationFrame(frame);
 
-helis.mushroom = (x, z, R) => disasters.mushroom(x, z, R); // the commander's nuke gets the full mushroom cloud
-helis.nukeBlast = (x, z, R) => disasters.nukeBlast(x, z, R, { byPlayer: true }); // the commander's own nuke
-const sirens = new Sirens(scene, { traffic, helis, boats: disasters.boats, daylight, fire }); // flashing lights on every rescue unit
-disasters.sirens = sirens;
-const game = new Game({ people, traffic, fire, city, camera, controls, renderer, mode, daylight, helis, post, disasters });
-const searchlights = new Searchlights(scene, { game, traffic, helis, city, daylight }); // beams at night on the trouble
+game = new Game({ camera, controls, renderer, mode, post, world: W });
+game.buildWorld = buildWorld; // the menu builds the place it picks, here
 game.audio = new Audio(camera, controls); // sound: switched on by the first tap
 game.radio = new Radio(game.audio); // the announcer
 if (game.menu.hidden) game.radio.begin(game.modeName === 'be' && game.mode ? game.mode.kind : null);
@@ -175,12 +186,19 @@ if (viaSky) setTimeout(() => { if (globe.active) { sky.to(0, 0.8); return; } con
 if (!game.menu.hidden) { globe.backdrop(game.menuPanel === 'main'); game.dockSide(); } // the menu sits over the planet
 // what this place remembers: the buildings that came down here last time (Sandbox; Commander starts each round fresh)
 const sandbox = () => game.mode && game.mode.kind === 'sandbox';
-for (const k of damageOf(placeKey())) if (city.buildings[k] && !city.dead[k]) { people.clearBuilding(k, 'spare'); city.hideBuilding(k); city.addRubble(k, 0.75); }
-const keepDamage = () => { if (!sandbox()) return; const dead = []; for (let k = 0; k < city.buildings.length; k++) if (city.dead[k]) dead.push(k); rememberDamage(placeKey(), dead); };
+const keepDamage = () => { if (!W || !sandbox()) return; const { city } = W, dead = []; for (let k = 0; k < city.buildings.length; k++) if (city.dead[k]) dead.push(k); rememberDamage(placeKey(), dead); };
 setInterval(keepDamage, 5000); addEventListener('pagehide', keepDamage); globe.onOpen = keepDamage;
 // a meteor sent down from orbit on this place: it comes in now
-const meteorIn = () => { const m = takeMeteor(placeKey()); if (!m || !sandbox()) return; const B = city.bounds, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2, hx = (B.x1 - B.x0) * 0.4, hz = (B.z1 - B.z0) * 0.4; disasters.start('meteor', cx + Math.max(-hx, Math.min(hx, m.x)), cz + Math.max(-hz, Math.min(hz, m.z)), { warn: 7, size: m.size }); };
+const meteorIn = () => { if (!W) return; const m = takeMeteor(placeKey()); if (!m || !sandbox()) return; const B = W.city.bounds, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2, hx = (B.x1 - B.x0) * 0.4, hz = (B.z1 - B.z0) * 0.4; W.disasters.start('meteor', cx + Math.max(-hx, Math.min(hx, m.x)), cz + Math.max(-hz, Math.min(hz, m.z)), { warn: 7, size: m.size }); };
 globe.onArrive = meteorIn; setTimeout(meteorIn, 1500);
-window.__lights = searchlights;
-
-window.__z = { THREE, scene, camera, controls, renderer, post, city, traffic, people, fire, game, daylight, helis, disasters, outskirts, sirens, sun, hemi, setView, buildMs, audio: game.audio, info: () => renderer.info.render };
+// once there is a world: the game takes it, the searchlights, what the place remembers, the test handle
+function worldReady() {
+  const { city, people, traffic, fire, helis, daylight, disasters, outskirts, sirens, buildMs } = W;
+  if (!game.people) game.attachWorld(W);
+  W.searchlights = new Searchlights(scene, { game, traffic, helis, city, daylight }); // beams at night on the trouble
+  window.__lights = W.searchlights;
+  for (const k of damageOf(placeKey())) if (city.buildings[k] && !city.dead[k]) { people.clearBuilding(k, 'spare'); city.hideBuilding(k); city.addRubble(k, 0.75); }
+  window.__z = { THREE, scene, camera, controls, renderer, post, city, traffic, people, fire, game, daylight, helis, disasters, outskirts, sirens, sun, hemi, setView, buildMs, audio: game.audio, info: () => renderer.info.render };
+}
+if (W) worldReady();
+else window.__z = { THREE, scene, camera, controls, renderer, post, game, sun, hemi, setView, audio: game.audio, buildWorld };

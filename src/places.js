@@ -27,6 +27,12 @@ export function placeKey() {
   if (!k) try { k = localStorage.getItem('zday_place'); } catch (e) { /* no storage */ }
   return k && PLACES[k] ? k : 'metro';
 }
+// this page is now that place (built here, no page load): the address and the memory say so, for a later reload
+export function settle(key, mode, extra) {
+  try { localStorage.setItem('zday_place', key); } catch (e) { /* no storage */ }
+  const P = new URLSearchParams(location.search); P.set('place', key); if (mode) P.set('mode', mode); if (extra) for (const k in extra) P.set(k, extra[k]);
+  try { history.replaceState(null, '', location.pathname + '?' + P.toString()); } catch (e) { /* fine */ }
+}
 // go to another place: the page is built again around it (in the mode given, or to the menu; more settings in extra)
 export function travel(key, mode, extra) {
   try { localStorage.setItem('zday_place', key); } catch (e) { /* no storage */ }
