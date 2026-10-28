@@ -116,8 +116,8 @@ export class Disasters {
   // the most striking thing an onlooker at (x, z) can see right now: { x, z, danger, range } or null
   poiAt(x, z) {
     let best = null, bs = 1;
-    const consider = (p) => { if (!p) return; const sc = Math.hypot(p.x - x, p.z - z) / p.range; if (sc < bs) { bs = sc; best = p; } };
-    for (const e of this.list) if (e.poi) consider(e.poi(x, z));
+    const consider = (p, type) => { if (!p) return; const sc = Math.hypot(p.x - x, p.z - z) / p.range; if (sc < bs) { bs = sc; best = p; if (type) p.type = type; } };
+    for (const e of this.list) if (e.poi) consider(e.poi(x, z), e.type); // what kind it is: people decide by it (lives.js)
     for (const l of this.leftovers) if (l.poi) consider(l.poi(x, z));
     if (!best) { const f = this.ctx.fire.firesWithin(x, z, 70); if (f.length) { const b = this.ctx.city.buildings[f[0]]; consider({ x: (b.x0 + b.x1) / 2, z: (b.z0 + b.z1) / 2, danger: 10, range: 70 }); } }
     return best;

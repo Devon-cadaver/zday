@@ -817,6 +817,7 @@ const SANDBOX_MSGS = {
   pray: 'People are kneeling in the street to pray',
   fightback: 'Some people are fighting back with whatever they can find',
   stolen: 'Someone hotwired a parked car and sped off',
+  looting: 'Looters are breaking into the shops and running off with armfuls',
 };
 const START_DROPS = 3;
 

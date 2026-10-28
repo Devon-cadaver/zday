@@ -59,6 +59,7 @@ const MSGS = {
   pray: 'Some people have stopped to pray in the street',
   fightback: 'Civilians are fighting back with whatever they can find',
   stolen: 'Someone hotwired a parked car and fled',
+  looting: 'Looters are breaking into shops in the chaos',
 };
 
 export class Commander {

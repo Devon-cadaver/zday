@@ -113,7 +113,7 @@ export class People {
     this.blk = new Int16Array(N); this.lvl = new Int16Array(N); this.bt = new Int16Array(N);
     this.target = new Int32Array(N);
     this.base = new Array(N); this.trait = new Uint8Array(N);
-    this.lives = new Lives(this, S, KIND); this.hour = 8.4; this.danger = false; this.lifeT = 0; // homes, jobs, characters, their day (the game sets the hour)
+    this.lives = new Lives(this, S, KIND, TRAIT); this.hour = 8.4; this.danger = false; this.lifeT = 0; // homes, jobs, characters, their day (the game sets the hour)
 
     const B = city.bounds;
     this.hx0 = B.x0 - HALF; this.hz0 = B.z0 - HALF;
@@ -459,7 +459,13 @@ export class People {
     if (!this.isCivilian(j)) return;
     const s = this.st[j];
     if (s === S.FIGHT || s === S.STEAL || (s === S.PRAY && this.r() < 0.8)) return; // they made their choice (most who pray keep praying)
-    if (s !== S.FLEE && s !== S.PRAY && this.lvl[j] === -1 && this.kind[j] === KIND.CIVILIAN && !this.inf[j] && this.react(j, fromX, fromZ, threat)) return;
+    if (s === S.GO && this.lives.inPlan(j) && (this.x[j] - fromX) ** 2 + (this.z[j] - fromZ) ** 2 > 25) return; // on their way to safety: they keep going unless it is right on them
+    if (s !== S.FLEE && s !== S.PRAY && this.lvl[j] === -1 && this.kind[j] === KIND.CIVILIAN && !this.inf[j] && this.lives.respond(j, fromX, fromZ, threat)) return; // what this person does about it (lives.js)
+    this.fleeFrom(j, fromX, fromZ, threat);
+  }
+  // away from (fromX, fromZ) at a run (or up onto a roof, if that is where they would rather be)
+  fleeFrom(j, fromX, fromZ, threat) {
+    const s = this.st[j];
     if (s === S.SEEK || s === S.COP || s === S.BOARD) return;
     if (s === S.RIOT && !(threat >= 0 && HOSTILE[this.st[threat]])) return; // rioters only scatter for the undead
     if (s === S.FIREMAN) { this.st[j] = S.FLEE; this.tx[j] = 2.8; this.t1[j] = 3 + this.r() * 2; this.target[j] = threat; this.bt[j] = -1; const d0 = Math.hypot(this.x[j] - fromX, this.z[j] - fromZ) || 1; this.hx[j] = (this.x[j] - fromX) / d0; this.hz[j] = (this.z[j] - fromZ) / d0; return; }
@@ -474,23 +480,29 @@ export class People {
     this.st[j] = S.FLEE; this.t1[j] = 4 + this.r() * 4; this.target[j] = threat;
   }
 
-  // run, fight, take a car or pray: what this person does when danger comes (false: run or hide as usual)
-  react(j, fromX, fromZ, threat) {
-    const x = this.x[j], z = this.z[j], t = this.trait[j], zombie = threat >= 0 && this.st[threat] === S.ZOMBIE;
-    if (t === TRAIT.FIGHTER && zombie && this.zombiesNear(x, z, 12) <= 3) { // standing their ground with whatever they can grab
-      this.st[j] = S.FIGHT; this.target[j] = threat; this.t1[j] = 6; this.wt[j] = 0.4; this.think[j] = 0; this.fx[j] = 0;
-      const A = this.fa.arrays; A.kit[j * 4 + 1] = (A.kit[j * 4 + 1] | 0) | FLAG.ITEM; this.lookDirty = true;
-      if (!this.saidFight) { this.saidFight = true; this.events.push({ type: 'fightback', x, z }); }
-      return true;
-    }
-    if (t === TRAIT.DRIVER && this.traffic) { // the nearest parked car nobody else is going for
+  // what a person can do about danger besides running (lives.respond chooses): stand their ground with whatever they can grab
+  fightBack(j, threat) {
+    const x = this.x[j], z = this.z[j];
+    this.st[j] = S.FIGHT; this.target[j] = threat; this.t1[j] = 6; this.wt[j] = 0.4; this.think[j] = 0; this.fx[j] = 0;
+    const A = this.fa.arrays; A.kit[j * 4 + 1] = (A.kit[j * 4 + 1] | 0) | FLAG.ITEM; this.lookDirty = true;
+    if (!this.saidFight) { this.saidFight = true; this.events.push({ type: 'fightback', x, z }); }
+    return true;
+  }
+  // the nearest parked car nobody else is going for: in, and away
+  stealCar(j, fromX, fromZ) {
+    const x = this.x[j], z = this.z[j];
+    if (this.traffic) {
       const L = this.traffic.parkedList; let best = 30 * 30, bi = -1;
       for (let k = 0; k < L.length; k++) { const pc = L[k]; if (!pc.alive || pc.claimed || pc.burnt) continue; const d2 = (pc.x - x) ** 2 + (pc.z - z) ** 2; if (d2 < best) { best = d2; bi = k; } }
       if (bi >= 0) { L[bi].claimed = true; this.st[j] = S.STEAL; this.bt[j] = bi; this.t1[j] = 20; this.px[j] = fromX; this.pz[j] = fromZ; this.wt[j] = RUN[0] + this.r() * (RUN[1] - RUN[0]); return true; }
     }
-    const circle = this.circles.find(c => Math.hypot(c.x - x, c.z - z) < 40 && c.n < 16);
-    if (t === TRAIT.FAITHFUL || (circle && circle.n >= 3 && this.r() < 0.15)) { this.pray(j, circle); return true; } // and some just join the people praying
     return false;
+  }
+  // a looter out of shop k with an armful: something in their hands, the first time a word on the news
+  looted(j, k) {
+    const A = this.fa.arrays; A.kit[j * 4 + 1] = (A.kit[j * 4 + 1] | 0) | FLAG.ITEM; this.lookDirty = true;
+    this.stats.looted = (this.stats.looted || 0) + 1;
+    if (!this.saidLoot) { this.saidLoot = true; this.events.push({ type: 'looting', x: this.x[j], z: this.z[j] }); }
   }
   // down on their knees: in the circle nearby, or starting one here
   pray(j, c) {
@@ -1130,7 +1142,7 @@ export class People {
       const s = this.st[i];
       if ((s !== S.WALK && s !== S.IDLE && s !== S.RETURN && s !== S.GO) || this.inf[i] || this.kind[i] !== KIND.CIVILIAN || this.lvl[i] !== -1) continue;
       const p = this.poi(this.x[i], this.z[i]);
-      if (!p || this.r() > 0.35) continue;
+      if (!p || this.r() > 0.08 + this.lives.trait('curious', i) * 0.5 - this.lives.trait('fear', i) * 0.2) continue; // the curious stay to film it
       const d = Math.hypot(p.x - this.x[i], p.z - this.z[i]);
       if (d < p.danger || d > Math.min(p.range * 0.5, 160)) continue; // from the street you only see what is fairly close
       this.st[i] = S.FILM; this.t1[i] = 8 + this.r() * 14; this.think[i] = this.r(); this.px[i] = p.x; this.pz[i] = p.z;

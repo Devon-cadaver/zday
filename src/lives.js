@@ -5,8 +5,15 @@
 // between. What they do next is weighed from the hour, their job and their
 // character (fear, greed, loyalty, curiosity, bravery, sociability), with a little
 // chance in it. Indoors they are hidden but still there: a building that falls or
-// burns has them inside. While a disaster is on nobody sets out on an errand; they
-// react as before (deciding what to do about it is the next step).
+// burns has them inside. While a disaster is on nobody sets out on an errand.
+// In danger each person weighs what to do the same way: run, stand and fight,
+// grab a car, pray, get indoors, hurry home to their family, loot a shop and run
+// home with it, freeze, or get up a building out of the water. What tips it is
+// who they are (a coward runs, the loyal go home, the greedy loot, the curious
+// stay to film), how close the danger is and what kind it is (indoors is safe
+// from a tornado, not from an earthquake). A choice that takes some doing is a
+// plan of steps (loot the shop, then home), carried through unless the danger
+// gets right up close.
 import { ARCHETYPES } from './figures.js';
 import { RW, SW } from './city.js';
 
@@ -20,22 +27,27 @@ const BIAS = {
 // where each kind works: offices (tall), a building site (anywhere), a clinic or a school (the big ones); shoppers,
 // travellers, off-duty officers and the homeless have no job, and some casual people none either
 const JOB = { business: 'office', construction: 'any', nurse: 'big', student: 'big', casual: 'any' };
-const WORK = 1, HOME = 2, SHOP = 3, HANG = 4;
+const WORK = 1, HOME = 2, SHOP = 3, HANG = 4, SHELTER = 5, LOOT = 6;
+// what kind of trouble it is: safer indoors from these; buildings are the danger in these (out into the open); up a
+// building out of these
+const INDOORS = new Set(['tornado', 'haboob', 'coldwave', 'solar', 'aliens', 'nuclear', 'meltdown', 'volcano', 'villains', 'riot', 'meteor', 'blackhole', 'spill']);
+const OPEN = new Set(['quake', 'sinkhole', 'kaiju', 'worm']);
+const UP = new Set(['tsunami', 'flood']);
 
 export class Lives {
-  constructor(P, S, KIND) {
-    this.P = P; this.S = S; this.KIND = KIND;
+  constructor(P, S, KIND, TRAIT) {
+    this.P = P; this.S = S; this.KIND = KIND; this.TRAIT = TRAIT;
     const N = P.N, U8 = () => new Uint8Array(N);
     this.home = new Int32Array(N).fill(-1); this.work = new Int32Array(N).fill(-1); this.arch = U8(); this.done = U8();
     this.nextT = new Float32Array(N); this.t = {}; for (const k of TRAITS) this.t[k] = U8();
-    this.trips = new Map(); this.cur = 0; this.lastHour = 8;
+    this.trips = new Map(); this.after = new Map(); this.respT = new Float32Array(N); this.cur = 0; this.lastHour = 8; // after: the rest of a plan, for someone indoors
     this.off = RW / 2 + SW * 0.55; // the middle of the pavement, from the street's centre line
   }
 
   // a new day for everyone: homes, jobs and characters (the same every time for this place)
   reset(seed) {
     const P = this.P, bl = P.bld; let s = (seed * 7919 + 13) % 2147483647 || 1; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
-    this.trips.clear(); this.done.fill(0); this.cur = 0;
+    this.trips.clear(); this.after.clear(); this.respT.fill(0); this.done.fill(0); this.cur = 0;
     // the buildings: any with a street door; offices are the tall ones; the big ones are clinics and schools; shops are low
     const all = [], office = [], big = [], shop = [];
     bl.forEach((b, k) => { if (!b.door || !b.roof) return; all.push(k); const h = b.roofY - b.baseY; if (h >= 15) office.push(k); if (h <= 11) shop.push(k); });
@@ -73,13 +85,75 @@ export class Lives {
     const P = this.P, S = this.S, n = P.nHuman, per = Math.ceil(n / 8), calm = !P.danger && !(P.alarmT > 0);
     if (this.lastHour < 4 && P.hour >= 4) this.done.fill(0); // a new working day
     this.lastHour = P.hour;
-    if (!calm) return;
     for (let c = 0; c < per; c++) {
       const i = this.cur; this.cur = (this.cur + 1) % n;
-      if (P.inf[i] || P.kind[i] !== this.KIND.CIVILIAN || P.lvl[i] !== -1 || P.time < this.nextT[i]) continue;
+      if (P.inf[i] || P.kind[i] !== this.KIND.CIVILIAN || P.lvl[i] !== -1) continue;
+      if (!calm) { this.sense(i); continue; } // a disaster on: those within its reach decide what to do about it
+      if (P.time < this.nextT[i]) continue;
       if (P.st[i] === S.WALK) this.decide(i, false);
       else if (P.st[i] === S.IDLE && i >= P.nWalk && P.r() < 0.008) this.decide(i, true); // one of a crowd off on an errand (they come back to their spot)
     }
+  }
+  // a disaster within reach (not yet on top of them): decide what to do about it, once in a while
+  sense(i) {
+    const P = this.P, S = this.S, s = P.st[i];
+    if ((s !== S.WALK && s !== S.IDLE && !(s === S.GO && !this.inPlan(i))) || P.time < this.respT[i] || !P.poi) return;
+    const p = P.poi(P.x[i], P.z[i]); if (!p) return;
+    const d = Math.hypot(p.x - P.x[i], p.z - P.z[i]); if (d > p.range * 0.75) return;
+    this.respT[i] = P.time + 20 + P.r() * 15;
+    if (!this.respond(i, p.x, p.z, -1, p.type || '') && d < Math.max(30, p.danger * 2.5)) P.fleeFrom(i, p.x, p.z, -1); // running: only from what is close
+  }
+  inPlan(i) { const T = this.trips.get(i); return !!(T && T.plan); }
+  // what to do about it: each choice scored from who they are and the situation (utility), a little chance in it; true
+  // if they did something other than run (running is the people code's own: away, or up onto a roof)
+  respond(i, fromX, fromZ, threat, kind) {
+    const P = this.P, S = this.S, TR = this.TRAIT, x = P.x[i], z = P.z[i], d = Math.hypot(x - fromX, z - fromZ), tr = (k) => this.t[k][i] / 255;
+    const f = tr('fear'), g = tr('greed'), l = tr('loyal'), c = tr('curious'), b = tr('brave'), old = P.trait[i];
+    const zombie = threat >= 0 && P.st[threat] === S.ZOMBIE;
+    if (kind == null) { const p = P.poi && P.poi(x, z); kind = p && Math.hypot(p.x - x, p.z - z) < p.range ? p.type || '' : zombie ? 'zombies' : ''; }
+    const U = { flee: 0.45 + f * 0.5 + (d < 8 ? 0.35 : 0) + (OPEN.has(kind) ? 0.3 : 0) };
+    if (zombie && P.zombiesNear(x, z, 12) <= 3) U.fight = b * 0.9 - f * 0.5 + (old === TR.FIGHTER ? 0.45 : 0);
+    U.steal = (old === TR.DRIVER ? 0.45 : 0) + g * 0.25 + f * 0.2 - l * 0.15;
+    const circle = P.circles.find(q => Math.hypot(q.x - x, q.z - z) < 40 && q.n < 16);
+    U.pray = (old === TR.FAITHFUL ? 0.7 : 0) + f * 0.15 - c * 0.2 + (circle && circle.n >= 3 ? 0.25 : 0);
+    const ref = OPEN.has(kind) ? -1 : this.refuge(x, z, 45);
+    if (ref >= 0) U.shelter = 0.35 + (1 - b) * 0.3 + f * 0.2 + (INDOORS.has(kind) ? 0.45 : 0) + (zombie ? 0.15 : 0);
+    const hm = this.home[i];
+    if (hm >= 0 && !OPEN.has(kind) && !UP.has(kind) && !P.city.dead[hm]) { const hd = Math.hypot(P.bld[hm].door[0] - x, P.bld[hm].door[1] - z); if (hd < 260) U.home = 0.2 + l * 0.7 - hd / 600 + (d > 15 ? 0.1 : -0.4); }
+    let shop = -1;
+    if (g > 0.6 && d > 18 && (kind === 'riot' || P.danger || zombie)) { shop = this.refuge(x, z, 40); if (shop >= 0) U.loot = 0.25 + (g - 0.5) * 2 - f * 0.3 - l * 0.3 + (kind === 'riot' ? 0.3 : 0); } // every building has its shopfront; a riot brings it out in them
+    if (d < 10 && f > 0.62 && b < 0.42) U.freeze = f * 0.7 - b * 0.6;
+    if (UP.has(kind)) U.up = 0.55 + (1 - b) * 0.2 + f * 0.2;
+    let best = 'flee', bv = -9;
+    for (const k in U) { const v = U[k] + P.r() * 0.25; if (v > bv) { bv = v; best = k; } }
+    switch (best) {
+      case 'fight': return P.fightBack(i, threat);
+      case 'steal': return P.stealCar(i, fromX, fromZ);
+      case 'pray': P.pray(i, circle); return true;
+      case 'shelter': this.plan(i, [{ act: SHELTER, b: ref }]); return true;
+      case 'home': this.plan(i, [{ act: SHELTER, b: hm }]); return true;
+      case 'loot': this.plan(i, [{ act: LOOT, b: shop }, { act: SHELTER, b: hm >= 0 ? hm : ref }]); return true;
+      case 'freeze': this.trips.set(i, { pts: [], k: 0, at: true, stay: 1 + P.r() * 2.2, plan: true, fromX, fromZ }); P.st[i] = S.GO; P.fx[i] = 7; P.face(i, fromX, fromZ); return true; // frozen to the spot, then they run
+      case 'up': return P.trySeek(i);
+      default: return false;
+    }
+  }
+  // the nearest building they could get into (a shop: a low one) within R
+  refuge(x, z, R, shop = false) {
+    const P = this.P; let bk = -1, bd = R * R;
+    P.refugesNear(x, z, R, (k) => {
+      const b = P.bld[k]; if (P.city.dead[k] || P.bBreach[k] || (P.fire && P.fire.bFire[k]) || (shop && b.roofY - b.baseY > 11)) return;
+      const d = (b.door[0] - x) ** 2 + (b.door[1] - z) ** 2; if (d < bd) { bd = d; bk = k; }
+    });
+    return bk;
+  }
+  // a plan: steps of [where, what to do there], one after another; carried through (the danger has to come right up
+  // close to change their mind)
+  plan(i, steps) {
+    const s = steps.find(q => q.b >= 0 && !this.P.city.dead[q.b]); if (!s) { this.P.fleeFrom(i, this.P.x[i] + 1, this.P.z[i], -1); return; }
+    const rest = steps.slice(steps.indexOf(s) + 1);
+    this.go(i, s.act, s.b, s.act === LOOT ? 3 + this.P.r() * 3 : 70 + this.P.r() * 80);
+    const T = this.trips.get(i); if (T) { T.plan = true; T.rest = rest; this.P.t1[i] = 120; }
   }
   // what next: each choice scored from the hour and who they are (utility), a little chance in it, the best one taken.
   // out: they have just come out of a door (no strolling on from there: back to their block)
@@ -148,7 +222,12 @@ export class Lives {
   goStep(i, h) {
     const P = this.P, T = this.trips.get(i);
     if (!T) { P.startReturn(i); return; }
-    if (T.at) { if ((T.stay -= h) <= 0) { this.trips.delete(i); P.fx[i] = 0; this.decide(i, true); } return; }
+    if (T.at) {
+      if ((T.stay -= h) > 0) return;
+      this.trips.delete(i); P.fx[i] = 0;
+      if (T.fromX != null) P.fleeFrom(i, T.fromX, T.fromZ, -1); else this.decide(i, true); // out of the freeze: run
+      return;
+    }
     if ((P.t1[i] -= h) <= 0) { this.trips.delete(i); P.startReturn(i); return; } // could not get there: back to their block
     const n = T.pts.length / 2;
     if (T.k >= n) { this.arrive(i, T); return; }
@@ -175,17 +254,24 @@ export class Lives {
     this.trips.delete(i);
     const k = T.b;
     if (k < 0 || P.city.dead[k] || (P.fire && P.fire.bFire[k] === 1) || P.bBreach[k]) { P.startReturn(i); return; } // gone, burning or broken into
-    P.st[i] = S.INSIDE; P.lvl[i] = -2; P.bt[i] = k; P.bIn[k]++; P.fx[i] = 9; P.t1[i] = T.dwell; // fx 9: in for the routine, not sheltering
+    P.st[i] = S.INSIDE; P.lvl[i] = -2; P.bt[i] = k; P.bIn[k]++; P.fx[i] = 9; P.t1[i] = T.dwell; // fx 9: in for the routine (or sheltering by their own choice), hidden
     if (T.act === WORK) this.done[i] = 1;
+    if (T.act === LOOT || (T.rest && T.rest.length)) this.after.set(i, { rest: T.rest || [], loot: T.act === LOOT });
   }
   // indoors for the routine: out of the door again when the time is up, and on to whatever is next
   indoorStep(i, h) {
     const P = this.P, k = P.bt[i];
     if ((P.t1[i] -= h) > 0) return;
-    if (P.danger) { P.t1[i] = 6 + P.r() * 6; return; } // trouble outside: they stay in for now
+    const A = this.after.get(i);
+    if (P.danger && !(A && A.loot)) { P.t1[i] = 6 + P.r() * 6; return; } // trouble outside: they stay in for now (looters come out with what they grabbed)
     P.bIn[k] = Math.max(0, P.bIn[k] - 1);
     const d = P.bld[k].door; P.x[i] = d[0] + (P.r() - 0.5) * 0.8; P.z[i] = d[1] + (P.r() - 0.5) * 0.8; P.y[i] = P.groundY(P.x[i], P.z[i]);
     P.st[i] = this.S.WALK; P.lvl[i] = -1; P.bt[i] = -1; P.fx[i] = 0;
+    if (A) {
+      this.after.delete(i);
+      if (A.loot) P.looted(i, k); // out with an armful
+      if (A.rest.length) { this.plan(i, A.rest); return; }
+    }
     this.decide(i, true);
   }
 }
