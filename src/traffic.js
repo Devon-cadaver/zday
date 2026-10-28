@@ -145,7 +145,7 @@ export class Traffic {
     if (!car.mission) this.tint(car, '#2a2622');
     if (this.people && !car.soft) this.people.crushNear(car.x, car.z, 2.6); // soft: thrown by a super villain, people get out of the way
     if (this.fire && this.r() < 0.35) { this.fire.carFire(car.x, car.z); car.burning = true; if (!car.mission) this.tint(car, '#1a1714'); }
-    this.events.push({ type: 'carland', x: car.x, z: car.z });
+    this.events.push({ type: 'carland', x: car.x, z: car.z, car });
   }
   // over the edge of a pit: it keeps its speed and the nose drops as it falls
   driveOff(car) {
@@ -511,7 +511,7 @@ export class Traffic {
       if (car.ignite && this.fire) {
         this.fire.carFire(car.x, car.z); car.burning = true;
         if (!car.mission) this.tint(car, '#1a1714');
-        this.events.push({ type: 'carfire', x: car.x, z: car.z });
+        this.events.push({ type: 'carfire', x: car.x, z: car.z, car });
       }
     }
   }
@@ -538,7 +538,7 @@ export class Traffic {
       car.vx = avx * 0.7 - car.hz * (this.r() - 0.5) * 6; car.vz = avz * 0.7 + car.hx * (this.r() - 0.5) * 6; car.w = (this.r() - 0.5) * 7;
     }
     this.stats.crashes++;
-    this.events.push({ type: 'crash', x: car.x, z: car.z });
+    this.events.push({ type: 'crash', x: car.x, z: car.z, car, other });
     if (this.people) this.people.scare(car.x, car.z, 16, 0.7);
     this.near(car.x, car.z, 18, (o) => { if (o.mode === DRIVE && Math.hypot(o.x - car.x, o.z - car.z) < 18) { o.panic = Math.max(o.panic, 10); o.zx = car.x; o.zz = car.z; } });
   }

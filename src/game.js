@@ -280,7 +280,8 @@ export class Game {
     SEE.on = true; SEE.far = 430; // back to the usual see-through (Be The Disaster sets its own)
     if (this.followSub || this.follow >= 0) this.setFollow(-1);
     const m = this.mode;
-    if (m) { m.dead = true; if (m.gauge && m.gauge.el) m.gauge.el.remove(); if (m.panel) m.panel.remove(); }
+    if (m) { m.dead = true; if (m.gauge && m.gauge.el) m.gauge.el.remove(); if (m.panel) m.panel.remove(); if (m.hits) m.hits.dispose(); }
+    this.slowT = 0;
     for (const e of document.querySelectorAll('#zd-end')) e.remove();
     document.body.classList.remove('zd-panel');
     this.mode = new Idle();
@@ -741,7 +742,8 @@ export class Game {
     const p = this.people, h = 1 / 30, run = this.paused ? 0 : 1;
     { const ph = this.mode.phase ? this.mode.phase() : 0; p.hour = (6 + ((ph - 0.9) % 1 + 1) % 1 * 24) % 24; } // their day runs on the same clock as the sun
     p.danger = !!this.disasters && this.disasters.list.some(e => e.alive && e.type !== 'heroes' && e.type !== 'spill'); // a disaster on: no errands, and those indoors stay in (an outbreak creeps up on people: they carry on)
-    const sdt = dt * this.speed * run;
+    const sdt = dt * this.speed * run * (this.slowT > 0 ? 0.3 : 1); // slowT: a beat of slow motion for a big moment (hits.js)
+    if (this.slowT > 0) this.slowT -= dt;
     this.acc = Math.min(this.acc + sdt, h * 12);
     let stepped = false;
     while (this.acc >= h) {
