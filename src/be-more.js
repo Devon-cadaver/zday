@@ -162,6 +162,7 @@ export class SolarCtl {
     people.around(x, z, R, (j) => { if (!people.hittable(j) || people.kind[j] === KIND.ALIEN) return; if (Math.random() < 0.45) { people.wz[j] = people.st[j] === ST.ZOMBIE ? 1 : 0; people.kill(j, 0, 0, 'zap'); } else people.panic(j, x, z, -1); });
     traffic.near(x, z, R, (car) => { if (car.mode === 0 && !car.mission) { if (Math.random() < 0.5) traffic.crash(car, null, 6); else car.cruise = 0; } }); // every engine dies
     city.buildingsNear(x, z, R, (k) => { city.char(k, 0.85); if (Math.random() < 0.3) fire.igniteBuilding(k); });
+    { const O = D.ctx.outskirts, P = O && O.plant && O.plant.reactor; if (P && Math.hypot(P.x - x, P.z - z) < R + 60) D.plantSurge(); } // a flare on the power plant: its cooling fails
     for (const l of city.lamps) if (Math.hypot(l.x - x, l.z - z) < R && Math.random() < 0.6) this.sparks.emit(l.x, 6.5, l.z, 14, { up: [2, 7], spread: 6, life: 0.9, size: 0.6 });
   }
   update(h) {

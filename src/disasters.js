@@ -122,6 +122,12 @@ export class Disasters {
     if (!best) { const f = this.ctx.fire.firesWithin(x, z, 70); if (f.length) { const b = this.ctx.city.buildings[f[0]]; consider({ x: (b.x0 + b.x1) / 2, z: (b.z0 + b.z1) / 2, danger: 10, range: 70 }); } }
     return best;
   }
+  // a power surge (a solar flare) hits the nuclear plant: it starts to overheat and, unless something stops it, blows (once; not while it is already melting down)
+  plantSurge() {
+    const O = this.ctx.outskirts; if (!O || !O.plant || !O.plant.group.visible || this.list.some(e => e.type === 'meltdown' && e.alive)) return null;
+    this.emit({ type: 'plantsurge', text: 'The solar flare has knocked out the cooling at the nuclear power plant!' });
+    return this.start('meltdown');
+  }
   mushroom(x, z, R) { return new Mushroom(this, x, z, R); }
   nukeBlast(x, z, R, o = {}) { return nuclearDamage(this, x, z, R, o); }
   contaminate(x, z, R) { return this.zones.add(x, z, R); }

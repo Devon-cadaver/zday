@@ -89,9 +89,11 @@ export class SolarStorm {
     const D = this.D, { city, fire, controls } = D.ctx;
     this.t += h; this.sparks.update(h);
     this.k = Math.min(1, this.t / 6, Math.max(0, (this.life - this.t) / 10));
-    if (this.ws < this.extent + 200) {
+    const o0 = this.origin, d0 = this.dir, O = D.ctx.outskirts, plant = O && O.plant && O.plant.group.visible ? O.plant.reactor : null, plantAt = plant ? (plant.x - o0[0]) * d0[0] + (plant.z - o0[1]) * d0[1] : -1e9;
+    if (this.ws < Math.max(this.extent + 200, plantAt + 30)) { // on past the town as far as the power plant
       this.ws += 70 * h;
       const o = this.origin, d = this.dir, at = (x, z) => (x - o[0]) * d[0] + (z - o[1]) * d[1];
+      if (plant && !this.plantHit && plantAt < this.ws) { this.plantHit = true; D.plantSurge(); } // the surge reaches the power plant: its cooling fails (Sean: always)
       const T = D.ctx.traffic;
       for (const car of T.cars) { // as the wave rolls over them the electronics go: drivers lose control, engines die, the rest panic
         if (car.mission || car.gone || this.rolled.has(car) || at(car.x, car.z) > this.ws) continue;
