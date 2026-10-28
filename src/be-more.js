@@ -20,18 +20,18 @@ function ringMesh(scene, color) {
 
 // Patient zero: tap to bite (bites come back over time), hold and drag and the horde follows your finger
 export class ZombiesCtl {
-  constructor(be) { this.be = be; this.bites = 3; this.regen = 0; this.lureT = 0; be.D.list.push(wrap(this)); }
+  constructor(be) { this.be = be; this.bites = 5; this.regen = 0; this.lureT = 0; be.D.list.push(wrap(this)); } // a 90 s run: five bites to start, one back every 3 s, up to 8
   down(x, z) { this.held = true; this.fx = x; this.fz = z; this.t0 = now(); }
   move(x, z) { this.fx = x; this.fz = z; }
   up() {
     this.held = false;
     if (now() - this.t0 < 260) { // a tap: a bite
       if (this.bites <= 0) { this.be.g.toast('No bites left yet: they come back every few seconds'); return; }
-      if (this.be.D.ctx.people.infectAt(this.fx, this.fz, 4, [1, 3])) this.bites--;
+      if (this.be.D.ctx.people.infectAt(this.fx, this.fz, 6, [1, 3])) this.bites--;
     }
   }
   update(h) {
-    if (this.bites < 5 && (this.regen += h) > 5) { this.regen = 0; this.bites++; }
+    if (this.bites < 8 && (this.regen += h) > 3) { this.regen = 0; this.bites++; }
     if (this.held && (this.lureT -= h) <= 0) { this.lureT = 0.4; this.be.D.ctx.people.lure(this.fx, this.fz, 110); }
   }
   label() { return this.bites + ' bites · ' + this.be.D.ctx.people.stats.zombies + ' zombies'; }
@@ -204,7 +204,7 @@ export class ReactorCtl {
   update(h) {
     const D = this.be.D, P = this.plant; if (!P) return;
     if (!this.ev) {
-      this.p = Math.max(0, Math.min(1, this.p + (this.held ? h * 0.12 : -h * 0.04)));
+      this.p = Math.max(0, Math.min(1, this.p + (this.held ? h * 0.2 : -h * 0.04))); // five seconds' hold to blow
       P.lightMat.color.setRGB(Math.sin(this.be.t * (4 + this.p * 18)) > 0 ? 1 + this.p * 4 : 0.3, 0.12, 0.05);
       if ((this.steamT -= h) <= 0) { this.steamT = Math.max(0.15, 1.4 - this.p * 1.2); D.ctx.fire.spray(P.reactor.x + (Math.random() - 0.5) * 20, P.reactor.z + (Math.random() - 0.5) * 20, 20 + Math.random() * 12, 5, 7, 2.6); }
       D.shake(this.p * this.p * 0.4);

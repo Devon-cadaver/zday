@@ -1,4 +1,4 @@
-// Be The Disaster: pick a disaster and be it for three minutes. One finger
+// Be The Disaster: pick a disaster and be it for a minute and a half. One finger
 // drives it (two fingers pan and zoom): steer a tornado, fly an alien saucer,
 // pull a tsunami through the streets, pour lava, tear a fault line across the
 // city, open sinkholes, or call down meteors. Everything destroyed scores.
@@ -17,28 +17,28 @@ import { Hits } from './hits.js';
 const SEE_KINDS = new Set(['saucer', 'tripod', 'zombies', 'riot', 'villains', 'kaiju', 'worm']); // see-through helps: someone in the streets to keep in sight
 import { ZombiesCtl, RiotCtl, FloodCtl, VolcanoCtl, DustCtl, BlizzardCtl, SolarCtl, NukeCtl, ReactorCtl, RoamingHoleCtl, TripodCtl, VillainsCtl, WormCtl, KaijuCtl } from './be-more.js';
 
-const RUN = 180;
+const RUN = 90; // arcade length: short runs, one tap to go again (was 180)
 // ranks against the town's goal (30 a building), so a hamlet and the city rank alike (playtests: fixed scores made the small towns all S and Metro all C)
 const RANKS = [[0, 'F'], [0.25, 'D'], [0.6, 'C'], [1, 'B'], [1.6, 'A'], [2.5, 'S']];
 export const BE = {
   tornado: { name: 'Tornado', k: 0.9, hint: 'Drag to steer the tornado. It grows as it feeds' },
   sinkhole: { name: 'Sinkhole', k: 0.6, hint: 'Hold to size a sinkhole (up to ten blocks wide), let go and the ground gives way' },
-  zombies: { name: 'Zombie outbreak', k: 4, zom: true, hint: 'Tap to bite someone. Hold and drag and the horde follows your finger' },
-  riot: { name: 'Riot', k: 13, hint: 'Drag to lead the mob. It smashes and burns wherever you take it, and grows' },
+  zombies: { name: 'Zombie outbreak', k: 6, zom: true, hint: 'Tap to bite someone. Hold and drag and the horde follows your finger' },
+  riot: { name: 'Riot', k: 15.5, hint: 'Drag to lead the mob. It smashes and burns wherever you take it, and grows' },
   quake: { name: 'Earthquake', k: 0.6, hint: 'Drag across the city to tear a fault line through it' },
-  flood: { name: 'Flood', k: 0.8, hint: 'Hold to make it pour: the water rises while you hold and drains when you let go' },
+  flood: { name: 'Flood', k: 1.15, hint: 'Hold to make it pour: the water rises while you hold and drains when you let go' },
   meteor: { name: 'Meteor shower', k: 0.3, hint: 'Hold to size the rock, from a fireball to a planet killer. Let go and it comes down there' },
   lava: { name: 'Lava', k: 2.6, hint: 'Drag to pour lava. It runs down the streets and swallows what it touches' },
   haboob: { name: 'Dust storm', k: 0.9, hint: 'Drag to pull the wall of dust through the streets. It lifts cars and people' },
-  coldwave: { name: 'Blizzard', k: 4, hint: 'Drag to steer a freezing blizzard. Everyone it catches freezes solid' },
+  coldwave: { name: 'Blizzard', k: 7, hint: 'Drag to steer a freezing blizzard. Everyone it catches freezes solid' },
   tsunami: { name: 'Tsunami', k: 0.5, hint: 'Drag to pull the wave. The water surges toward your finger' },
-  saucer: { name: 'Alien saucer', k: 3.5, hint: 'Drag to fly and blast the streets. Hold still over a crowd to beam them up' },
+  saucer: { name: 'Alien saucer', k: 4.2, hint: 'Drag to fly and blast the streets. Hold still over a crowd to beam them up' },
   solar: { name: 'Solar flare', k: 1.25, hint: 'Hold to charge a flare, let go to strike. The longer you hold, the wider it hits' },
-  tripod: { name: 'Alien tripod', k: 7, hint: 'Drag to walk it. Hold under it to beam people up. Tap to sweep the heat ray' },
+  tripod: { name: 'Alien tripod', k: 8.2, hint: 'Drag to walk it. Hold under it to beam people up. Tap to sweep the heat ray' },
   volcano: { name: 'Volcano', k: 1.9, hint: 'Hold to size the volcano and let go where it bursts out. Then hold anywhere to rain lava bombs there' },
   blackhole: { name: 'Black hole', k: 1.55, hint: 'Drag to move the black hole. It grows with everything it swallows' },
   nuclear: { name: 'Nuclear strike', k: 0.16, hint: 'Hold to set the yield, let go to launch. Three warheads, another every 30 seconds' },
-  meltdown: { name: 'Meltdown', k: 3.3, zom: true, hint: 'Hold to overload the reactor until it blows, then drag to steer the fallout over the city' },
+  meltdown: { name: 'Meltdown', k: 4.5, zom: true, hint: 'Hold to overload the reactor until it blows, then drag to steer the fallout over the city' },
   worm: { name: 'Giant worm', k: 2, hint: 'Drag to steer it under the streets. Let go and it bursts out of the ground there' },
   kaiju: { name: 'Kaiju', k: 4.2, hint: 'Drag to walk it. Tap a car to throw it, tap people to send a tentacle, tap a building to swipe it, tap open ground to roar' },
   villains: { name: 'Super villains', k: 1.8, hint: 'Play as Blur, Tyrant or Weaver; Switch changes who. Blur runs where you drag, Tyrant grabs and throws what you tap, Weaver webs the street' },
