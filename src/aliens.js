@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { Tripod, roofTop } from './tripod.js';
 import { ST, KIND } from './people.js';
+import { orphans } from './herofight.js';
 
 const PROFILE = [[0, 1.5], [1.9, 1.35], [3.4, 0.75], [6.6, 0.16], [7, 0], [6.6, -0.14], [4.6, -0.55], [2.4, -0.85], [0, -0.95]];
 const BEAM_VS = /* glsl */`
@@ -123,10 +124,12 @@ export class Invasion {
       D.emit({ type: 'tripodland', x, z, text: 'A tripod is coming down in the ' + D.district(x, z) + ' district!' });
     }
     for (const t of this.tripods) t.update(h);
+    orphans(this); // let go of mid-throw (a hero knocked away): no machine hangs in the air
     const tripodsDown = this.toDrop === 0 && this.tripods.every(t => t.state === 'fall' || t.state === 'wreck');
-    if (!this.leaving && (this.t > this.life || (this.toLaunch === 0 && tripodsDown && this.saucers.every(s => s.state === 'down' || s.state === 'wreck')))) {
+    const beaten = (s) => s.state === 'down' || s.state === 'wreck' || s.spaced; // spaced: thrown out into space by a hero
+    if (!this.leaving && (this.t > this.life || (this.toLaunch === 0 && tripodsDown && this.saucers.every(beaten)))) {
       this.leaving = true; for (const t of this.tripods) t.recall();
-      const won = tripodsDown && this.saucers.every(s => s.state === 'down' || s.state === 'wreck');
+      const won = tripodsDown && this.saucers.every(beaten);
       D.emit({ type: 'aliensend', won, text: won ? 'Every saucer is down. The mothership is retreating' : 'The aliens are leaving with their captives' });
     }
     for (const s of this.saucers) { this.saucerStep(s, h); this.clear(s, h); }
@@ -138,7 +141,7 @@ export class Invasion {
   saucerStep(s, h) {
     const D = this.D, { people, traffic, fire, city } = D.ctx;
     s.t += h;
-    if (s.state === 'wreck' || s.state === 'gone') return;
+    if (s.state === 'wreck' || s.state === 'gone' || s.state === 'held' || s.state === 'tossed') return; // held, tossed: a hero has it (herofight.js)
     if (s.state === 'down') { // spiral down trailing smoke and hit the ground
       s.vy = (s.vy || 0) - 9.8 * h; s.y += s.vy * h; s.x += s.vx * h; s.z += s.vz * h; s.tilt += h * 1.6;
       if (Math.random() < 0.5) fire.burst(s.x, s.y, s.z, 4, 1.6);
@@ -214,7 +217,7 @@ export class Invasion {
 
   // a saucer never flies through a building: it lifts over the roofs, and a falling one crashes into them
   clear(s, h) {
-    if (s.state === 'wreck' || s.state === 'gone' || s.state === 'home') return;
+    if (s.state === 'wreck' || s.state === 'gone' || s.state === 'home' || s.state === 'held' || s.state === 'tossed') return;
     const city = this.D.ctx.city, r = roofTop(city, s.x, s.z, 8.5);
     if (s.state === 'down') {
       if (r.k >= 0 && s.y < r.top + 0.5 && s.y > r.top - 6) {

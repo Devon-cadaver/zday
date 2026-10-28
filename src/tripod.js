@@ -132,7 +132,7 @@ export class Tripod {
   update(h) {
     const D = this.D;
     this.t += h;
-    if (this.state === 'wreck') return;
+    if (this.state === 'wreck' || this.state === 'held' || this.state === 'hurled') return; // held, hurled: a hero has it (herofight.js)
     if (this.state === 'fall') { this.fallStep(h); return; }
     if (this.state === 'rise') { this.y += h * (8 + (this.y - HEAD_Y) * 0.4); for (const L of this.legs) { L.fx += (this.x - L.fx) * h * 0.8; L.fz += (this.z - L.fz) * h * 0.8; L.fy = Math.max(0, this.y - HEAD_Y - 10); } if (this.y > 280) this.gone = true; return; } // winched back up into the mothership
     if (this.state === 'drop') { // lowered out of the mothership, legs dangling, then they plant
@@ -326,7 +326,7 @@ export class Tripod {
     if (shooter >= 0 && !this.ray && Math.random() < 0.15) { this.fireAt(people.x[shooter], people.z[shooter]); }
   }
   recall() { if (this.state === 'walk' || this.state === 'drop') { this.state = 'rise'; this.ray = null; this.tb = null; const { people } = this.D.ctx; for (const j of this.lift) if (people.st[j] === ST.EXT) people.fling(j, 0, 0, 0); this.lift.length = 0; } }
-  damage(n) { if (this.state === 'fall' || this.state === 'wreck') return; this.hp -= n; if (this.hp <= 0) this.down(); }
+  damage(n) { if (this.state === 'fall' || this.state === 'wreck' || this.state === 'held' || this.state === 'hurled') return; this.hp -= n; if (this.hp <= 0) this.down(); }
   down() {
     if (this.state === 'fall' || this.state === 'wreck') return;
     this.state = 'fall'; this.ft = 0; this.ray = null; this.tb = null; this.fallA = Math.random() * 6.28;
@@ -375,6 +375,7 @@ export class Tripod {
     const P = this.obj, wreck = this.state === 'wreck' || this.state === 'fall';
     P.position.set(this.x, this.y, this.z);
     P.rotation.set(wreck ? Math.min(0.5, (this.ft || 0) * 0.25) : Math.sin(this.t * 1.3) * 0.04, -this.yaw, wreck ? Math.min(0.35, (this.ft || 0) * 0.15) : Math.cos(this.t * 1.1) * 0.03);
+    if (this.rot) { P.rotation.x = this.rot[0]; P.rotation.z = this.rot[1]; } // swung round or tumbling through the air
     // legs: a cubic curve from the hip, bowing out and up, down to the foot, rippling along its length
     const m = this._m, q = this._q, v = this._v, A = this._a;
     let n = 0;

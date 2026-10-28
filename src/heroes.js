@@ -15,6 +15,7 @@ import * as THREE from 'three';
 import { rig, relax, handsOnHips, tumble, detail } from './villains.js';
 import { tossStep, toss } from './brawl.js';
 import { fightPose } from './melee.js';
+import { alienStep } from './herofight.js';
 const up = (v) => v && !v.gone && !v.beaten;
 import { roofTop } from './tripod.js';
 import { ST } from './people.js';
@@ -137,7 +138,7 @@ class Hero {
     }
     if (o.glow) this.hands = this.rig.arms.map(a => { const g = new THREE.Mesh(K.sphere, K.glow); g.scale.setScalar(0.07); g.position.y = -0.3; g.visible = false; a.el.add(g); return g; });
   }
-  get busy() { return this.job && (this.job.kind === 'catch' || this.job.kind === 'carry' || this.job.kind === 'return' || this.job.kind === 'ferry' || (this.job.kind === 'swim' && this.job.ppl && this.job.ppl.length > 0)); }
+  get busy() { return this.job && ((this.job.kind === 'alien' && this.job.phase && this.job.phase !== 'go') || this.job.kind === 'catch' || this.job.kind === 'carry' || this.job.kind === 'return' || this.job.kind === 'ferry' || (this.job.kind === 'swim' && this.job.ppl && this.job.ppl.length > 0)); }
   fly(gx, gy, gz, h, top = 50, extra = 0) {
     const dx = gx - this.x, dy = gy - this.y, dz = gz - this.z, d = Math.hypot(dx, dy, dz), sp = Math.min(top, d * 1.8 + extra), f = Math.min(1, h * 3);
     if (d > 0.01) { this.vx += (dx / d * sp - this.vx) * f; this.vy += (dy / d * sp - this.vy) * f; this.vz += (dz / d * sp - this.vz) * f; }
@@ -169,6 +170,7 @@ class Hero {
     else if (J.kind === 'blur') this.doBlur(h, J);
     else if (J.kind === 'swim') this.doSwim(h, J);
     else if (J.kind === 'wave') this.doWave(h, J);
+    else if (J.kind === 'alien') alienStep(this, h, J);
   }
   // nothing to do: hover by the signal, then land on its roof
   idle(h) {
@@ -520,6 +522,9 @@ export class Heroes {
       if (tempo.state === 'fly' && !tempo.job && bl) tempo.job = { kind: 'slow', v: bl, V };
       if (bl) for (const hr of [nova, dragon]) if (hr.state === 'fly' && !hr.job) hr.job = { kind: 'blur', v: bl, V }; // free of their own: help catch Blur
     }
+    // the alien invasion: whoever is free goes at the tripods and saucers
+    const I = D.list.find(e => e.type === 'aliens' && e.alive && !e.leaving);
+    if (I) { work++; for (const hr of live) if (!hr.job) hr.job = { kind: 'alien', I }; }
     // the giant monsters: whoever is free goes at it
     const M = D.list.find(e => e.alive && !e.heroLost && ((e.type === 'kaiju' && e.state !== 'leave') || (e.type === 'worm' && e.phase !== 'leave' && e.phase !== 'gone')));
     if (M) {
