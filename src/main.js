@@ -18,6 +18,7 @@ import { Audio } from './audio.js';
 import { CURVE, curveFrame } from './curve.js';
 import { seeFrame, SEE, seeButton } from './see.js';
 import { Band } from './band.js';
+import { Rail } from './rail.js';
 import { PLACES, placeKey, settle } from './places.js';
 import { Globe } from './globe.js';
 import { Sky } from './sky.js';
@@ -120,6 +121,7 @@ function buildWorld() {
 function moveWorld(key, m, kind) {
   if (W) {
     if (W.band) W.band.dispose();
+    if (W.rail) W.rail.dispose();
     keepDamage(); game.leaveWorld();
     const keep = new Set([sun, sun.target, hemi]);
     for (const o of [...scene.children]) {
@@ -225,6 +227,7 @@ function worldReady() {
   if (!game.people) game.attachWorld(W);
   W.searchlights = new Searchlights(scene, { game, traffic, helis, city, daylight }); // beams at night on the trouble
   window.__lights = W.searchlights;
+  W.rail = game.rail = city.rail ? new Rail({ scene, city, disasters, post }) : null; // the neon city's trains overhead
   W.band = game.band = new Band({ scene, game, city, people, traffic, fire, disasters, camera, controls, get music() { return game.audio && game.audio.music; } }); // the house band, playing the theme
   for (const k of damageOf(placeKey())) if (city.buildings[k] && !city.dead[k]) { people.clearBuilding(k, 'spare'); city.hideBuilding(k); city.addRubble(k, 0.75); }
   window.__z = { see: SEE, THREE, scene, camera, controls, renderer, post, city, traffic, people, fire, game, daylight, helis, disasters, outskirts, sirens, sun, hemi, setView, buildMs, audio: game.audio, info: () => renderer.info.render };

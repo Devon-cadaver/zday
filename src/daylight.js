@@ -90,6 +90,7 @@ export class Daylight {
     const lit = sstep(0.15, 0.6, night);
     for (const m of this.city.mats.fac) m.emissiveIntensity = 0.45 * lit;
     this.city.mats.shop.emissiveIntensity = 0.6 * lit;
+    this.city.mats.neon.userData.k.value = 0.3 + 1.5 * lit; // the neon city's signs
     this.lampMat.opacity = 0.4 * lit; this.lampPools.visible = lit > 0.01;
     this.headMat.opacity = 0.35 * lit; this.headPools.visible = lit > 0.01;
     if (this.people) this.people.uGlow.value = 0.3 + 0.7 * lit;

@@ -42,6 +42,7 @@ const MIX = {
 const RUST = ['#b86a3e', '#a85d36', '#c27c4b', '#9c5a3a', '#b5774f', '#a8673f'];
 const GREENS = ['#6f7f3a', '#5d7034', '#7d8a45', '#56692f', '#8a9150', '#68783c', '#4f6330'];
 // the Far Isles: cherry blossom, plaster and timber walls (the texture's own colours show through), grey roof tiles
+const NEON = ['#ff3b8d', '#28e0ff', '#ffd23f', '#7cff6b', '#ff7b2b', '#b56bff', '#ff4848', '#ffffff', '#4a7bff', '#ff9ad5']; // the neon city's signs
 const SAKURA = ['#f2b8c6', '#eaa6b8', '#f6c8d2', '#e79aae', '#f0c0cc'];
 const JWALL = ['#f4efe6', '#efe6d6', '#e9dfcc', '#f2eadc', '#e2d6c2', '#d8c8b0'], JTILE = ['#6a7078', '#61666e', '#70747a', '#5a5f67', '#787874'];
 
@@ -120,7 +121,7 @@ export function buildCity(tex, opts = {}) {
   const r = rng(opts.seed ?? 20261025);
   const NB = opts.blocks ?? 12;
   const pick = (a) => a[Math.floor(r() * a.length)];
-  const JAPAN = opts.style === 'japan'; // the Far Isles' old towns (see jHouse)
+  const JAPAN = opts.style === 'japan', TOKYO = opts.style === 'tokyo'; // the Far Isles' old towns (see jHouse) and neon city (tSigns)
 
   // ---- street grid
   const sx = [0], sz = [0];
@@ -183,7 +184,7 @@ export function buildCity(tex, opts = {}) {
 
   const B = {
     fac: [new Bucket(), new Bucket(), new Bucket(), new Bucket(), new Bucket()], // the fifth: the Far Isles' timber and plaster
-    shop: new Bucket(), roof: new Bucket(), walk: new Bucket(), grass: new Bucket(), tile: new Bucket(), // tile: pitched roofs
+    shop: new Bucket(), roof: new Bucket(), walk: new Bucket(), grass: new Bucket(), tile: new Bucket(), neon: new Bucket(), // tile: pitched roofs; neon: lit signs
   };
   const crowns = [], trunks = [], tanks = [], lamps = [], stripes = [], parked = [], crowds = [], walkBlocks = [], open = [], buildings = [];
   let curB = -1; // building being generated (rooftop clutter remembers its owner)
@@ -198,6 +199,33 @@ export function buildCity(tex, opts = {}) {
     for (const [cx, cz, s] of centers) h = Math.max(h, Math.exp(-((x - cx) ** 2 + (z - cz) ** 2) / (2 * s * s)));
     return h;
   };
+
+  // the neon city (opts.style 'tokyo'): its elevated railway, along a street right across the town that no superblock
+  // has taken (pillars at the thirds of each block, clear of the crossings and any roundabout; rail.js builds it), and
+  // its scramble crossing, the crossroads nearest its first downtown with every street into it open
+  let rail = null, scramble = null;
+  if (TOKYO) {
+    for (const j of [3, NB - 3, 2, NB - 2, 4]) {
+      if (j <= 0 || j >= NB) continue;
+      let ok = true; for (let i = 0; ok && i < NB; i++) if (layout.removed.has(ekey(nid(i, j), nid(i + 1, j)))) ok = false;
+      if (!ok) continue;
+      const m = Math.floor(NB / 2), px = [];
+      rail = { j, z: sz[j], x0: sx[0] - 70, x1: sx[NB] + 70, y: 9.2, station: (sx[m] + sx[m + 1]) / 2 };
+      for (let i = 0; i < NB; i++) for (const f of [1 / 3, 2 / 3]) px.push(sx[i] + (sx[i + 1] - sx[i]) * f);
+      for (let x = sx[0] - 28; x > rail.x0 + 6; x -= 28) px.push(x);
+      for (let x = sx[NB] + 28; x < rail.x1 - 6; x += 28) px.push(x);
+      rail.pillars = [rail.x0, ...px.filter(x => !layout.rounds.some(rd => Math.hypot(x - rd.x, rail.z - rd.z) < rd.ro + 2)), rail.x1].sort((a, b) => a - b);
+      break;
+    }
+    let bd = 1e9;
+    for (let i = 2; i < NB - 1; i++) for (let j = 2; j < NB - 1; j++) {
+      const id = nid(i, j);
+      if (roundAt.has(id) || diagNodes.has(id) || (rail && j === rail.j) || land(i - 1, j - 1) || land(i, j - 1) || land(i - 1, j) || land(i, j)) continue;
+      if ([nid(i - 1, j), nid(i + 1, j), nid(i, j - 1), nid(i, j + 1)].some(o => layout.removed.has(ekey(id, o)))) continue;
+      const d = Math.hypot(sx[i] - centers[0][0], sz[j] - centers[0][1]);
+      if (d < bd) { bd = d; scramble = { i, j, x: sx[i], z: sz[j] }; }
+    }
+  }
 
   // districts: a brick old town, a stone, glass and concrete downtown, lighter painted residential streets, industrial edges
   const dS = [r() * 100, r() * 100, r() * 100];
@@ -309,6 +337,7 @@ export function buildCity(tex, opts = {}) {
 
   function building(lot, interior, blk) {
     if (JAPAN) { jHouses(lot, interior, blk); return; }
+    if (TOKYO && !lot.cut) { tSlices(lot, blk); return; }
     const ins = r() < 0.75 ? 0.12 : 0.4 + r() * 1.4;
     const b = { x0: lot.x0 + ins, x1: lot.x1 - ins, z0: lot.z0 + ins, z1: lot.z1 - ins };
     const w = b.x1 - b.x0, d = b.z1 - b.z0;
@@ -321,13 +350,14 @@ export function buildCity(tex, opts = {}) {
     else if (q < 1 - tall) fl = 3 + Math.floor(r() * 4);
     else fl = 7 + Math.floor(r() * 6);
     fl = Math.max(1, Math.round(fl * (0.8 + hf * 0.8)));
+    if (TOKYO) { const q2 = r(); fl = Math.round((q2 < 0.12 ? 2 + r() * 3 : q2 < 1 - tall ? 4 + r() * 7 : 12 + r() * 12) * (0.7 + hf * 0.9)); } // the neon city: taller all round, towers downtown
     if (interior) fl = Math.max(1, Math.round(fl * 0.6));
-    fl = Math.min(fl, Math.floor(Math.min(w, d) * 0.9), opts.maxFloors ?? 16);
+    fl = Math.min(fl, Math.floor(Math.min(w, d) * (TOKYO ? 2.2 : 0.9)), opts.maxFloors ?? 16);
     const sq = r();
-    const style = fl >= 9 ? (sq < 0.25 ? 1 : sq < 0.7 ? 0 : 2) : (sq < 0.45 ? 0 : sq < 0.72 ? 2 : sq < 0.93 ? 3 : 1);
+    const style = TOKYO ? (fl >= 9 ? (sq < 0.55 ? 1 : sq < 0.85 ? 0 : 2) : (sq < 0.45 ? 0 : sq < 0.75 ? 1 : 2)) : fl >= 9 ? (sq < 0.25 ? 1 : sq < 0.7 ? 0 : 2) : (sq < 0.45 ? 0 : sq < 0.72 ? 2 : sq < 0.93 ? 3 : 1);
     const col = wallColor((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2, fl, style);
     const y0 = CURB;
-    const fk = 'fac' + style, vStart = { [fk]: B.fac[style].v, shop: B.shop.v, roof: B.roof.v, grass: B.grass.v };
+    const fk = 'fac' + style, vStart = { [fk]: B.fac[style].v, shop: B.shop.v, roof: B.roof.v, grass: B.grass.v, neon: B.neon.v };
     sides(B.shop, b, y0, y0 + GF, toWhite(col, 0.35), { su: 24, sv: GF, v0: y0 });
     const h = y0 + GF + fl * FH;
     sides(B.fac[style], b, y0 + GF, h, col, { su: 12, sv: 12, v0: y0 + GF });
@@ -357,8 +387,9 @@ export function buildCity(tex, opts = {}) {
       }
     }
     const hut = roofStuff({ x0: tr.x0 + 0.35, x1: tr.x1 - 0.35, z0: tr.z0 + 0.35, z1: tr.z1 - 0.35 }, th, col, !interior);
+    if (TOKYO) tSigns(b, lot, blk, h, th, tr, fl);
     // gameplay record: street door, roof, vertex ranges (for charring)
-    const ranges = [{ key: fk, v0: vStart[fk], v1: B.fac[style].v }, { key: 'shop', v0: vStart.shop, v1: B.shop.v }, { key: 'roof', v0: vStart.roof, v1: B.roof.v }, { key: 'grass', v0: vStart.grass, v1: B.grass.v }]; // grass: its roof garden
+    const ranges = [{ key: fk, v0: vStart[fk], v1: B.fac[style].v }, { key: 'shop', v0: vStart.shop, v1: B.shop.v }, { key: 'roof', v0: vStart.roof, v1: B.roof.v }, { key: 'grass', v0: vStart.grass, v1: B.grass.v }, { key: 'neon', v0: vStart.neon, v1: B.neon.v }]; // grass: its roof garden; neon: its signs
     const rec = { x0: b.x0, x1: b.x1, z0: b.z0, z1: b.z1, roofY: th, baseY: y0, fl, ranges, door: null,
       roof: { x0: tr.x0 + 0.7, x1: tr.x1 - 0.7, z0: tr.z0 + 0.7, z1: tr.z1 - 0.7 } };
     if (!interior) frontDoor(rec, b, lot, blk);
@@ -468,6 +499,7 @@ export function buildCity(tex, opts = {}) {
     else if (kind === 'stadium') stadium(cx, cz, Math.min(W, D) * 0.92, blk);
     else if (kind === 'temple') jTemple(blk);
     else if (kind === 'pagoda') jPagoda(blk);
+    else if (kind === 'lattice') tLattice(blk);
     else if (kind === 'dome') { // city hall: white stone, a columned portico and a green copper dome
       const hw = W * 0.8, hd = D * 0.55, h = CURB + GF + 4 * FH, R = Math.min(hw, hd) * 0.42;
       tiered([{ b: sq(cx, cz, hw, hd), fl: 4 }], 3, lin('#efe9dc'), blk, { name: 'City hall', noHut: true, trim: 0.45, roof: '#cfc6b4',
@@ -483,7 +515,7 @@ export function buildCity(tex, opts = {}) {
   // pagoda for landmarks, red gates, stone lanterns. A pitched roof's 'roof' (where people stand, heroes land) is a
   // strip along its ridge; area: the floor, for how many fit inside
   const grow = (b, o) => ({ x0: b.x0 - o, x1: b.x1 + o, z0: b.z0 - o, z1: b.z1 + o });
-  const vNow = () => { const o = { shop: B.shop.v, roof: B.roof.v, grass: B.grass.v, tile: B.tile.v }; B.fac.forEach((bk, k) => { o['fac' + k] = bk.v; }); return o; };
+  const vNow = () => { const o = { shop: B.shop.v, roof: B.roof.v, grass: B.grass.v, tile: B.tile.v, neon: B.neon.v }; B.fac.forEach((bk, k) => { o['fac' + k] = bk.v; }); return o; };
   const vSince = (o) => { const n = vNow(); return Object.keys(o).filter(k => n[k] > o[k]).map(k => ({ key: k, v0: o[k], v1: n[k] })); };
   const nrmOf = (a, b, d) => { const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = d[0] - a[0], vy = d[1] - a[1], vz = d[2] - a[2], n = [uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx], l = Math.hypot(n[0], n[1], n[2]) || 1; return [n[0] / l, n[1] / l, n[2] / l]; };
   // a tiled roof: rings of eaves ({ b, y }) from the outermost up to the ridge (a ring as thin as a line, or a point),
@@ -641,6 +673,106 @@ export function buildCity(tex, opts = {}) {
     buildings.push(rec); curB = -1;
   }
 
+  // ---- the neon city (opts.style 'tokyo'): a lot cut into narrow buildings side by side (often a row of 'pencil'
+  // buildings), signs on every street front that glow at night, big screens round the scramble crossing
+  function tSlices(lot, blk) {
+    const w = lot.x1 - lot.x0, d = lot.z1 - lot.z0, alongX = w >= d, L = alongX ? w : d, e = 0.01;
+    const n = L > 11 && r() < 0.75 ? Math.max(2, Math.round(L / (5 + r() * 4))) : 1;
+    for (let k = 0; k < n; k++) {
+      const p = alongX ? { x0: lot.x0 + w * k / n, x1: lot.x0 + w * (k + 1) / n, z0: lot.z0, z1: lot.z1, cut: true } : { x0: lot.x0, x1: lot.x1, z0: lot.z0 + d * k / n, z1: lot.z0 + d * (k + 1) / n, cut: true };
+      building(p, p.x0 > blk.x0 + e && p.x1 < blk.x1 - e && p.z0 > blk.z0 + e && p.z1 < blk.z1 - e, blk);
+    }
+  }
+  // a sign board in the glowing bucket: its two faces (normal n, half width hw across, half thickness ht) show uv
+  // [u0, u1, v0, v1] of the sign texture; its edges and top the plain patch
+  const PLAINUV = [0.8, 0.95, 0.8, 0.95];
+  function signBoard(cx, cz, nx, nz, hw, ht, y0, y1, col, uv) {
+    const rx = nz, rz = -nx, P = (a, o, y) => [cx + rx * a + nx * o, y, cz + rz * a + nz * o];
+    const q = (a, b, c, d, n, U) => B.neon.quad(a, b, c, d, n, [U[0], U[2]], [U[1], U[2]], [U[1], U[3]], [U[0], U[3]], col, col);
+    q(P(-hw, ht, y0), P(hw, ht, y0), P(hw, ht, y1), P(-hw, ht, y1), [nx, 0, nz], uv);
+    q(P(hw, -ht, y0), P(-hw, -ht, y0), P(-hw, -ht, y1), P(hw, -ht, y1), [-nx, 0, -nz], uv);
+    q(P(hw, ht, y0), P(hw, -ht, y0), P(hw, -ht, y1), P(hw, ht, y1), [rx, 0, rz], PLAINUV);
+    q(P(-hw, -ht, y0), P(-hw, ht, y0), P(-hw, ht, y1), P(-hw, -ht, y1), [-rx, 0, -rz], PLAINUV);
+    q(P(-hw, ht, y1), P(hw, ht, y1), P(hw, -ht, y1), P(-hw, -ht, y1), [0, 1, 0], PLAINUV);
+  }
+  // which part of the sign texture: a column of characters (a tall board), a row (a banner), one of the screens
+  const glyphCol = (cells) => { const c = Math.floor(r() * 6) / 8, v = Math.floor(r() * 8) / 8; return [c, c + 1 / 8, v, v + Math.max(1, cells) / 8]; };
+  const glyphRow = (cells) => { const n = Math.max(1, Math.min(6, cells)), u = Math.floor(r() * (7 - n)) / 8, v = Math.floor(r() * 8) / 8; return [u, u + n / 8, v, v + 1 / 8]; };
+  const screenUV = () => { const k = Math.floor(r() * 3) / 4; return [0.75, 1, k, k + 0.25]; };
+  // the signs on a building's street fronts (b its footprint, h the top of its main walls, th of its roof, tr the
+  // roof's own outline): tall boards standing out from the wall (read down the street), banners across a floor, a
+  // board up on the roof now and then; a big screen if it looks onto the scramble crossing
+  function tSigns(b, lot, blk, h, th, tr, fl) {
+    const e = 0.05, y0 = CURB + GF, edge = [Math.abs(lot.x1 - blk.x1) < e, Math.abs(lot.x0 - blk.x0) < e, Math.abs(lot.z1 - blk.z1) < e, Math.abs(lot.z0 - blk.z0) < e];
+    let roofBoard = fl >= 5 && tr === b && r() < 0.3;
+    for (let s = 0; s < 4; s++) {
+      if (!edge[s]) continue;
+      const S = SIDES[s], [lx, lz] = S.L(b), w = S.w(b), ox = S.out[0], oz = S.out[1], rx = S.R[0], rz = S.R[1];
+      const at = (t, o) => [lx + rx * t + ox * o, lz + rz * t + oz * o], [mx, mz] = at(w / 2, 0);
+      if (scramble && fl >= 4 && Math.hypot(mx - scramble.x, mz - scramble.z) < HALF + w / 2 + 8) { // a big screen over the crossing
+        const hw = Math.min(w * 0.45, 8), yb = y0 + FH * 0.5, yt = Math.min(h - 1, yb + Math.min(10, hw * 1.25));
+        signBoard(...at(w / 2, 0.2), ox, oz, hw, 0.15, yb, yt, lin('#ffffff'), screenUV());
+        continue;
+      }
+      const station = rail && Math.abs(mz + oz * 8 - rail.z) < 1 && Math.abs(mx - rail.station) < 40; // facing the station: nothing standing out over its platforms
+      const nV = station || fl < 3 ? 0 : w < 7 ? 1 : 1 + Math.floor(r() * 2.2);
+      for (let k = 0; k < nV; k++) {
+        const t = nV === 1 ? (r() < 0.5 ? 0.9 : w - 0.9) : 0.9 + (w - 1.8) * k / (nV - 1), ext = 1.1 + r() * 0.5;
+        const H = Math.min(h - y0 - 0.6, 3 + r() * 9), yb = y0 + 0.4 + r() * Math.max(0, h - y0 - 1 - H);
+        if (H > 2) signBoard(...at(t, ext / 2 + 0.06), rx, rz, ext / 2, 0.14, yb, yb + H, lin(pick(NEON)), glyphCol(Math.round(H / ext)));
+      }
+      for (let f = 1; f < fl; f++) if (r() < 0.14) { // a banner across a floor
+        const bw = w * (0.45 + r() * 0.4), t = (w - bw) / 2 + (r() - 0.5) * (w - bw) * 0.8, y = y0 + (f - 1) * FH + 2.1, bh = 0.7 + r() * 0.4;
+        if (y + bh < h - 0.3) signBoard(...at(t + bw / 2, 0.12), ox, oz, bw / 2, 0.08, y, y + bh, lin(pick(NEON)), glyphRow(Math.round(bw / bh)));
+      }
+      if (roofBoard) { // a board up on the roof, on legs, facing this street
+        roofBoard = false;
+        const hw = Math.min(w * 0.4, 7), H = 2.6 + r() * 2, [cx, cz] = at(w / 2, -1.4), yb = th + 1.1;
+        for (const sg of [-1, 1]) box(B.roof, sq(cx + rx * sg * hw * 0.7, cz + rz * sg * hw * 0.7, 0.18), th, yb + 0.3, lin('#4a4846'));
+        signBoard(cx, cz, ox, oz, hw, 0.2, yb, yb + H, lin(r() < 0.4 ? '#ffffff' : pick(NEON)), r() < 0.4 ? screenUV() : glyphRow(Math.round(2 * hw / H)));
+      }
+    }
+  }
+  // a bar from p to q, t thick, in the glowing bucket (the lattice tower)
+  function strut(p, q, t, col) {
+    const dx = q[0] - p[0], dy = q[1] - p[1], dz = q[2] - p[2], L = Math.hypot(dx, dy, dz), ux = dx / L, uy = dy / L, uz = dz / L;
+    let ax = -uz, az = ux, al = Math.hypot(ax, az); if (al < 1e-3) { ax = 1; az = 0; al = 1; } ax /= al; az /= al; // across it, level
+    const bx = uy * az, by = uz * ax - ux * az, bz = -uy * ax, h = t / 2; // across both
+    const C = [[1, 1], [-1, 1], [-1, -1], [1, -1]].map(([s1, s2]) => [(ax * s1 + bx * s2) * h, by * s2 * h, (az * s1 + bz * s2) * h]);
+    for (let k = 0; k < 4; k++) {
+      const c0 = C[k], c1 = C[(k + 1) % 4], a = [p[0] + c0[0], p[1] + c0[1], p[2] + c0[2]], b = [p[0] + c1[0], p[1] + c1[1], p[2] + c1[2]], c = [q[0] + c1[0], q[1] + c1[1], q[2] + c1[2]], d = [q[0] + c0[0], q[1] + c0[1], q[2] + c0[2]];
+      B.neon.quad(a, b, c, d, nrmOf(a, b, d), [0.8, 0.8], [0.95, 0.8], [0.95, 0.95], [0.8, 0.95], col, col);
+    }
+  }
+  // a red lattice tower (after Tokyo's): four legs curving in from a wide base, braced, in orange with white bands (it
+  // glows at night), a main deck and a top deck in glass, a banded mast; a low glass building between its feet
+  function tLattice(blk) {
+    curB = buildings.length;
+    const vs = vNow(), cx = (blk.x0 + blk.x1) / 2, cz = (blk.z0 + blk.z1) / 2, a0 = Math.min(blk.x1 - blk.x0, blk.z1 - blk.z0) * 0.4, a1 = 1.4, TOP = 104, N = 13;
+    const A = (y) => a1 + (a0 - a1) * Math.pow(1 - y / TOP, 2.3), ORANGE = lin('#e85a26'), WHITE = lin('#f4f0e8'), band = (y) => (Math.floor(y / 9) % 3 === 2 ? WHITE : ORANGE);
+    const corner = (y, s1, s2) => [cx + s1 * A(y), y, cz + s2 * A(y)], CS = [[1, 1], [-1, 1], [-1, -1], [1, -1]];
+    const fb = sq(cx, cz, a0 * 0.6, a0 * 0.45), fy = CURB + GF + 2 * FH;
+    sides(B.shop, fb, CURB, CURB + GF, lin('#e8e2d6'), { su: 24, sv: GF, v0: CURB });
+    sides(B.fac[1], fb, CURB + GF, fy, lin('#c8ccd0'), { su: 12, sv: 12, v0: CURB + GF });
+    top(B.roof, fb, fy, lin('#a39c8e')); parapet(fb, fy, lin('#c8ccd0'));
+    for (let k = 0; k < N; k++) {
+      const ya = TOP * k / N, yb = TOP * (k + 1) / N, t = 1.6 - 1.05 * k / N, col = band((ya + yb) / 2);
+      for (let c = 0; c < 4; c++) {
+        const [s1, s2] = CS[c], [t1, t2] = CS[(c + 1) % 4];
+        strut(corner(ya, s1, s2), corner(yb, s1, s2), t, col); // a leg
+        strut(corner(yb, s1, s2), corner(yb, t1, t2), t * 0.6, col); // a girder round
+        strut(corner(ya, s1, s2), corner(yb, t1, t2), t * 0.42, col); strut(corner(ya, t1, t2), corner(yb, s1, s2), t * 0.42, col); // the braces
+      }
+    }
+    const deck = (y, hgt, extra) => { const s = A(y) + extra, b2 = sq(cx, cz, s); box(B.roof, b2, y - 0.7, y, lin('#d8d4cc')); sides(B.fac[1], b2, y, y + hgt, lin('#a9bcc8'), { su: 12, sv: 12, v0: y }); top(B.roof, b2, y + hgt, lin('#b8b2a8')); box(B.roof, sq(cx, cz, s + 0.5), y + hgt, y + hgt + 0.6, lin('#ece8e0')); return { b: b2, top: y + hgt + 0.6 }; };
+    const main = deck(TOP * 0.42, 7, 3); deck(TOP * 0.72, 4, 1.6);
+    for (let y = TOP, k = 0; k < 7; y += 4, k++) strut([cx, y, cz], [cx, y + 4, cz], 1.4 - k * 0.14, k % 2 ? WHITE : ORANGE); // the mast
+    const rec = { x0: cx - a0, x1: cx + a0, z0: cz - a0, z1: cz + a0, roofY: main.top, baseY: CURB, fl: 14, ranges: vSince(vs), door: null, landmark: 'Lattice tower', area: (fb.x1 - fb.x0) * (fb.z1 - fb.z0), roof: grow(main.b, -0.8) };
+    rec.wall = [cx, fb.z0]; rec.door = [cx, blk.z0 - 0.9]; rec.n = [0, -1];
+    rec.wallCol = ORANGE; rec.top = TOP + 28; rec.hut = null; rec.hatch = null;
+    buildings.push(rec); curB = -1;
+  }
+
   function split(rect, out, depth) {
     const w = rect.x1 - rect.x0, d = rect.z1 - rect.z0;
     const maxS = 10 + r() * 13;
@@ -788,7 +920,7 @@ export function buildCity(tex, opts = {}) {
     const cand = [];
     for (let i = 1; i < NB - 1; i++) for (let j = 1; j < NB - 1; j++) {
       const key = i + ',' + j;
-      if (owner.get(key) || splitBlk.get(key) || land(i, j) || cornersOf(i, j).some(c => roundAt.get(c))) continue;
+      if (owner.get(key) || splitBlk.get(key) || land(i, j) || cornersOf(i, j).some(c => roundAt.get(c)) || (scramble && (i === scramble.i || i === scramble.i - 1) && (j === scramble.j || j === scramble.j - 1))) continue; // the scramble's corners keep their screens
       const x = (sx[i] + sx[i + 1]) / 2, z = (sz[j] + sz[j + 1]) / 2;
       cand.push({ key, x, z, s: heightAt(x, z) + r() * 0.35 });
     }
@@ -902,12 +1034,17 @@ export function buildCity(tex, opts = {}) {
   }
   // crosswalks (pushed out past the ring at a roundabout; none where the avenue crosses)
   for (let i = 0; i <= NB; i++) for (let j = 0; j <= NB; j++) {
-    if (r() > 0.45 || diagNodes.has(nid(i, j)) || (land(i - 1, j - 1) && land(i, j - 1) && land(i - 1, j) && land(i, j))) continue;
+    const scr = scramble && scramble.i === i && scramble.j === j;
+    if ((r() > 0.45 && !scr) || diagNodes.has(nid(i, j)) || (land(i - 1, j - 1) && land(i, j - 1) && land(i - 1, j) && land(i, j))) continue;
     const X = sx[i], Z = sz[j], rd = roundAt.get(nid(i, j)), off = rd ? rd.ro + 2 : HALF + 1.6;
     for (const sd of [-1, 1]) {
       // across the road running along x (bars along x, spread along z)
       for (let k = -4; k <= 4; k += 1.1) stripes.push({ x: X + sd * off, z: Z + k, w: 3, d: 0.55 });
       for (let k = -4; k <= 4; k += 1.1) stripes.push({ x: X + k, z: Z + sd * off, w: 0.55, d: 3 });
+    }
+    if (scr) { // the scramble: across it corner to corner both ways too, crowds waiting on its corners
+      for (const dg of [1, -1]) for (let t = -HALF * Math.SQRT2 + 2.4; t <= HALF * Math.SQRT2 - 2.4; t += 1.1) stripes.push({ x: X + t * Math.SQRT1_2, z: Z + dg * t * Math.SQRT1_2, w: 3, d: 0.55, rot: dg * Math.PI / 4 });
+      for (const [cx2, cz2] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) crowds.push({ x: X + cx2 * (HALF - 1.4), z: Z + cz2 * (HALF - 1.4), y: CURB + 0.03, n: 16, rad: 2.2 });
     }
   }
 
@@ -917,10 +1054,14 @@ export function buildCity(tex, opts = {}) {
   // walls darken towards the street: grime and the shade of the pavement, baked into the shading (it costs nothing)
   const walls = (m) => { const prev = m.onBeforeCompile; m.onBeforeCompile = (sh, r) => { prev(sh, r); sh.fragmentShader = sh.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.rgb *= 0.74 + 0.26 * smoothstep(0.2, 6.0, vHoleW.y);'); }; return m; };
   const nrm = (k) => new THREE.Vector2(k, k);
+  // the signs: lit from within in their own colours, faint by day, bright at night (k, set by daylight.js)
+  const neonK = { value: 0.3 };
+  const neonMat = () => { const m = std({ map: tex.signs, vertexColors: true, roughness: 0.45 }), prev = m.onBeforeCompile; m.onBeforeCompile = (sh, rr) => { prev(sh, rr); sh.uniforms.uNeon = neonK; sh.fragmentShader = 'uniform float uNeon;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  totalEmissiveRadiance += diffuseColor.rgb * uNeon;'); }; m.userData.k = neonK; return seeThrough(m); };
   const mats = {
     fac: tex.facades.map((m, k) => seeThrough(walls(std({ map: m, normalMap: tex.facadeRelief[k], normalScale: nrm(1.6), vertexColors: true, roughness: 0.85, emissiveMap: tex.facadesLit[k], emissive: '#ffffff', emissiveIntensity: 0 })))), // walls in the way of the action go see-through (see.js)
     shop: seeThrough(walls(std({ map: tex.shop, normalMap: tex.shopRelief, normalScale: nrm(1.6), vertexColors: true, emissiveMap: tex.shopLit, emissive: '#ffffff', emissiveIntensity: 0 }))),
     roof: seeThrough(std({ map: tex.roof, normalMap: tex.roofRelief, normalScale: nrm(1.5), vertexColors: true })),
+    neon: neonMat(),
     tile: seeThrough(std({ map: tex.tile, normalMap: tex.tileRelief, normalScale: nrm(1.3), vertexColors: true, roughness: 0.62, side: THREE.DoubleSide })), // seen from under the eaves too
     walk: std({ map: tex.sidewalk, vertexColors: true }),
     grass: std({ map: tex.grass, vertexColors: true, roughness: 1 }),
@@ -934,7 +1075,7 @@ export function buildCity(tex, opts = {}) {
     group.add(m);
   };
   B.fac.forEach((bk, k) => add(bk, mats.fac[k], true, 'fac' + k));
-  add(B.shop, mats.shop, true, 'shop'); add(B.roof, mats.roof, true, 'roof'); add(B.tile, mats.tile, true, 'tile'); add(B.walk, mats.walk, false); add(B.grass, mats.grass, false, 'grass');
+  add(B.shop, mats.shop, true, 'shop'); add(B.roof, mats.roof, true, 'roof'); add(B.tile, mats.tile, true, 'tile'); add(B.neon, mats.neon, true, 'neon'); add(B.walk, mats.walk, false); add(B.grass, mats.grass, false, 'grass');
   if (slabGeos.length) { const m = new THREE.Mesh(mergeGeometries(slabGeos), mats.walk); m.receiveShadow = true; m.matrixAutoUpdate = false; group.add(m); }
   const colorize = (g, c) => { const n = g.attributes.position.count, a = new Float32Array(n * 3); for (let v = 0; v < n; v++) a.set(c, v * 3); g.setAttribute('color', new THREE.BufferAttribute(a, 3)); return g; };
   const curbMat = std({ color: '#e2d8c6' });
@@ -1014,7 +1155,7 @@ export function buildCity(tex, opts = {}) {
   });
   const stripeG = new THREE.PlaneGeometry(1, 1); stripeG.rotateX(-Math.PI / 2);
   instTiled(stripeG, std({ color: '#f3ede0', polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), stripes, (st) => {
-    q.identity(); m4.compose(p.set(st.x, 0.02, st.z), q, s.set(st.w, 1, st.d));
+    q.setFromEuler(e.set(0, st.rot || 0, 0)); m4.compose(p.set(st.x, 0.02, st.z), q, s.set(st.w, 1, st.d));
   }, false);
 
   // a spot to stand on building k's roof near (x, z): inside its edge and out of the stair hut (Sean: a hero landed
@@ -1156,8 +1297,10 @@ export function buildCity(tex, opts = {}) {
   };
   const hidden = [];
   // street trees and lamps within R are ripped out; returns what was taken
+  const hooks = {}; // hooks.street(x, z, R): the street torn up there (the railway breaks)
   const takeStreetNear = (x, z, R) => {
     const out = [];
+    if (hooks.street) hooks.street(x, z, R);
     for (let gx = Math.floor((x - R) / SG); gx <= Math.floor((x + R) / SG); gx++) for (let gz = Math.floor((z - R) / SG); gz <= Math.floor((z + R) / SG); gz++) {
       const a = streetGrid.get(gx + ',' + gz); if (!a) continue;
       for (const it of a) {
@@ -1195,7 +1338,7 @@ export function buildCity(tex, opts = {}) {
   return {
     buildings, char, uncharAll, lamps, mats,
     dead, buildingsNear, hideBuilding, extractBuilding, addRubble, clearRubble, restoreBuilding, takeStreetNear, restoreAll,
-    group, sx, sz, NB, parked, crowds, walkBlocks, open, layout, nid, roofPoint,
+    group, sx, sz, NB, parked, crowds, walkBlocks, open, layout, nid, roofPoint, rail, scramble, hooks,
     bounds: { x0: sx[0], x1: sx[NB], z0: sz[0], z1: sz[NB] },
     stats: { crowns: crowns.length, tanks: tanks.length, parked: parked.length, verts: Object.values(B).flat().reduce((a, b) => a + b.v, 0) },
   };

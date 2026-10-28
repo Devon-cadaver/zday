@@ -21,7 +21,7 @@ import { Sky } from './sky.js';
 
 const R = 10;
 // the places' character on the map: what each one wants to be next to
-const WANTS = { kiyomura: 'forest', metro: 'city', bayview: 'city', harbor: 'coast', dust: 'desert', mesa: 'desert', sunvale: 'desert', pines: 'forest', lakeside: 'forest', northgate: 'forest', crossing: 'grass', ironside: 'grass' }; // city: deep in a big landmass that reaches the sea
+const WANTS = { kiyomura: 'forest', hoshimachi: 'coast', metro: 'city', bayview: 'city', harbor: 'coast', dust: 'desert', mesa: 'desert', sunvale: 'desert', pines: 'forest', lakeside: 'forest', northgate: 'forest', crossing: 'grass', ironside: 'grass' }; // city: deep in a big landmass that reaches the sea
 // a place's wall colours, as its city builder leans them (an even mix, plus the place's tint)
 function palette(P) {
   const w = { stone: 3, concrete: 3, brick: 3, white: 2, glass: 1 }, out = [];
@@ -45,7 +45,7 @@ function fbm(x, y, z, oct) { let s = 0, a = 0.5, f = 1, n = 0; for (let o = 0; o
 // made there with a strait all round them, a lone snowy peak on the biggest. [lat, lon] along the arc
 const ISLES = [[0.86, -1.5], [0.7, -1.58], [0.55, -1.66], [0.42, -1.77], [0.31, -1.9], [0.22, -2.05]], PEAK = [0.47, -1.74];
 // the eastern towns: placed near these spots (the others in the band that faces you at first)
-const EAST = { kiyomura: [0.6, -1.6] };
+const EAST = { kiyomura: [0.6, -1.6], hoshimachi: [0.4, -1.8] };
 const unit = (lat, lon) => [Math.cos(lat) * Math.cos(lon), Math.sin(lat), Math.cos(lat) * Math.sin(lon)]; // as paint() reads the noise
 const ISLE_P = ISLES.map(([a, b]) => unit(a, b)), PEAK_P = unit(...PEAK), ISLE_C = unit(0.54, -1.72);
 // how far (in radians, near enough) a point is from the arc, and how far along it (0 to 1)

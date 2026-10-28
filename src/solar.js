@@ -143,6 +143,7 @@ export class SolarStorm {
     const tg = controls.target, passed = Math.min(1, Math.max(0, (this.ws - ((tg.x - this.origin[0]) * this.dir[0] + (tg.z - this.origin[1]) * this.dir[1])) / 40)), k = this.k * passed;
     for (const m of city.mats.fac) m.emissiveIntensity *= 1 - k + k * off;
     city.mats.shop.emissiveIntensity *= 1 - k + k * off;
+    city.mats.neon.userData.k.value *= 1 - k + k * off;
     const dl = game && game.daylight; if (dl) { dl.lampMat.opacity *= 1 - k; }
     const night = post.opts.night || 0;
     hemi.color.lerp(this._g || (this._g = new THREE.Color(0.45, 1, 0.65)), 0.25 * k * (0.3 + 0.7 * night));

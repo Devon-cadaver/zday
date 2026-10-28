@@ -297,7 +297,7 @@ export class Game {
   leaveWorld() {
     this.endMode();
     this.pendingFires = []; this.simT = 0; this.acc = 0; this.seen = {}; this.zoomTo = 0; this.flash = 0; this.shake = 0; this.focusAt = null;
-    this.people = this.traffic = this.fire = this.city = this.daylight = this.helis = this.disasters = this.band = null;
+    this.people = this.traffic = this.fire = this.city = this.daylight = this.helis = this.disasters = this.band = this.rail = null;
   }
   startMode(which, kind) {
     this.menu.hidden = true; this.menuOff(); this.modeName = which;
@@ -576,6 +576,7 @@ export class Game {
     this.city.restoreAll();
     this.people.reset();
     if (this.band) this.band.reset(); // the show back on
+    if (this.rail) this.rail.reset(); // the line whole again, the trains at its ends
     this.simT = 0; this.shake = 0; this.seen = {}; this.setFollow(-1);
   }
 
@@ -768,7 +769,7 @@ export class Game {
     let stepped = false;
     while (this.acc >= h) {
       stepped = true;
-      p.step(h); this.traffic.step(h); if (this.helis) this.helis.update(h); if (this.disasters) this.disasters.update(h); this.acc -= h; this.simT += h;
+      p.step(h); this.traffic.step(h); if (this.helis) this.helis.update(h); if (this.disasters) this.disasters.update(h); if (this.rail) this.rail.step(h); this.acc -= h; this.simT += h;
       for (const e of p.events) if (e.type === 'bite') this.traffic.panicNear(e.x, e.z, 20);
       this.mode.afterStep && this.mode.afterStep(h);
     }

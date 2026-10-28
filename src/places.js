@@ -17,11 +17,12 @@ export const PLACES = {
   ironside: { name: 'Ironside', blurb: 'A brick and concrete mill town, smoke and rail yards', blocks: 9, seed: 4444, maxFloors: 8, tall: 0.04, landmarks: [], centers: 1, tint: { brick: 14, concrete: 8, dark: 3 }, people: 0.42, cars: 0.42, shape: 'ell' },
   northgate: { name: 'Northgate', blurb: 'A busy city in the hills, an Art Deco tower over it', blocks: 10, seed: 6060, maxFloors: 10, tall: 0.07, landmarks: ['deco'], centers: 1, tint: { stone: 8, concrete: 6, brick: 4 }, people: 0.55, cars: 0.55, land: 'forest', shape: 'diamond' },
   kiyomura: { name: 'Kiyomura', blurb: 'An old temple town on the Far Isles: wooden houses, a pagoda, cherry trees', blocks: 7, seed: 8686, maxFloors: 3, tall: 0, landmarks: ['pagoda', 'temple'], centers: 1, diag: false, style: 'japan', tint: { white: 10, brown: 8, dark: 4 }, people: 0.32, cars: 0.18, land: 'forest', shape: 'round' },
+  hoshimachi: { name: 'Hoshimachi', blurb: 'The neon city of the Far Isles: towers, a scramble crossing, trains overhead, a red lattice tower', blocks: 9, seed: 2929, maxFloors: 24, tall: 0.22, landmarks: ['lattice', 'spire', 'stadium'], centers: 2, diag: false, style: 'tokyo', tint: { concrete: 8, white: 8, glass: 6, dark: 3 }, people: 0.75, cars: 0.6, land: 'coast', shape: 'ragged' },
 };
 
 // the road through the world in Commander and Be The Disaster: the smallest town first, up to the big city, then on
 // across the sea to the towns of the Far Isles. Win in a place and the next one opens
-export const PATH = ['mesa', 'pines', 'crossing', 'dust', 'lakeside', 'harbor', 'sunvale', 'ironside', 'northgate', 'bayview', 'metro', 'kiyomura'];
+export const PATH = ['mesa', 'pines', 'crossing', 'dust', 'lakeside', 'harbor', 'sunvale', 'ironside', 'northgate', 'bayview', 'metro', 'kiyomura', 'hoshimachi'];
 
 export function placeKey() {
   let k = new URLSearchParams(location.search).get('place');

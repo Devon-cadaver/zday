@@ -228,6 +228,38 @@ function tiles(r) {
   return c;
 }
 
+// the neon city's signs, 512x512: boards of made-up characters in a grid of 64 px cells (6 columns: read down a tall
+// board, or along a banner), three bright screens down the right-hand quarter, a plain white patch above them (board
+// edges, the lattice tower)
+function signBoards(r) {
+  const S = 512, C = 64; const [c, g] = mk(S, S);
+  g.fillStyle = '#ffffff'; g.fillRect(0, 0, S, S);
+  for (let i = 0; i < 6; i++) for (let j = 0; j < 8; j++) {
+    const x = i * C, y = j * C, p = (v) => 14 + v * (C - 28);
+    g.fillStyle = '#5c5c5c'; g.fillRect(x, y, C, C);
+    g.strokeStyle = '#9a9a9a'; g.lineWidth = 2; g.strokeRect(x + 3, y + 3, C - 6, C - 6);
+    g.strokeStyle = '#ffffff'; g.lineWidth = 5; g.lineCap = 'round';
+    for (let k = 0, n = 3 + Math.floor(r() * 3); k < n; k++) {
+      const t = r(); g.beginPath();
+      if (t < 0.3) { const yy = y + p(r()); g.moveTo(x + p(r() * 0.3), yy); g.lineTo(x + p(0.7 + r() * 0.3), yy); }
+      else if (t < 0.55) { const xx = x + p(r()); g.moveTo(xx, y + p(r() * 0.3)); g.lineTo(xx, y + p(0.7 + r() * 0.3)); }
+      else if (t < 0.7) { g.moveTo(x + p(r()), y + p(r() * 0.4)); g.lineTo(x + p(r()), y + p(0.6 + r() * 0.4)); }
+      else if (t < 0.85) g.rect(x + p(r() * 0.4), y + p(r() * 0.4), 10 + r() * 16, 10 + r() * 16);
+      else { const xx = x + p(0.3 + r() * 0.4), y0 = y + p(r() * 0.3); g.moveTo(xx, y0); g.lineTo(xx, y0 + 22); g.lineTo(xx - 8, y0 + 16); }
+      g.stroke();
+    }
+  }
+  const grads = [['#ff4fa3', '#6b2bff'], ['#2be0ff', '#1b3bff'], ['#ffb02b', '#ff3b3b']];
+  for (let k = 0; k < 3; k++) {
+    const x = 384, y = S - (k + 1) * 128, gr = g.createLinearGradient(x, y, x + 128, y + 128);
+    gr.addColorStop(0, grads[k][0]); gr.addColorStop(1, grads[k][1]); g.fillStyle = gr; g.fillRect(x, y, 128, 128);
+    g.fillStyle = 'rgba(255,255,255,.85)'; g.beginPath(); g.arc(x + 40 + r() * 48, y + 50 + r() * 20, 20 + r() * 14, 0, Math.PI * 2); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.9)'; for (let b = 0; b < 3; b++) g.fillRect(x + 12, y + 92 + b * 10, 50 + r() * 60, 5);
+    g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(x, y, 128, 3); g.fillRect(x, y, 3, 128);
+  }
+  return c;
+}
+
 // 1024x176 = 8 bays x ground floor (24 m x 4 m)
 function shop(r) {
   const W = 1024, H = 176, B = 128; const [c, g] = mk(W, H);
@@ -352,6 +384,7 @@ export function makeTextures(renderer, seed = 7) {
     shopLit: finish(sh.lit, renderer),
     roof: finish(rf, renderer),
     tile: finish(tl, renderer),
+    signs: finish(signBoards(rng(seed + 777)), renderer), // the neon city's (its own dice too)
     tileRelief: relief(tl, 2.6, renderer),
     asphalt: finish(asphalt(r), renderer),
     sidewalk: finish(sidewalk(r), renderer),
