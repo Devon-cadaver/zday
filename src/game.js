@@ -541,7 +541,7 @@ export class Game {
     const out = [], D = this.disasters; if (!D) return out;
     if (side === 'good') {
       for (const e of D.list) if (e.alive && e.type === 'heroes') for (const h of e.who) out.push({ obj: h, name: h.name, pos: () => (h.state === 'fly' ? [h.x, h.y + 2.5, h.z] : null) });
-      if (this.helis) for (const hl of this.helis.list) out.push({ obj: hl, name: 'Helicopter', kind: 'heli', pos: () => (this.helis.list.includes(hl) ? [hl.x, hl.y, hl.z] : null) });
+      if (this.helis) for (const hl of this.helis.list) out.push({ obj: hl, name: 'Helicopter', kind: 'heli', pos: () => (this.helis.list.includes(hl) && hl.state !== 'out' ? [hl.x, hl.y, hl.z] : null) }); // flying off: done
       const VEH = { police: 'Police car', fire: 'Fire truck', apc: 'Army truck', bus: 'Evacuation bus', chaser: 'Storm chasers', tank: 'Tank', build: 'Construction truck', hazmat: 'Hazmat truck', medic: 'Ambulance', jail: 'Police bus' };
       for (const c of this.traffic.missions) out.push({ obj: c, name: VEH[c.kind] || 'Rescue truck', kind: 'car', pos: () => (!c.gone && c.mode === 0 ? [c.x, 1.5, c.z] : null) });
       const p = this.people, tg = this.controls.target, near = [];
@@ -607,12 +607,14 @@ export class Game {
     return { key: e.type, dist: 540, pol: 0.86 };
   }
   followSubject(s, side = this.followSide || 'bad') {
-    this.follow = -1; this.followSub = s; this.followSide = side; this.dir = null; this.camDir = null; this.zoomTo = 0; this.manualCam = false; this.followIn = false; this.lockControls(true);
+    this.follow = -1; this.followSub = s; this.followSide = side; this.dir = null; this.camDir = null; this.zoomTo = 0; this.manualCam = false; this.followIn = false; this.outT = 0; this.lockControls(true);
     const on = side === 'good' ? this.goodBtn : this.followBtn, off = side === 'good' ? this.followBtn : this.goodBtn;
     if (on) { on.classList.add('on'); this.setLabel(on, side === 'good' ? 'Next rescue' : 'Next disaster'); }
     if (off) { off.classList.remove('on'); this.setLabel(off, off === this.goodBtn ? 'Follow rescue' : 'Follow disaster'); }
     if (this.followChip) this.followChip.querySelector('b').textContent = s.name;
   }
+  // inside the city (what the camera can actually go to: the view is kept over the city)
+  inCity(q, m = 12) { const B = this.city.bounds; return !!q && q[0] > B.x0 + m && q[0] < B.x1 - m && q[2] > B.z0 + m && q[2] < B.z1 - m; }
   // the camera's shot for what it follows: how far back, how steeply it looks down (the angle from overhead), and the
   // side it looks from (base +/- off, whichever is nearer where the camera already is; no base: stay on this side)
   shot(s) {
@@ -648,7 +650,7 @@ export class Game {
   }
   // the Follow rescue button: each press the next of them
   cycleGood() {
-    const subs = this.subjects('good');
+    const subs = this.subjects('good').filter(s => this.inCity(s.pos(), -40)); // not one still on its way in from far out
     if (!subs.length) { this.toast('No rescuers out yet. Drop a disaster and they will come'); return; }
     let k = this.followSub && this.followSide === 'good' ? subs.findIndex(s => s.obj === this.followSub.obj) + 1 : 0;
     if (k >= subs.length) k = 0;
@@ -656,7 +658,7 @@ export class Game {
   }
   // the Follow disaster button
   cycleFollow() {
-    const p = this.people, tg = this.controls.target, subs = this.subjects();
+    const p = this.people, tg = this.controls.target, subs = this.subjects().filter(s => this.inCity(s.pos(), -40));
     if (subs.length) { // each press: the next of them, then the zombies (if any), then round again
       let k = this.followSub && this.followSide === 'bad' ? subs.findIndex(s => s.obj === this.followSub.obj) + 1 : 0;
       if (this.follow >= 0) k = 0;
@@ -732,9 +734,9 @@ export class Game {
     this.focusAt = null;
     if (this.followSub) {
       const q = this.followSub.pos();
-      const B = this.city.bounds, inCity = (p) => p && p[0] > B.x0 + 12 && p[0] < B.x1 - 12 && p[2] > B.z0 + 12 && p[2] < B.z1 - 12;
-      if (q && inCity(q)) this.followIn = true;
-      if (!q || (this.followIn && !inCity(q))) { // gone, or on its way out of the city: on to another of the same side, or stop
+      const inCity = (p) => this.inCity(p);
+      if (q && inCity(q)) { this.followIn = true; this.outT = 0; } else this.outT = (this.outT || 0) + dt;
+      if (!q || (this.followIn && !inCity(q)) || this.outT > 2.5) { // gone, on its way out of the city, or out there too long: on to another of the same side, or stop
         const side = this.followSide || 'bad', cur = this.followSub.obj, next = this.subjects(side).find(s => s.obj !== cur && inCity(s.pos()));
         if (next) this.followSubject(next, side); else this.setFollow(-1);
       } else {
