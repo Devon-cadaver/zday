@@ -72,9 +72,9 @@ const CSS = `
 .zd-card.sel{border-color:#a6ff4d;box-shadow:0 0 0 2px rgba(166,255,77,.35) inset;background:rgba(60,88,30,.85)}
 .zd-card.off{opacity:.45}
 .zd-nuke{border-color:rgba(255,90,60,.5)}.zd-nuke .cost{color:#ff8a6a}
-#zd-toast{position:fixed;left:50%;top:calc(150px + env(safe-area-inset-top));transform:translateX(-50%);max-width:min(88vw,420px);
-  background:rgba(28,20,12,.8);color:#f6ead2;border:1px solid rgba(255,236,200,.16);border-radius:10px;padding:9px 12px;
-  font:600 13px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif;text-align:center;pointer-events:none;transition:opacity .4s;opacity:0}
+#zd-toast{position:fixed;left:50%;top:calc(112px + env(safe-area-inset-top));transform:translateX(-50%);max-width:min(80vw,380px);
+  background:rgba(28,20,12,.66);color:#f6ead2;border:1px solid rgba(255,236,200,.14);border-radius:9px;padding:6px 10px;
+  font:600 12px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif;text-align:center;pointer-events:none;transition:opacity .4s;opacity:0}
 #zd-fps{position:fixed;right:max(8px, env(safe-area-inset-right));bottom:calc(var(--zd-bar-h, 64px) + 4px);font:10px system-ui,sans-serif;color:#f6ead2;opacity:.45;pointer-events:none}
 #zd-end{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(14,10,6,.78);z-index:35;
   padding:max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));box-sizing:border-box;font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;color:#f6ead2}

@@ -34,6 +34,8 @@ const ALERTS = ['Quiet', 'Incident', 'Spreading', 'Major incident', 'City emerge
 const FLOOD_CD = { boat: 5, rescue: 8, water: 15 }; // once the streets flood the coast guard and air rescue go out back to back
 const GROUND = new Set(['police', 'bus', 'fire', 'apc', 'chaser', 'build', 'camp', 'hazmat']); // nothing on wheels gets through flooded streets
 const ROUND = 600;
+// the long ones are shorter in a round (playtests: villains, the kaiju and the worm outlasted the round, so it could never end secured)
+const LIFE = { villains: 240, kaiju: 200, worm: 160, aliens: 140 };
 const START_RP = 250; // enough for a first cordon (playtests: 100 bought two cruisers and the outbreak got away)
 const SITE_AT = [0, 11, 23]; // the sites of one zombie outbreak break out this far apart
 
@@ -65,6 +67,12 @@ const MSGS = {
   argue: 'Two neighbours are having it out in the street',
   mourn: 'Someone has lost a friend and stopped in the street',
 };
+
+// a disaster that has done its worst and is on its way out: it no longer holds up City secured
+function spent(e) {
+  if (!e.alive || e.leaving || e.state === 'leave' || e.phase === 'leave' || e.phase === 'gone') return true;
+  return e.type === 'villains' && !!e.who && e.who.length > 0 && e.who.every(v => v.beaten || v.gone || v.leaving); // every villain beaten or off
+}
 
 export class Commander {
   constructor(g) {
@@ -149,7 +157,7 @@ export class Commander {
   incident(inc) {
     const g = this.g, p = g.people;
     inc.fired = true; this.hit.push(inc.type); this.lastInc = this.t; this.quietT = 0;
-    if (inc.type !== 'zombies') { g.disasters.start(inc.type); return; }
+    if (inc.type !== 'zombies') { g.disasters.start(inc.type, null, null, LIFE[inc.type] ? { life: LIFE[inc.type] } : {}); return; }
     const B = g.city.bounds, pts = [], R = Math.random; // well apart, away from the edge
     for (let tries = 0; tries < 200 && pts.length < this.diff.sites; tries++) {
       const x = B.x0 + 50 + R() * (B.x1 - B.x0 - 100), z = B.z0 + 50 + R() * (B.z1 - B.z0 - 100);
@@ -163,7 +171,7 @@ export class Commander {
   // nothing left to deal with: no disaster under way, no zombies or bitten, no buildings burning
   quiet() {
     const p = this.g.people;
-    return !this.g.disasters.list.some(e => e.type !== 'heroes') && p.stats.zombies === 0 && p.stats.infected === 0 && this.fires === 0 && this.sites.every(s => s.fired);
+    return !this.g.disasters.list.some(e => e.type !== 'heroes' && !spent(e)) && p.stats.zombies === 0 && p.stats.infected === 0 && this.fires <= 2 && this.sites.every(s => s.fired); // a couple of buildings burning out on their own don't hold it up
   }
 
   // a 911 call or an incident: its name blinks with what to do, then waits in a chip above the bar; Show flies there

@@ -1011,7 +1011,7 @@ export class People {
       // deep water: a few seconds wading in it and the living are swept off their feet (zombies just keep walking)
       if (this.waterAt && CIV[this.st[i]] && this.lvl[i] === -1) {
         const d = this.waterAt(this.x[i], this.z[i]) - this.groundY(this.x[i], this.z[i]);
-        if (d > 1.3) { this.wet[i] += h; if (this.wet[i] > 5) this.swim(i, 25 + this.r() * 35); }
+        if (d > 1.3) { this.wet[i] += h; if (this.wet[i] > 5) this.swim(i, 60 + this.r() * 60); }
         else if (this.wet[i] > 0) this.wet[i] = Math.max(0, this.wet[i] - h);
       }
     }
@@ -1354,7 +1354,7 @@ export class People {
       if (sp < 14 || this.r() < 0.3) { this.fx[i] = 2; this.t1[i] = 2 + this.r() * 2; this.think[i] = 0; return; } // gets back up
       this.kill(i, this.tx[i], this.tz[i], 'fling'); return;
     }
-    if (w - gnd > 1.3 && this.kind[i] === KIND.CIVILIAN && this.r() < 0.75) { this.tx[i] *= 0.15; this.tz[i] *= 0.15; this.swim(i, 35 + this.r() * 45); return; } // into deep water: most come up again
+    if (w - gnd > 1.3 && this.kind[i] === KIND.CIVILIAN && this.r() < 0.9) { this.tx[i] *= 0.15; this.tz[i] *= 0.15; this.swim(i, 60 + this.r() * 60); return; } // into deep water: nearly all come up again, and keep afloat a minute or two (playtests: they drowned before a boat could get there)
     this.st[i] = S.IDLE; // so kill() treats it as the person it was
     this.kill(i, this.tx[i], this.tz[i], 'fling');
   }
@@ -1910,22 +1910,23 @@ export class People {
   buildingTick(dt) {
     for (let k = 0; k < this.bld.length; k++) {
       if (this.bPile[k] === 0 && !this.bBreach[k]) continue;
-      if (this.bRoof[k] === 0 && this.bIn[k] === 0) {
+      const lone = this.bPile[k] <= 2 && this.bRoof[k] === 0 && !this.bBreach[k]; // one or two scratching at a door with people indoors: they give up in a while (else nobody can shoot them)
+      if ((this.bRoof[k] === 0 && this.bIn[k] === 0) || lone) {
         this.bEmpty[k] += dt;
-        if (this.bEmpty[k] >= 3) this.collapse(k);
+        if (this.bEmpty[k] >= (this.bIn[k] ? 20 : 3)) this.collapse(k, this.bIn[k] > 0);
       } else this.bEmpty[k] = 0;
     }
   }
 
   // survivors gone: the pile spills back into the street
-  collapse(k) {
+  collapse(k, gaveUp = false) { // gaveUp: a small pile that came to nothing (no overrun)
     for (let i = 0; i < this.active; i++) {
       if ((this.st[i] === S.PILE || this.st[i] === S.CLIMB) && this.bt[i] === k) {
         this.startFall(i, this.x[i], this.z[i], this.y[i], false);
       }
     }
     this.bPile[k] = 0; this.bBreach[k] = 0; this.bEmpty[k] = 0; this.bBarr[k] = 0;
-    if (this.bHad[k] && !this.bOver[k]) { this.bOver[k] = 1; if (this.onOverrun) this.onOverrun(k, 'collapse'); }
+    if (!gaveUp && this.bHad[k] && !this.bOver[k]) { this.bOver[k] = 1; if (this.onOverrun) this.onOverrun(k, 'collapse'); }
   }
 
   // ---------- render sync
