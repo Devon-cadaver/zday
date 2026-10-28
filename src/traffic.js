@@ -14,8 +14,8 @@ const LEN = 4.3, HALF_L = 2.2, HALF_W = 0.95;
 const CELL = 10;
 const DRIVE = 0, WRECK = 1, REST = 2, PARKED = 3, EXT = 4, AIR = 5;
 export const CAR_MODE = { DRIVE, WRECK, REST, PARKED, EXT, AIR };
-const MISSION_CAP = 24;
-const MISSION_KINDS = { police: { geo: () => cruiserGeometry(), cap: 12, cruise: 14 }, fire: { geo: () => VEHICLES.fire_truck.build(), cap: 8, cruise: 11 }, apc: { geo: () => VEHICLES.stryker.build(), cap: 6, cruise: 12, tough: true }, bus: { geo: () => VEHICLES.bus.build(), cap: 8, cruise: 10 },
+const MISSION_CAP = 72; // emergency vehicles out at once (Sean: as many police cars as the points will buy)
+const MISSION_KINDS = { police: { geo: () => cruiserGeometry(), cap: 48, cruise: 14 }, fire: { geo: () => VEHICLES.fire_truck.build(), cap: 8, cruise: 11 }, apc: { geo: () => VEHICLES.stryker.build(), cap: 6, cruise: 12, tough: true }, bus: { geo: () => VEHICLES.bus.build(), cap: 8, cruise: 10 },
   chaser: { geo: () => VEHICLES.storm_chaser.build(), cap: 6, cruise: 15 }, tank: { geo: () => VEHICLES.abrams.build(), cap: 6, cruise: 9, tough: true },
   build: { geo: () => VEHICLES.crane_truck.build(), cap: 8, cruise: 10 }, hazmat: { geo: () => VEHICLES.hazmat_truck.build(), cap: 4, cruise: 11 }, medic: { geo: () => VEHICLES.ambulance.build(), cap: 6, cruise: 13 }, jail: { geo: () => VEHICLES.police_bus.build(), cap: 4, cruise: 11 } };
 const tough = (car) => car.kind === 'apc' || car.kind === 'tank' || car.kind === 'build' || car.kind === 'hazmat'; // drive through traffic and wrecks, park right at the crossing
@@ -708,6 +708,8 @@ export class Traffic {
   }
 
   // route from a clear stretch of the city edge to (x,z) and send a cruiser
+  // no room for another of this kind (all its places taken, or the city's limit on vehicles out)
+  full(kind) { const out = this.missions.filter(m => !m.gone); return out.filter(m => m.mode === DRIVE || m.mode === PARKED).length >= MISSION_CAP || out.filter(m => m.kind === kind).length >= MISSION_KINDS[kind].cap; }
   dispatchTo(x, z, opts = {}) {
     const tried = new Set();
     let route = null;

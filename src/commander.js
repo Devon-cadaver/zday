@@ -320,7 +320,7 @@ export class Commander {
       },
       onLost: () => { this.lost++; g.toast('A cruiser was wrecked on the way'); },
     });
-    if (!car) { g.toast(g.traffic.missions.filter(m => !m.gone).length >= 24 ? 'All cruisers are out' : 'No road to that spot'); return; }
+    if (!car) { g.toast(g.traffic.full('police') ? 'All 48 cruisers are out' : 'No road to that spot'); return; }
     this.spend('police'); this.sent++;
     g.toast('Cruiser dispatched, about ' + Math.ceil(car.eta) + ' s out');
   }
