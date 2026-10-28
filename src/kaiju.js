@@ -8,7 +8,8 @@
 // It walks in from the edge of the city: every footfall flattens what it lands
 // on, it ploughs through the smaller buildings in its way, swipes the tops off
 // others, picks up cars and hurls them, and its tentacles snatch people and cars
-// off the street and fling them, or slam down on rooftops. Airstrikes hurt it;
+// off the street and fling them, or slam down on rooftops; now and then a head
+// draws a breath and pours fire from its jaws like a flamethrower. Airstrikes hurt it;
 // hurt enough (or after a few minutes) it walks back out of the city. In Be The
 // Disaster you walk it and choose what it smashes and grabs.
 import * as THREE from 'three';
@@ -17,6 +18,7 @@ import { Body, hideMaterial, sstep } from './flesh.js';
 import { ST } from './people.js';
 import { sfx } from './audio.js';
 import { heroesWin } from './heroes.js';
+import { Splash } from './water.js';
 
 const THIGH = 12, SHIN = 10, META = 7, UPPER = 18, FORE = 17, NECK = 4.4, LEAN = 0.95, SPEED = 5.5, STRIDE = 20, TP = 12, TAU = Math.PI * 2;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -233,12 +235,12 @@ function pose(r, ph, o = {}, t = 0) {
   r.hips.position.z = 0.6 * Math.sin(P) * sw; // and its weight shifts over the standing leg
   // each neck curves up and forward, splayed apart; each head looks about on its own, snaps now and then, rears back to roar
   r.heads.forEach((H, hi) => {
-    const rr = (hi ? o.roar2 : o.roar) || 0, f = ((t + hi * 3.7) / 8.3) % 1, sn = f < 0.085 ? Math.sin(Math.PI * f / 0.085) : 0;
+    const rr = (hi ? o.roar2 : o.roar) || 0, br = (hi ? o.br2 : o.br) || 0, f = ((t + hi * 3.7) / 8.3) % 1, sn = f < 0.085 ? Math.sin(Math.PI * f / 0.085) : 0;
     const ly = 0.28 * Math.sin(t * 0.33 + hi * 2.1) + 0.16 * Math.sin(t * 0.87 + hi * 4.3), lp = 0.12 * Math.sin(t * 0.41 + hi * 1.3) + 0.06 * Math.sin(t * 1.13 + hi);
     const n0 = 0.42 + rr * 0.35 + lp + sn * 0.3 + 0.05 * Math.sin(P * 2 + hi) * sw, n1 = -0.12 + rr * 0.15 - sn * 0.25, n2 = -0.18 - lp * 0.6 + 0.04 * Math.sin(P * 2 + 1 + hi) * sw;
     H.neck[0].rotation.z = Math.PI + n0; H.neck[0].rotation.x = H.s * 0.32 + ly * 0.5; H.neck[1].rotation.z = n1; H.neck[1].rotation.x = ly * 0.4; H.neck[2].rotation.z = n2;
-    H.head.rotation.z = 1.42 + rr * 0.6 + sn * 0.2 - (-LEAN + Math.PI + n0 + n1 + n2); H.head.rotation.x = -(H.s * 0.32 + ly * 0.9) * 0.5;
-    H.jaw.rotation.z = -(0.08 + rr * 0.85 + sn * 0.7 + 0.07 * Math.max(0, Math.sin(t * 0.7 + hi * 2.6))); // the jaw drops to roar or snap, and hangs a little open now and then
+    H.head.rotation.z = 1.42 + rr * 0.6 - br * 0.3 + sn * 0.2 - (-LEAN + Math.PI + n0 + n1 + n2); // br: lowered to pour fire on the street H.head.rotation.x = -(H.s * 0.32 + ly * 0.9) * 0.5;
+    H.jaw.rotation.z = -(0.08 + rr * 0.85 + br * 0.8 + sn * 0.7 + 0.07 * Math.max(0, Math.sin(t * 0.7 + hi * 2.6))); // the jaw drops to roar or snap, and hangs a little open now and then
   });
   r.tail.forEach((tl, i) => { tl.rotation.y = Math.sin(t * 1.4 - i * 0.55 + P * 0.5) * (0.06 + i * 0.022) + 0.03; tl.rotation.z = i ? (i < 5 ? 0.07 : -0.11) + 0.04 * Math.sin(t * 0.9 - i * 0.5) : -1.5; }); // a wave running down the tail, which sags, lifts again at the tip and hangs a little to one side
   return low;
@@ -262,7 +264,7 @@ export class Kaiju {
     const ex = x - cx, ez = z - cz, side = Math.abs(ex) > Math.abs(ez) ? [Math.sign(ex || 1), 0] : [0, Math.sign(ez || 1)];
     this.x = side[0] ? (side[0] > 0 ? B.x1 + 40 : B.x0 - 40) : clamp(x, B.x0 + 40, B.x1 - 40); this.z = side[1] ? (side[1] > 0 ? B.z1 + 40 : B.z0 - 40) : clamp(z, B.z0 + 40, B.z1 - 40);
     this.goal = [clamp(x, B.x0 + 40, B.x1 - 40), clamp(z, B.z0 + 40, B.z1 - 40)]; this.yaw = Math.atan2(this.goal[1] - this.z, this.goal[0] - this.x);
-    this.ph = 0; this.state = 'walk'; this.act = null; this.actT = 6; this.roarT = 10; this.goT = 20; this.cars = 0; this.grabbed = 0; this.tentT = 3;
+    this.ph = 0; this.state = 'walk'; this.act = null; this.actT = 6; this.roarT = 10; this.fireT = 9 + Math.random() * 8; this.goT = 20; this._m = new THREE.Vector3(); this._f = new THREE.Vector3(); // fireT: till it breathes fire this.cars = 0; this.grabbed = 0; this.tentT = 3;
     this.rig = kaijuRig(); D.ctx.scene.add(this.rig.root); this.cur = []; this.hy = null; this.swept = false;
     this._v = new THREE.Vector3();
     if (!o.quiet) D.emit({ type: 'warn', hazard: 'kaiju', x: this.goal[0], z: this.goal[1], r: 60, exact: true, text: 'A giant monster is coming into the city from the ' + (side[0] ? (side[0] > 0 ? 'east' : 'west') : (side[1] > 0 ? 'south' : 'north')) + '!' });
@@ -284,9 +286,10 @@ export class Kaiju {
   }
   retreat(text) { if (this.state === 'leave') return; this.state = 'leave'; this.dropCar(); this.act = null; for (const q of this.rig.tents) this.tentIdle(q); const B = this.D.ctx.city.bounds, d = [this.x - B.x0, B.x1 - this.x, this.z - B.z0, B.z1 - this.z], m = Math.min(...d); this.goal = m === d[0] ? [B.x0 - 120, this.z] : m === d[1] ? [B.x1 + 120, this.z] : m === d[2] ? [this.x, B.z0 - 120] : [this.x, B.z1 + 120]; this.D.emit({ type: 'kaijuleave', text }); }
   onEvent(e) { if ((e.type === 'blast' && Math.hypot(e.x - this.x, e.z - this.z) < 35) || ((e.type === 'nuked' || e.type === 'nukeflash') && Math.hypot(e.x - this.x, e.z - this.z) < 200)) this.damage(e.type === 'blast' ? 50 : 999); }
-  // pick something to do next: grab a car, swipe a building, roar
+  // pick something to do next: grab a car, swipe a building, roar, breathe fire
   choose() {
     const { traffic, city } = this.D.ctx;
+    if ((this.fireT -= 4) <= 0) { this.fireT = 16 + Math.random() * 12; this.act = { kind: 'fire', t: 0, hi: Math.random() < 0.5 ? 0 : 1, sweep: Math.random() < 0.5 ? 1 : -1, both: Math.random() < 0.4 }; sfx('roarDeep', this.x, 45, this.z, { gain: 0.8 }); return; } // a head at a time; now and then the other takes a turn after it
     if ((this.roarT -= 4) <= 0) { this.roarT = 14 + Math.random() * 8; this.act = { kind: 'roar', t: 0 }; sfx('roar', this.x, 45, this.z, { delay: 0.35 }); sfx('roarDeep', this.x, 45, this.z, { delay: 0.6, gain: 0.7 }); return; } // about every third thing it does (two heads, two voices)
     let car = null; traffic.near(this.x + Math.cos(this.yaw) * 14, this.z + Math.sin(this.yaw) * 14, 26, (c) => { if (!car && !c.gone && c.mode === 0 && !c.mission) car = c; });
     if (car && Math.random() < 0.6) { this.act = { kind: 'car', car, t: 0, arm: Math.random() < 0.5 ? 0 : 1 }; return; }
@@ -297,7 +300,7 @@ export class Kaiju {
   update(h) {
     const D = this.D, B = D.ctx.city.bounds;
     h *= D.slowAt(this.x, 30, this.z); // held in one of Tempo's time bubbles, it all but stops
-    this.t += h;
+    this.t += h; if (this.flame) { this.flame.update(h); this.core.update(h); } // its fire burns on its own clock
     if (this.state !== 'leave' && this.t > this.life) this.retreat('The monster is wandering back out of the city');
     if (this.state === 'leave' && (this.x < B.x0 - 100 || this.x > B.x1 + 100 || this.z < B.z0 - 100 || this.z > B.z1 + 100)) { this.alive = false; return; }
     this.tentAI(h);
@@ -442,6 +445,13 @@ export class Kaiju {
   }
   doAct(h, A) {
     const D = this.D, { traffic, city, people } = D.ctx; A.t += h;
+    if (A.kind === 'fire') { // a breath drawn in (0.7 s), then fire out of the jaws (2.7 s); the other head after it, sometimes
+      if (A.t > 0.7 && A.t < 3.4) this.breathe(A, h, A.hi, A.t - 0.7);
+      if (A.both && A.t > 1.9 && A.t < 4.6) this.breathe(A, h, 1 - A.hi, A.t - 1.9);
+      if (A.t > 0.8 && !this.saidFire) { this.saidFire = true; D.emit({ type: 'kaijufire', text: 'The monster breathes fire!' }); }
+      if (A.t > (A.both ? 4.9 : 3.7)) this.act = null;
+      return;
+    }
     if (A.kind === 'roar') {
       if (A.t > 0.5 && !A.done) { A.done = true; people.scare(this.x, this.z, 140, 0.95); if (this.near(this.x, this.z)) D.shake(0.9); if (!this.saidRoar) { this.saidRoar = true; D.emit({ type: 'roar', text: 'The monster roars!' }); } }
       if (A.t > 2.9) this.act = null;
@@ -472,6 +482,36 @@ export class Kaiju {
       if (this.cars === 1) D.emit({ type: 'kaijucar', text: 'The monster is throwing cars!' });
     }
   }
+  // a stream of fire from head hi's jaws, ft seconds in: an arcing jet of flame along the way the head faces, sweeping a
+  // little side to side, landing on the street (or the first roof in its way) ahead, where it bursts into flame - the
+  // buildings there catch, cars burn, people run
+  breathe(A, h, hi, ft) {
+    const D = this.D, { fire, city, people, traffic } = D.ctx, H = this.rig.heads[hi];
+    if (!this.flame) { // the fire itself: an outer flame, a hot core
+      this.flame = new Splash(D.ctx.scene, 900); this.flame.mat.blending = THREE.AdditiveBlending; this.flame.mat.uniforms.uColor.value.setRGB(3.2, 1.15, 0.22);
+      this.core = new Splash(D.ctx.scene, 400); this.core.mat.blending = THREE.AdditiveBlending; this.core.mat.uniforms.uColor.value.setRGB(3.6, 2.7, 1.3);
+    }
+    this.rig.root.updateMatrixWorld(true);
+    const m = H.head.localToWorld(this._m.set(-0.5, -8.4, 0)), f = H.head.localToWorld(this._f.set(-0.5, -14, 0)).sub(m).normalize();
+    const sw = Math.sin(ft * 1.7) * 0.32 * A.sweep, cs = Math.cos(sw), sn = Math.sin(sw), fx = f.x * cs - f.z * sn, fz = f.x * sn + f.z * cs, fy = Math.min(f.y, -0.12); // a sweep; never up into the sky
+    const sp = 40, vx = fx * sp, vy = fy * sp, vz = fz * sp;
+    this.flame.emit(m.x, m.y, m.z, 8, { v: [vx, vy, vz], spread: 5, life: 1.15, size: 4.6 });
+    this.core.emit(m.x, m.y, m.z, 4, { v: [vx * 0.92, vy * 0.92, vz * 0.92], spread: 2.4, life: 0.7, size: 2.6 });
+    if ((A.roarT = (A.roarT || 0) - h) <= 0) { A.roarT = 0.7; sfx('whoomph', m.x, m.y, m.z, { gain: 0.9, rate: 0.7 }); }
+    if ((A.burnT = (A.burnT || 0) - h) > 0) return;
+    A.burnT = 0.3;
+    // where it comes down (the same fall as the flame: 4.9 t^2): on the street, or on a roof first
+    let ix = m.x, iy = m.y, iz = m.z;
+    for (let t = 0.1; t < 2.5; t += 0.1) {
+      ix = m.x + vx * t; iy = m.y + vy * t - 4.9 * t * t; iz = m.z + vz * t;
+      let roof = 0; city.buildingsNear(ix, iz, 0.5, (k, d, b) => { roof = Math.max(roof, b.top); });
+      if (iy <= Math.max(0.5, roof)) break;
+    }
+    fire.burst(ix, iy + 1, iz, 12, 2.4);
+    city.buildingsNear(ix, iz, 9, (k) => { if (Math.random() < 0.55) fire.igniteBuilding(k); });
+    traffic.near(ix, iz, 9, (c) => { if (!c.gone && !c.burnt && c.mode !== 5) { c.burnt = true; fire.carFire(c.x, c.z); traffic.crash(c, null, 4); } });
+    people.scare(ix, iz, 45, 0.95);
+  }
   handAt(i) { this.rig.root.updateMatrixWorld(true); return this.rig.arms[i].hand.getWorldPosition(this._v); }
   near(x, z) { const { camera, controls } = this.D.ctx, c = controls.target; return Math.hypot(x - c.x, z - c.z) < camera.position.distanceTo(c) * 1.3; }
   poi() { return { x: this.x, z: this.z, danger: 45, range: 400 }; }
@@ -482,7 +522,13 @@ export class Kaiju {
   sync(dt = 0) {
     const r = this.rig, A = this.act, o = {};
     if (dt > 0) this.st = (this.st || 0) + dt;
+    if (this.flame) { const lk = Math.max(0.6, this.D.lightK || 1), sc = this.D.ctx.fire.uniforms.uScale.value; this.flame.sync(lk, sc); this.core.sync(lk, sc); }
     if (A && A.kind === 'roar') { const k = (tt) => Math.max(0, Math.min(1, tt * 3) * Math.min(1, (2.6 - tt) * 2)); o.roar = k(A.t); o.roar2 = k(A.t - 0.3); o.inhale = A.t < 0.45 ? A.t / 0.45 : Math.max(0, 1 - (A.t - 0.45) * 1.2); }
+    if (A && A.kind === 'fire') { // each head: rearing back to draw the breath (as to roar), then lowered, jaws wide, pouring it out
+      const inh = (tt) => (tt < 0 ? 0 : tt < 0.7 ? tt / 0.7 : Math.max(0, 1 - (tt - 0.7) * 5)), out = (tt) => Math.max(0, Math.min(1, (tt - 0.6) * 5) * Math.min(1, (3.4 - tt) * 4));
+      const t0 = A.t, t1 = A.both ? A.t - 1.2 : -9, ta = A.hi === 0 ? t0 : t1, tb = A.hi === 0 ? t1 : t0;
+      o.roar = inh(ta); o.roar2 = inh(tb); o.br = out(ta); o.br2 = out(tb); o.inhale = Math.max(o.roar, o.roar2);
+    }
     if (A && A.kind === 'swipe') o.swipe = { arm: A.arm, k: Math.min(1, A.t / 0.9) };
     if (A && A.kind === 'car') { if (!A.held) o.reach = { arm: A.arm, k: Math.min(1, A.t / 0.9) }; else o.lift = { arm: A.arm, k: Math.min(1, A.t / 0.8) }; }
     const walking = !A || (A.kind === 'car' && A.held);
@@ -499,5 +545,5 @@ export class Kaiju {
       if (!this.swept || (this.seen() && (!far || this.fN % 2 === 0))) { sweep(r, this.st); this.swept = true; }
     }
   }
-  dispose() { this.dropCar(); for (const q of this.rig.tents) this.tentIdle(q); this.D.ctx.scene.remove(this.rig.root); this.rig.body.geo.dispose(); }
+  dispose() { this.dropCar(); for (const q of this.rig.tents) this.tentIdle(q); this.D.ctx.scene.remove(this.rig.root); this.rig.body.geo.dispose(); for (const s of [this.flame, this.core]) if (s) { this.D.ctx.scene.remove(s.points); s.points.geometry.dispose(); s.mat.dispose(); } }
 }

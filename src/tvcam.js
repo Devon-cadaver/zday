@@ -1,14 +1,17 @@
 // Disaster TV's cameras: the news helicopter (SKY 7, and SKY 4 to fall back on)
-// circling the action with a little sway, and cameras on the roofs of the town's
-// tallest buildings, panning after it. The director cuts between them now and
-// then. A disaster can notice a camera and go for it - a beam from a kaiju, a
+// circling the action with a little sway, and now and then a viewer's video, shot
+// on a phone from the roof of one of the town's tallest buildings (held by hand:
+// it wobbles, never quite level). The pans ease in and out, a moving target is led
+// a little so it stays in the middle of a phone's screen (a wave or a storm front:
+// the wall itself), and now and then the shot slowly zooms in and back out. The
+// director cuts between them now and then. A disaster can notice a camera and go for it - a beam from a kaiju, a
 // villain or an alien machine; debris or a lava bomb hurled at it; a solar flare,
 // dust or ice drowning the signal; the building brought down under it - and the
 // picture tumbles, breaks up into static (SIGNAL LOST), and cuts to another one.
 import * as THREE from 'three';
 import { sfx } from './audio.js';
 
-const ease = (u) => 1 - (1 - u) * (1 - u);
+const ease = (u) => 1 - (1 - u) * (1 - u), smooth = (u) => u * u * (3 - 2 * u);
 
 const CSS = `
 #zd-cam{position:fixed;left:max(10px, env(safe-area-inset-left));top:calc(34px + env(safe-area-inset-top));z-index:6;pointer-events:none;
@@ -43,10 +46,12 @@ export class TvCam {
     const c = this.g.controls; this.saved = { min: c.minDistance, max: c.maxDistance, p0: c.minPolarAngle, p1: c.maxPolarAngle, en: c.enabled };
     c.minDistance = 1; c.maxDistance = 6000; c.minPolarAngle = 0; c.maxPolarAngle = Math.PI; c.enabled = false; // the director holds the camera
     const o = this.g.post.opts; this.dof0 = { bandK: o.bandK, rangeK: o.rangeK, blurFrac: o.blurFrac }; // the tilt-shift look, put back after
-    this.L = new THREE.Vector3(); this.P = new THREE.Vector3(); this.F = new THREE.Vector3(); this.fx = []; this.t = 0;
+    this.L = new THREE.Vector3(); this.LV = new THREE.Vector3(); this.P = new THREE.Vector3(); this.F = new THREE.Vector3(); this.fx = []; this.t = 0; // LV: how fast the look is panning
+    this.fov0 = this.g.camera.fov; // the zooms go from it and back
   }
   dispose() {
     Object.assign(this.g.post.opts, this.dof0);
+    const cam = this.g.camera; if (cam.fov !== this.fov0) { cam.fov = this.fov0; cam.updateProjectionMatrix(); }
     const c = this.g.controls, s = this.saved; c.minDistance = s.min; c.maxDistance = s.max; c.minPolarAngle = s.p0; c.maxPolarAngle = s.p1; c.enabled = s.en;
     this.label.remove(); this.frameEl.remove(); this.stat.remove(); this.clearFx(); this.g.focusAt = null;
   }
@@ -64,7 +69,7 @@ export class TvCam {
       if (this.cams.some(c => c.kind === 'roof' && Math.hypot(c.x - x, c.z - z) < span)) continue;
       // at the corner of the roof nearest the middle of town, looking in
       const cx = mid[0] < x ? b.x0 + 1 : b.x1 - 1, cz = mid[1] < z ? b.z0 + 1 : b.z1 - 1;
-      this.cams.push({ kind: 'roof', k, x: cx, z: cz, y: b.top + 2.5, alive: true, name: 'ROOF CAM ' + (this.cams.length - 1) + ' · ' + this.g.disasters.district(x, z).toUpperCase() });
+      this.cams.push({ kind: 'roof', k, x: cx, z: cz, y: b.top + 2.5, alive: true, name: 'VIEWER VIDEO ' + (this.cams.length - 1) + ' · ' + this.g.disasters.district(x, z).toUpperCase() });
     }
     this.cur = null; this.attack = null; this.lost = 0; this.cutT = 3; this.calmT = 0; this.heli = { ang: Math.random() * 6.28 }; this.L.set(mid[0], 0, mid[1]); this.have = false;
     this.pick(true);
@@ -74,6 +79,9 @@ export class TvCam {
   want() {
     const g = this.g, tv = this.tv, c = tv.cur, D = g.disasters;
     const parts = c ? [].concat(c.who || [], c.tripods || [], c.saucers || []) : [];
+    const F = c && g.front ? g.front(c) : null; // a wave or a storm front: the wall itself in the middle (the follow camera's point is out ahead of it)
+    if (F && !F.gone) { this.frontDir = Math.atan2(F.dz, F.dx); return [F.x + F.dx * 3, 8, F.z + F.dz * 3]; }
+    this.frontDir = null;
     const sub = g.subjects('bad').find(s => s.obj === c || parts.includes(s.obj));
     let p = sub ? sub.pos() : null, sh = p && g.shot ? g.shot(sub) : null;
     if (!p) for (const e of D.list) { if (!e.alive || e.type === 'heroes' || e.type === 'player') continue; p = g.disasterAt(e); if (p) { sh = g.disasterShot ? g.disasterShot(e) : null; break; } }
@@ -89,7 +97,8 @@ export class TvCam {
     let next = (sky && heli) || (!sky && roofs[0]) || heli || roofs[0] || (this.cur && this.cur.alive ? this.cur : null);
     if (!next) { next = { kind: 'heli', name: 'SKY ' + (5 + this.cams.length), alive: true }; this.cams.push(next); } // every camera lost: the station sends up another helicopter
     if (next && next !== this.cur) { this.cur = next; this.onAirT = 0; this.tries = 0; if (next.kind === 'heli') this.heli.ang = Math.atan2(this.g.camera.position.z - a.z, this.g.camera.position.x - a.x); }
-    this.cutT = 13 + Math.random() * 9;
+    this.cutT = this.cur && this.cur.kind === 'roof' ? 8 + Math.random() * 5 : 14 + Math.random() * 9; // a viewer's video a short while
+    this.zoom = null; this.zoomT = 5 + Math.random() * 6;
     this.show();
   }
   // the viewer's Change camera: on to the next live camera in turn (a bad angle, or one that is slow to draw); the director holds off a while
@@ -99,7 +108,7 @@ export class TvCam {
     const live = this.cams.filter(c => c.alive && (c.kind === 'heli' || !this.g.city.dead[c.k])); if (live.length < 2) { this.pick(true); return; }
     const next = live[(live.indexOf(this.cur) + 1) % live.length];
     this.cur = next; this.onAirT = 0; if (next.kind === 'heli') this.heli.ang = Math.atan2(this.g.camera.position.z - this.L.z, this.g.camera.position.x - this.L.x);
-    this.cutT = 30; this.show();
+    this.cutT = 30; this.zoom = null; this.zoomT = 5 + Math.random() * 6; this.show();
   }
   show() { const c = this.cur; this.label.innerHTML = '<i></i>' + (c ? c.name : 'NO SIGNAL') + (c && c.kind === 'heli' ? '<span>ALT ' + Math.round(this.P.y * 3.28) + ' FT</span>' : ''); }
 
@@ -109,27 +118,42 @@ export class TvCam {
     const A0 = this.attack, look = this.lookAt(A0);
     const p = look || (A0 && A0.style === 'grab') ? null : this.want(); // coming for us: the orbit holds still
     // where to look: a flyer right on it (seen from above, the town behind); on the ground a little below the middle of it
-    if (p) { const k = 1 - Math.exp(-dt * 2); this.L.x += (p[0] - this.L.x) * k; const py = p[1] || 0; this.L.y += ((py > 25 ? py : py * 0.6) - this.L.y) * k; this.L.z += (p[2] - this.L.z) * k; }
+    // a pan is a spring, starting and stopping gently (Sean: smoother); a moving target is led a little so it stays in the middle
+    if (p) {
+      const py = p[1] || 0, h = Math.min(dt, 0.05), w = 1.7, V = this.LV;
+      if (!this.pv) { this.pv = [0, 0]; this.pp = [p[0], p[2]]; }
+      const vx = (p[0] - this.pp[0]) / Math.max(h, 1e-3), vz = (p[2] - this.pp[2]) / Math.max(h, 1e-3), kv = 1 - Math.exp(-h * 1.5); this.pp = [p[0], p[2]];
+      if (Math.hypot(vx, vz) < 120) { this.pv[0] += (vx - this.pv[0]) * kv; this.pv[1] += (vz - this.pv[1]) * kv; } // a jump to another subject is not a speed
+      const tx = p[0] + this.pv[0] * 0.6, ty = py > 25 ? py : py * 0.6, tz = p[2] + this.pv[1] * 0.6;
+      V.x += ((tx - this.L.x) * w * w - 2 * w * V.x) * h; V.y += ((ty - this.L.y) * w * w - 2 * w * V.y) * h; V.z += ((tz - this.L.z) * w * w - 2 * w * V.z) * h;
+      this.L.addScaledVector(V, h);
+    }
     const c = this.cur; if (!c) return;
     // an attack in progress, then static, then the cut
     if (this.attack) this.attackStep(dt, sdt);
     if (this.lost > 0) { this.lost -= dt; this.stat.style.opacity = '1'; this.stat.style.backgroundPosition = Math.floor(Math.random() * 160) + 'px ' + Math.floor(Math.random() * 160) + 'px'; if (this.lost <= 0) { this.stat.style.opacity = '0'; this.pick(true); } return; }
     if (!this.attack) {
       this.onAirT += sdt;
-      if (c.kind === 'roof' && g.city.dead[c.k]) { this.signalLost(c, 'ROOF CAM DOWN'); return; } // the building went down by itself
-      if ((this.cutT -= dt) <= 0) this.pick(c.kind !== 'heli');
+      if (c.kind === 'roof' && g.city.dead[c.k]) { this.signalLost(c, 'VIEWER VIDEO LOST'); return; } // the building went down by itself
+      if ((this.cutT -= dt) <= 0) this.pick(c.kind !== 'heli' || Math.random() < 0.6); // mostly the helicopters; a viewer's video now and then (Sean: less often)
       else if (c.kind === 'roof' && this.L.y > 40 && this.onAirT > 2 && this.cams.some(q => q.alive && q.kind === 'heli')) this.pick(true); // a roof camera looking up at something high sees only sky: over to the helicopter
       this.maybeAttack(sdt);
     }
     // where the camera is this frame
     const a = this.L;
     if (c.kind === 'heli') {
-      const h = this.heli; if (!look) h.ang += dt * 0.07;
-      const dd = Math.max(220, Math.min(700, (this.dist || 260) * 1.2)), R = dd * 0.82, H = Math.max(dd * 0.57 + a.y * 0.5, (a.y > 25 ? a.y : a.y / 0.6) + dd * 0.5), sx = Math.sin(this.t * 0.6) * 3, sy = Math.sin(this.t * 0.9) * 2; // further off for a kaiju than a villain; always above what it films, looking down with the town behind (level with a high flyer it showed only sky)
+      const h = this.heli;
+      if (!look) { if (this.frontDir != null) { let da = this.frontDir + 0.55 - h.ang; da = Math.atan2(Math.sin(da), Math.cos(da)); h.ang += da * Math.min(1, dt * 0.25); } else h.ang += dt * 0.07; } // out ahead of a front, looking back at it as it comes
+      this.dd = this.dd == null ? Math.max(220, Math.min(700, (this.dist || 260) * 1.2)) : this.dd + (Math.max(220, Math.min(700, (this.dist || 260) * 1.2)) - this.dd) * Math.min(1, dt * 0.6); // closing in or standing off, gently
+      const dd = this.dd, R = dd * 0.82, H = Math.max(dd * 0.57 + a.y * 0.5, (a.y > 25 ? a.y : a.y / 0.6) + dd * 0.5), sx = Math.sin(this.t * 0.6) * 3, sy = Math.sin(this.t * 0.9) * 2; // further off for a kaiju than a villain; always above what it films, looking down with the town behind (level with a high flyer it showed only sky)
       this.P.set(a.x + Math.cos(h.ang) * R + sx, H + sy, a.z + Math.sin(h.ang) * R);
       this.F.set(a.x + Math.sin(this.t * 1.3) * 1.5, a.y + Math.sin(this.t * 1.7) * 1.2, a.z);
     } else {
-      this.P.set(c.x, c.y, c.z); this.F.copy(a);
+      this.P.set(c.x, c.y, c.z); this.F.copy(a); // a viewer's phone up on the roof, held by hand: it wobbles and drifts a little
+      const t = this.t, s = this.P.distanceTo(a) * 0.006;
+      this.F.x += (Math.sin(t * 1.7) * 0.6 + Math.sin(t * 2.9 + 1) * 0.3 + Math.sin(t * 7.1) * 0.06) * s;
+      this.F.y += (Math.sin(t * 1.3 + 2) * 0.5 + Math.sin(t * 3.7) * 0.2 + Math.sin(t * 8.3 + 1) * 0.05) * s;
+      this.F.z += (Math.sin(t * 1.9 + 4) * 0.6 + Math.sin(t * 3.1 + 2) * 0.3) * s;
     }
     if (look) this.F.set(look[0], look[1], look[2]); // eyes on whoever is coming at the camera
     if (this.attack && this.attack.fall) { const f = this.attack.fall; this.P.y -= f.drop; this.F.x += f.tilt * 30; this.F.y += f.tilt * 60; this.P.x += Math.sin(this.t * 30) * f.shake; this.P.z += Math.cos(this.t * 27) * f.shake;
@@ -137,6 +161,8 @@ export class TvCam {
     const A1 = this.attack; // a villain holding the camera: it moves with the lens (the town jolts behind it) until the last moment's spin
     if (A1 && A1.style === 'grab' && A1.hit && A1.gd && !A1.who.kaiju && (A1.hitT || 0) <= 0.85) { const v = A1.who.obj; v.x = this.P.x + A1.gd[0] * 13; v.y = this.P.y + A1.gd[1] * 13 - 3.4; v.z = this.P.z + A1.gd[2] * 13; this.F.set(v.x, v.y + 3.4, v.z); }
     cam.position.copy(this.P); tg.copy(this.F); cam.lookAt(this.F); g.zoomTo = 0;
+    if (c.kind === 'roof' && !this.attack) cam.rotateZ(0.03 * Math.sin(this.t * 0.7) + 0.012 * Math.sin(this.t * 2.3)); // never quite level
+    this.zoomStep(dt, c);
     { // a rooftop looks across the town: a much deeper sharp band and softer blur than the miniature look (Sean: too blurry); the helicopter a little deeper too
       const o = g.post.opts, d = this.dof0, roof = c.kind === 'roof', k = 1 - Math.exp(-dt * 4);
       o.bandK += ((roof ? 0.2 : d.bandK * 1.6) - o.bandK) * k; o.rangeK += ((roof ? 0.9 : d.rangeK * 1.4) - o.rangeK) * k; o.blurFrac += ((roof ? 0.011 : d.blurFrac) - o.blurFrac) * k;
@@ -146,6 +172,20 @@ export class TvCam {
     if (c.kind === 'heli' && (this.labT = (this.labT || 0) - dt) <= 0) { this.labT = 0.5; this.show(); }
   }
 
+  // now and then a slow zoom in on the action, a hold, and back out (a viewer's phone more often, and closer); out again
+  // the moment something comes for the camera; a cut puts it back
+  zoomStep(dt, c) {
+    const cam = this.g.camera, T = 2.2;
+    if (!this.zoom && !this.attack && !(this.lost > 0) && (this.zoomT = (this.zoomT ?? 8) - dt) <= 0) this.zoom = { t: 0, f: c.kind === 'roof' ? 0.45 + Math.random() * 0.15 : 0.55 + Math.random() * 0.15, hold: 2.5 + Math.random() * 2.5 };
+    let z = 1; const Z = this.zoom;
+    if (Z) {
+      Z.t += dt; const u0 = Z.t < T ? smooth(Z.t / T) : Z.t < T + Z.hold ? 1 : 1 - smooth(Math.min(1, (Z.t - T - Z.hold) / T));
+      if (this.attack && Z.t < T + Z.hold) Z.t = T + Z.hold + (1 - u0) * T; // back out from where it was
+      z = 1 - (1 - Z.f) * u0;
+      if (Z.t > 2 * T + Z.hold) { this.zoom = null; this.zoomT = c.kind === 'roof' ? 5 + Math.random() * 5 : 12 + Math.random() * 12; }
+    }
+    const fov = this.fov0 * z; if (Math.abs(cam.fov - fov) > 0.01) { cam.fov = fov; cam.updateProjectionMatrix(); }
+  }
   // now and then the disaster notices the camera: after a while on air, a chance every few seconds (twice a disaster at most)
   // the villains and the kaiju come after the cameras often (Sean): a car thrown at it, or straight up to it to grab it
   maybeAttack(sdt) {
@@ -165,9 +205,9 @@ export class TvCam {
       if (style === 'throw') { car = this.carNear(who.pos()); if (!car) style = 'beam'; }
     }
     this.tv.attacks = (this.tv.attacks || 0) + 1;
-    const what = c.kind === 'heli' ? c.name : 'the rooftop camera', by = who ? who.name : WHO[kind];
+    const what = c.kind === 'heli' ? c.name : 'a viewer filming', by = who ? who.name : WHO[kind];
     this.tv.hits.say(by + (style === 'grab' ? ' is coming for ' : ' spotted ') + what + '!', 'small');
-    this.tv.say(by + (style === 'grab' ? ' is heading straight for our ' : ' has spotted our ') + (c.kind === 'heli' ? 'helicopter' : 'rooftop camera') + '!');
+    this.tv.say(by + (style === 'grab' ? ' is heading straight for our ' : ' has spotted our ') + (c.kind === 'heli' ? 'helicopter' : 'viewer filming from a rooftop') + '!');
     this.attack = { style, t: 0, cam: c, hit: false, who, car };
     if (who && style === 'grab' && who.kaiju) { who.obj.goal = [c.x, c.z]; who.obj.goT = 99; } // it walks over to the building
   }
@@ -217,7 +257,7 @@ export class TvCam {
     if (A.fall && A.hit) { A.fall.drop += dt * (A.style === 'grab' ? -9 : c.kind === 'heli' ? 40 : 18); A.fall.tilt = Math.min(A.style === 'grab' ? 0 : 1, A.fall.tilt + dt * 1.4); } // held: no tilt (it is metres off), it stays in the picture
     if (A.hit && (A.hitT = (A.hitT || 0) + dt) > (A.style === 'fell' || A.style === 'grab' ? 1.2 : 0.8)) {
       this.release(A); this.attack = null; for (const e of this.fx) { scene.remove(e.m); e.m.material.dispose(); } this.fx.length = 0;
-      this.signalLost(c, A.style === 'grab' ? (c.kind === 'heli' ? c.name + ' WAS GRABBED BY ' + A.who.name.toUpperCase() : 'ROOF CAM GRABBED') : c.kind === 'heli' ? c.name + ' IS DOWN' : 'ROOF CAM DOWN');
+      this.signalLost(c, A.style === 'grab' ? (c.kind === 'heli' ? c.name + ' WAS GRABBED BY ' + A.who.name.toUpperCase() : 'THE PHONE WAS GRABBED') : c.kind === 'heli' ? c.name + ' IS DOWN' : 'VIEWER VIDEO LOST');
     }
   }
   // what the camera watches while one comes for it: the villain or the kaiju, then the car once it is on its way
@@ -268,6 +308,6 @@ export class TvCam {
     c.alive = false; this.lost = 1.2; this.stat.style.opacity = '1';
     const next = this.cams.filter(q => q.alive && (q.kind === 'heli' || !this.g.city.dead[q.k]));
     this.stat.innerHTML = 'SIGNAL LOST<small>' + why + (next.length ? ' · SWITCHING CAMERAS' : '') + '</small>';
-    this.tv.say(why.startsWith('ROOF') ? 'We have lost a rooftop camera!' : 'We have lost ' + c.name + '! Our crew is safe');
+    this.tv.say(c.kind === 'roof' ? 'We have lost that viewer\'s video!' : 'We have lost ' + c.name + '! Our crew is safe');
   }
 }

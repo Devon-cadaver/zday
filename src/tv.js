@@ -91,7 +91,7 @@ export class DisasterTV {
     this.cdEl = mk.querySelector('.t b'); this.rowEl = mk.querySelector('.row');
     this.hits = new Hits(g, null, { quiet: true }); // no points on TV: just the big moments
     this.chain = new Chain(this.D, (text, slow) => this.hits.moment(text, slow));
-    this.cam = new TvCam(this); // the helicopter and the rooftop cameras
+    this.cam = new TvCam(this); // the helicopter and viewers' videos from the rooftops
     this.auto = new Responders(g); this.auto.on = false; // the crews rebuild between disasters; the rescue comes only when the viewers call it
     document.body.classList.add('zd-tv'); // the radio's words sit over the ticker
     g.addButton('zd-tvcam', 'Change camera', () => this.cam.change());

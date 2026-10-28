@@ -569,6 +569,9 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 - The call sign (You're listening to K-D-I-S, Disaster Radio) only once, on the menu 2.5 s after PLAY, far off as if heard from space over the planet (radio.farIdent: no words on screen, a lowpass at 1.7 kHz, mostly a 3.6 s echo, quiet); no more at the start of a game.
 - Menu music far off too (Music.space: lowpass 2.6 kHz, dry 0.3, a 3.2 s echo at 0.5; the echo joined in only on the menus); close again in a town. Music.reverbIR makes the echo for both.
 
+- Disaster TV cameras (Sean): the rooftop cameras are now viewers' phone videos (VIEWER VIDEO n, held by hand: a wobble and a tilt, never level; on air 8 to 13 s), cut to less often (from a helicopter 40% of cuts, else the other helicopter); pans are a spring (no snapping) leading a moving target by 0.6 s so it stays mid-screen; a wave or storm front is framed on the wall itself (game.front), the helicopter easing round to out ahead of it looking back; its distance eases too; now and then a slow zoom (camera fov to 55-70%, a phone 45-60% and more often) held 2.5 to 5 s and back, out at once if something comes for the camera; a cut puts it back; fov restored on leaving TV.
+- Kaiju fire breath: act 'fire' (every 16 to 28 s of choosing): a head rears back for a breath (0.7 s) then lowers, jaws wide, and pours a jet of flame (two additive Splash emitters, outer and core, 40 m/s with the splash fall 4.9 t^2) along the way it faces, sweeping a little; where it lands (a roof or the street) fire bursts every 0.3 s, buildings within 9 m catch (55%), cars burn, people run; 40% of the time the other head takes a turn 1.2 s later. Toast: The monster breathes fire!
+
 ## Next
 - Sean tests v1.3 on his phone; tune from his notes. Candidates: Be The Disaster score scales and ranks once real scores come in, the saucer size at close zoom, how often zombie outbreaks turn up in Commander, incident pacing, card bar height on the phone.
 
