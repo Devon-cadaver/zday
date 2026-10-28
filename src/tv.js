@@ -97,7 +97,7 @@ export class DisasterTV {
     g.addButton('zd-tvcam', 'Change camera', () => this.cam.change());
     g.addButton('zd-tvnext', 'Next disaster', () => this.next());
     g.addButton('zd-tvtown', 'Next town', () => this.moveOn());
-    g.addButton('zd-menu-btn', 'Menu', () => { location.href = location.pathname; });
+    g.addButton('zd-menu-btn', 'Menu', () => g.toMenu());
     this.showCalls();
     this.start();
   }

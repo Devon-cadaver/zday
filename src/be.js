@@ -272,8 +272,8 @@ export class BeTheDisaster {
     this.hits = new Hits(g, this.el.score); // points popping up where things fall, combos, the big moments
     this.chain = new Chain(this.D, (text, slow) => this.hits.moment(text, slow)); // the town finishes what the disaster starts
     g.addButton('zd-restart', 'Restart', () => this.start());
-    g.addButton('zd-pick', 'Disasters', () => { location.href = location.pathname + '?mode=be'; });
-    g.addButton('zd-menu-btn', 'Menu', () => { location.href = location.pathname; });
+    g.addButton('zd-pick', 'Disasters', () => g.toMenu('?mode=be'));
+    g.addButton('zd-menu-btn', 'Menu', () => g.toMenu());
     this.end = document.getElementById('zd-end') || document.createElement('div'); this.end.id = 'zd-end'; this.end.hidden = true;
     if (!this.end.parentNode) document.body.appendChild(this.end);
     // one finger drives the disaster; two fingers (or the right mouse button) pan, pinch or wheel to zoom
@@ -455,7 +455,7 @@ export class BeTheDisaster {
       '<div class="xp">+' + r.xp.toLocaleString() + ' XP' + (r.levelUp ? ' · level up! Level ' + r.level : '') + '</div>' + road, lines,
       (nextOpen ? '<button class="zd-btn go" type="button" id="zd-next">On to ' + PLACES[nextKey].name + '</button>' : '') + '<button class="zd-btn' + (nextOpen ? '' : ' go') + '" type="button" id="zd-again">Again</button><button class="zd-btn" type="button" id="zd-other">Other disaster</button>');
     this.end.querySelector('#zd-again').onclick = () => this.start();
-    this.end.querySelector('#zd-other').onclick = () => { location.href = location.pathname + '?mode=be'; };
+    this.end.querySelector('#zd-other').onclick = () => this.g.toMenu('?mode=be');
     if (nextOpen) this.end.querySelector('#zd-next').onclick = () => g.journey(nextKey);
     setTimeout(() => { if (this.ended) this.end.hidden = false; }, 1700);
   }

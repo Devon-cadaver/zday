@@ -340,6 +340,13 @@ export class Globe {
     this.shiftTo = innerHeight > innerWidth ? 0.14 : 0.08; // the planet sits above the menu
     document.body.classList.add('zd-globe-on');
   }
+  // the menu reached up through the clouds from a town: start just over that town and pull back to where the menu looks from
+  pullBack(key) {
+    const sp = this.spots && this.spots[key]; if (!sp) return;
+    const to = this.cam.position.clone(), p = toVec(sp[0], sp[1], 1).normalize();
+    this.cam.position.copy(p).multiplyScalar(R * 1.07); this.cam.lookAt(0, 0, 0);
+    this.rise = { t: 0, dur: 2.4, from: R * 1.07, to: to.length(), dir: to.normalize() };
+  }
   // far enough back that the whole planet fits across the screen (a phone held upright sees a narrow slice)
   fit() { const half = Math.min(16, Math.atan(Math.tan(16 * Math.PI / 180) * innerWidth / innerHeight) * 180 / Math.PI) * Math.PI / 180; return Math.max(R * 3.2, R / Math.sin(half * 0.97)); }
   // from the menu: pick a place (Sandbox: opts.arrive(key) once flown down; opts.back for the Back button), or head for

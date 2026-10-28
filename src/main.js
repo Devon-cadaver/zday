@@ -211,7 +211,7 @@ globe.moveTo = (key) => { const m = game.modeName, kind = m === 'be' && game.mod
 globe.up = (after) => { game.setFollow(-1); sky.up(() => { globe.open({ clouds: true }); globe.after = after || null; }); }; // up through the clouds (then on to another town)
 if (viaSky) game.audio.askTap(); // the trip reloaded the page: sound needs a tap again
 if (viaSky) setTimeout(() => { if (globe.active) { sky.to(0, 0.8); return; } const r1 = game.zoomTo || 0; game.zoomTo = 0; sky.down(r1); }, 300); // out of the clouds over the streets
-if (!game.menu.hidden) { globe.backdrop(game.menuPanel === 'main'); game.dockSide(); } // the menu sits over the planet
+if (!game.menu.hidden) { globe.backdrop(game.menuPanel === 'main'); game.dockSide(); if (viaSky) globe.pullBack(placeKey()); } // the menu sits over the planet (come up from a town: pulling back off it)
 // what this place remembers: the buildings that came down here last time (Sandbox; Commander starts each round fresh)
 const sandbox = () => game.mode && game.mode.kind === 'sandbox';
 const keepDamage = () => { if (!W || !sandbox()) return; const { city } = W, dead = []; for (let k = 0; k < city.buildings.length; k++) if (city.dead[k]) dead.push(k); rememberDamage(placeKey(), dead); };

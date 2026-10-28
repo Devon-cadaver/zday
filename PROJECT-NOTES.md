@@ -534,6 +534,8 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 
 - Globe road as a trail (Sean: only where you came from, never where you are going; the menu shows none until you travel): Globe.buildRoad(n) draws the road only from the first town to town n (rebuilt when n changes; n < 1 none) and showRoad(on, mode) uses globe.trail(mode) = profile.been(mode): the furthest town played in that mode (profile.played now records data.been[mode]; older saves: max of the last town played and the towns cleared). In Commander or Be The Disaster (the in-game globe, the road picker) that mode's trail; on the menu the furthest of either. A fresh save shows no lines.
 
+- Back to the menu through the clouds (Sean: the way in, backwards): every Menu button (Commander, its end card, Be The Disaster, Sandbox, Disaster TV) and Be The Disaster's Disasters / Other disaster call game.toMenu(q): the mode goes quiet, sky.up lifts the camera straight up off the town into the clouds, then the menu page loads arriving inside them (Sky.leaving); there the clouds clear (as before) while globe.pullBack(the town you came from) starts the planet camera just over that town and pulls back over 2.4 s to the menu's view. Falls back to a plain page load if the sky is busy or there is no town.
+
 ## Next
 - Sean tests v1.3 on his phone; tune from his notes. Candidates: Be The Disaster score scales and ranks once real scores come in, the saucer size at close zoom, how often zombie outbreaks turn up in Commander, incident pacing, card bar height on the phone.
 

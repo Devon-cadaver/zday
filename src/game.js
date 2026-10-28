@@ -408,6 +408,15 @@ export class Game {
     const reach = this.profile.reach(mode), why = 'Win in ' + PLACES[PATH[reach]].name + ' to open the next town';
     return (key) => { const i = PATH.indexOf(key); return { text: (i + 1) + ' \u00B7 ' + PLACES[key].name + (i < reach ? ' \u2713' : i > reach ? ' \uD83D\uDD12' : ''), locked: i > reach || i < 0, why }; };
   }
+  // back to the menu: straight up off the town into the clouds (the way in, backwards), then the menu page, which comes out of
+  // them pulling back from this town to the whole planet (main.js: globe.pullBack)
+  toMenu(q = '') {
+    const sky = this.globe && this.globe.sky, home = () => { location.href = location.pathname + q; };
+    if (!sky || sky.busy() || !this.people || (this.globe && this.globe.active)) { home(); return; }
+    for (const e of document.querySelectorAll('#zd-end')) e.hidden = true;
+    this.setFollow(-1); if (this.mode) this.mode.dead = true; // its buttons and fingers go quiet on the way up
+    sky.up(() => { sky.constructor.leaving(); home(); });
+  }
   // on to another town: up from this one to the globe, then down to it (the page is built again there, same mode)
   journey(key) {
     const end = document.getElementById('zd-end'); if (end) end.hidden = true;
@@ -874,7 +883,7 @@ class Sandbox {
     g.goodBtn = g.addButton('zd-good', 'Follow rescue', () => g.cycleGood());
     g.addSpeedButton();
     g.addButton('zd-reset', 'Reset', () => this.reset());
-    g.addButton('zd-menu-btn', 'Menu', () => { location.href = location.pathname; });
+    g.addButton('zd-menu-btn', 'Menu', () => g.toMenu());
     this.buildPanel(); this.bindHold();
     this.dropsLeft = START_DROPS; this.clock = -1; this.milestone = 0;
     g.toast('Open Disasters to drop zombies or unleash a disaster', 4500);

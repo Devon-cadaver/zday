@@ -96,7 +96,7 @@ export class Commander {
     }
     g.addSpeedButton();
     g.addButton('zd-restart', 'Restart', () => this.start());
-    g.addButton('zd-menu-btn', 'Menu', () => { location.href = location.pathname; });
+    g.addButton('zd-menu-btn', 'Menu', () => g.toMenu());
     this.end = document.createElement('div'); this.end.id = 'zd-end'; this.end.hidden = true;
     document.body.appendChild(this.end);
     // the scope: red rings and cross hairs that close in on where an incident is, when Show is tapped
@@ -734,7 +734,7 @@ export class Commander {
       '<div class="score">Score ' + score.toLocaleString() + '</div>' + xpLine + road, lines,
       (nextOpen ? '<button class="zd-btn go" type="button" id="zd-next">On to ' + PLACES[nextKey].name + '</button>' : '') + '<button class="zd-btn' + (nextOpen ? '' : ' go') + '" type="button" id="zd-again">Play again</button><button class="zd-btn" type="button" id="zd-tomenu" style="background:rgba(28,20,12,.9);border-color:rgba(255,236,200,.25)">Menu</button>');
     this.end.querySelector('#zd-again').onclick = () => { if (r.levelUp) { g.endMode(); g.startMode('commander'); return; } this.start(); }; // a level up: the mode again, with its new cards
-    this.end.querySelector('#zd-tomenu').onclick = () => { location.href = location.pathname; };
+    this.end.querySelector('#zd-tomenu').onclick = () => this.g.toMenu();
     if (nextOpen) this.end.querySelector('#zd-next').onclick = () => this.g.journey(nextKey);
     this.end.hidden = false;
     g.setSpeed(1);
