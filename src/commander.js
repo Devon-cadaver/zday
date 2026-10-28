@@ -82,21 +82,13 @@ export class Commander {
     g.addButton('zd-menu-btn', 'Menu', () => { location.href = location.pathname; });
     this.end = document.createElement('div'); this.end.id = 'zd-end'; this.end.hidden = true;
     document.body.appendChild(this.end);
-    // latest 911 call, with a button that flies the camera to the search zone
-    this.call = document.createElement('div'); this.call.id = 'zd-call'; this.call.hidden = true;
-    this.call.innerHTML = '<span class="t"></span><button type="button" class="zd-btn" id="zd-go">Go</button>';
-    document.body.appendChild(this.call);
-    this.call.querySelector('#zd-go').onclick = () => { if (this.lastCall) g.lookAt(this.lastCall.x, this.lastCall.z, 330); };
-    // search zones drawn on the ground
-    this.pins = [];
-    const ring = new THREE.RingGeometry(0.94, 1, 64); ring.rotateX(-Math.PI / 2);
-    const ring2 = new THREE.RingGeometry(0.985, 1, 64); ring2.rotateX(-Math.PI / 2);
-    for (let k = 0; k < 6; k++) {
-      const m = new THREE.Group();
-      m.add(new THREE.Mesh(ring, new THREE.MeshBasicMaterial({ color: '#ff4a3a', transparent: true, opacity: 0, depthWrite: false, depthTest: false })));
-      m.add(new THREE.Mesh(ring2, new THREE.MeshBasicMaterial({ color: '#fff0e0', transparent: true, opacity: 0, depthWrite: false, depthTest: false })));
-      m.visible = false; m.renderOrder = 3; g.people.mesh.parent.add(m);
-      this.pins.push({ m, life: 0 });
+    // the scope: red rings and cross hairs that close in on where an incident is, when Show is tapped
+    {
+      const mat = new THREE.MeshBasicMaterial({ color: '#ff3b2a', transparent: true, opacity: 0, depthWrite: false, depthTest: false }), m = this.scope = new THREE.Group();
+      const flat = (geo) => { geo.rotateX(-Math.PI / 2); const o = new THREE.Mesh(geo, mat); o.renderOrder = 3; m.add(o); };
+      flat(new THREE.RingGeometry(0.93, 1, 64)); flat(new THREE.RingGeometry(0.44, 0.48, 48)); flat(new THREE.CircleGeometry(0.05, 16));
+      for (let k = 0; k < 4; k++) { const geo = new THREE.PlaneGeometry(0.035, 0.42); geo.translate(0, 0.83, 0); geo.rotateZ(k * Math.PI / 2); flat(geo); } // the four ticks
+      m.visible = false; this.scopeMat = mat; g.people.mesh.parent.add(m); this.aim = null;
     }
     this.start();
   }
@@ -121,7 +113,7 @@ export class Commander {
     this.out0 = 0; this.rescued0 = 0; this.trucks = 0; this.helisSent = 0; this.apcs = 0; this.strikes = 0; this.bombedCiv0 = 0; this.bombed0 = 0;
     this.buses = 0; this.bused0 = 0; this.boatsSent = 0; this.chasersSent = 0; this.seeds = 0; this.calledJets = 0; this.calledTanks = 0; this.jetAt = 0; this.tankAt = 0; this.chaseT = 0;
     if (this.tracers) { for (const tr of this.tracers) this.g.disasters.ctx.scene.remove(tr.m); this.tracers.length = 0; } g.disasters.boats.auto = false; this.nuked = false; this.nukeAt = null; this.nukedCiv0 = 0;
-    this.lastCall = null; this.call.hidden = true; for (const p of this.pins) { p.life = 0; p.m.visible = false; }
+    this.lastCall = null; this.aim = null; this.scope.visible = false;
     for (const c of Object.values(this.cards)) c.btn.classList.remove('sel');
     // the weather this round (the people RNG restarts with every reset, so the round plan rolls its own dice)
     const R = Math.random;
@@ -166,18 +158,26 @@ export class Commander {
     return !this.g.disasters.list.some(e => e.type !== 'heroes') && p.stats.zombies === 0 && p.stats.infected === 0 && this.fires === 0 && this.sites.every(s => s.fired);
   }
 
-  // a 911 call: toast, call strip, and a search zone on the map (jittered, so it is a hunt)
-  report(x, z, text, radius, exact = false) {
+  // a 911 call or an incident: its name blinks with what to do, then waits in a chip above the bar; Show flies there
+  // and the scope closes in on the search zone (jittered, so it is still a hunt). mark: show the scope straight away
+  // without moving the camera (a target you picked yourself)
+  report(x, z, text, radius, exact = false, name = 'Incident', mark = false) {
     const p = this.g.people;
     if (this.g.disasters.active('solar') && !exact) { radius *= 1.6; text = 'Static on the line... ' + text; } // the radio blackout garbles calls
     const a = p.r() * Math.PI * 2, jit = exact ? 0 : p.r() * radius * 0.45;
-    const cx = x + Math.cos(a) * jit, cz = z + Math.sin(a) * jit;
-    this.lastCall = { x: cx, z: cz };
-    this.g.toast(text, 4200);
-    this.call.querySelector('.t').textContent = text;
-    this.call.hidden = false;
-    const pin = this.pins.find(q => q.life <= 0) || this.pins.reduce((a, b) => (a.life < b.life ? a : b));
-    pin.life = 45; pin.m.visible = true; pin.m.position.set(cx, 0.1, cz); pin.m.scale.setScalar(radius);
+    const cx = x + Math.cos(a) * jit, cz = z + Math.sin(a) * jit, call = this.lastCall = { x: cx, z: cz, r: radius };
+    const hint = text.replace(/^[^!:.]{1,24}[!:.]\s*/, ''); // the name is in the flash already
+    this.g.alertFlash(name, hint, () => { this.g.lookAt(call.x, call.z, 330); this.aimAt(call); });
+    if (mark) this.aimAt(call);
+  }
+  aimAt(c) { this.aim = { x: c.x, z: c.z, r: Math.max(18, c.r * 0.6), t: 0 }; this.scope.visible = true; }
+  // the scope: wide and turning, it closes on the spot in a second, holds there pulsing, then fades
+  scopeStep(dt) {
+    const A = this.aim; if (!A) return;
+    A.t += dt; const k = Math.min(1, A.t / 1.1), e = 1 - Math.pow(1 - k, 3), m = this.scope;
+    m.position.set(A.x, 0.4, A.z); m.scale.setScalar(A.r * (4.5 - 3.5 * e)); m.rotation.y = (1 - e) * Math.PI * 0.75;
+    this.scopeMat.opacity = Math.min(1, A.t * 4) * (A.t < 6 ? 0.8 + 0.2 * Math.sin(A.t * 9) : Math.max(0, 1 - (A.t - 6) / 1.2));
+    if (A.t > 7.2) { this.aim = null; m.visible = false; }
   }
 
   district(x, z) {
@@ -192,7 +192,6 @@ export class Commander {
     if (this.ended) return;
     if (this.sel === id) { this.sel = null; c.btn.classList.remove('sel'); return; }
     if (c.u.once && this.nuked) { this.g.toast('Only one nuke per round'); return; }
-    if (this.cool[id] > 0) { this.g.toast(c.u.name + ' is busy for ' + Math.ceil(this.cool[id]) + ' s'); return; }
     if (this.rp < c.u.cost) { this.g.toast('Not enough points. ' + c.u.name + ' costs ' + c.u.cost); return; }
     if (this.alert < c.u.alert) { this.g.toast(c.u.name + ' needs alert level ' + c.u.alert); return; }
     if ((id === 'water' || id === 'rescue') && this.g.disasters.active('solar')) { this.g.toast('Helicopters are grounded by the solar storm'); return; }
@@ -347,7 +346,7 @@ export class Commander {
     const near = (x, z, R) => chasers.find(c => Math.hypot(c.x - x, c.z - z) < R);
     for (const e of D.list) if (e.type === 'tornado' && e.tw && e.tw.onGround) {
       const c = near(e.tw.x, e.tw.z, 280);
-      if (c && now > (e.seedAt || 0)) { e.seedAt = now + 18; this.sendSeeder(e.tw.x, e.tw.z, false); this.report(e.tw.x, e.tw.z, 'Storm chasers: "Tornado on the ground! Calling in a seeding run"', 40, true); }
+      if (c && now > (e.seedAt || 0)) { e.seedAt = now + 18; this.sendSeeder(e.tw.x, e.tw.z, false); this.report(e.tw.x, e.tw.z, 'Storm chasers: "Tornado on the ground! Calling in a seeding run"', 40, true, 'Tornado'); }
     }
     const inv = D.list.find(e => e.type === 'aliens');
     const targets = [];
@@ -358,7 +357,7 @@ export class Commander {
     for (const tg of targets) {
       const c = near(tg.x, tg.z, 300); if (!c) continue;
       const o = tg.t || tg.s;
-      if (!o.spotted) { o.spotted = true; this.report(tg.x, tg.z, 'Storm chasers: "' + (tg.t ? 'A tripod' : 'A saucer') + ' in the ' + this.district(tg.x, tg.z) + '! Calling it in to the army"', 45, true); }
+      if (!o.spotted) { o.spotted = true; this.report(tg.x, tg.z, 'Storm chasers: "' + (tg.t ? 'A tripod' : 'A saucer') + ' in the ' + this.district(tg.x, tg.z) + '! Calling it in to the army"', 45, true, tg.t ? 'Tripod' : 'Saucer'); }
       if (now > (this.jetAt || 0)) { this.jetAt = now + 12; g.helis.strike(tg.x, tg.z, { radius: 25 }); this.calledJets++; } // an A-10 on the spot
       if (tg.t && now > (this.tankAt || 0) && g.traffic.missions.filter(m => m.kind === 'tank' && !m.gone).length < 3) {
         const car = g.traffic.dispatchTo(tg.x, tg.z, { kind: 'tank', onArrive: () => g.toast('A tank is in position and engaging') });
@@ -420,8 +419,8 @@ export class Commander {
 
   spend(id) {
     const c = this.cards[id];
-    this.rp -= c.u.cost; this.cool[id] = this.cdOf(id);
-    this.sel = null; c.btn.classList.remove('sel');
+    this.rp -= c.u.cost; this.cool[id] = c.u.once ? this.cdOf(id) : 0; // send another straight away if the points are there
+    if (this.rp < c.u.cost || c.u.once) { this.sel = null; c.btn.classList.remove('sel'); } // still picked: tap the map again for another
   }
 
   sendFire(x, z) {
@@ -490,7 +489,7 @@ export class Commander {
     const jet = g.helis.strike(x, z, { radius: 25, onBlast: (bx, bz) => { if (g.camera.position.distanceTo(g.controls.target) < 500) g.shake = Math.max(g.shake, 1); } });
     this.spend('strike'); this.strikes++;
     // mark the target for the player
-    this.report(x, z, 'Airstrike inbound. Impact in ' + Math.ceil(jet.eta) + ' s. Clear the area!', 25, true);
+    this.report(x, z, 'Airstrike inbound. Impact in ' + Math.ceil(jet.eta) + ' s. Clear the area!', 25, true, 'Airstrike', true);
     this.lastCall = { x, z };
   }
 
@@ -516,7 +515,7 @@ export class Commander {
     this.nuked = true; this.nukeAt = { x, z };
     const jet = g.helis.nuke(x, z, { radius: 230, onBlast: (bx, bz) => { g.flash = 1.6; g.shake = 2.5; } });
     this.spend('nuke');
-    this.report(x, z, 'NUCLEAR STRIKE AUTHORISED. Impact in ' + Math.ceil(jet.eta) + ' s. Get everyone out!', 150, true);
+    this.report(x, z, 'NUCLEAR STRIKE AUTHORISED. Impact in ' + Math.ceil(jet.eta) + ' s. Get everyone out!', 150, true, 'Nuke', true);
     this.lastCall = { x, z };
     g.toast('B-2 inbound. ' + Math.ceil(jet.eta) + ' seconds to detonation', 5000);
   }
@@ -542,7 +541,7 @@ export class Commander {
     if (e.type === 'warn') {
       if (e.hazard === 'villains' && !this.ended) setTimeout(() => this.g.toast(this.cards.heroes ? 'Only the super heroes can beat them: use the Hero signal' : 'Police cannot stop them. Hold out until they leave', 4500), 4500);
       this.alertFloor = Math.max(this.alertFloor, e.hazard === 'aliens' || e.hazard === 'volcano' || e.hazard === 'meteor' || e.hazard === 'nuclear' || e.hazard === 'meltdown' || e.hazard === 'blackhole' || e.hazard === 'kaiju' || e.hazard === 'worm' ? 3 : e.hazard === 'riot' ? 1 : 2); // disasters open up the units you need
-      if (e.x != null && !this.ended) { this.report(e.x, e.z, e.text, e.r || 60, e.exact); return true; }
+      if (e.x != null && !this.ended) { this.report(e.x, e.z, e.text, e.r || 60, e.exact, e.hazard ? threatName(e.hazard) : 'Incident'); return true; }
     }
   }
 
@@ -575,7 +574,8 @@ export class Commander {
 
   phase() { return (this.t / ROUND) % 1; }
 
-  update(sdt) {
+  update(sdt, dt = sdt) {
+    this.scopeStep(dt); // on the real clock: it closes in while paused too
     if (this.ended) return;
     const g = this.g, p = g.people;
     this.t += sdt;
@@ -583,7 +583,7 @@ export class Commander {
       if (o.fired || this.t < o.at) continue;
       o.fired = true;
       p.infectAt(o.x, o.z, this.diff.seeds);
-      this.report(o.x, o.z, '911 · ' + this.district(o.x, o.z) + ': "someone is biting people!"', 70);
+      this.report(o.x, o.z, '911 · ' + this.district(o.x, o.z) + ': "someone is biting people!"', 70, false, 'Zombies');
     }
     // the next incident: on schedule, or early once the city has been quiet for a while
     this.quietT = this.quiet() ? this.quietT + sdt : 0;
@@ -615,13 +615,7 @@ export class Commander {
     const fl = this.flooded();
     if (fl && !this.wasFlooded) { for (const id in FLOOD_CD) if (this.cool[id] > FLOOD_CD[id]) this.cool[id] = FLOOD_CD[id]; g.toast('The streets are flooding. The Coast Guard and air rescue are on full alert: boats and rescue helicopters can go out back to back', 4500); }
     this.wasFlooded = fl;
-    for (const q of this.pins) {
-      if (q.life <= 0) continue;
-      q.life -= sdt;
-      const k = Math.min(1, q.life / 10), pulse = 0.75 + 0.25 * Math.sin(this.g.realT * 3);
-      q.m.children[0].material.opacity = 0.7 * k * pulse; q.m.children[1].material.opacity = 0.5 * k;
-      if (q.life <= 0) q.m.visible = false;
-    }
+
     this.heatT += sdt;
     if (this.heatT >= 1) { this.heatT = 0; this.heat(); }
     // the switchboard: every so often a caller reports where they saw one
@@ -629,7 +623,7 @@ export class Commander {
     if (this.callT <= 0 && p.stats.zombies > 0 && this.sites.length && this.sites.every(s => s.fired)) {
       this.callT = 15 + p.r() * 10;
       const zs = []; for (let i = 0; i < p.active; i++) if (p.st[i] === ST.ZOMBIE && p.lvl[i] === -1) zs.push(i);
-      if (zs.length) { const i = zs[Math.floor(p.r() * zs.length)]; this.report(p.x[i], p.z[i], '911 · ' + this.district(p.x[i], p.z[i]) + ': "' + CALLS[Math.floor(p.r() * CALLS.length)] + '"', 55); }
+      if (zs.length) { const i = zs[Math.floor(p.r() * zs.length)]; this.report(p.x[i], p.z[i], '911 · ' + this.district(p.x[i], p.z[i]) + ': "' + CALLS[Math.floor(p.r() * CALLS.length)] + '"', 55, false, 'Zombie sighting'); }
     }
     // end of round
     const hum = p.stats.humans, tot = p.nHuman;
@@ -652,7 +646,7 @@ export class Commander {
       const cd = this.cool[c.u.id];
       c.cd.style.height = cd > 0 ? (100 * cd / this.cdOf(c.u.id)) + '%' : '0';
       const id = c.u.id, wet = this.flooded(), cant = (GROUND.has(id) && wet) || ((id === 'coast' || id === 'boat') && !wet) || (id === 'barrier' && !this.tsunami());
-      c.btn.classList.toggle('off', (c.u.once && this.nuked) || cd > 0 || this.rp < c.u.cost || this.alert < c.u.alert || cant);
+      c.btn.classList.toggle('off', (c.u.once && this.nuked) || this.rp < c.u.cost || this.alert < c.u.alert || cant);
       if (c.u.once) c.cd.style.height = '0';
     }
   }

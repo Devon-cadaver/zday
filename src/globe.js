@@ -340,7 +340,7 @@ export class Globe {
     this.metBtn.style.display = 'none'; this.backBtn.textContent = 'Back'; this.backBtn.style.display = opts.back ? '' : 'none';
     if (opts.key) this.turn = { t: 0, key: opts.key, r: Math.min(this.cam.position.length(), R * 3), to: toVec(...this.spots[opts.key], 1).normalize() };
   }
-  toggleHud(on) { for (const el of document.querySelectorAll('#zd-top, #zd-bar, #zd-dis, #zd-call, #zd-toast, #zd-end, #zd-menu, #zd-compass')) el.style.visibility = on ? '' : 'hidden'; }
+  toggleHud(on) { for (const el of document.querySelectorAll('#zd-top, #zd-bar, #zd-dis, #zd-toast, #zd-end, #zd-menu, #zd-compass, #zd-pause, #zd-paused, #zd-flash')) el.style.visibility = on ? '' : 'hidden'; }
   // down to a place: fly in over it; back where you were, the city is still there; anywhere else is built afresh
   go(key) {
     if (this.fly) return;

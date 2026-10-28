@@ -74,11 +74,6 @@ const CSS = `
 #zd-toast{position:fixed;left:50%;top:calc(150px + env(safe-area-inset-top));transform:translateX(-50%);max-width:min(88vw,420px);
   background:rgba(28,20,12,.8);color:#f6ead2;border:1px solid rgba(255,236,200,.16);border-radius:10px;padding:9px 12px;
   font:600 13px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif;text-align:center;pointer-events:none;transition:opacity .4s;opacity:0}
-#zd-call{position:fixed;left:50%;top:calc(96px + env(safe-area-inset-top));transform:translateX(-50%);display:flex;gap:8px;align-items:center;max-width:min(92vw,440px);
-  background:rgba(60,22,14,.82);color:#ffd9cc;border:1px solid rgba(255,120,90,.35);border-radius:10px;padding:7px 8px 7px 12px;font:600 12px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif;z-index:3}
-#zd-call[hidden]{display:none}
-#zd-call .t{flex:1;min-width:0}
-#zd-call .zd-btn{padding:8px 12px;background:rgba(200,60,40,.9);border-color:rgba(255,160,130,.5);min-width:0}
 #zd-fps{position:fixed;right:max(8px, env(safe-area-inset-right));bottom:calc(var(--zd-bar-h, 64px) + 4px);font:10px system-ui,sans-serif;color:#f6ead2;opacity:.45;pointer-events:none}
 #zd-end{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(14,10,6,.78);z-index:35;
   padding:max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));box-sizing:border-box;font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;color:#f6ead2}
@@ -183,6 +178,25 @@ const CSS = `
 #zd-compass text{font:700 7.5px system-ui,-apple-system,"Segoe UI",sans-serif;fill:#f6ead2;text-anchor:middle;dominant-baseline:central}
 #zd-compass text.n{fill:#ff7a5a;font-size:9px}
 body.zd-menu-on #zd-compass,body.zd-panel #zd-compass{display:none}
+#zd-pause{position:fixed;left:max(13px, env(safe-area-inset-left));top:calc(50% - 56px);transform:translateY(-50%);z-index:30;width:40px;height:40px;border-radius:20px;padding:0;cursor:pointer;
+  border:1px solid rgba(255,236,200,.18);background:rgba(28,20,12,.72);color:#f6ead2;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);touch-action:manipulation}
+#zd-pause svg{width:18px;height:18px;display:block;margin:auto;fill:currentColor}
+#zd-pause.on{border-color:#ffc233;color:#ffc233}
+body.zd-menu-on #zd-pause,body.zd-panel #zd-pause{display:none}
+#zd-paused{position:fixed;left:0;right:0;margin:0 auto;width:max-content;top:calc(50% - 20px);z-index:29;padding:8px 16px;border-radius:12px;background:rgba(18,14,10,.78);border:1px solid rgba(255,194,51,.45);
+  color:#ffc233;font:800 14px/1.2 system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:.2em;pointer-events:none}
+#zd-paused[hidden]{display:none}
+#zd-flash{position:fixed;left:0;right:0;margin:0 auto;width:max-content;max-width:min(calc(100vw - 32px),380px);z-index:4;text-align:center;pointer-events:none;transition:opacity .5s;opacity:0}
+#zd-flash.on{opacity:1}
+#zd-flash b{display:inline-block;padding:5px 16px;border-radius:10px;background:rgba(170,40,26,.9);border:1px solid rgba(255,150,120,.6);color:#fff3ec;font:800 17px/1.2 system-ui,-apple-system,"Segoe UI",sans-serif;
+  letter-spacing:.16em;text-transform:uppercase;animation:zd-blip .45s steps(2, jump-none) 4}
+#zd-flash span{display:block;margin-top:5px;color:#f6ead2;font:600 11px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif;text-shadow:0 1px 4px rgba(0,0,0,.8)}
+@keyframes zd-blip{from{opacity:1}to{opacity:.15}}
+#zd-alertchip{display:flex;align-items:center;gap:9px;background:rgba(60,20,14,.86);border:1px solid rgba(255,120,90,.45);border-radius:18px;padding:3px 3px 3px 12px;
+  font:700 12px/1.2 system-ui,-apple-system,"Segoe UI",sans-serif;color:#ffd9cc;letter-spacing:.04em}
+#zd-alertchip i{width:7px;height:7px;border-radius:4px;background:#ff5a3a;flex:none}
+#zd-alertchip .zd-btn{padding:6px 12px;min-width:0;border-radius:14px;font-size:11px;background:rgba(200,60,40,.92);border-color:rgba(255,160,130,.55);color:#fff}
+@media (prefers-reduced-motion: reduce){#zd-flash b{animation:none}}
 #zd-disb{border-color:rgba(255,154,90,.55);color:#ffc08a}
 #zd-disb.on{background:rgba(120,58,24,.88);border-color:#ff9a5a;color:#ffd9b8}
 @media (prefers-reduced-motion: reduce){#zd-toast{transition:none}}
@@ -251,7 +265,7 @@ export class Game {
 
   startMode(which, kind) {
     this.menu.hidden = true; this.menuOff(); this.modeName = which;
-    this.top.innerHTML = ''; this.bar.innerHTML = ''; this.followChip = this.stopBtn = null;
+    this.top.innerHTML = ''; this.bar.innerHTML = ''; this.followChip = this.stopBtn = null; this.el.chip = null; this.setPaused(false);
     this.mode = which === 'sandbox' ? new Sandbox(this) : which === 'be' ? new BeTheDisaster(this, kind) : new Commander(this);
     if (this.radio) this.radio.begin(which === 'be' ? this.mode.kind : null);
   }
@@ -379,6 +393,10 @@ export class Game {
       '<text class="n" x="24" y="6">N</text><text x="42" y="24.5">E</text><text x="24" y="42.5">S</text><text x="6" y="24.5">W</text></g></svg>';
     cp.onclick = () => { const off = this.camera.position.clone().sub(this.controls.target); this.faceNorth = { t: 0, from: Math.atan2(off.x, off.z) }; };
     document.body.appendChild(cp); this.rose = cp.querySelector('.rose'); this.roseA = 999;
+    // pause: the world and the round clock stop (the camera still moves); a tap goes on
+    const pz = this.pauseBtn = document.createElement('button'); pz.type = 'button'; pz.id = 'zd-pause'; pz.title = 'Pause'; pz.setAttribute('aria-label', 'Pause');
+    const ps = this.pausedEl = document.createElement('div'); ps.id = 'zd-paused'; ps.hidden = true; ps.textContent = 'PAUSED';
+    pz.onclick = () => this.setPaused(!this.paused); document.body.append(pz, ps); this.setPaused(false);
     const barH = () => document.documentElement.style.setProperty('--zd-bar-h', this.bar.offsetHeight + 'px');
     if (window.ResizeObserver) new ResizeObserver(barH).observe(this.bar); else setInterval(barH, 500);
   }
@@ -423,6 +441,23 @@ export class Game {
   }
   setSpeed(s) { this.speed = s; this.setLabel(this.speedBtn, s + 'x'); }
 
+  setPaused(on) {
+    this.paused = on; this.pausedEl.hidden = !on; this.pauseBtn.classList.toggle('on', on);
+    this.pauseBtn.innerHTML = on ? svg('<path d="M7 5v14l12-7z"/>') : svg('<rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/>');
+    this.pauseBtn.title = on ? 'Carry on' : 'Pause';
+  }
+  // a new incident: its name blinks a few times under the numbers with what to do, then a small chip above the bar
+  // says what it is, with Show (which takes the camera there)
+  alertFlash(name, hint, show) {
+    let f = this.el.flash; if (!f) { f = this.el.flash = document.createElement('div'); f.id = 'zd-flash'; f.innerHTML = '<b></b><span></span>'; document.body.appendChild(f); }
+    f.style.top = (this.top.getBoundingClientRect().bottom + 10) + 'px';
+    const b = f.querySelector('b'); b.textContent = name; b.style.animation = 'none'; void b.offsetWidth; b.style.animation = '';
+    f.querySelector('span').textContent = hint || ''; f.classList.add('on');
+    clearTimeout(this._ft); this._ft = setTimeout(() => f.classList.remove('on'), 3200);
+    let c = this.el.chip; if (!c || !this.bar.contains(c)) { c = this.el.chip = document.createElement('div'); c.id = 'zd-alertchip'; c.innerHTML = '<i></i><b></b><button type="button" class="zd-btn">Show</button>'; this.extraRow().appendChild(c); }
+    c.querySelector('b').textContent = name; c.querySelector('button').onclick = show; c.hidden = false;
+    clearTimeout(this._ct); this._ct = setTimeout(() => { c.hidden = true; }, 45000);
+  }
   // the compass card turned so N points to the north (-z) as the camera sees it; and the view turning to face north
   compassStep(dt) {
     const tg = this.controls.target, off = this.camera.position.clone().sub(tg);
@@ -663,8 +698,8 @@ export class Game {
   }
 
   update(dt, fps) {
-    const p = this.people, h = 1 / 30;
-    const sdt = dt * this.speed;
+    const p = this.people, h = 1 / 30, run = this.paused ? 0 : 1;
+    const sdt = dt * this.speed * run;
     this.acc = Math.min(this.acc + sdt, h * 12);
     let stepped = false;
     while (this.acc >= h) {
@@ -676,14 +711,14 @@ export class Game {
     for (let k = this.pendingFires.length - 1; k >= 0; k--) {
       if (this.simT >= this.pendingFires[k].t) { this.fire.igniteBuilding(this.pendingFires[k].k); this.pendingFires.splice(k, 1); }
     }
-    this.realT += dt;
+    this.realT += dt * run;
     p.uTime.value = this.realT;
     if (stepped) this.traffic.sync(this.realT); // cars and people only move on a step (30 a second): no need to rebuild their matrices on the frames between
-    if (this.helis) this.helis.sync(dt * this.speed);
+    if (this.helis) this.helis.sync(sdt);
     if (this.daylight) { this.daylight.set(this.mode.phase ? this.mode.phase() : 0); if (this.disasters) { this.disasters.weather.apply(dt); this.disasters.afterLight(); } this.daylight.update(); }
     this.fire.update(sdt, this.realT, this.camera, this.renderer);
     if (stepped || p.lookDirty) p.sync();
-    if (this.disasters) this.disasters.sync(dt * this.speed, this.realT);
+    if (this.disasters) this.disasters.sync(sdt, this.realT);
 
     if (this.follow >= 0) {
       let f = this.follow;
@@ -732,7 +767,7 @@ export class Game {
     }
     this.mode.update(sdt, dt);
     if (this.audio) this.audio.update(dt, this);
-    if (this.radio) this.radio.update(dt, this);
+    if (this.radio) this.radio.update(dt * run, this);
     if (this.flash > 0) { this.flash = Math.max(0, this.flash - dt * 0.6); this.post.opts.flash = Math.min(1, this.flash * this.flash); } else this.post.opts.flash = 0;
     if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 1.2);
     if (fps) this.el.fps.textContent = fps + ' fps';
