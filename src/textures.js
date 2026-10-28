@@ -151,6 +151,83 @@ function facade(style, r) {
   return c;
 }
 
+// the Far Isles: an old wooden townhouse front, 512x512 = 12 m x 12 m from the pavement up (4 bays of 3 m): a ground
+// floor of dark timber lattice, sliding doors under hanging curtains and open shops; white plaster above with timber
+// posts and beams, slatted windows, paper screens and wooden rails. The lattice and the paper glow at night
+function jfacade(r) {
+  const S = 512, P = S / 12; const [c, g] = mk(S, S);
+  const [ce, ge] = mk(S, S); ge.fillStyle = '#000'; ge.fillRect(0, 0, S, S); GE = ge; c.lit = ce;
+  const Y = (m) => S - m * P, DARK = '#2c2017', dim = (x, y, w, h) => { if (GE) { GE.fillStyle = '#000'; GE.fillRect(x, y, w, h); } };
+  g.fillStyle = '#f2ece0'; g.fillRect(0, 0, S, S); addNoise(g, S, S, 10, r);
+  blotches(g, S, S, r, 18, '120,100,80', 0.1, 20, 70);
+  // paper screens: cream panes in a fine grid of dark wood
+  const shoji = (x, y, w, h) => {
+    lit(x, y, w, h, r, 0.6);
+    g.fillStyle = '#ebe2cb'; g.fillRect(x, y, w, h);
+    g.fillStyle = 'rgba(60,40,25,.75)'; for (let k = x; k <= x + w; k += 14) g.fillRect(k, y, 2, h); for (let k = y; k <= y + h; k += 18) g.fillRect(x, k, w, 2);
+    g.fillStyle = DARK; g.fillRect(x - 3, y - 3, w + 6, 4); g.fillRect(x - 3, y + h, w + 6, 4);
+  };
+  // the ground floor, 0 to 4 m
+  g.fillStyle = '#3a2a1e'; g.fillRect(0, Y(4), S, 4 * P);
+  for (let bx = 0; bx < 4; bx++) {
+    const x = bx * 128, t = r(), top = Y(3.3), hh = 2.95 * P;
+    if (t < 0.45) { // a lattice front: fine red-brown slats before a dim room
+      g.fillStyle = '#17110c'; g.fillRect(x + 8, top, 112, hh); lit(x + 8, top, 112, hh, r, 0.65);
+      for (let k = x + 9; k < x + 118; k += 7) { g.fillStyle = r() < 0.5 ? '#6b3a26' : '#5c3322'; g.fillRect(k, top, 4, hh); dim(k, top, 4, hh); }
+      g.fillStyle = '#4a2a1c'; for (const f of [0.02, 0.5, 0.97]) { g.fillRect(x + 8, top + hh * f, 112, 5); dim(x + 8, top + hh * f, 112, 5); }
+    } else if (t < 0.75) { // a sliding door of paper screens under a curtain
+      shoji(x + 18, top + 10, 92, hh - 14);
+      const cloth = pick(r, ['#2b3f6b', '#7a2a2a', '#2f4a3a', '#e8e2d4', '#2b3f6b']), ch = 0.9 * P;
+      g.fillStyle = cloth; for (let k = 0; k < 3; k++) g.fillRect(x + 14 + k * 34, top + 4, 31, ch); dim(x + 14, top + 4, 100, ch);
+      g.fillStyle = cloth === '#e8e2d4' ? '#2b3f6b' : '#f2ece0'; g.beginPath(); g.arc(x + 64, top + 4 + ch * 0.55, 9, 0, Math.PI * 2); g.fill();
+    } else { // an open shop: a lit room, shelves of goods
+      g.fillStyle = '#2a2018'; g.fillRect(x + 8, top, 112, hh); lit(x + 8, top, 112, hh, r, 0.9);
+      for (let s = 0; s < 3; s++) { const y = top + 30 + s * 30; g.fillStyle = '#6b4a30'; g.fillRect(x + 14, y, 100, 4); for (let k = x + 16; k < x + 110; k += 9) { g.fillStyle = pick(r, ['#c9a46a', '#a8402f', '#e8dcc0', '#5f7a4a', '#d8b766']); g.fillRect(k, y - 10, 6, 10); } }
+      g.fillStyle = '#5a3d28'; g.fillRect(x + 8, top + hh - 26, 112, 26);
+    }
+  }
+  g.fillStyle = DARK; for (let bx = 0; bx <= 4; bx++) g.fillRect(bx * 128 - 5, Y(4), 10, 4 * P);
+  g.fillRect(0, Y(4), S, 10); g.fillRect(0, Y(3.35), S, 8);
+  g.fillStyle = '#6f6a62'; g.fillRect(0, Y(0.25), S, 0.25 * P);
+  // the floors above, a storey every 3 m from 4 m up
+  for (let f = 0; f < 3; f++) {
+    const y0 = 4 + f * 3;
+    for (let bx = 0; bx < 4; bx++) {
+      const x = bx * 128, t = r();
+      if (t < 0.35) { // a slatted plaster window: thick white bars over a dark room
+        const wy = Y(y0 + 2.1), wh = 1.05 * P;
+        g.fillStyle = '#1c1510'; g.fillRect(x + 22, wy, 84, wh); lit(x + 22, wy, 84, wh, r, 0.5);
+        g.fillStyle = '#efe7d8'; for (let k = x + 22; k < x + 106; k += 15) { g.fillRect(k, wy, 8, wh); dim(k, wy, 8, wh); }
+        g.fillStyle = 'rgba(70,50,30,.35)'; g.fillRect(x + 18, wy + wh, 92, 5);
+      } else if (t < 0.75) shoji(x + 20, Y(y0 + 2.3), 88, 1.65 * P); // paper screens
+      else { // paper screens behind a wooden rail
+        shoji(x + 14, Y(y0 + 2.4), 100, 1.9 * P);
+        g.fillStyle = '#4a3020'; g.fillRect(x + 6, Y(y0 + 1.1), 116, 7); dim(x + 6, Y(y0 + 1.1), 116, 7);
+        for (let k = x + 8; k < x + 122; k += 10) { g.fillRect(k, Y(y0 + 1.1), 4, 0.9 * P); dim(k, Y(y0 + 1.1), 4, 0.9 * P); }
+      }
+    }
+    g.fillStyle = DARK; for (let bx = 0; bx <= 4; bx++) g.fillRect(bx * 128 - 4, Y(y0 + 3), 9, 3 * P);
+    g.fillRect(0, Y(y0) - 4, S, 9);
+  }
+  streaks(g, S, S, r, 40, 0.18);
+  GE = null;
+  return c;
+}
+
+// grey roof tiles, 256x256 = 4 m x 4 m: rows of round tiles running down the slope, a shadow at each course
+function tiles(r) {
+  const S = 256; const [c, g] = mk(S, S);
+  for (let x = 0; x < S; x += 16) {
+    const gr = g.createLinearGradient(x, 0, x + 16, 0);
+    gr.addColorStop(0, '#8e8e8c'); gr.addColorStop(0.35, '#f2f2f0'); gr.addColorStop(0.6, '#e2e2e0'); gr.addColorStop(1, '#7c7c7a');
+    g.fillStyle = gr; g.fillRect(x, 0, 16, S);
+  }
+  addNoise(g, S, S, 14, r);
+  g.fillStyle = 'rgba(0,0,0,.28)'; for (let y = 0; y < S; y += 21) g.fillRect(0, y, S, 3);
+  blotches(g, S, S, r, 14, '40,40,40', 0.18, 10, 40);
+  return c;
+}
+
 // 1024x176 = 8 bays x ground floor (24 m x 4 m)
 function shop(r) {
   const W = 1024, H = 176, B = 128; const [c, g] = mk(W, H);
@@ -264,6 +341,7 @@ function relief(src, k, renderer) {
 export function makeTextures(renderer, seed = 7) {
   const r = rng(seed);
   const fac = [0, 1, 2, 3].map(s => facade(s, r)), sh = shop(r), rf = roof(r);
+  const rj = rng(seed + 501), tl = tiles(rj); fac.push(jfacade(rj)); // the Far Isles' (their own dice: the others stay as they were)
   return {
     facadeRelief: fac.map(c => relief(c, 2.2, renderer)),
     shopRelief: relief(sh, 2.2, renderer),
@@ -273,6 +351,8 @@ export function makeTextures(renderer, seed = 7) {
     shop: finish(sh, renderer),
     shopLit: finish(sh.lit, renderer),
     roof: finish(rf, renderer),
+    tile: finish(tl, renderer),
+    tileRelief: relief(tl, 2.6, renderer),
     asphalt: finish(asphalt(r), renderer),
     sidewalk: finish(sidewalk(r), renderer),
     grass: finish(grass(r), renderer),

@@ -21,7 +21,7 @@ import { Sky } from './sky.js';
 
 const R = 10;
 // the places' character on the map: what each one wants to be next to
-const WANTS = { metro: 'city', bayview: 'city', harbor: 'coast', dust: 'desert', mesa: 'desert', sunvale: 'desert', pines: 'forest', lakeside: 'forest', northgate: 'forest', crossing: 'grass', ironside: 'grass' }; // city: deep in a big landmass that reaches the sea
+const WANTS = { kiyomura: 'forest', metro: 'city', bayview: 'city', harbor: 'coast', dust: 'desert', mesa: 'desert', sunvale: 'desert', pines: 'forest', lakeside: 'forest', northgate: 'forest', crossing: 'grass', ironside: 'grass' }; // city: deep in a big landmass that reaches the sea
 // a place's wall colours, as its city builder leans them (an even mix, plus the place's tint)
 function palette(P) {
   const w = { stone: 3, concrete: 3, brick: 3, white: 2, glass: 1 }, out = [];
@@ -41,6 +41,25 @@ function vnoise(x, y, z) {
 }
 function fbm(x, y, z, oct) { let s = 0, a = 0.5, f = 1, n = 0; for (let o = 0; o < oct; o++) { s += a * vnoise(x * f, y * f, z * f); n += a; a *= 0.5; f *= 2.03; } return s / n; }
 
+// the Far Isles: an arc of islands on the far side of the world (the eastern towns), drawn over whatever the noise
+// made there with a strait all round them, a lone snowy peak on the biggest. [lat, lon] along the arc
+const ISLES = [[0.86, -1.5], [0.7, -1.58], [0.55, -1.66], [0.42, -1.77], [0.31, -1.9], [0.22, -2.05]], PEAK = [0.47, -1.74];
+// the eastern towns: placed near these spots (the others in the band that faces you at first)
+const EAST = { kiyomura: [0.6, -1.6] };
+const unit = (lat, lon) => [Math.cos(lat) * Math.cos(lon), Math.sin(lat), Math.cos(lat) * Math.sin(lon)]; // as paint() reads the noise
+const ISLE_P = ISLES.map(([a, b]) => unit(a, b)), PEAK_P = unit(...PEAK), ISLE_C = unit(0.54, -1.72);
+// how far (in radians, near enough) a point is from the arc, and how far along it (0 to 1)
+function isleAt(x, y, z) {
+  let bd = 1e9, bt = 0; const n = ISLE_P.length - 1;
+  for (let k = 0; k < n; k++) {
+    const a = ISLE_P[k], b = ISLE_P[k + 1], ex = b[0] - a[0], ey = b[1] - a[1], ez = b[2] - a[2];
+    const t = Math.max(0, Math.min(1, ((x - a[0]) * ex + (y - a[1]) * ey + (z - a[2]) * ez) / (ex * ex + ey * ey + ez * ez)));
+    const d = Math.hypot(x - a[0] - ex * t, y - a[1] - ey * t, z - a[2] - ez * t);
+    if (d < bd) { bd = d; bt = (k + t) / n; }
+  }
+  return [bd, bt];
+}
+
 // the map: colour, and what is where (for placing the towns)
 function paint(W, H) {
   const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'), img = g.createImageData(W, H), d = img.data, bio = new Uint8Array(W * H), hgt = new Float32Array(W * H);
@@ -50,10 +69,16 @@ function paint(W, H) {
     const lat = (0.5 - (y + 0.5) / H) * Math.PI, cl = Math.cos(lat), sl = Math.sin(lat), al = Math.abs(lat) * 180 / Math.PI;
     for (let x = 0; x < W; x++) {
       const lon = ((x + 0.5) / W) * Math.PI * 2 - Math.PI, px = cl * Math.cos(lon), py = sl, pz = cl * Math.sin(lon), i = y * W + x;
-      const h = fbm(px * 1.7 + 11, py * 1.7, pz * 1.7, 5), m = fbm(px * 2.6 + 40, py * 2.6, pz * 2.6, 3), sea = 0.5;
+      let h = fbm(px * 1.7 + 11, py * 1.7, pz * 1.7, 5), m = fbm(px * 2.6 + 40, py * 2.6, pz * 2.6, 3), isle = 0; const sea = 0.5;
+      const ss = (a, c, v) => { const t = Math.max(0, Math.min(1, (v - a) / (c - a))); return t * t * (3 - 2 * t); };
+      if (px * ISLE_C[0] + py * ISLE_C[1] + pz * ISLE_C[2] > 0.8) { // near the Far Isles: green islands, never desert
+        const [d, t] = isleAt(px, py, pz), hw = 0.048 + 0.055 * Math.sin(Math.PI * t) - 0.1 * (Math.exp(-(((t - 0.14) / 0.03) ** 2)) + Math.exp(-(((t - 0.74) / 0.03) ** 2))) + (fbm(px * 9 + 3, py * 9, pz * 9, 3) - 0.5) * 0.06; // two straits: three islands
+        const pk = Math.hypot(px - PEAK_P[0], py - PEAK_P[1], pz - PEAK_P[2]);
+        const want = Math.max(d < hw ? 0.512 + Math.min(0.11, (hw - d) * 1.5) : 0.5 + (hw - d) * 0.8, 0.8 - pk * 3.2);
+        isle = 1 - ss(hw + 0.06, hw + 0.12, d); h += (want - h) * isle; m += (Math.max(m, 0.52) - m) * isle;
+      }
       hgt[i] = h;
       let rgb, b;
-      const ss = (a, c, v) => { const t = Math.max(0, Math.min(1, (v - a) / (c - a))); return t * t * (3 - 2 * t); };
       if (h < sea) { rgb = col(col(DEEP, SHALLOW, ss(sea - 0.08, sea, h)), SAND, ss(sea - 0.006, sea, h) * 0.6); b = BIOME.OCEAN; } // shallows paling into the beach
       else if (al > 68 + (m - 0.5) * 12) { rgb = SNOW; b = BIOME.ICE; }
       else if (h < sea + 0.012) { rgb = col(SAND, GRASS, ss(sea + 0.006, sea + 0.014, h) * 0.5); b = BIOME.COAST; }
@@ -61,6 +86,7 @@ function paint(W, H) {
       else if (al < 34 && m < 0.5) { rgb = col(DESERT, SAND, Math.max(0, 0.42 - m) * 2); b = BIOME.DESERT; }
       else if (m > 0.53) { rgb = FOREST; b = BIOME.FOREST; }
       else { rgb = col(GRASS, FOREST, Math.max(0, m - 0.45) * 5); b = BIOME.GRASS; }
+      if (isle > 0.5 && (b === BIOME.GRASS || b === BIOME.FOREST)) { const s = fbm(px * 30, py * 30, pz * 30, 2); if (s > 0.56) rgb = col(rgb, [226, 168, 186], Math.min(0.5, (s - 0.56) * 6)); } // cherry blossom
       const k = h < sea ? 1 : 0.86 + (h - sea) * 0.9 + (fbm(px * 14, py * 14, pz * 14, 2) - 0.5) * 0.16; // a little relief and grain on the land
       d[i * 4] = rgb[0] * k; d[i * 4 + 1] = rgb[1] * k; d[i * 4 + 2] = rgb[2] * k; d[i * 4 + 3] = 255; bio[i] = b;
     }
@@ -131,7 +157,7 @@ export class Globe {
     for (const key of keys) {
       let best = null, bs = -1e9;
       for (let n = 0; n < 4000; n++) {
-        const lat = (rnd() - 0.5) * 1.1, lon = (rnd() - 0.5) * 2.0, b = at(lat, lon); // the band facing you at first
+        const E = EAST[key], lat = E ? E[0] + (rnd() - 0.5) * 0.24 : (rnd() - 0.5) * 1.1, lon = E ? E[1] + (rnd() - 0.5) * 0.3 : (rnd() - 0.5) * 2.0, b = at(lat, lon); // the band facing you at first (the eastern towns: near their spot)
         if (b === BIOME.OCEAN || b === BIOME.ICE) continue;
         const want = WANTS[key] || 'grass';
         const sea = (r) => near(lat, lon, BIOME.OCEAN, r);
@@ -140,6 +166,7 @@ export class Globe {
           : want === 'desert' ? (b === BIOME.DESERT ? 8 : 0) + near(lat, lon, BIOME.DESERT, 0.05) - sea(0.03) * 3
           : want === 'grass' ? (b === BIOME.GRASS ? 8 : 0) + near(lat, lon, BIOME.GRASS, 0.05) - sea(0.03) * 3
           : (b === BIOME.FOREST ? 8 : 0) + near(lat, lon, BIOME.FOREST, 0.05) - sea(0.03) * 3;
+        if (E) sc -= Math.hypot(lat - E[0], lon - E[1]) * 30;
         for (const q of taken) { const dd = Math.acos(Math.min(1, Math.sin(lat) * Math.sin(q[0]) + Math.cos(lat) * Math.cos(q[0]) * Math.cos(lon - q[1]))); if (dd < 0.18) sc -= 100; else if (dd < 0.7) sc += 2; } // apart, but not too far
         if (sc > bs) { bs = sc; best = [lat, lon]; }
       }
@@ -332,7 +359,7 @@ export class Globe {
     this.uiEl.style.display = 'none'; this.backBtn.style.display = 'none'; this.metBtn.style.display = 'none';
     this.here.visible = false; this.showRoad(true, null); this.relabel(); // the menu: the trail of the towns played in either mode
     if (!was) { // looking at the middle of the road, from a little above
-      const c = new THREE.Vector3(); for (const k of PATH) c.add(toVec(...this.spots[k], 1).normalize());
+      const c = new THREE.Vector3(); for (const k of PATH) if (!EAST[k]) c.add(toVec(...this.spots[k], 1).normalize()); // the home towns (the Far Isles come round as it turns)
       const [lat, lon] = toLatLon(c); this.cam.position.copy(toVec(Math.min(1.1, lat + 0.35), lon, this.fit())); this.cam.lookAt(0, 0, 0); this.controls.target.set(0, 0, 0);
     }
     this.controls.maxDistance = Math.max(R * 5, this.fit() * 1.15);

@@ -41,6 +41,9 @@ const MIX = {
 };
 const RUST = ['#b86a3e', '#a85d36', '#c27c4b', '#9c5a3a', '#b5774f', '#a8673f'];
 const GREENS = ['#6f7f3a', '#5d7034', '#7d8a45', '#56692f', '#8a9150', '#68783c', '#4f6330'];
+// the Far Isles: cherry blossom, plaster and timber walls (the texture's own colours show through), grey roof tiles
+const SAKURA = ['#f2b8c6', '#eaa6b8', '#f6c8d2', '#e79aae', '#f0c0cc'];
+const JWALL = ['#f4efe6', '#efe6d6', '#e9dfcc', '#f2eadc', '#e2d6c2', '#d8c8b0'], JTILE = ['#6a7078', '#61666e', '#70747a', '#5a5f67', '#787874'];
 
 class Bucket {
   constructor() { this.p = []; this.n = []; this.u = []; this.c = []; this.i = []; this.v = 0; }
@@ -117,6 +120,7 @@ export function buildCity(tex, opts = {}) {
   const r = rng(opts.seed ?? 20261025);
   const NB = opts.blocks ?? 12;
   const pick = (a) => a[Math.floor(r() * a.length)];
+  const JAPAN = opts.style === 'japan'; // the Far Isles' old towns (see jHouse)
 
   // ---- street grid
   const sx = [0], sz = [0];
@@ -178,8 +182,8 @@ export function buildCity(tex, opts = {}) {
   const hGone = (j, x) => { for (let i = 0; i < NB; i++) if (x >= sx[i] && x < sx[i + 1]) return layout.removed.has(ekey(nid(i, j), nid(i + 1, j))); return false; };
 
   const B = {
-    fac: [new Bucket(), new Bucket(), new Bucket(), new Bucket()],
-    shop: new Bucket(), roof: new Bucket(), walk: new Bucket(), grass: new Bucket(),
+    fac: [new Bucket(), new Bucket(), new Bucket(), new Bucket(), new Bucket()], // the fifth: the Far Isles' timber and plaster
+    shop: new Bucket(), roof: new Bucket(), walk: new Bucket(), grass: new Bucket(), tile: new Bucket(), // tile: pitched roofs
   };
   const crowns = [], trunks = [], tanks = [], lamps = [], stripes = [], parked = [], crowds = [], walkBlocks = [], open = [], buildings = [];
   let curB = -1; // building being generated (rooftop clutter remembers its owner)
@@ -215,7 +219,7 @@ export function buildCity(tex, opts = {}) {
 
   const addTree = (x, z, y, s, trunkH) => {
     trunks.push({ x, z, y, h: trunkH, s: s * 0.5, b: curB });
-    crowns.push({ x, y: y + trunkH + s * 0.75, z, s, col: pick(GREENS), b: curB });
+    crowns.push({ x, y: y + trunkH + s * 0.75, z, s, col: JAPAN && r() < 0.5 ? pick(SAKURA) : pick(GREENS), b: curB });
   };
 
   function parapet(b, y, col, hgt = 0.9) {
@@ -304,6 +308,7 @@ export function buildCity(tex, opts = {}) {
   }
 
   function building(lot, interior, blk) {
+    if (JAPAN) { jHouses(lot, interior, blk); return; }
     const ins = r() < 0.75 ? 0.12 : 0.4 + r() * 1.4;
     const b = { x0: lot.x0 + ins, x1: lot.x1 - ins, z0: lot.z0 + ins, z1: lot.z1 - ins };
     const w = b.x1 - b.x0, d = b.z1 - b.z0;
@@ -356,24 +361,26 @@ export function buildCity(tex, opts = {}) {
     const ranges = [{ key: fk, v0: vStart[fk], v1: B.fac[style].v }, { key: 'shop', v0: vStart.shop, v1: B.shop.v }, { key: 'roof', v0: vStart.roof, v1: B.roof.v }, { key: 'grass', v0: vStart.grass, v1: B.grass.v }]; // grass: its roof garden
     const rec = { x0: b.x0, x1: b.x1, z0: b.z0, z1: b.z1, roofY: th, baseY: y0, fl, ranges, door: null,
       roof: { x0: tr.x0 + 0.7, x1: tr.x1 - 0.7, z0: tr.z0 + 0.7, z1: tr.z1 - 0.7 } };
-    if (!interior) {
-      const dr = rng(buildings.length * 7919 + 13), e = 0.05, opts = [];
-      if (Math.abs(lot.z0 - blk.z0) < e) opts.push(3);
-      if (Math.abs(lot.z1 - blk.z1) < e) opts.push(2);
-      if (Math.abs(lot.x0 - blk.x0) < e) opts.push(1);
-      if (Math.abs(lot.x1 - blk.x1) < e) opts.push(0);
-      if (opts.length) {
-        const sd = opts[Math.floor(dr() * opts.length)];
-        const ax = b.x0 + 1.2 + dr() * Math.max(0, w - 2.4), az = b.z0 + 1.2 + dr() * Math.max(0, d - 2.4);
-        if (sd === 3) { rec.wall = [ax, b.z0]; rec.door = [ax, blk.z0 - 0.9]; rec.n = [0, -1]; }
-        else if (sd === 2) { rec.wall = [ax, b.z1]; rec.door = [ax, blk.z1 + 0.9]; rec.n = [0, 1]; }
-        else if (sd === 1) { rec.wall = [b.x0, az]; rec.door = [blk.x0 - 0.9, az]; rec.n = [-1, 0]; }
-        else { rec.wall = [b.x1, az]; rec.door = [blk.x1 + 0.9, az]; rec.n = [1, 0]; }
-      }
-    }
+    if (!interior) frontDoor(rec, b, lot, blk);
     rec.wallCol = col; rec.top = th; rec.hut = hut || null; rec.hatch = hut ? hut.door : null;
     buildings.push(rec);
     curB = -1;
+  }
+
+  // the street door of building rec (footprint b) on lot, on a side of the lot that is on the edge of its block
+  function frontDoor(rec, b, lot, blk) {
+    const dr = rng(buildings.length * 7919 + 13), e = 0.05, cand = [], w = b.x1 - b.x0, d = b.z1 - b.z0;
+    if (Math.abs(lot.z0 - blk.z0) < e) cand.push(3);
+    if (Math.abs(lot.z1 - blk.z1) < e) cand.push(2);
+    if (Math.abs(lot.x0 - blk.x0) < e) cand.push(1);
+    if (Math.abs(lot.x1 - blk.x1) < e) cand.push(0);
+    if (!cand.length) return;
+    const sd = cand[Math.floor(dr() * cand.length)];
+    const ax = b.x0 + 1.2 + dr() * Math.max(0, w - 2.4), az = b.z0 + 1.2 + dr() * Math.max(0, d - 2.4);
+    if (sd === 3) { rec.wall = [ax, b.z0]; rec.door = [ax, blk.z0 - 0.9]; rec.n = [0, -1]; }
+    else if (sd === 2) { rec.wall = [ax, b.z1]; rec.door = [ax, blk.z1 + 0.9]; rec.n = [0, 1]; }
+    else if (sd === 1) { rec.wall = [b.x0, az]; rec.door = [blk.x0 - 0.9, az]; rec.n = [-1, 0]; }
+    else { rec.wall = [b.x1, az]; rec.door = [blk.x1 + 0.9, az]; rec.n = [1, 0]; }
   }
 
   // ---- landmarks: one building of stacked tiers on a whole block, recorded like any other (it can burn and fall)
@@ -459,6 +466,8 @@ export function buildCity(tex, opts = {}) {
       tiered([{ b: sq(cx, cz, W * 0.66, D * 0.66), fl: 10 }, { b: sq(cx, cz, W * 0.54, D * 0.54), fl: 8 }, { b: sq(cx, cz, W * 0.42, D * 0.42), fl: 7 }, { b: sq(cx, cz, W * 0.3, D * 0.3), fl: 5 }], 0, lin('#e2d6bc'), blk,
         { name: 'Art Deco tower', trim: 0.4, crown: (x, z, y, t) => { const s = (t.x1 - t.x0) / 2; box(B.roof, sq(x, z, s * 0.7), y, y + 5, lin('#e8dcc2')); box(B.roof, sq(x, z, s * 0.45), y + 5, y + 9, lin('#d9c9a4')); box(B.roof, sq(x, z, s * 0.25), y + 9, y + 13, lin('#cdb98c')); return mast(x, z, y + 13, 16, 0.35); } });
     else if (kind === 'stadium') stadium(cx, cz, Math.min(W, D) * 0.92, blk);
+    else if (kind === 'temple') jTemple(blk);
+    else if (kind === 'pagoda') jPagoda(blk);
     else if (kind === 'dome') { // city hall: white stone, a columned portico and a green copper dome
       const hw = W * 0.8, hd = D * 0.55, h = CURB + GF + 4 * FH, R = Math.min(hw, hd) * 0.42;
       tiered([{ b: sq(cx, cz, hw, hd), fl: 4 }], 3, lin('#efe9dc'), blk, { name: 'City hall', noHut: true, trim: 0.45, roof: '#cfc6b4',
@@ -467,6 +476,169 @@ export function buildCity(tex, opts = {}) {
       box(B.roof, { x0: cx - hw * 0.62, x1: cx + hw * 0.62, z0: cz - hd - 3.2, z1: cz - hd }, h, h + 1.4, lin('#ebe4d5'));
       box(B.roof, { x0: cx - hw * 0.62, x1: cx + hw * 0.62, z0: cz - hd - 3.4, z1: cz - hd }, CURB, CURB + 0.6, lin('#e2dacb')); // steps
     }
+  }
+
+  // ---- the Far Isles' old towns (opts.style 'japan'): narrow wooden townhouses under grey tiled roofs (the ridge along
+  // the street, a pent roof over it), little gardens inside the blocks, cherry trees; a temple hall and a five-storey
+  // pagoda for landmarks, red gates, stone lanterns. A pitched roof's 'roof' (where people stand, heroes land) is a
+  // strip along its ridge; area: the floor, for how many fit inside
+  const grow = (b, o) => ({ x0: b.x0 - o, x1: b.x1 + o, z0: b.z0 - o, z1: b.z1 + o });
+  const vNow = () => { const o = { shop: B.shop.v, roof: B.roof.v, grass: B.grass.v, tile: B.tile.v }; B.fac.forEach((bk, k) => { o['fac' + k] = bk.v; }); return o; };
+  const vSince = (o) => { const n = vNow(); return Object.keys(o).filter(k => n[k] > o[k]).map(k => ({ key: k, v0: o[k], v1: n[k] })); };
+  const nrmOf = (a, b, d) => { const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = d[0] - a[0], vy = d[1] - a[1], vz = d[2] - a[2], n = [uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx], l = Math.hypot(n[0], n[1], n[2]) || 1; return [n[0] / l, n[1] / l, n[2] / l]; };
+  // a tiled roof: rings of eaves ({ b, y }) from the outermost up to the ridge (a ring as thin as a line, or a point),
+  // tiles sloping between each and the next on the sides in mask (the others are gable ends)
+  function roofRings(rings, col, mask = 15) {
+    const acc = [0, 0, 0, 0];
+    for (let k = 0; k + 1 < rings.length; k++) {
+      const O = rings[k], I = rings[k + 1];
+      for (let s = 0; s < 4; s++) {
+        if (!(mask & (1 << s))) continue;
+        const S = SIDES[s], [ox, oz] = S.L(O.b), ow = S.w(O.b), [ix, iz] = S.L(I.b), iw = Math.max(0, S.w(I.b));
+        const a = [ox, O.y, oz], b = [ox + S.R[0] * ow, O.y, oz + S.R[1] * ow], c = [ix + S.R[0] * iw, I.y, iz + S.R[1] * iw], d = [ix, I.y, iz];
+        const run = Math.abs((ix - ox) * S.out[0] + (iz - oz) * S.out[1]), v0 = acc[s] / 4, v1 = (acc[s] += Math.hypot(run, I.y - O.y)) / 4, u = (p) => (p[0] * S.R[0] + p[2] * S.R[1]) / 4;
+        B.tile.quad(a, b, c, d, nrmOf(a, b, d), [u(a), v0], [u(b), v0], [u(c), v1], [u(d), v1], shade(col, 0.86), col);
+      }
+    }
+  }
+  // the end walls up under a gable roof (the sides not in mask), from the wall top y to the ridge at yr
+  function gables(b, y, yr, mask, col) {
+    for (let s = 0; s < 4; s++) {
+      if (mask & (1 << s)) continue;
+      const S = SIDES[s], [lx, lz] = S.L(b), w = S.w(b), a = [lx, y, lz], c = [lx + S.R[0] * w, y, lz + S.R[1] * w], t = [lx + S.R[0] * w / 2, yr, lz + S.R[1] * w / 2];
+      const u0 = (lx * S.R[0] + lz * S.R[1]) / 12, v = (q) => (q - CURB) / 12;
+      B.fac[4].quad(a, c, t, t, S.n, [u0, v(y)], [u0 + w / 12, v(y)], [u0 + w / 24, v(yr)], [u0 + w / 24, v(yr)], col, col);
+    }
+  }
+  // a stone lantern: a foot, a post, the light box, a wide cap
+  const lantern = (x, z, y) => { const c = lin('#a8a296'); box(B.roof, sq(x, z, 0.38), y, y + 0.25, c); box(B.roof, sq(x, z, 0.15), y + 0.25, y + 1.05, c); box(B.roof, sq(x, z, 0.3), y + 1.05, y + 1.5, lin('#d8c08a')); box(B.roof, sq(x, z, 0.46), y + 1.5, y + 1.68, c); box(B.roof, sq(x, z, 0.13), y + 1.68, y + 1.9, c); };
+  // a red gate (torii): two posts on black feet, a tie beam, the long top beam under a black cap lifted at its ends
+  function torii(x, z, alongX, s = 1) {
+    const RED = lin('#c8402a'), BLK = lin('#2a2624'), y = CURB, H = 6.4 * s, hs = 3.2 * s;
+    const bar = (u0, u1, v0, v1, y0, y1, c) => box(B.roof, alongX ? { x0: x + u0 * s, x1: x + u1 * s, z0: z + v0 * s, z1: z + v1 * s } : { x0: x + v0 * s, x1: x + v1 * s, z0: z + u0 * s, z1: z + u1 * s }, y0, y1, c);
+    for (const u of [-3.2, 3.2]) { bar(u - 0.32, u + 0.32, -0.32, 0.32, y, y + H, RED); bar(u - 0.42, u + 0.42, -0.42, 0.42, y, y + 0.55, BLK); }
+    bar(-4.1, 4.1, -0.22, 0.22, y + H * 0.78, y + H * 0.78 + 0.45 * s, RED);
+    bar(-0.25, 0.25, -0.2, 0.2, y + H * 0.78 + 0.45 * s, y + H, RED);
+    bar(-4.8, 4.8, -0.38, 0.38, y + H, y + H + 0.55 * s, RED);
+    bar(-5.2, 5.2, -0.45, 0.45, y + H + 0.55 * s, y + H + 0.85 * s, BLK);
+    bar(-5.6, -4.4, -0.45, 0.45, y + H + 0.85 * s, y + H + 1.15 * s, BLK); bar(4.4, 5.6, -0.45, 0.45, y + H + 0.85 * s, y + H + 1.15 * s, BLK);
+    return hs;
+  }
+  // a lot as a row of narrow townhouses side by side, now and then a little garden inside a block instead
+  function jHouses(lot, interior, blk) {
+    const w = lot.x1 - lot.x0, d = lot.z1 - lot.z0, alongX = w >= d, n = Math.max(1, Math.round((alongX ? w : d) / (6 + r() * 3))), e = 0.01;
+    for (let k = 0; k < n; k++) {
+      const p = alongX ? { x0: lot.x0 + w * k / n, x1: lot.x0 + w * (k + 1) / n, z0: lot.z0, z1: lot.z1 } : { x0: lot.x0, x1: lot.x1, z0: lot.z0 + d * k / n, z1: lot.z0 + d * (k + 1) / n };
+      const inner = p.x0 > blk.x0 + e && p.x1 < blk.x1 - e && p.z0 > blk.z0 + e && p.z1 < blk.z1 - e;
+      if (inner && r() < 0.35) jGarden(p); else jHouse(p, inner, blk);
+    }
+  }
+  function jGarden(p) {
+    const w = p.x1 - p.x0, d = p.z1 - p.z0;
+    top(B.grass, p, CURB + 0.04, lin('#ffffff'), 6);
+    for (let t = 0, n = 1 + Math.floor(r() * 2); t < n; t++) addTree(p.x0 + 1.5 + r() * Math.max(0, w - 3), p.z0 + 1.5 + r() * Math.max(0, d - 3), CURB, 1.2 + r() * 0.9, 1.6 + r() * 1.2);
+    if (w > 4 && d > 4) lantern(p.x0 + 1.2, p.z0 + 1.2, CURB + 0.04);
+    open.push(p);
+  }
+  // a townhouse: a dark timber lattice front at the street, plaster above, a gable roof (or one sloping all round)
+  function jHouse(p, interior, blk) {
+    const b = grow(p, -0.15), w = b.x1 - b.x0, d = b.z1 - b.z0;
+    if (w < 3.2 || d < 3.2) { open.push(p); return; }
+    curB = buildings.length;
+    const vs = vNow(), y0 = CURB, q = r(), up = q < 0.25 ? 0 : q < 0.87 || (opts.maxFloors ?? 3) < 3 ? 1 : 2; // storeys over the ground floor
+    const h = y0 + GF + up * FH, col = lin(pick(JWALL)), tcol = lin(pick(JTILE)), e = 0.05;
+    const street = [Math.abs(p.x1 - blk.x1) < e, Math.abs(p.x0 - blk.x0) < e, Math.abs(p.z1 - blk.z1) < e, Math.abs(p.z0 - blk.z0) < e]; // on each side (SIDES order)
+    sides(B.fac[4], b, y0, h, col, { su: 12, sv: 12, v0: y0 });
+    const ridgeX = street[2] || street[3] ? true : street[0] || street[1] ? false : w >= d; // the ridge along the street, the eaves over it
+    const o = 0.75, E = grow(b, o), half = ridgeX ? (E.z1 - E.z0) / 2 : (E.x1 - E.x0) / 2, k = Math.min(0.58, 3.4 / half), ye = h - o * k, yr = ye + half * k, hip = r() < 0.3;
+    const cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2;
+    const ridge = ridgeX ? { x0: hip ? Math.min(cx, E.x0 + half) : E.x0, x1: hip ? Math.max(cx, E.x1 - half) : E.x1, z0: cz, z1: cz }
+      : { x0: cx, x1: cx, z0: hip ? Math.min(cz, E.z0 + half) : E.z0, z1: hip ? Math.max(cz, E.z1 - half) : E.z1 };
+    const mask = hip ? 15 : ridgeX ? 12 : 3;
+    roofRings([{ b: E, y: ye }, { b: ridge, y: yr }], tcol, mask);
+    if (!hip) gables(b, h, yr, mask, col);
+    const cap = lin('#3c4046'), rlen = ridgeX ? ridge.x1 - ridge.x0 : ridge.z1 - ridge.z0;
+    if (rlen > 0.6) {
+      box(B.tile, ridgeX ? { x0: ridge.x0, x1: ridge.x1, z0: cz - 0.24, z1: cz + 0.24 } : { x0: cx - 0.24, x1: cx + 0.24, z0: ridge.z0, z1: ridge.z1 }, yr - 0.15, yr + 0.3, cap);
+      if (!hip) for (const t of [0, 1]) { const ex = ridgeX ? ridge.x0 + t * rlen : cx, ez = ridgeX ? cz : ridge.z0 + t * rlen; box(B.tile, sq(ex, ez, 0.36), yr - 0.1, yr + 0.62, cap); } // the end tiles
+    }
+    if (up >= 1) for (let s = 0; s < 4; s++) { // a pent roof over the street
+      if (!street[s]) continue;
+      const S = SIDES[s], [lx, lz] = S.L(b), ws = S.w(b), yb = y0 + GF - 0.3, yt = yb + 0.6, ou = 1.0;
+      const dd = [lx, yt, lz], cc = [lx + S.R[0] * ws, yt, lz + S.R[1] * ws], aa = [lx + S.out[0] * ou, yb, lz + S.out[1] * ou], bb = [cc[0] + S.out[0] * ou, yb, cc[2] + S.out[1] * ou];
+      B.tile.quad(aa, bb, cc, dd, nrmOf(aa, bb, dd), [0, 0], [ws / 4, 0], [ws / 4, 0.3], [0, 0.3], shade(tcol, 0.86), tcol);
+    }
+    const strip = ridgeX ? { x0: Math.min(cx - 0.8, Math.max(b.x0 + 0.6, ridge.x0)), x1: Math.max(cx + 0.8, Math.min(b.x1 - 0.6, ridge.x1)), z0: cz - 0.45, z1: cz + 0.45 }
+      : { x0: cx - 0.45, x1: cx + 0.45, z0: Math.min(cz - 0.8, Math.max(b.z0 + 0.6, ridge.z0)), z1: Math.max(cz + 0.8, Math.min(b.z1 - 0.6, ridge.z1)) };
+    const rec = { x0: b.x0, x1: b.x1, z0: b.z0, z1: b.z1, roofY: yr, baseY: y0, fl: up + 1, ranges: vSince(vs), door: null, roof: strip, area: w * d };
+    if (!interior) frontDoor(rec, b, p, blk);
+    rec.wallCol = col; rec.top = yr + 0.3; rec.hut = null; rec.hatch = null;
+    buildings.push(rec); curB = -1;
+  }
+  // a hall's wide curving roof, sloping on all four sides from eaves out by o round b (walls up to y): a flat sweep out
+  // to the eaves, steeper up to the ridge; returns the ridge height
+  function hallRoof(b, y, o, col, steep = 0.95) {
+    const cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2, hd = Math.min(b.x1 - b.x0, b.z1 - b.z0) / 2;
+    const mid = grow(b, -hd * 0.45), ym = y + hd * 0.45 * 0.55, yr = ym + hd * 0.55 * steep;
+    const ridge = (b.x1 - b.x0) >= (b.z1 - b.z0) ? { x0: b.x0 + hd, x1: b.x1 - hd, z0: cz, z1: cz } : { x0: cx, x1: cx, z0: b.z0 + hd, z1: b.z1 - hd };
+    roofRings([{ b: grow(b, o), y: y - o * 0.3 }, { b, y }, { b: mid, y: ym }, { b: ridge, y: yr }], col);
+    return { yr, ridge };
+  }
+  // a temple hall on a stone terrace: red posts round a veranda, white walls and paper screens, a great curving tiled
+  // roof with gold ends to its ridge; a red gate at the street and stone lanterns along the path to the steps
+  function jTemple(blk) {
+    curB = buildings.length;
+    const vs = vNow(), cx = (blk.x0 + blk.x1) / 2, cz = (blk.z0 + blk.z1) / 2, W = (blk.x1 - blk.x0) / 2, D = (blk.z1 - blk.z0) / 2;
+    const hw = Math.min(W * 0.6, 17), hd = Math.min(D * 0.45, 11), hz = cz + D * 0.12, y0 = CURB, ty = y0 + 1.3, wy = ty + 6.2;
+    const base = sq(cx, hz, hw + 2.5, hd + 2.5), hall = sq(cx, hz, hw, hd), RED = lin('#b8402c'), stone = lin('#b9b2a4'), wood = lin('#6b4a30');
+    box(B.roof, base, y0, ty, stone);
+    box(B.roof, { x0: cx - 4, x1: cx + 4, z0: base.z0 - 2.6, z1: base.z0 }, y0, y0 + 0.65, stone); // the steps
+    box(B.roof, hall, ty, ty + 0.3, wood); // the veranda floor
+    sides(B.fac[4], grow(hall, -2), ty + 0.3, wy + 1.1, lin('#f4eee2'), { su: 12, sv: 12, v0: ty - 3.7 });
+    for (let s = 0; s < 4; s++) { // red posts round the veranda, a red beam over them
+      const S = SIDES[s], [lx, lz] = S.L(hall), w = S.w(hall), n = Math.max(2, Math.round(w / 3.4));
+      for (let k = 0; k < n; k++) { const t = k / n * w; box(B.roof, sq(lx + S.R[0] * t, lz + S.R[1] * t, 0.34), ty + 0.3, wy - 0.25, RED); }
+    }
+    for (const bb of [{ x0: hall.x0, x1: hall.x1, z0: hall.z0 - 0.2, z1: hall.z0 + 0.2 }, { x0: hall.x0, x1: hall.x1, z0: hall.z1 - 0.2, z1: hall.z1 + 0.2 }, { x0: hall.x0 - 0.2, x1: hall.x0 + 0.2, z0: hall.z0, z1: hall.z1 }, { x0: hall.x1 - 0.2, x1: hall.x1 + 0.2, z0: hall.z0, z1: hall.z1 }].map(q => grow(q, -0.1))) box(B.roof, bb, wy - 0.95, wy - 0.25, RED);
+    const { yr, ridge } = hallRoof(hall, wy, 3.2, lin('#4f555c'));
+    box(B.tile, { x0: ridge.x0 - 0.3, x1: ridge.x1 + 0.3, z0: hz - 0.4, z1: hz + 0.4 }, yr - 0.2, yr + 0.7, lin('#3c4046'));
+    for (const x of [ridge.x0, ridge.x1]) box(B.roof, sq(x, hz, 0.5, 0.35), yr + 0.3, yr + 2.0, lin('#d8a840')); // gold ends
+    // the way in: a red gate at the street, a paved path between lanterns, trees round the yard
+    const pz0 = blk.z0 + 1.5;
+    top(B.walk, { x0: cx - 2.2, x1: cx + 2.2, z0: blk.z0, z1: base.z0 - 2.6 }, CURB + 0.06, lin('#d6ccb4'), 4);
+    torii(cx, pz0 + 2, true, 1.05);
+    for (let z = pz0 + 6; z < base.z0 - 3; z += 5) for (const sx of [-3.3, 3.3]) lantern(cx + sx, z, CURB + 0.03);
+    for (const [fx, fz] of [[0.1, 0.12], [0.9, 0.12], [0.08, 0.9], [0.92, 0.9], [0.22, 0.28], [0.78, 0.28]]) addTree(blk.x0 + (blk.x1 - blk.x0) * fx, blk.z0 + (blk.z1 - blk.z0) * fz, CURB, 1.6 + r() * 0.8, 2.2 + r());
+    const rec = { x0: base.x0, x1: base.x1, z0: base.z0, z1: base.z1, roofY: yr, baseY: y0, fl: 3, ranges: vSince(vs), door: null, landmark: 'Temple', area: hw * hd * 4,
+      roof: { x0: Math.min(cx - 0.8, ridge.x0), x1: Math.max(cx + 0.8, ridge.x1), z0: hz - 0.45, z1: hz + 0.45 } };
+    rec.wall = [cx, base.z0]; rec.door = [cx, blk.z0 - 0.9]; rec.n = [0, -1];
+    rec.wallCol = lin('#8a6a52'); rec.top = yr + 2; rec.hut = null; rec.hatch = null;
+    buildings.push(rec); curB = -1;
+  }
+  // a five-storey pagoda on a stone base: each storey a little smaller under its own wide sweeping roof, a bronze
+  // spire of rings on top; lanterns and trees round it
+  function jPagoda(blk) {
+    curB = buildings.length;
+    const vs = vNow(), cx = (blk.x0 + blk.x1) / 2, cz = (blk.z0 + blk.z1) / 2, W = (blk.x1 - blk.x0) / 2, D = (blk.z1 - blk.z0) / 2, y0 = CURB;
+    const s0 = Math.max(4.2, Math.min(6.2, Math.min(W, D) * 0.22)), wall = lin('#c65a3c'), tcol = lin('#4c5158'), BRZ = lin('#5a4a38');
+    box(B.roof, sq(cx, cz, s0 + 2.6), y0, y0 + 1.1, lin('#b9b2a4'));
+    let y = y0 + 1.1, s = s0, yr = y;
+    for (let i = 0; i < 5; i++) {
+      const hgt = i === 0 ? 4.4 : 3.2, yt = y + hgt, next = s0 * (1 - 0.1 * (i + 1));
+      sides(B.fac[4], sq(cx, cz, s), y, yt, wall, { su: 12, sv: 12, v0: y - 4 });
+      if (i < 4) { roofRings([{ b: sq(cx, cz, s + 2.4), y: yt - 0.75 }, { b: sq(cx, cz, s), y: yt }, { b: sq(cx, cz, next), y: yt + 0.5 }], tcol); y = yt + 0.35; }
+      else { const h2 = hallRoof(sq(cx, cz, s), yt, 2.4, tcol, 1.2); yr = h2.yr; }
+      s = next;
+    }
+    box(B.roof, sq(cx, cz, 0.24), yr - 0.2, yr + 9, BRZ); // the spire
+    for (let k = 0; k < 9; k++) box(B.roof, sq(cx, cz, 0.62), yr + 1.6 + k * 0.62, yr + 1.78 + k * 0.62, BRZ);
+    box(B.roof, sq(cx, cz, 0.38), yr + 9, yr + 9.6, lin('#c9a040'));
+    for (const [fx, fz] of [[0.18, 0.18], [0.82, 0.18], [0.18, 0.82], [0.82, 0.82]]) lantern(cx + (fx - 0.5) * (s0 + 9) * 2, cz + (fz - 0.5) * (s0 + 9) * 2, CURB + 0.03);
+    for (const [fx, fz] of [[0.08, 0.1], [0.92, 0.1], [0.1, 0.92], [0.9, 0.9], [0.5, 0.94]]) addTree(blk.x0 + (blk.x1 - blk.x0) * fx, blk.z0 + (blk.z1 - blk.z0) * fz, CURB, 1.5 + r() * 0.8, 2 + r());
+    const rec = { x0: cx - s0 - 2.6, x1: cx + s0 + 2.6, z0: cz - s0 - 2.6, z1: cz + s0 + 2.6, roofY: yr, baseY: y0, fl: 5, ranges: vSince(vs), door: null, landmark: 'Pagoda', area: s0 * s0 * 4, roof: sq(cx, cz, 0.8) };
+    rec.wall = [cx, cz - s0]; rec.door = [cx, blk.z0 - 0.9]; rec.n = [0, -1];
+    rec.wallCol = wall; rec.top = yr + 9.6; rec.hut = null; rec.hatch = null;
+    buildings.push(rec); curB = -1;
   }
 
   function split(rect, out, depth) {
@@ -588,7 +760,7 @@ export function buildCity(tex, opts = {}) {
     for (let k = 0; k < n; k++) {
       const x = sw.x0 + 3 + rl() * (sw.x1 - sw.x0 - 6), z = sw.z0 + 3 + rl() * (sw.z1 - sw.z0 - 6), s = desert ? 0.6 + rl() * 0.6 : 1.5 + rl() * 1.6, h = desert ? 0.5 + rl() * 0.5 : 2 + rl() * 2.4;
       trunks.push({ x, z, y: 0.05, h, s: s * 0.5, b: -1 });
-      crowns.push({ x, y: 0.05 + h + s * 0.75, z, s, col: desert ? (rl() < 0.5 ? '#8f8a52' : '#a39a5e') : GREENS[Math.floor(rl() * GREENS.length)], b: -1 });
+      crowns.push({ x, y: 0.05 + h + s * 0.75, z, s, col: desert ? (rl() < 0.5 ? '#8f8a52' : '#a39a5e') : JAPAN && rl() < 0.2 ? SAKURA[Math.floor(rl() * SAKURA.length)] : GREENS[Math.floor(rl() * GREENS.length)], b: -1 });
     }
   }
   // a big park across a superblock: lawns, two crossing paths, a fountain in the middle, plenty of trees
@@ -749,6 +921,7 @@ export function buildCity(tex, opts = {}) {
     fac: tex.facades.map((m, k) => seeThrough(walls(std({ map: m, normalMap: tex.facadeRelief[k], normalScale: nrm(1.6), vertexColors: true, roughness: 0.85, emissiveMap: tex.facadesLit[k], emissive: '#ffffff', emissiveIntensity: 0 })))), // walls in the way of the action go see-through (see.js)
     shop: seeThrough(walls(std({ map: tex.shop, normalMap: tex.shopRelief, normalScale: nrm(1.6), vertexColors: true, emissiveMap: tex.shopLit, emissive: '#ffffff', emissiveIntensity: 0 }))),
     roof: seeThrough(std({ map: tex.roof, normalMap: tex.roofRelief, normalScale: nrm(1.5), vertexColors: true })),
+    tile: seeThrough(std({ map: tex.tile, normalMap: tex.tileRelief, normalScale: nrm(1.3), vertexColors: true, roughness: 0.62, side: THREE.DoubleSide })), // seen from under the eaves too
     walk: std({ map: tex.sidewalk, vertexColors: true }),
     grass: std({ map: tex.grass, vertexColors: true, roughness: 1 }),
   };
@@ -761,7 +934,7 @@ export function buildCity(tex, opts = {}) {
     group.add(m);
   };
   B.fac.forEach((bk, k) => add(bk, mats.fac[k], true, 'fac' + k));
-  add(B.shop, mats.shop, true, 'shop'); add(B.roof, mats.roof, true, 'roof'); add(B.walk, mats.walk, false); add(B.grass, mats.grass, false, 'grass');
+  add(B.shop, mats.shop, true, 'shop'); add(B.roof, mats.roof, true, 'roof'); add(B.tile, mats.tile, true, 'tile'); add(B.walk, mats.walk, false); add(B.grass, mats.grass, false, 'grass');
   if (slabGeos.length) { const m = new THREE.Mesh(mergeGeometries(slabGeos), mats.walk); m.receiveShadow = true; m.matrixAutoUpdate = false; group.add(m); }
   const colorize = (g, c) => { const n = g.attributes.position.count, a = new Float32Array(n * 3); for (let v = 0; v < n; v++) a.set(c, v * 3); g.setAttribute('color', new THREE.BufferAttribute(a, 3)); return g; };
   const curbMat = std({ color: '#e2d8c6' });

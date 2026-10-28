@@ -255,7 +255,7 @@ export class People {
     this.rw = Math.ceil((B.x1 - B.x0 + 2 * HALF) / RCELL) + 1; this.rh = Math.ceil((B.z1 - B.z0 + 2 * HALF) / RCELL) + 1;
     this.rgrid = Array.from({ length: this.rw * this.rh }, () => []);
     bl.forEach((b, k) => {
-      const rf = b.roof, area = Math.max(0, rf.x1 - rf.x0) * Math.max(0, rf.z1 - rf.z0);
+      const rf = b.roof, area = b.area ?? Math.max(0, rf.x1 - rf.x0) * Math.max(0, rf.z1 - rf.z0); // area: a pitched roof's floor (its 'roof' is the ridge)
       if (b.door && b.n) b.t = [-b.n[1], b.n[0]]; // along the wall from the door (firefighters line up on it, however small the building)
       if (!b.door || area < 20) return;
       this.bCap[k] = Math.min(120, Math.floor(area / 5));

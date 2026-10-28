@@ -130,7 +130,7 @@ export function buildOutskirts(scene, city, opts = {}) {
   })();
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), p = new THREE.Vector3(), s = new THREE.Vector3(), tc = new THREE.Color();
   const inst = (geo2, mat, list, scale, colorFn) => {
-    const im = new THREE.InstancedMesh(geo2, mat, Math.max(1, list.length));
+    const im = new THREE.InstancedMesh(geo2, mat, Math.max(1, list.length)); im.count = list.length; // none in this country: none drawn (an empty list left one palm in the middle of the town)
     list.forEach(([x, y, z], k) => { e.set(0, rand() * 6.28, 0); q.setFromEuler(e); const sc = scale(); m4.compose(p.set(x, y - 0.2, z), q, s.set(sc, sc * (0.85 + rand() * 0.3), sc)); im.setMatrixAt(k, m4); if (colorFn) im.setColorAt(k, colorFn(tc)); });
     im.castShadow = false; im.receiveShadow = false; im.computeBoundingSphere(); group.add(im); return im; // too many to draw again into the shadow map
   };

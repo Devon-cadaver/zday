@@ -16,11 +16,12 @@ export const PLACES = {
   sunvale: { name: 'Sun Valley', blurb: 'A round desert town of white walls and a domed mission', blocks: 8, seed: 8282, maxFloors: 5, tall: 0, landmarks: ['dome'], centers: 1, diag: false, tint: { white: 14, sand: 12, pastel: 4 }, people: 0.4, cars: 0.3, land: 'desert', shape: 'round' },
   ironside: { name: 'Ironside', blurb: 'A brick and concrete mill town, smoke and rail yards', blocks: 9, seed: 4444, maxFloors: 8, tall: 0.04, landmarks: [], centers: 1, tint: { brick: 14, concrete: 8, dark: 3 }, people: 0.42, cars: 0.42, shape: 'ell' },
   northgate: { name: 'Northgate', blurb: 'A busy city in the hills, an Art Deco tower over it', blocks: 10, seed: 6060, maxFloors: 10, tall: 0.07, landmarks: ['deco'], centers: 1, tint: { stone: 8, concrete: 6, brick: 4 }, people: 0.55, cars: 0.55, land: 'forest', shape: 'diamond' },
+  kiyomura: { name: 'Kiyomura', blurb: 'An old temple town on the Far Isles: wooden houses, a pagoda, cherry trees', blocks: 7, seed: 8686, maxFloors: 3, tall: 0, landmarks: ['pagoda', 'temple'], centers: 1, diag: false, style: 'japan', tint: { white: 10, brown: 8, dark: 4 }, people: 0.32, cars: 0.18, land: 'forest', shape: 'round' },
 };
 
-// the road through the world in Commander and Be The Disaster: the smallest town first, up to the big city. Win in a
-// place and the next one opens
-export const PATH = ['mesa', 'pines', 'crossing', 'dust', 'lakeside', 'harbor', 'sunvale', 'ironside', 'northgate', 'bayview', 'metro'];
+// the road through the world in Commander and Be The Disaster: the smallest town first, up to the big city, then on
+// across the sea to the towns of the Far Isles. Win in a place and the next one opens
+export const PATH = ['mesa', 'pines', 'crossing', 'dust', 'lakeside', 'harbor', 'sunvale', 'ironside', 'northgate', 'bayview', 'metro', 'kiyomura'];
 
 export function placeKey() {
   let k = new URLSearchParams(location.search).get('place');

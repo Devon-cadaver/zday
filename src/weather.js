@@ -136,7 +136,7 @@ export class Weather {
     post.opts.sepia = this.base.sepia * p.sepia;
     post.opts.exposure = this.base.exp * p.exp;
     const cover = p.cover * (1 - night * 0.7);
-    for (const m of [city.mats.walk, city.mats.grass, city.mats.roof, city.mats.ground]) { if (!m) continue; m.emissive.setRGB(cover, cover, cover * 1.05); }
+    for (const m of [city.mats.walk, city.mats.grass, city.mats.roof, city.mats.tile, city.mats.ground]) { if (!m) continue; m.emissive.setRGB(cover, cover, cover * 1.05); }
   }
 
   sync(dt, realT) {
