@@ -274,6 +274,7 @@ export class Game {
   // a mode stops for good: its touch handlers go quiet (dead), what it put on the screen goes
   endMode() {
     if (this.folk) this.folk.hide();
+    if (this.profile) this.profile.mode = null;
     if (this.followSub || this.follow >= 0) this.setFollow(-1);
     const m = this.mode;
     if (m) { m.dead = true; if (m.gauge && m.gauge.el) m.gauge.el.remove(); if (m.panel) m.panel.remove(); }

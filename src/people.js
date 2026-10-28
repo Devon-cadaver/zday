@@ -171,6 +171,7 @@ export class People {
   // ---------- setup
   makeCrowds(r) {
     const pts = [];
+    const groups = Math.round(320 * Math.min(1, this.opts.crowd ?? 1)); // the corner groups go with the size of the town (a hamlet is not as packed as the city)
     for (const c of this.city.crowds) {
       for (let k = 0; k < c.n; k++) {
         const a = r() * Math.PI * 2, d = Math.sqrt(r()) * c.rad;
@@ -179,7 +180,7 @@ export class People {
       }
     }
     const blocks = this.city.walkBlocks;
-    for (let k = 0; k < 320; k++) {
+    for (let k = 0; k < groups; k++) {
       const b = blocks[Math.floor(r() * blocks.length)]; const n = 3 + Math.floor(r() * 10);
       const cx = r() < 0.5 ? b.x0 : b.x1, cz = r() < 0.5 ? b.z0 : b.z1;
       for (let m = 0; m < n; m++) { const [px, pz] = this.offRoad(...this.offRing(cx + (r() - 0.5) * 3, cz + (r() - 0.5) * 3)); pts.push([px, CURB, pz]); }
@@ -658,7 +659,7 @@ export class People {
   becomeZombie(i, type = -1) {
     this.zt[i] = type >= 0 ? type : this.zrad[i] ? RADIOACTIVE : (this.runnerBoost && this.r() < 0.3 ? 1 : rollZombieType(this.r));
     const Z = ZTYPES[this.zt[i]];
-    this.hp[i] = Z.hp; this.inc[i] = Z.scream ? 4 + this.r() * 4 : 0;
+    this.hp[i] = Z.rad && this.zrad[i] === 1 ? 1 : Z.hp; // the tanker's gas: they glow, but drop to one shot (the nuclear kind takes two) this.inc[i] = Z.scream ? 4 + this.r() * 4 : 0;
     this.zombieLook(i);
   }
 
@@ -688,8 +689,8 @@ export class People {
     for (let i = 0; i < this.active; i++) {
       if (this.st[i] !== S.ZOMBIE || this.lvl[i] !== -1) continue;
       const Z = ZTYPES[this.zt[i]];
-      if (Z.rad) {
-        this.around(this.x[i], this.z[i], 6.5, (j) => { if (this.isPrey(j) && this.kind[j] === KIND.CIVILIAN && this.r() < 0.05) { this.inf[j] = 1; this.zrad[j] = 1; this.inc[j] = this.inc0[j] = 5 + this.r() * 8; this.dirty[j] = 1; } });
+      if (Z.rad && this.zrad[i] === 2) { // only the nuclear kind gives off enough to infect without a bite
+        this.around(this.x[i], this.z[i], 6.5, (j) => { if (this.isPrey(j) && this.kind[j] === KIND.CIVILIAN && this.r() < 0.05) { this.inf[j] = 1; this.zrad[j] = 2; this.inc[j] = this.inc0[j] = 5 + this.r() * 8; this.dirty[j] = 1; } });
       } else if (Z.spit && (this.spitT[i] -= 0.5) <= 0) {
         let tg = -1, bd = 1e9;
         this.around(this.x[i], this.z[i], 9, (j, d2) => { if (d2 > 4 && d2 < bd && this.isPrey(j) && this.kind[j] === KIND.CIVILIAN) { bd = d2; tg = j; } });
@@ -798,6 +799,7 @@ export class People {
   boardStep(i, h) {
     const dx = this.tx[i] - this.x[i], dz = this.tz[i] - this.z[i], d = Math.hypot(dx, dz), D = this.doors.get(this.bt[i]);
     const aboard = () => { this.st[i] = S.EVAC; this.lvl[i] = -1; if (this.fx[i] === 1) this.stats.jailed++; else this.stats.bused++; this.fx[i] = 0; this.watch[i] = 0; this.events.push({ type: 'boarded', i, bus: this.bt[i] }); };
+    if (this.watch[i] === 2 && !D) { this.bt[i] = -1; this.fx[i] = 0; this.watch[i] = 0; this.y[i] = this.groundY(this.x[i], this.z[i]); this.startReturn(i); return; } // the bus pulled away as they stepped up
     if (this.watch[i] === 2) { // from where they stood to the door, then up into the bus
       this.t1[i] -= h; const k = 1 - Math.max(0, this.t1[i]) / 0.9;
       if (k < 0.55) { const e = k / 0.55; this.x[i] = this.px[i] + (D.d[0] - this.px[i]) * e; this.z[i] = this.pz[i] + (D.d[1] - this.pz[i]) * e; }
@@ -975,7 +977,7 @@ export class People {
             this.inf[i] = 1;
             this.inc[i] = this.inc0[i] = this.incubate[0] + this.r() * (this.incubate[1] - this.incubate[0]);
             const b = this.target[i];
-            if (b >= 0 && this.zt[b] === RADIOACTIVE) this.zrad[i] = 1; // a radioactive bite carries it on: the whole outbreak glows
+            if (b >= 0 && this.zt[b] === RADIOACTIVE) this.zrad[i] = this.zrad[b] || 1; // a radioactive bite carries it on: the whole outbreak glows
             if (this.kind[i] === KIND.OFFICER) { this.st[i] = S.COP; this.target[i] = -1; break; }
             if (this.kind[i] === KIND.FIREFIGHTER) { this.st[i] = S.FIREMAN; this.target[i] = -1; break; }
             this.st[i] = this.lvl[i] >= 0 ? S.ROOF : S.IDLE; // released, a civilian again (infected)

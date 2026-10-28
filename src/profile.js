@@ -37,7 +37,9 @@ export class Profile {
   get xp() { return this.data.xp; }
   get bank() { return this.data.xp - this.data.spent; } // XP free to spend on upgrades
   levelFor(xp) { let l = 1; for (let k = 1; k < LEVELS.length; k++) if (xp >= LEVELS[k]) l = k + 1; return l; }
-  get level() { return this.levelFor(this.data.xp); }
+  // the level: from XP, and in a mode with a road of towns (this.mode, set by the mode) at least one per town opened, so the
+  // road and the level keep step (playtests: XP alone left the whole road at level 1 to 3)
+  get level() { const x = this.levelFor(this.data.xp); return this.mode ? Math.min(MAX_LEVEL, Math.max(x, this.reach(this.mode) + 1)) : x; }
   get nextXp() { const l = this.level; return l >= MAX_LEVEL ? null : LEVELS[l]; }
   get progress() { const l = this.level; if (l >= MAX_LEVEL) return 1; const a = LEVELS[l - 1], b = LEVELS[l]; return (this.data.xp - a) / (b - a); }
   unlocked(unitId) { return this.level >= (UNLOCK[unitId] ?? 1); }
@@ -89,8 +91,9 @@ export class Profile {
     const l = this.level;
     return {
       incidents: l <= 1 ? 2 : l <= 3 ? 3 : l <= 6 ? 4 : 5, // incidents per round
-      sites: l <= 3 ? 2 : 3,                              // outbreak sites in a zombie incident (Sean: level 1 was too easy)
-      incubate: l <= 1 ? [13, 21] : l === 2 ? [12, 20] : [10, 18],
+      sites: l <= 1 ? 1 : l <= 4 ? 2 : 3,                 // outbreak sites in a zombie incident (the first is the tanker spill)
+      spill: l <= 1 ? 8 : l <= 3 ? 12 : l <= 6 ? 16 : 22, // how many the tanker's gas can infect (playtests: 22 at level 1 outran any response)
+      incubate: l <= 1 ? [24, 34] : l === 2 ? [18, 28] : l <= 4 ? [14, 22] : [10, 18],
       seeds: l >= 8 ? 5 : 4,
       runners: l >= 10,
       policeCd: (l >= 5 ? 15 : 20) * (this.has('fastcops') ? 0.5 : 1),

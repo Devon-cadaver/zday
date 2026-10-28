@@ -97,7 +97,7 @@ function buildWorld() {
   scene.add(city.group);
   const outskirts = buildOutskirts(scene, city, { low, land: place.land });
   const traffic = new Traffic(city, scene, { cars: Math.round((low ? 160 : 280) * (place.cars ?? 1)) });
-  const people = new People(city, scene, { people: Math.round((low ? 2600 : 5200) * (place.people ?? 1)) });
+  const people = new People(city, scene, { people: Math.round((low ? 2600 : 5200) * (place.people ?? 1)), crowd: (place.people ?? 1) * (low ? 0.6 : 1) });
   const fire = new Fire(scene, city, { low });
   const helis = new Helicopters(scene, city, fire, people);
   helis.traffic = traffic;

@@ -204,7 +204,7 @@ export class NukeBlast {
           people.kill(j, ox * 14, oz * 14, 'burn');
           if (this.byPlayer) { if (wasZ) { people.stats.disasterZ--; people.stats.nukedZ++; } else if (civ) { people.stats.disasterCiv--; people.stats.nukedCiv++; } }
         }
-      } else if (people.isPrey(j) && people.kind[j] === 0 && Math.random() < 0.12) { people.inf[j] = 1; people.zrad[j] = 1; people.inc[j] = people.inc0[j] = 10 + Math.random() * 25; people.dirty[j] = 1; } // a dose of radiation
+      } else if (people.isPrey(j) && people.kind[j] === 0 && Math.random() < 0.12) { people.inf[j] = 1; people.zrad[j] = 2; people.inc[j] = people.inc0[j] = 10 + Math.random() * 25; people.dirty[j] = 1; } // a dose of radiation
     }
     traffic.near(x, z, r1, (car) => {
       if (car.gone || car.mode === 4 || car.mode === 5) return;
@@ -328,7 +328,7 @@ export class Meltdown {
     if ((f.doseT -= h) <= 0) {
       f.doseT = 1;
       if (f.k > 0.3 && (this.zoneT = (this.zoneT ?? 0) - 1) <= 0 && this.D.contaminate) { this.zoneT = 8; this.D.contaminate(f.x, f.z, f.R * 0.6); } // fallout settles where the cloud passes
-      people.around(f.x, f.z, f.R * 0.85, (j) => { const s = people.st[j]; if ((s === 0 || s === 1 || s === 2 || s === 3 || s === 9 || s === 24) && people.kind[j] === 0 && Math.random() < 0.02 * f.k) { if (Math.random() < 0.45) people.kill(j, 0, 0, 'rad'); else if (!people.inf[j]) { people.inf[j] = 1; people.zrad[j] = 1; people.inc[j] = people.inc0[j] = 12 + Math.random() * 20; people.dirty[j] = 1; } } }); // the rest of the dosed turn radioactive later
+      people.around(f.x, f.z, f.R * 0.85, (j) => { const s = people.st[j]; if ((s === 0 || s === 1 || s === 2 || s === 3 || s === 9 || s === 24) && people.kind[j] === 0 && Math.random() < 0.02 * f.k) { if (Math.random() < 0.45) people.kill(j, 0, 0, 'rad'); else if (!people.inf[j]) { people.inf[j] = 1; people.zrad[j] = 2; people.inc[j] = people.inc0[j] = 12 + Math.random() * 20; people.dirty[j] = 1; } } }); // the rest of the dosed turn radioactive later
     }
     if (f.t > f.life) this.alive = false;
   }

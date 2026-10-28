@@ -34,7 +34,7 @@ const ALERTS = ['Quiet', 'Incident', 'Spreading', 'Major incident', 'City emerge
 const FLOOD_CD = { boat: 5, rescue: 8, water: 15 }; // once the streets flood the coast guard and air rescue go out back to back
 const GROUND = new Set(['police', 'bus', 'fire', 'apc', 'chaser', 'build', 'camp', 'hazmat']); // nothing on wheels gets through flooded streets
 const ROUND = 600;
-const START_RP = 100;
+const START_RP = 250; // enough for a first cordon (playtests: 100 bought two cruisers and the outbreak got away)
 const SITE_AT = [0, 11, 23]; // the sites of one zombie outbreak break out this far apart
 
 const CALLS = ['there is a man eating someone on the sidewalk!', 'they are attacking people outside my window', 'something is wrong with the people on my street', 'send help, they are everywhere', 'my neighbour just bit the mailman'];
@@ -74,6 +74,7 @@ export class Commander {
       rp: g.addPill('zd-rp', 'Points'), inc: g.addPill('', 'Incidents'), tr: g.addPill('zd-tr', 'Trust'), alert: g.addPill('zd-al', '', 'zd-alert'), clock: g.addPill('', '', 'zd-clock'),
     };
     this.el.alertPill = this.el.alert.parentElement;
+    g.profile.mode = 'commander'; // its level keeps step with the road of towns
     this.pr = g.profile; this.diff = this.pr.difficulty();
     this.quar = new Quarantine(g);
     this.cards = {};
@@ -604,7 +605,7 @@ export class Commander {
     for (const o of this.sites) {
       if (o.fired || this.t < o.at) continue;
       o.fired = true;
-      if (!this.sites.some(s => s.spilled)) { o.spilled = true; g.disasters.start('spill', o.x, o.z, { inc: this.diff.incubate, max: 10 + this.diff.seeds * 3 }); continue; } // the tanker reports itself
+      if (!this.sites.some(s => s.spilled)) { o.spilled = true; g.disasters.start('spill', o.x, o.z, { inc: this.diff.incubate, max: this.diff.spill }); continue; } // the tanker reports itself
       p.infectAt(o.x, o.z, this.diff.seeds, undefined, 1); // the tanker's gas got further than anyone knew: these glow too
       this.report(o.x, o.z, '911 · ' + this.district(o.x, o.z) + ': "someone glowing green is biting people!"', 70, false, 'Zombies');
     }
@@ -713,6 +714,7 @@ export class Commander {
     ];
     const r = this.pr.addRound(score, stars);
     const here = placeKey(), at = PATH.indexOf(here), opened = stars >= 2 ? this.pr.clear('commander', here) : null, nextKey = PATH[at + 1], nextOpen = at >= 0 && nextKey && at + 1 <= this.pr.reach('commander');
+    if (this.pr.level > r.level) { r.level = this.pr.level; r.levelUp = r.level > r.before; } // a new town: a level with it
     const road = at < 0 ? '' : opened ? '<div class="lvl">New town open: ' + PLACES[opened].name + '</div>' : nextKey && !nextOpen ? '<div class="xp">Win with two stars to open ' + PLACES[nextKey].name + '</div>' : '';
     const xpLine = '<div class="xp">+' + r.xp.toLocaleString() + ' XP · level ' + r.level + (this.pr.nextXp ? ' · ' + (this.pr.nextXp - this.pr.xp).toLocaleString() + ' to next' : '') + '</div>' +
       (r.levelUp ? '<div class="lvl">Level up! Commander level ' + r.level + this.g.nextUnlockText(r.level) + '</div>' : '');

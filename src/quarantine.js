@@ -26,7 +26,7 @@ const ZST = new Set([ST.ZOMBIE, ST.TURNING, ST.PILE, ST.CLIMB]);
 export class Quarantine {
   constructor(g) {
     this.g = g; this.P = null; this.zones = []; this.gaps = []; this.t = 0; this.seen = []; this.said = false;
-    this.tracked = new Map(); // healthy people seen inside a sealed zone: where that zone was (to score the ones who get out)
+    this.tracked = new Map(); // healthy people seen inside a sealed zone: their cell there and when (to score the ones who get out)
   }
   // the grid for this town
   build() {
@@ -112,7 +112,10 @@ export class Quarantine {
         for (const o of out) if (Math.hypot(o.sx / o.n - x, o.sz / o.n - z) < BLOCK * 1.5) { m = o; break; }
         if (m) { m.sx += x; m.sz += z; m.n++; } else out.push({ sx: x, sz: z, n: 1 });
       }
-      zn.gaps = out.map(o => ({ x: o.sx / o.n, z: o.sz / o.n })).sort((a, b) => Math.hypot(a.x - zn.cx, a.z - zn.cz) - Math.hypot(b.x - zn.cx, b.z - zn.cz)).slice(0, 16);
+      // each on the nearest junction within 22 m (a cruiser there closes every street through it), the same junction once
+      const nodes = g.traffic.nodes || [], snap = (o) => { let best = null, bd = 22 * 22; for (const nd of nodes) { const d = (nd.x - o.x) ** 2 + (nd.z - o.z) ** 2; if (d < bd) { bd = d; best = nd; } } return best ? { x: best.x, z: best.z } : o; };
+      const snapped = []; for (const o of out.map(o => snap({ x: o.sx / o.n, z: o.sz / o.n }))) if (!snapped.some(q => Math.hypot(q.x - o.x, q.z - o.z) < 10)) snapped.push(o);
+      zn.gaps = snapped.sort((a, b) => Math.hypot(a.x - zn.cx, a.z - zn.cz) - Math.hypot(b.x - zn.cx, b.z - zn.cz)).slice(0, 16);
       this.gaps.push(...zn.gaps);
     }
     this.track();
@@ -127,17 +130,22 @@ export class Quarantine {
       const k = s === ST.INSIDE ? P.bt[j] : P.lvl[j], b = k >= 0 ? P.bld[k] : null, d = b && b.door;
       const c = d ? this.seedOf(d[0], d[1]) : this.cell(P.x[j], P.z[j]); if (c < 0) continue;
       const id = comp[c], zn = id ? this.zones[id - 1] : null; if (!zn || !zn.sealed) continue;
-      zn.people++; this.tracked.set(j, [zn.cx, zn.cz]);
+      zn.people++; this.tracked.set(j, [c, this.g.simT]);
     }
   }
   // inside a sealed zone (the police let nobody in on an errand)
   closed(x, z) { if (!this.zones.length || this.P !== this.g.people) return false; const c = this.seedOf(x, z); if (c < 0) return false; const zn = this.comp[c] ? this.zones[this.comp[c] - 1] : null; return !!zn && zn.sealed; }
-  zoneAt(x, z) { const c = this.cell(x, z); if (c < 0) return null; const id = this.comp[c]; if (id) return this.zones[id - 1]; let best = null, bd = 1e9; for (const zn of this.zones) if (zn.cells) { const d = Math.hypot(zn.cx - x, zn.cz - z) - zn.r; if (d < bd) { bd = d; best = zn; } } return bd < 6 ? best : null; }
+  // the zone tapped: its cell, or one within two cells (a tap on a kerb or a building's edge)
+  zoneAt(x, z) {
+    const c = this.cell(x, z); if (c < 0) return null; if (this.comp[c]) return this.zones[this.comp[c] - 1] || null;
+    const W = this.W; for (let r = 1; r <= 2; r++) for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) { const k = c + dz * W + dx; if (k >= 0 && k < this.comp.length && this.comp[k]) return this.zones[this.comp[k] - 1] || null; }
+    return null;
+  }
 
   // ---------- each frame (from Commander.update)
   step(dt) {
     const g = this.g, P = g.people; if (!P) return;
-    P.holdPosts = P.stats.zombies > 0; P.quar = this; // an outbreak on: officers keep to their posts (the cordon holds); lives.go asks closed()
+    P.holdPosts = P.stats.zombies > 12; P.quar = this; // an outbreak on: officers keep to their posts (the cordon holds) until the last dozen, then hunt them down; lives.go asks closed()
     if ((this.t -= dt) <= 0) { this.t = 1; if (P.stats.zombies > 0) { this.compute(); this.news(); } else if (this.zones.length) { this.zones = []; this.gaps = []; } this.draw(); }
     if (this.gapMesh && this.gapMesh.visible) this.gapMat.opacity = 0.55 + Math.sin(performance.now() / 220) * 0.3; // the open streets blink
   }
@@ -197,7 +205,8 @@ export class Quarantine {
     // the ones who were boxed in here and got out (gone off on a bus or a stolen car, or simply out past the police), alive and unbitten
     let saved = 0;
     for (const [j, at] of this.tracked) {
-      if (Math.hypot(at[0] - zn.cx, at[1] - zn.cz) > zn.r + 30) continue; // seen in another zone
+      if (g.simT - at[1] > 60) { this.tracked.delete(j); continue; } // not seen in a sealed zone for a minute
+      if (comp[at[0]] !== zn.id) continue; // seen in another zone, not this one
       const s = P.st[j]; if (s !== ST.DEAD && !P.inf[j] && !ZST.has(s) && P.kind[j] === KIND.CIVILIAN && (s === ST.EVAC || !hit(j))) saved++;
       this.tracked.delete(j);
     }
@@ -205,7 +214,7 @@ export class Quarantine {
     P.bld.forEach((b, k) => { if (hitB[k]) { g.city.char(k, 0.22); if (g.fire.bFire[k] === 1) g.fire.extinguish(k); g.fire.bFire[k] = 2; g.fire.soaked[k] = g.fire.simT + 1e9; } });
     D.mushroom(zn.cx, zn.cz, Math.max(40, zn.r * 0.8));
     g.fire.spray(zn.cx, zn.cz, 1, 40, zn.r, 4);
-    g.flash = 1.2; g.shake = 1.6;
+    g.flash = 0.5; g.shake = 1.6; // a flash that leaves the picture readable
     D.events.push({ type: 'nukeflash', x: zn.cx, z: zn.cz });
     this.t = 0; // look again straight away
     return res;
