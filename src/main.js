@@ -28,7 +28,7 @@ CURVE.on = P.get('curve') !== '0'; // ?curve=0: the flat world, to compare
 const coarse = matchMedia('(pointer: coarse)').matches;
 const low = P.get('q') === 'low' || (coarse && P.get('q') !== 'high');
 const num = (k, d) => (P.has(k) ? parseFloat(P.get(k)) : d);
-const mode = P.get('mode') || 'menu'; // menu | commander | be | sandbox
+const mode = P.get('mode') || 'menu'; // menu | commander | be | sandbox | tv
 
 const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', preserveDrawingBuffer: P.has('shot') });
 renderer.setPixelRatio(Math.min(devicePixelRatio, low ? 1.5 : 2));
@@ -132,7 +132,7 @@ function moveWorld(key, m, kind) {
   buildWorld();
   globe.setHere();
 }
-const needWorld = mode === 'commander' || mode === 'sandbox' || ((mode === 'be' || mode === 'storm') && (P.has('kind') || mode === 'storm'));
+const needWorld = mode === 'commander' || mode === 'sandbox' || mode === 'tv' || ((mode === 'be' || mode === 'storm') && (P.has('kind') || mode === 'storm'));
 let game = null;
 if (needWorld) buildWorld();
 

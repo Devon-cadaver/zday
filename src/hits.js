@@ -32,17 +32,20 @@ const PTS = { b: 150, car: 40, fire: 60 }; // as be.js scores them, before the d
 const POOL = 18;
 
 export class Hits {
-  constructor(g, scorePill) {
-    this.g = g;
+  // scorePill: the score's pill (null: no points shown); o.quiet: no numbers or combos, only the named moments (Disaster TV)
+  constructor(g, scorePill, o = {}) {
+    this.g = g; this.quiet = !!o.quiet;
     if (!document.getElementById('zd-hits-css')) { const s = document.createElement('style'); s.id = 'zd-hits-css'; s.textContent = CSS; document.head.appendChild(s); }
     this.layer = document.createElement('div'); this.layer.id = 'zd-pops';
     this.call = document.createElement('div'); this.call.id = 'zd-call';
     document.body.append(this.layer, this.call);
     this.pool = [];
     for (let i = 0; i < POOL; i++) { const d = document.createElement('div'); d.className = 'p'; this.layer.appendChild(d); this.pool.push({ d, life: 0, x: 0, y: 0, z: 0 }); }
-    this.pill = scorePill.parentNode; // the score pill: the multiplier and its draining bar ride on it
-    this.xEl = document.createElement('i'); this.xEl.className = 'x'; this.pill.appendChild(this.xEl);
-    this.bar = document.createElement('span'); this.bar.className = 'cb'; this.pill.appendChild(this.bar);
+    this.pill = scorePill ? scorePill.parentNode : null; // the score pill: the multiplier and its draining bar ride on it
+    if (this.pill) {
+      this.xEl = document.createElement('i'); this.xEl.className = 'x'; this.pill.appendChild(this.xEl);
+      this.bar = document.createElement('span'); this.bar.className = 'cb'; this.pill.appendChild(this.bar);
+    }
     this.v = new THREE.Vector3();
     this.reset();
   }
@@ -51,14 +54,15 @@ export class Hits {
     this.t = 0; this.n = 0; this.mult = 1; this.lastT = -99; this.tokens = 4; this.bonus = 0;
     this.best = 1; this.bestN = 0; this.bins = new Map(); this.binT = 0; this.recent = []; this.cool = {}; this.slowCool = 0;
     for (const p of this.pool) { p.life = 0; p.d.style.opacity = '0'; }
-    this.call.className = ''; this.pill.classList.remove('combo');
+    this.call.className = ''; if (this.pill) this.pill.classList.remove('combo');
   }
 
-  dispose() { this.layer.remove(); this.call.remove(); this.xEl.remove(); this.bar.remove(); }
+  dispose() { this.layer.remove(); this.call.remove(); if (this.pill) { this.xEl.remove(); this.bar.remove(); } }
 
   // something wrecked at (x, y, z): kind 'b' (a building), 'car' or 'fire'; k is the disaster's own scale
   hit(kind, x, y, z, k, o = {}) {
     const t = this.t;
+    if (this.quiet) { this.recent.push(kind, t); if (o.big) this.moment('Big one!', 0.9); return; }
     if (t - this.lastT > WINDOW) this.drop();
     this.lastT = t;
     if (this.tokens >= 1) { this.tokens--; this.n++; } // a burst (a nuke, a meteor) counts as only so many hits: a combo is built by keeping it going
@@ -81,7 +85,7 @@ export class Hits {
   }
 
   // the combo runs out
-  drop() { this.n = 0; this.mult = 1; this.pill.classList.remove('combo'); }
+  drop() { this.n = 0; this.mult = 1; if (this.pill) this.pill.classList.remove('combo'); }
 
   here() { const tg = this.g.controls.target; return [tg.x, 0, tg.z]; }
 
@@ -114,6 +118,7 @@ export class Hits {
     if ((this.binT -= sdt) <= 0 && this.bins.size) { this.binT = 0.25; this.flush(); }
     this.draw(dt);
     // the multiplier on the score pill, its bar draining until the combo runs out
+    if (!this.pill) return;
     const on = this.mult > 1 && this.n > 0;
     this.pill.classList.toggle('combo', on);
     if (on) { this.xEl.textContent = '×' + this.mult; this.bar.style.transform = 'scaleX(' + Math.max(0, 1 - (this.t - this.lastT) / WINDOW).toFixed(3) + ')'; }

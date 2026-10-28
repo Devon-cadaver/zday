@@ -14,6 +14,7 @@ import { PLACES, PATH, placeKey, travel, settle } from './places.js';
 import { dragScroll } from './ui.js';
 import { Folk } from './folk.js';
 import { SEE } from './see.js';
+import { DisasterTV } from './tv.js';
 
 const CSS = `
 #zd-top{position:fixed;left:0;right:0;top:0;display:flex;gap:6px;align-items:center;justify-content:center;flex-wrap:wrap;
@@ -104,7 +105,7 @@ const CSS = `
 #zd-menu .box{width:100%;max-width:420px;background:rgba(24,18,12,.86);border:1px solid rgba(255,236,200,.16);border-radius:16px;text-align:center;max-height:calc(100% - 96px);
   display:flex;flex-direction:column;overflow:hidden;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:transform .35s}
 #zd-menu .mbody{overflow-y:auto;overscroll-behavior:contain;padding:14px 14px 12px;min-height:0;flex:1 1 auto}
-#zd-menu .modes{display:flex;gap:8px;margin-top:12px}
+#zd-menu .modes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
 #zd-menu .zd-btn.mode{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:5px;padding:12px 4px 10px;text-transform:none;letter-spacing:.02em;font-size:13px}
 #zd-menu .mode svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 #zd-menu .mode b{font-size:13px;line-height:1.15}
@@ -231,7 +232,10 @@ const MICON = {
   commander: svg('<path d="M7 18v-6a5 5 0 0 1 10 0v6"/><path d="M5 21h14M12 3v2M4.2 6.2l1.4 1.4M19.8 6.2l-1.4 1.4"/>'),
   be: svg('<path d="M3 5h18M5.5 9h13M8 13h9M10 17h5.5M11.5 21h2"/>'),
   sandbox: svg('<rect x="3" y="12" width="8" height="8" rx="1.2"/><rect x="13" y="12" width="8" height="8" rx="1.2"/><rect x="8" y="3" width="8" height="8" rx="1.2"/>'),
+  tv: svg('<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 3l4 4 4-4"/>'),
 };
+ICON['zd-tvnext'] = svg('<path d="M5 5l9 7-9 7zM17 5v14"/>');
+ICON['zd-tvtown'] = svg('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>');
 const EXTRA = new Set(['zd-help']); // shown above the bar only when they are wanted
 
 // the city runs on its own behind the menu
@@ -257,6 +261,7 @@ export class Game {
     document.body.appendChild(this.menu);
     this.modeName = mode;
     if (mode === 'sandbox') this.mode = new Sandbox(this);
+    else if (mode === 'tv') this.mode = new DisasterTV(this);
     else if (mode === 'commander') this.mode = new Commander(this);
     else if (mode === 'be' || mode === 'storm') { // ?mode=be&kind=lava starts that disaster, ?mode=be alone opens the picker
       const d = new URLSearchParams(location.search).get('kind') || (mode === 'storm' ? 'tornado' : '');
@@ -280,6 +285,7 @@ export class Game {
     SEE.on = true; SEE.far = 430; // back to the usual see-through (Be The Disaster sets its own)
     if (this.followSub || this.follow >= 0) this.setFollow(-1);
     const m = this.mode;
+    if (m && m.dispose) m.dispose();
     if (m) { m.dead = true; if (m.gauge && m.gauge.el) m.gauge.el.remove(); if (m.panel) m.panel.remove(); if (m.hits) m.hits.dispose(); if (m.targets) m.targets.dispose(); if (m.mix) m.mix.dispose(); }
     this.slowT = 0;
     for (const e of document.querySelectorAll('#zd-end')) e.remove();
@@ -295,7 +301,7 @@ export class Game {
   startMode(which, kind) {
     this.menu.hidden = true; this.menuOff(); this.modeName = which;
     this.top.innerHTML = ''; this.bar.innerHTML = ''; this.followChip = this.stopBtn = null; this.el.chip = null; this.setPaused(false);
-    this.mode = which === 'sandbox' ? new Sandbox(this) : which === 'be' ? new BeTheDisaster(this, kind) : new Commander(this);
+    this.mode = which === 'sandbox' ? new Sandbox(this) : which === 'be' ? new BeTheDisaster(this, kind) : which === 'tv' ? new DisasterTV(this) : new Commander(this);
     if (this.radio) this.radio.begin(which === 'be' ? this.mode.kind : null);
   }
 
@@ -317,7 +323,8 @@ export class Game {
         '<div class="bar sm"><i style="width:' + Math.round(pr.progress * 100) + '%"></i></div>' +
         '<div class="modes"><button class="zd-btn mode main" type="button" data-play="commander">' + MICON.commander + '<b>Commander</b><span>' + town('commander') + '</span></button>' +
         '<button class="zd-btn mode" type="button" data-go="be">' + MICON.be + '<b>Be the Disaster</b><span>' + town('be') + '</span></button>' +
-        '<button class="zd-btn mode" type="button" data-play="sandbox">' + MICON.sandbox + '<b>Sandbox</b><span>Pick any city</span></button></div>' +
+        '<button class="zd-btn mode" type="button" data-play="sandbox">' + MICON.sandbox + '<b>Sandbox</b><span>Pick any city</span></button>' +
+        '<button class="zd-btn mode" type="button" data-play="tv">' + MICON.tv + '<b>Disaster TV</b><span>Sit back and watch</span></button></div>' +
         '<div class="mrow"><button class="zd-btn" type="button" data-go="unlocks">Units' + (pr.bank >= 3000 && UPGRADES.some(u => pr.canBuy(u.id)) ? ' \u2022' : '') + '</button><button class="zd-btn" type="button" data-go="roster">Roster</button><div class="mside"></div></div>' +
         '<div class="foot">' + pr.data.rounds + ' rounds played · best score ' + pr.data.best.toLocaleString() + ' · ' + pr.data.stars + ' stars' + (pr.ok ? '' : ' · progress is not being saved on this device') + '</div>';
     } else if (panel === 'roster') { // every model, turning on its plinth (roster.js, loaded only now)
@@ -388,6 +395,7 @@ export class Game {
       if (this.moveWorld) { this.moveWorld(key, which, kind); G.close(); this.startMode(which, kind); return; }
       G.travelling(key); travel(key, which, kind ? { kind } : null);
     };
+    if (which === 'tv') { const ks = Object.keys(PLACES); arrive(ks[Math.floor(Math.random() * ks.length)]); return; } // the broadcast starts in a town of its own choosing
     if (which === 'sandbox') { G.choose({ title: 'SANDBOX', sub: 'Pick a city: tap it to play there', arrive, back: () => this.showMenu() }); return; }
     const key = this.profile.town(which);
     G.choose({ title: (which === 'be' ? 'BE THE DISASTER' : 'COMMANDER') + ' \u00B7 LEVEL ' + (PATH.indexOf(key) + 1), sub: PLACES[key].name, key, road: true, status: this.townStatus(which), arrive });
