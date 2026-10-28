@@ -7,9 +7,11 @@
 // (and small enough for a mini nuke) that area is sealed and drawn in red. If it
 // gets out, the streets out are marked with amber rings about 50 m beyond the
 // zombies: a cruiser on each one closes the box. The mini nuke clears only a sealed
-// zone, everyone inside it included, chars its buildings and leaves no radiation
-// (nobody turns from it). A zombie that gets out before it goes off has to be
-// boxed in again.
+// zone, everyone inside it included (in the street, indoors, up on its roofs), chars
+// its buildings and leaves no radiation (nobody turns from it). Everyone who was in
+// a sealed zone and got out before it went off earns points (Sean: extra points for
+// getting people out; anyone still in it dies). A zombie that gets out before it
+// goes off has to be boxed in again.
 import * as THREE from 'three';
 import { ST, KIND } from './people.js';
 
@@ -24,6 +26,7 @@ const ZST = new Set([ST.ZOMBIE, ST.TURNING, ST.PILE, ST.CLIMB]);
 export class Quarantine {
   constructor(g) {
     this.g = g; this.P = null; this.zones = []; this.gaps = []; this.t = 0; this.seen = []; this.said = false;
+    this.tracked = new Map(); // healthy people seen inside a sealed zone: where that zone was (to score the ones who get out)
   }
   // the grid for this town
   build() {
@@ -112,13 +115,29 @@ export class Quarantine {
       zn.gaps = out.map(o => ({ x: o.sx / o.n, z: o.sz / o.n })).sort((a, b) => Math.hypot(a.x - zn.cx, a.z - zn.cz) - Math.hypot(b.x - zn.cx, b.z - zn.cz)).slice(0, 16);
       this.gaps.push(...zn.gaps);
     }
+    this.track();
   }
+  // the healthy people in each sealed zone (in its streets, or in or on a building whose door opens onto it)
+  track() {
+    const P = this.P, comp = this.comp;
+    for (const zn of this.zones) zn.people = 0;
+    if (!this.zones.some(zn => zn.sealed)) return;
+    for (let j = 0; j < P.nHuman; j++) {
+      const s = P.st[j]; if (P.kind[j] !== KIND.CIVILIAN || P.inf[j] || s === ST.DEAD || s === ST.EVAC || ZST.has(s)) continue;
+      const k = s === ST.INSIDE ? P.bt[j] : P.lvl[j], b = k >= 0 ? P.bld[k] : null, d = b && b.door;
+      const c = d ? this.seedOf(d[0], d[1]) : this.cell(P.x[j], P.z[j]); if (c < 0) continue;
+      const id = comp[c], zn = id ? this.zones[id - 1] : null; if (!zn || !zn.sealed) continue;
+      zn.people++; this.tracked.set(j, [zn.cx, zn.cz]);
+    }
+  }
+  // inside a sealed zone (the police let nobody in on an errand)
+  closed(x, z) { const c = this.seedOf(x, z); if (c < 0) return false; const zn = this.comp[c] ? this.zones[this.comp[c] - 1] : null; return !!zn && zn.sealed; }
   zoneAt(x, z) { const c = this.cell(x, z); if (c < 0) return null; const id = this.comp[c]; if (id) return this.zones[id - 1]; let best = null, bd = 1e9; for (const zn of this.zones) if (zn.cells) { const d = Math.hypot(zn.cx - x, zn.cz - z) - zn.r; if (d < bd) { bd = d; best = zn; } } return bd < 6 ? best : null; }
 
   // ---------- each frame (from Commander.update)
   step(dt) {
     const g = this.g, P = g.people; if (!P) return;
-    P.holdPosts = P.stats.zombies > 0; // an outbreak on: officers keep to their posts (the cordon holds)
+    P.holdPosts = P.stats.zombies > 0; P.quar = this; // an outbreak on: officers keep to their posts (the cordon holds); lives.go asks closed()
     if ((this.t -= dt) <= 0) { this.t = 1; if (P.stats.zombies > 0) { this.compute(); this.news(); } else if (this.zones.length) { this.zones = []; this.gaps = []; } this.draw(); }
     if (this.gapMesh && this.gapMesh.visible) this.gapMat.opacity = 0.55 + Math.sin(performance.now() / 220) * 0.3; // the open streets blink
   }
@@ -131,7 +150,7 @@ export class Quarantine {
     let said = false;
     for (const zn of [...this.zones].sort((a, b) => b.z - a.z)) {
       const was = this.seen.find(o => Math.hypot(o.x - zn.cx, o.z - zn.cz) < 60);
-      if (!said && zn.sealed && zn.z >= 2 && (!was || !was.sealed) && fresh('sealed', zn.cx, zn.cz)) { said = true; told.push({ what: 'sealed', x: zn.cx, z: zn.cz, t: T }); g.toast('Quarantine sealed in the ' + D.district(zn.cx, zn.cz) + ' district: ' + zn.z + ' zombies boxed in. Mini nuke it', 5000); }
+      if (!said && zn.sealed && zn.z >= 2 && (!was || !was.sealed) && fresh('sealed', zn.cx, zn.cz)) { said = true; told.push({ what: 'sealed', x: zn.cx, z: zn.cz, t: T }); g.toast('Quarantine sealed in the ' + D.district(zn.cx, zn.cz) + ' district: ' + zn.z + ' zombies' + (zn.people ? ' and ' + zn.people + (zn.people === 1 ? ' person' : ' people') + ' boxed in. Get the people out for points (an evac bus), then mini nuke it' : ' boxed in. Mini nuke it'), 6000); }
       if (!said && !zn.sealed && was && was.sealed && fresh('broke', zn.cx, zn.cz)) { said = true; told.push({ what: 'broke', x: zn.cx, z: zn.cz, t: T }); g.toast('Zombies broke out of the quarantine in the ' + D.district(zn.cx, zn.cz) + ' district! Box them in again', 5000); }
       now.push({ x: zn.cx, z: zn.cz, sealed: zn.sealed });
     }
@@ -172,8 +191,18 @@ export class Quarantine {
     const g = this.g, P = g.people, D = g.disasters, comp = this.comp, blk = this.blk, W = this.W;
     // inside: in a zone cell, or a step out from it where no officer holds the street (the cordon itself is spared)
     const inside = (x, z) => { const c = this.cell(x, z); if (c < 0) return false; if (comp[c] === zn.id) return true; if (blk[c]) return false; for (const k of [c - 1, c + 1, c - W, c + W, c - W - 1, c - W + 1, c + W - 1, c + W + 1]) if (comp[k] === zn.id) return true; return false; };
-    const res = P.nukeIf((j) => { if (P.st[j] === ST.INSIDE) { const b = P.bld[P.bt[j]]; return !!b && b.door && inside(b.door[0], b.door[1]); } return inside(P.x[j], P.z[j]); }, zn.cx, zn.cz, zn.r, true);
-    P.bld.forEach((b, k) => { const x = (b.x0 + b.x1) / 2, z = (b.z0 + b.z1) / 2; if (inside(x, z) || (b.door && inside(b.door[0], b.door[1]))) { g.city.char(k, 0.22); if (g.fire.bFire[k] === 1) g.fire.extinguish(k); g.fire.bFire[k] = 2; g.fire.soaked[k] = g.fire.simT + 1e9; } });
+    const hitB = new Uint8Array(P.bld.length); // its buildings: the door or the middle in it
+    P.bld.forEach((b, k) => { if (inside((b.x0 + b.x1) / 2, (b.z0 + b.z1) / 2) || (b.door && inside(b.door[0], b.door[1]))) hitB[k] = 1; });
+    const hit = (j) => { const s = P.st[j]; if (s === ST.INSIDE) return P.bt[j] >= 0 && hitB[P.bt[j]] === 1; if (P.lvl[j] >= 0) return hitB[P.lvl[j]] === 1; return inside(P.x[j], P.z[j]); }; // anyone in it dies: in the street, indoors, up on a roof
+    // the ones who were boxed in here and got out (gone off on a bus or a stolen car, or simply out past the police), alive and unbitten
+    let saved = 0;
+    for (const [j, at] of this.tracked) {
+      if (Math.hypot(at[0] - zn.cx, at[1] - zn.cz) > zn.r + 30) continue; // seen in another zone
+      const s = P.st[j]; if (s !== ST.DEAD && !P.inf[j] && !ZST.has(s) && P.kind[j] === KIND.CIVILIAN && (s === ST.EVAC || !hit(j))) saved++;
+      this.tracked.delete(j);
+    }
+    const res = P.nukeIf(hit, zn.cx, zn.cz, zn.r, true); res.saved = saved;
+    P.bld.forEach((b, k) => { if (hitB[k]) { g.city.char(k, 0.22); if (g.fire.bFire[k] === 1) g.fire.extinguish(k); g.fire.bFire[k] = 2; g.fire.soaked[k] = g.fire.simT + 1e9; } });
     D.mushroom(zn.cx, zn.cz, Math.max(40, zn.r * 0.8));
     g.fire.spray(zn.cx, zn.cz, 1, 40, zn.r, 4);
     g.flash = 1.2; g.shake = 1.6;

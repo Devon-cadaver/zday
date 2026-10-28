@@ -302,6 +302,7 @@ export class Lives {
     const P = this.P;
     if (k >= 0) { if (P.city.dead[k]) { this.nextT[i] = P.time + 8; return; } x = P.bld[k].door[0]; z = P.bld[k].door[1]; }
     if (x == null) return;
+    if (P.quar && act !== SHELTER && act !== GATHER && act !== POLICE && P.quar.closed(x, z)) { this.nextT[i] = P.time + 10; return; } // quarantined: the police turn them away (they can still run in for their family)
     this.trips.set(i, { pts: this.route(P.x[i], P.z[i], x, z, P.lat[i] * 0.6), k: 0, act, b: k, dwell, best: 1e9, stuck: 0, at: false, stay: 0 });
     P.st[i] = this.S.GO; P.fx[i] = 0; P.t1[i] = 280; P.inc[i] = 0; P.target[i] = -1;
   }

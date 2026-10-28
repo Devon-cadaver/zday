@@ -110,7 +110,7 @@ export class Commander {
     this.works = []; this.camps = []; this.hazmats = []; this.buildTo = new Set();
     this.rebuiltN = 0; this.crews = 0; this.campsSent = 0; this.sheltered = 0; this.hazSent = 0; this.cleanups = 0; this.jailBuses = 0; this.heroCalls = 0; this.villainsBeaten = 0;
     g.resetWorld(); g.setSpeed(1);
-    this.quar.zones = []; this.quar.gaps = []; this.quar.seen = []; this.quar.told = []; this.quar.said = false; this.quar.t = 0; this.quar.draw(); this.minis = 0;
+    this.quar.zones = []; this.quar.gaps = []; this.quar.seen = []; this.quar.told = []; this.quar.tracked.clear(); this.quar.said = false; this.gotOut = 0; this.quar.t = 0; this.quar.draw(); this.minis = 0;
     this.t = 0; this.rp = START_RP; this.earned = 0; this.alert = 0; this.blocksInf = 0; this.fires = 0; this.ended = false;
     this.sel = null; this.cool = {}; for (const u of UNITS) this.cool[u.id] = 0;
     this.cdOf = (id) => id === 'police' ? this.diff.policeCd : id === 'fire' ? this.diff.fireCd : this.flooded() && FLOOD_CD[id] ? FLOOD_CD[id] : this.cards[id].u.cd;
@@ -528,7 +528,8 @@ export class Commander {
     if (!zn) { g.toast('Tap inside a red quarantine zone'); return; }
     if (zn.open) { g.toast('That outbreak is not boxed in: ' + (zn.gaps && zn.gaps.length ? zn.gaps.length + (zn.gaps.length === 1 ? ' street' : ' streets') + ' out still open (the amber rings)' : 'it has a way out'), 4000); return; }
     const r = Q.nuke(zn); this.spend('mininuke'); this.minis++;
-    g.toast('Mini nuke: ' + r.zk + (r.zk === 1 ? ' zombie' : ' zombies') + ' gone' + (r.ck ? ', and ' + r.ck + (r.ck === 1 ? ' person' : ' people') + ' still inside' : '. Nobody else was in there'), 5000);
+    const bonus = r.saved * 5 + (r.saved && !r.ck ? 50 : 0); this.rp += bonus; this.earned += bonus; this.gotOut = (this.gotOut || 0) + r.saved; // every one got out of the zone first: points
+    g.toast('Mini nuke: ' + r.zk + (r.zk === 1 ? ' zombie' : ' zombies') + ' gone. ' + (r.saved ? r.saved + (r.saved === 1 ? ' person' : ' people') + ' got out: +' + bonus + ' pts' + (r.ck ? '' : ', nobody left behind') + '. ' : '') + (r.ck ? r.ck + (r.ck === 1 ? ' person was' : ' people were') + ' still inside' : r.saved ? '' : 'Nobody else was in there'), 6000);
   }
   sendNuke(x, z) {
     const g = this.g;
