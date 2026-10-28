@@ -310,7 +310,7 @@ export class Audio {
   // how loud and how muffled a sound at (x, y, z) is from the camera, and where it sits left to right
   place(x, y, z, reach) {
     const cam = this.camera.position, d = Math.hypot(x - cam.x, y - cam.y, z - cam.z), g = Math.min(1, reach / Math.max(1, d));
-    const v = this._v.set(x, y, z).project(this.camera), pan = Math.max(-1, Math.min(1, v.x)) * (v.z > 1 ? 0.25 : 0.75);
+    const v = this._v.set(x, y, z).project(this.camera), pn = Math.max(-1, Math.min(1, v.x)) * (v.z > 1 ? 0.25 : 0.75), pan = Number.isFinite(pn) ? pn : 0; // a sound right at the camera (a TV camera being hit) projects to nothing: dead centre
     return { g, pan, lp: Math.max(900, Math.min(14000, 14000 * Math.pow(reach * 0.6 / Math.max(1, d), 1.3))) };
   }
   play(name, x, y = 0, z = 0, o = {}) {
