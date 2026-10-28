@@ -15,6 +15,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { PLACES, PATH, placeKey, travel } from './places.js';
 import { damageOf, craters, addCrater, sendMeteor } from './world.js';
 import { sideButton } from './ui.js';
+import { Sky } from './sky.js';
 
 const R = 10;
 // the places' character on the map: what each one wants to be next to
@@ -84,7 +85,7 @@ export class Globe {
   }
   button() {
     const b = sideButton('zd-globe', 'The world'); b.textContent = '🌍'; b.style.fontSize = '19px';
-    b.onclick = (e) => { e.stopPropagation(); this.open(); };
+    b.onclick = (e) => { e.stopPropagation(); if (this.up) this.up(); else this.open(); }; // up through the clouds
     this.btn = b;
   }
   // the planet, built the first time it is opened
@@ -108,7 +109,7 @@ export class Globe {
     this.decorate();
     this.labels();
     this.controls = new OrbitControls(cam, this.renderer.domElement); this.controls.enablePan = false; this.controls.enableDamping = true; this.controls.dampingFactor = 0.08;
-    this.controls.minDistance = R * 1.25; this.controls.maxDistance = R * 5; this.controls.rotateSpeed = 0.5; this.controls.enabled = false;
+    this.controls.minDistance = R * 1.25; this.controls.maxDistance = Math.max(R * 5, this.fit() * 1.15); this.controls.rotateSpeed = 0.5; this.controls.enabled = false;
     this.ui();
   }
   // where each place sits: the spot on the map that suits it best (a coast for the big city and the harbour, the desert,
@@ -252,15 +253,17 @@ export class Globe {
     document.body.appendChild(u); document.body.appendChild(back);
   }
   // up from where you are: the game waits, the camera pulls back off the city out to the whole planet
-  open() {
+  open(opts = {}) {
     if (this.active) return;
     if (!this.built) this.build();
     this.active = true; this.fly = null; this.state = 'game'; this.arrive = null; this.shiftTo = 0;
     this.status = this.statusFor ? this.statusFor() : null; this.road.visible = !!this.status; this.here.visible = true; this.relabel();
     this.uiEl.firstChild.textContent = 'THE WORLD'; this.say('Spin it, tap a town to go there'); this.backBtn.textContent = 'Back to ' + PLACES[placeKey()].name;
     const [lat, lon] = this.spots[placeKey()], p = toVec(lat, lon, 1).normalize();
-    this.cam.position.copy(p).multiplyScalar(R * 1.15); this.cam.lookAt(0, 0, 0); this.controls.target.set(0, 0, 0); this.controls.update();
-    this.rise = { t: 0, from: R * 1.15, to: R * 3.2, dir: p.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), 0.25).add(new THREE.Vector3(0, 0.25, 0)).normalize() };
+    const r0 = opts.clouds ? R * 1.07 : R * 1.15; // out of the clouds: from just over the place
+    this.cam.position.copy(p).multiplyScalar(r0); this.cam.lookAt(0, 0, 0); this.controls.target.set(0, 0, 0); this.controls.update();
+    this.rise = { t: 0, dur: opts.clouds ? 2.1 : 1.6, from: r0, to: Math.max(R * 3.2, this.fit() * 0.8), dir: p.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), 0.25).add(new THREE.Vector3(0, 0.25, 0)).normalize() };
+    if (opts.clouds && this.sky) this.sky.to(0, 1.0);
     this.controls.enabled = true;
     document.body.classList.add('zd-globe-on'); this.toggleHud(false);
     this.uiEl.style.display = ''; this.backBtn.style.display = ''; this.metBtn.style.display = '';
@@ -269,12 +272,14 @@ export class Globe {
   close() {
     this.active = false; this.controls.enabled = false; this.controls.autoRotate = false; this.state = 'game'; this.arrive = null; this.turn = null; this.toggleHud(true);
     this.shift = this.shiftTo = 0; this.cam.clearViewOffset(); document.body.classList.remove('zd-globe-on');
+    if (this.sky && this.sky.want >= 1) this.sky.down(); // back down to the streets out of the clouds
     this.uiEl.style.display = 'none'; this.backBtn.style.display = 'none'; this.metBtn.style.display = 'none'; this.armed = false; for (const k in this.tags) this.tags[k].style.display = 'none';
     if (this.onArrive) this.onArrive();
   }
   // behind the main menu: the planet turning slowly, the places on it and the road between them
-  backdrop() {
+  backdrop(names = true) {
     if (!this.built) this.build();
+    this.quiet = !names;
     const was = this.active;
     this.active = true; this.state = 'menu'; this.status = null; this.arrive = null; this.fly = this.rise = this.turn = null; this.armed = false;
     this.uiEl.style.display = 'none'; this.backBtn.style.display = 'none'; this.metBtn.style.display = 'none';
@@ -300,21 +305,21 @@ export class Globe {
     this.metBtn.style.display = 'none'; this.backBtn.textContent = 'Back'; this.backBtn.style.display = opts.back ? '' : 'none';
     if (opts.key) this.turn = { t: 0, key: opts.key, r: Math.min(this.cam.position.length(), R * 3), to: toVec(...this.spots[opts.key], 1).normalize() };
   }
-  toggleHud(on) { for (const el of document.querySelectorAll('#zd-top, #zd-bar, #zd-dis, #zd-call, #zd-toast, #zd-end, #zd-menu')) el.style.visibility = on ? '' : 'hidden'; }
+  toggleHud(on) { for (const el of document.querySelectorAll('#zd-top, #zd-bar, #zd-dis, #zd-call, #zd-toast, #zd-end, #zd-menu, #zd-compass')) el.style.visibility = on ? '' : 'hidden'; }
   // down to a place: fly in over it; back where you were, the city is still there; anywhere else is built afresh
   go(key) {
     if (this.fly) return;
     const s = this.status && this.status(key);
     if (s && s.locked) { this.say(s.why || 'That town is not open yet'); return; }
-    this.turn = null;
+    this.turn = null; this.metBtn.style.display = this.backBtn.style.display = 'none'; this.armed = false;
     const [lat, lon] = this.spots[key];
-    this.fly = { t: 0, key, from: this.cam.position.clone(), to: toVec(lat, lon, R * 1.12) };
+    this.fly = { t: 0, key, from: this.cam.position.clone(), to: toVec(lat, lon, R * 1.05) }; // down into the clouds over it
     this.controls.enabled = false;
   }
   frame(dt) {
     this.t += dt;
     this.clouds.rotation.y += dt * 0.012;
-    this.here.material.opacity = 0.55 + 0.45 * Math.sin(this.t * 3);
+    this.here.material.opacity = (0.55 + 0.45 * Math.sin(this.t * 3)) * (this.rise ? Math.max(0, Math.min(1, this.rise.t / this.rise.dur * 2 - 0.6)) : 1);
     for (const S of this.smoke) { const k = (this.t * 0.25 + S.ph) % 1; S.s.position.copy(S.base).addScaledVector(S.nrm, 0.1 + k * 1.4 * S.k); S.s.scale.setScalar((0.25 + k * 0.9) * (0.5 + S.k)); S.s.material.opacity = (1 - k) * 0.7; }
     for (const M of this.marks) M.glow.material.opacity = Math.max(0, 1 - (Date.now() - M.when) / 60000) * (0.7 + 0.3 * Math.sin(this.t * 7));
     if (this.met) { // on its way in, a burning trail behind it
@@ -327,11 +332,12 @@ export class Globe {
     if (this.flash) { const F = this.flash; F.t += dt; F.s.scale.setScalar(0.3 + F.t * 6); F.s.material.opacity = Math.max(0, 1 - F.t / 0.9); if (F.t > 0.9) { this.scene.remove(F.s); this.flash = null; } }
     if (this.ring) { const G = this.ring; G.t += dt; G.m.scale.setScalar(0.1 + G.t * 1.8); G.m.material.opacity = Math.max(0, 1 - G.t / 1.2); if (G.t > 1.2) { this.scene.remove(G.m); this.ring = null; } }
     if (this.rise) { // pulling back off the city
-      const R0 = this.rise; R0.t += dt; const k = Math.min(1, R0.t / 1.6), e = 1 - Math.pow(1 - k, 3), r = R0.from + (R0.to - R0.from) * e;
+      const R0 = this.rise; R0.t += dt; const k = Math.min(1, R0.t / (R0.dur || 1.6)), e = 1 - Math.pow(1 - k, 3), r = R0.from + (R0.to - R0.from) * e;
       const dir = this.cam.position.clone().normalize().lerp(R0.dir, Math.min(1, dt * 1.2)).normalize(); this.cam.position.copy(dir.multiplyScalar(r)); this.cam.lookAt(0, 0, 0);
       if (k >= 1) { this.rise = null; if (this.after) { const a = this.after; this.after = null; this.go(a); } } // on to the next town
     } else if (this.fly) { // flying down to a place
-      const F = this.fly; F.t += dt; const k = Math.min(1, F.t / 1.4), e = k * k * (3 - 2 * k);
+      const F = this.fly; F.t += dt; const k = Math.min(1, F.t / 1.6), e = k * k * (3 - 2 * k);
+      if (k > 0.58 && this.sky && this.sky.want < 1) { this.sky.to(1, 0.62); this.sky.moving = 1; }
       const a = F.from.clone().normalize(), b = F.to.clone().normalize(), dir = a.lerp(b, e).normalize(), r = F.from.length() + (F.to.length() - F.from.length()) * e;
       this.cam.position.copy(dir.multiplyScalar(r)); this.cam.lookAt(0, 0, 0);
       if (k >= 1) {
@@ -349,13 +355,13 @@ export class Globe {
     const v = new THREE.Vector3(), camDir = this.cam.position.clone().normalize();
     for (const key in this.tags) {
       const [lat, lon] = this.spots[key], p = toVec(lat, lon, R * 1.01), el = this.tags[key];
-      if (p.clone().normalize().dot(camDir) < 0.25 || this.fly || this.rise) { el.style.display = 'none'; continue; }
+      if (!this.active || (this.quiet && this.state === 'menu') || p.clone().normalize().dot(camDir) < 0.25 || this.fly || this.rise) { el.style.display = 'none'; continue; }
       v.copy(p).project(this.cam); el.style.display = ''; el.style.left = ((v.x + 1) / 2 * innerWidth) + 'px'; el.style.top = ((1 - v.y) / 2 * innerHeight) + 'px';
     }
     this.shift += (this.shiftTo - this.shift) * Math.min(1, dt * 3);
     if (this.shift > 0.002) this.cam.setViewOffset(innerWidth, innerHeight, 0, this.shift * innerHeight, innerWidth, innerHeight); else if (this.cam.view && this.cam.view.enabled) this.cam.clearViewOffset();
     this.renderer.setRenderTarget(null); this.renderer.render(this.scene, this.cam);
   }
-  travelling(key) { this.uiEl.firstChild.textContent = 'TRAVELLING TO ' + PLACES[key].name.toUpperCase(); this.say(''); this.uiEl.style.display = ''; this.backBtn.style.display = 'none'; }
+  travelling(key) { Sky.leaving(); this.uiEl.firstChild.textContent = 'TRAVELLING TO ' + PLACES[key].name.toUpperCase(); this.say(''); this.uiEl.style.display = ''; this.backBtn.style.display = 'none'; }
   resize() { if (this.cam) { this.cam.aspect = innerWidth / innerHeight; this.cam.updateProjectionMatrix(); } }
 }

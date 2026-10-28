@@ -4,9 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>My Tiny Disaster</title>
+<script>try { if (sessionStorage.getItem('zd_sky')) document.documentElement.className = 'sky'; } catch (e) {}</script>
 <style>
 html,body{margin:0;height:100%;background:#2a1d12;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none}
 canvas{display:block;width:100%;height:100%}
+html.sky,html.sky body{background:#e9eef3}
 #hud{position:fixed;left:10px;top:calc(8px + env(safe-area-inset-top));color:#f6e7cc;font:12px/1.35 system-ui,sans-serif;text-shadow:0 1px 2px #000;pointer-events:none;opacity:.85}
 </style>
 </head>

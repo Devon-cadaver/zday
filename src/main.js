@@ -18,6 +18,7 @@ import { Audio } from './audio.js';
 import { CURVE, curveFrame } from './curve.js';
 import { PLACES, placeKey } from './places.js';
 import { Globe } from './globe.js';
+import { Sky } from './sky.js';
 import { damageOf, rememberDamage, takeMeteor } from './world.js';
 
 const P = new URLSearchParams(location.search);
@@ -62,6 +63,8 @@ function setView(x = 0, z = 0, dist = 420, pitchDeg = 46, yawDeg = 45) {
   controls.update();
 }
 setView(num('x', 0), num('z', 0), num('d', coarse ? 430 : 470), num('p', 48), num('a', 45));
+const sky = new Sky(camera, controls), viaSky = Sky.arriving(); // the trip to and from orbit, through the clouds
+if (viaSky) sky.set(1); // this page was reached through them: it starts inside
 
 // lights
 const hemi = new THREE.HemisphereLight('#fff0d4', '#7a5c3c', num('hemi', 1.25));
@@ -113,8 +116,9 @@ const B = city.bounds, M = 10;
 function frame() {
   const dt = Math.min(0.05, clock.getDelta());
   time += dt;
+  sky.update(dt);
   if (globe.active) { controls.enabled = false; globe.frame(dt); frames++; fpsT += dt; requestAnimationFrame(frame); globeWas = true; return; } // up on the globe: the city waits
-  if (globeWas) { globeWas = false; controls.enabled = true; }
+  if (globeWas) { globeWas = false; controls.enabled = !sky.busy(); }
   controls.update();
   // keep the view over the city
   const tg = controls.target;
@@ -123,6 +127,8 @@ function frame() {
   tg.y = 0;
 
   game.update(dt, fps);
+  sky.step(dt); // up off the city, or down to it
+  game.compassStep(dt);
   outskirts.update(time, scene, sun, disasters.lightK, disasters.sunK);
   sun.position.copy(tg).addScaledVector(daylight.sunDir, 700); // the sun (or the moon) where the day and night cycle has it
   sun.target.position.copy(tg);
@@ -159,7 +165,10 @@ const searchlights = new Searchlights(scene, { game, traffic, helis, city, dayli
 game.audio = new Audio(camera, controls); // sound: switched on by the first tap
 const globe = game.globe = new Globe(renderer); let globeWas = false; // the world from orbit: the big city and the towns
 globe.statusFor = () => game.townStatus(game.modeName); // Commander and Be The Disaster: towns further down the road are locked
-if (!game.menu.hidden) { globe.backdrop(); game.dockSide(); } // the menu sits over the planet
+globe.sky = sky;
+globe.up = (after) => { game.setFollow(-1); sky.up(() => { globe.open({ clouds: true }); globe.after = after || null; }); }; // up through the clouds (then on to another town)
+if (viaSky) setTimeout(() => { if (globe.active) { sky.to(0, 0.8); return; } const r1 = game.zoomTo || 0; game.zoomTo = 0; sky.down(r1); }, 300); // out of the clouds over the streets
+if (!game.menu.hidden) { globe.backdrop(game.menuPanel === 'main'); game.dockSide(); } // the menu sits over the planet
 // what this place remembers: the buildings that came down here last time (Sandbox; Commander starts each round fresh)
 const sandbox = () => game.mode && game.mode.kind === 'sandbox';
 for (const k of damageOf(placeKey())) if (city.buildings[k] && !city.dead[k]) { people.clearBuilding(k, 'spare'); city.hideBuilding(k); city.addRubble(k, 0.75); }

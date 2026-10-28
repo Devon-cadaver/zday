@@ -115,6 +115,15 @@ const CSS = `
 #zd-menu .mrow{display:flex;gap:8px;align-items:center;margin-top:10px}
 #zd-menu .mrow .zd-btn{flex:1 1 0;min-width:0;padding:11px 6px;font-size:11px;text-decoration:none;display:block}
 #zd-menu .mside{flex:none;display:flex}
+#zd-menu .box.tall{height:calc(100% - 96px);backdrop-filter:none;-webkit-backdrop-filter:none;background:rgba(24,18,12,.93)}
+#zd-menu .rgl{position:fixed;inset:0;width:100%;height:100%;z-index:2;pointer-events:none}
+#zd-menu .rsec{text-align:left}
+#zd-menu .rsec h2{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#d8c49e;margin:14px 0 8px;display:flex;align-items:center;gap:10px}
+#zd-menu .rsec h2::after{content:"";flex:1;height:1px;background:rgba(255,236,200,.18)}
+#zd-menu .rsec .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:7px}
+#zd-menu .rsec .tile{aspect-ratio:1/1;position:relative;border-radius:9px;background:rgba(255,236,200,.04);border:1px solid rgba(255,236,200,.08)}
+#zd-menu .rsec .lbl{position:absolute;z-index:3;left:50%;bottom:5px;transform:translateX(-50%);max-width:92%;box-sizing:border-box;text-align:center;background:rgba(28,20,12,.88);
+  border:1px solid rgba(255,236,200,.2);color:#f6ead2;padding:3px 6px;border-radius:5px;font:700 8.5px/1.15 system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase}
 #zd-menu .mhead{display:flex;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid rgba(255,236,200,.14);flex:none;background:rgba(24,18,10,.6)}
 #zd-menu .mhead .zd-btn{padding:9px 12px;font-size:12px;min-width:0;flex:none}
 #zd-menu .mhead .mt{flex:1;text-align:left;font-weight:800;font-size:15px;letter-spacing:.14em;text-transform:uppercase;color:#fff4e0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -168,6 +177,12 @@ const CSS = `
 #zd-dis .zd-btn.hero{color:#ffe08a;border-color:rgba(255,224,138,.45)}
 #zd-dis .zd-btn.auto{color:#7be0ff;border-color:rgba(123,224,255,.4)}
 #zd-dis .zd-btn.auto.off{color:#f6ead2;opacity:.6;border-color:rgba(255,236,200,.18)}
+#zd-compass{position:fixed;left:max(10px, env(safe-area-inset-left));top:50%;transform:translateY(-50%);z-index:30;width:46px;height:46px;border-radius:23px;padding:0;cursor:pointer;
+  border:1px solid rgba(255,236,200,.18);background:rgba(28,20,12,.72);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);touch-action:manipulation}
+#zd-compass svg{display:block;width:100%;height:100%}
+#zd-compass text{font:700 7.5px system-ui,-apple-system,"Segoe UI",sans-serif;fill:#f6ead2;text-anchor:middle;dominant-baseline:central}
+#zd-compass text.n{fill:#ff7a5a;font-size:9px}
+body.zd-menu-on #zd-compass,body.zd-panel #zd-compass{display:none}
 #zd-disb{border-color:rgba(255,154,90,.55);color:#ffc08a}
 #zd-disb.on{background:rgba(120,58,24,.88);border-color:#ff9a5a;color:#ffd9b8}
 @media (prefers-reduced-motion: reduce){#zd-toast{transition:none}}
@@ -258,8 +273,11 @@ export class Game {
         '<div class="modes"><button class="zd-btn mode main" type="button" data-play="commander">' + MICON.commander + '<b>Commander</b><span>' + town('commander') + '</span></button>' +
         '<button class="zd-btn mode" type="button" data-go="be">' + MICON.be + '<b>Be the Disaster</b><span>' + town('be') + '</span></button>' +
         '<button class="zd-btn mode" type="button" data-play="sandbox">' + MICON.sandbox + '<b>Sandbox</b><span>Pick any city</span></button></div>' +
-        '<div class="mrow"><button class="zd-btn" type="button" data-go="unlocks">Units' + (pr.bank >= 3000 && UPGRADES.some(u => pr.canBuy(u.id)) ? ' \u2022' : '') + '</button><a class="zd-btn" href="showcase.html">Roster</a><div class="mside"></div></div>' +
+        '<div class="mrow"><button class="zd-btn" type="button" data-go="unlocks">Units' + (pr.bank >= 3000 && UPGRADES.some(u => pr.canBuy(u.id)) ? ' \u2022' : '') + '</button><button class="zd-btn" type="button" data-go="roster">Roster</button><div class="mside"></div></div>' +
         '<div class="foot">' + pr.data.rounds + ' rounds played · best score ' + pr.data.best.toLocaleString() + ' · ' + pr.data.stars + ' stars' + (pr.ok ? '' : ' · progress is not being saved on this device') + '</div>';
+    } else if (panel === 'roster') { // every model, turning on its plinth (roster.js, loaded only now)
+      head = top('Roster');
+      body = '<div class="rsec"><div class="tag">Bringing out the models...</div></div>';
     } else if (panel === 'be') {
       const bests = pr.data.beBest || {};
       head = top('Be The Disaster');
@@ -286,10 +304,15 @@ export class Game {
         '<div class="tag" style="margin-top:16px">Threats</div><div class="list">' + Object.keys(HAZARD_LEVEL).map(h => '<div class="row' + (lvl >= HAZARD_LEVEL[h] ? '' : ' locked') + '"><div><div class="n">' + threatName(h) + '</div><div class="d">' + (THREAT_HINT[h] ? THREAT_HINT[h] + ' · ' : '') + (lvl >= HAZARD_LEVEL[h] ? 'Can strike during a round' : 'Starts at level ' + HAZARD_LEVEL[h]) + '</div></div><span class="s">L' + HAZARD_LEVEL[h] + '</span></div>').join('') + '</div>' +
         '<div class="btns back"><button class="zd-btn" type="button" data-go="main">Back</button></div>';
     }
-    this.menu.innerHTML = '<div class="mtitle"><h1>MY TINY<br>DISASTER</h1><div class="tag">Save the city, or be the disaster</div></div><div class="box">' + head + '<div class="mbody">' + body + '</div></div>';
+    this.stopRoster(); this.menuPanel = panel;
+    this.menu.innerHTML = '<div class="mtitle"><h1>MY TINY<br>DISASTER</h1><div class="tag">Save the city, or be the disaster</div></div><div class="box' + (panel === 'roster' ? ' tall' : '') + '">' + head + '<div class="mbody">' + body + '</div></div>';
+    if (panel === 'roster') {
+      const cv = document.createElement('canvas'); cv.className = 'rgl'; this.menu.appendChild(cv);
+      import('./roster.js').then(m => { if (!cv.isConnected) return; const sec = this.menu.querySelector('.rsec'); sec.innerHTML = ''; this.roster = m.startRoster({ canvas: cv, list: this.menu.querySelector('.mbody'), root: sec }); });
+    }
     clearTimeout(this._gone); this.menu.classList.remove('gone'); this.menu.hidden = false; document.body.classList.add('zd-menu-on');
     this.dockSide();
-    if (this.globe) this.globe.backdrop();
+    if (this.globe) this.globe.backdrop(panel === 'main'); // the town names only round the main menu
     dragScroll(this.menu.querySelector('.mbody'), 'y');
     this.menu.querySelectorAll('[data-go]').forEach(b => { b.onclick = () => this.showMenu(b.dataset.go); });
     this.menu.querySelectorAll('[data-play]').forEach(b => { b.onclick = () => this.playMode(b.dataset.play); });
@@ -305,7 +328,8 @@ export class Game {
     el.innerHTML = '<div class="box">' + head + '<div class="row2">' + buttons + '</div><div class="stats">' + lines.map(l => '<div class="line"><span>' + l[0] + '</span><b>' + l[1] + '</b></div>').join('') + '</div></div>';
     dragScroll(el.querySelector('.box'), 'y');
   }
-  menuOff() { document.body.classList.remove('zd-menu-on'); const side = document.getElementById('zd-side'); if (side && side.parentNode !== document.body) document.body.appendChild(side); }
+  stopRoster() { if (this.roster) { this.roster.stop(); this.roster = null; } }
+  menuOff() { this.stopRoster(); document.body.classList.remove('zd-menu-on'); const side = document.getElementById('zd-side'); if (side && side.parentNode !== document.body) document.body.appendChild(side); }
   // from the menu: Commander and Be The Disaster head for the town where you left off (the first town the first time),
   // Sandbox lets you pick any place on the globe; the menu drops away first
   playMode(which, kind) {
@@ -328,7 +352,7 @@ export class Game {
   journey(key) {
     const end = document.getElementById('zd-end'); if (end) end.hidden = true;
     if (!this.globe) { travel(key, this.modeName); return; }
-    this.globe.open(); this.globe.after = key;
+    if (this.globe.up) this.globe.up(key); else { this.globe.open(); this.globe.after = key; }
   }
 
   nextUnlockText(level) {
@@ -348,6 +372,12 @@ export class Game {
     document.body.append(this.top, this.bar, toast, fps);
     const old = document.getElementById('hud'); if (old) old.remove();
     this.el = { toast, fps };
+    // the compass on the left (the districts are named by it): it turns with the view; a tap turns the view to face north
+    const cp = this.compass = document.createElement('button'); cp.type = 'button'; cp.id = 'zd-compass'; cp.title = 'Compass: tap to face north'; cp.setAttribute('aria-label', 'Compass: tap to face north');
+    cp.innerHTML = '<svg viewBox="0 0 48 48" aria-hidden="true"><g class="rose"><path d="M24 9 27.6 24 24 22 20.4 24z" fill="#ff5a3a"/><path d="M24 39 27.6 24 24 26 20.4 24z" fill="#f6ead2" opacity=".5"/>' +
+      '<text class="n" x="24" y="6">N</text><text x="42" y="24.5">E</text><text x="24" y="42.5">S</text><text x="6" y="24.5">W</text></g></svg>';
+    cp.onclick = () => { const off = this.camera.position.clone().sub(this.controls.target); this.faceNorth = { t: 0, from: Math.atan2(off.x, off.z) }; };
+    document.body.appendChild(cp); this.rose = cp.querySelector('.rose'); this.roseA = 999;
     const barH = () => document.documentElement.style.setProperty('--zd-bar-h', this.bar.offsetHeight + 'px');
     if (window.ResizeObserver) new ResizeObserver(barH).observe(this.bar); else setInterval(barH, 500);
   }
@@ -391,6 +421,18 @@ export class Game {
     this.speedBtn = this.addButton('zd-speed', '1x', () => { this.speed = this.speed >= 4 ? 1 : this.speed * 2; this.setLabel(this.speedBtn, this.speed + 'x'); });
   }
   setSpeed(s) { this.speed = s; this.setLabel(this.speedBtn, s + 'x'); }
+
+  // the compass card turned so N points to the north (-z) as the camera sees it; and the view turning to face north
+  compassStep(dt) {
+    const tg = this.controls.target, off = this.camera.position.clone().sub(tg);
+    if (this.faceNorth) {
+      const F = this.faceNorth; F.t += dt; const k = Math.min(1, F.t / 0.6), e = k * k * (3 - 2 * k), wrap = Math.atan2(Math.sin(-F.from), Math.cos(-F.from)), az = F.from + wrap * e, h = Math.hypot(off.x, off.z);
+      this.camera.position.x = tg.x + Math.sin(az) * h; this.camera.position.z = tg.z + Math.cos(az) * h; this.camera.lookAt(tg); off.x = Math.sin(az) * h; off.z = Math.cos(az) * h;
+      if (k >= 1) this.faceNorth = null;
+    }
+    const a = Math.round(Math.atan2(off.x, off.z) * 180 / Math.PI * 2) / 2; // north on screen, clockwise from up
+    if (a !== this.roseA) { this.roseA = a; this.rose.setAttribute('transform', 'rotate(' + a + ' 24 24)'); }
+  }
 
   toast(msg, ms = 2600) {
     const t = this.el.toast; t.textContent = msg; t.style.opacity = '1';
@@ -768,7 +810,7 @@ class Sandbox {
       }
       g.disasters.start(h); this.close(); if (this.clock < 0) this.clock = 0;
     }; });
-    d.querySelectorAll('[data-place]').forEach(b => { b.onclick = () => { if (b.dataset.place !== placeKey()) travel(b.dataset.place, 'sandbox'); else this.close(); }; });
+    d.querySelectorAll('[data-place]').forEach(b => { b.onclick = () => { this.close(); if (b.dataset.place !== placeKey()) g.journey(b.dataset.place); }; }); // up to the globe and down to it
     d.querySelectorAll('[data-wx]').forEach(b => { b.onclick = () => { g.disasters.weather.set(b.dataset.wx); g.toast('Weather: ' + WEATHER[b.dataset.wx].name); this.close(); }; });
   }
   zombieLabel() {
