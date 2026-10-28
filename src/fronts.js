@@ -4,40 +4,14 @@
 // face, twisted vortex columns hang down it, dust balls tumble along its foot,
 // lightning flickers inside and dust devils follow behind. It sandblasts the
 // streets, lifts people and cars, topples some low buildings and leaves a
-// sandstorm behind it. Cold wave: a blizzard wall with frost creeping over the
-// ground behind it; anyone caught outdoors freezes solid (zombies included,
+// sandstorm behind it. Cold wave (the arctic blast): the same rolling wall in
+// white and ice blue, powder boiling along its foot, snow falling only behind it
+// and frost creeping over the ground there; anyone caught outdoors freezes solid (zombies included,
 // until the cold breaks).
 import * as THREE from 'three';
 import { NOISE, FRONT, SweepFront, Splash } from './water.js';
 import { sfx } from './audio.js';
 
-const CURTAIN_VS = /* glsl */`
-uniform float uTime, uH, uBack; uniform vec2 uOrigin, uDir, uTan;
-varying vec2 vP; varying vec3 vW; varying float vY;
-${NOISE}
-${FRONT}
-void main() {
-  float tc = position.x, y = position.y;
-  float top = uH * (0.65 + 0.5 * fbm(vec2(tc * 0.007, uTime * 0.02)));
-  // the foot rolls forward, the top trails back
-  float s = frontAt(tc) - uBack + (sin(y * 3.1416) * 0.18 - y * 0.35) * top * 0.3;
-  vec3 w = vec3(uOrigin.x + uTan.x * tc + uDir.x * s, y * top, uOrigin.y + uTan.y * tc + uDir.y * s);
-  vW = w; vY = y; vP = vec2(tc, y * top);
-  gl_Position = projectionMatrix * viewMatrix * vec4(w, 1.0);
-}`;
-const CURTAIN_FS = /* glsl */`
-uniform float uTime, uAlpha, uLight, uFogDensity, uRise; uniform vec3 uColA, uColB, uFogColor;
-varying vec2 vP; varying vec3 vW; varying float vY;
-${NOISE}
-void main() {
-  float n = fbm(vec2(vP.x * 0.018, vP.y * 0.028 - uTime * uRise)), n2 = fbm(vec2(vP.x * 0.06 + uTime * 0.05, vP.y * 0.08 - uTime * uRise * 2.5));
-  float bill = n * 0.6 + n2 * 0.4;
-  vec3 col = mix(uColA, uColB, smoothstep(0.3, 0.8, bill) * 0.7 + vY * 0.3) * uLight;
-  float a = uAlpha * (1.0 - smoothstep(0.72, 1.0, vY + (bill - 0.5) * 0.4)) * (0.72 + 0.28 * bill);
-  float dist = length(cameraPosition - vW);
-  col = mix(col, uFogColor, (1.0 - exp(-pow(dist * uFogDensity, 2.0))) * 0.6);
-  gl_FragColor = vec4(col, a);
-}`;
 const FROST_VS = /* glsl */`
 varying vec3 vW;
 void main() { vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`;
@@ -54,22 +28,6 @@ void main() {
   gl_FragColor = vec4(col, uFade * smoothstep(0.0, 25.0, behind) * (0.55 + 0.25 * n));
 }`;
 
-function curtain(D, sw, o) {
-  const geo = new THREE.PlaneGeometry(sw.width, 1, 220, 14); geo.translate(0, 0.5, 0);
-  const mat = new THREE.ShaderMaterial({ vertexShader: CURTAIN_VS, fragmentShader: CURTAIN_FS, transparent: true, depthWrite: false, side: THREE.DoubleSide,
-    uniforms: { uTime: { value: 0 }, uH: { value: o.H }, uBack: { value: o.back || 0 }, uOrigin: { value: sw.origin }, uDir: { value: sw.dir }, uTan: { value: sw.tan },
-      uFront: { value: sw.F }, uPile: { value: sw.P }, uHalfW: { value: sw.halfW }, uSegW: { value: sw.segW }, uRise: { value: o.rise ?? 0.12 },
-      uAlpha: { value: o.alpha }, uLight: { value: 1 }, uFogDensity: { value: 0.0006 }, uColA: { value: new THREE.Color(o.a) }, uColB: { value: new THREE.Color(o.b) }, uFogColor: { value: new THREE.Color() } } });
-  const m = new THREE.Mesh(geo, mat); m.frustumCulled = false; m.renderOrder = 5; m.userData.alpha = o.alpha;
-  D.ctx.scene.add(m);
-  return m;
-}
-function syncCurtain(D, m, realT, fade = 1) {
-  const u = m.material.uniforms, sc = D.ctx.scene;
-  u.uTime.value = realT; u.uLight.value = D.lightK; u.uFogColor.value.copy(sc.background); u.uFogDensity.value = sc.fog ? sc.fog.density : 0.0006;
-  u.uAlpha.value = m.userData.alpha * fade;
-}
-function drop(D, m) { D.ctx.scene.remove(m); m.geometry.dispose(); m.material.dispose(); }
 
 // a wall of billowing cloud: hundreds of lit puffs riding a SweepFront. Small cauliflower clumps roll
 // along the ground at the front, big billows tower up behind them and dark masses overhang the top;
@@ -419,7 +377,9 @@ export class ColdWave {
   constructor(D, opts = {}) {
     this.type = 'coldwave'; this.D = D; this.t = 0; this.alive = true; this.phase = 'sweep'; this.fade = 1;
     const side = opts.side ?? (Math.random() < 0.7 ? 1 : Math.floor(Math.random() * 4)), sw = this.sw = new SweepFront(D, side, { speed: 9, slow: 1, fast: 1, pile: 1, start: -70 });
-    this.walls = [curtain(D, sw, { H: 80, alpha: 0.72, a: '#b8c2d0', b: '#f0f4fa', rise: 0.05 }), curtain(D, sw, { H: 60, alpha: 0.55, back: 30, a: '#c8d0dc', b: '#eef2f8', rise: 0.05 })];
+    this.wall = new DustWall(D, sw, { H: 190, lit: '#ffffff', shade: '#b4c3d6', dark: '#8797ad', pale: '#f2f6fb' }); // the dust storm's wall, in white (Sean)
+    this.powder = new Splash(D.ctx.scene, 1600); this.powder.mat.uniforms.uColor.value.set('#f2f6fc');
+    D.weather.snowBehind(sw); // the snow falls behind the front, never ahead of it
     const B = D.ctx.city.bounds, geo = new THREE.PlaneGeometry(B.x1 - B.x0 + 300, B.z1 - B.z0 + 300, 1, 1); geo.rotateX(-Math.PI / 2);
     this.frostMat = new THREE.ShaderMaterial({ vertexShader: FROST_VS, fragmentShader: FROST_FS, transparent: true, depthWrite: false,
       uniforms: { uTime: { value: 0 }, uLight: { value: 1 }, uFade: { value: 1 }, uOrigin: { value: sw.origin }, uDir: { value: sw.dir }, uTan: { value: sw.tan }, uFront: { value: sw.F }, uPile: { value: sw.P }, uHalfW: { value: sw.halfW }, uSegW: { value: sw.segW } } });
@@ -433,17 +393,20 @@ export class ColdWave {
   }
   update(h) {
     const D = this.D, { people, traffic } = D.ctx, sw = this.sw;
-    this.t += h;
+    this.t += h; this.powder.update(h);
     if (this.phase === 'after') {
       this.fade = Math.max(0, this.fade - h / 10);
       if (this.t > this.endT) {
         this.alive = false; people.thawAll(); traffic.thawAll(); traffic.gripK = 1;
-        D.weather.set(this.prevWeather === 'snow' ? 'clear' : this.prevWeather);
+        D.weather.set(this.prevWeather === 'snow' ? 'clear' : this.prevWeather); D.weather.snowBehind(null);
         D.emit({ type: 'coldend', text: 'The cold has broken. The frozen are thawing' });
       }
     } else {
       sw.advance(h);
-      if (!this.snowOn && sw.lead() > sw.extent * 0.25) { this.snowOn = true; D.weather.set('snow'); traffic.gripK = 0.35; }
+      if (!this.iceOn && sw.lead() > sw.extent * 0.25) { this.iceOn = true; traffic.gripK = 0.35; }
+      // the sky closes in and it snows once the front has passed where you are looking (or has crossed the town)
+      const tg = D.ctx.controls.target; if (!this.snowOn && (sw.behind(tg.x, tg.z) > 30 || sw.lead() > sw.extent)) { this.snowOn = true; D.weather.set('snow'); traffic.gripK = 0.35; }
+      for (let n = 0; n < 5; n++) { const k = Math.floor(Math.random() * 96), [x, z] = sw.at(k, -3); if (sw.inCity(x, z, 150)) this.powder.emit(x, 1, z, 4, { up: [0.5, 3], dir: [sw.dir.x * 10, sw.dir.y * 10], spread: 6, life: 2.4, size: 7, along: [sw.tan.x, sw.tan.y, sw.segW * 0.5] }); } // powder boiling along the foot
       if (sw.lead() > sw.extent + 80) { this.phase = 'after'; this.endT = this.t + 40; }
     }
     // the cold gets into everyone outdoors behind the front
@@ -472,8 +435,8 @@ export class ColdWave {
   }
   poi(x, z) { return this.phase === 'after' ? null : (() => { const dx = x - this.sw.origin.x, dz = z - this.sw.origin.y, t = dx * this.sw.tan.x + dz * this.sw.tan.y, s = this.sw.frontAt(t); return { x: this.sw.origin.x + this.sw.tan.x * t + this.sw.dir.x * s, z: this.sw.origin.y + this.sw.tan.y * t + this.sw.dir.y * s, danger: 12, range: 260 }; })(); }
   sync(dt, realT) {
-    for (const w of this.walls) syncCurtain(this.D, w, realT, this.phase === 'after' ? Math.max(0, this.fade * 2 - 1) : 1);
+    this.wall.sync(realT, this.phase === 'after' ? Math.max(0, this.fade * 2 - 1) : 1); this.powder.sync(this.D.lightK, this.D.ctx.fire.uniforms.uScale.value);
     this.frostMat.uniforms.uLight.value = this.D.lightK; this.frostMat.uniforms.uFade.value = this.fade;
   }
-  dispose() { for (const w of this.walls) drop(this.D, w); this.D.ctx.scene.remove(this.frost); this.frost.geometry.dispose(); this.frostMat.dispose(); if (this.alive) { this.D.ctx.people.thawAll(); this.D.ctx.traffic.thawAll(); } }
+  dispose() { this.wall.dispose(); this.D.ctx.scene.remove(this.powder.points); this.powder.points.geometry.dispose(); this.powder.mat.dispose(); this.D.weather.snowBehind(null); this.D.ctx.scene.remove(this.frost); this.frost.geometry.dispose(); this.frostMat.dispose(); if (this.alive) { this.D.ctx.people.thawAll(); this.D.ctx.traffic.thawAll(); } }
 }

@@ -3,6 +3,7 @@
 // camera; the rest is light, fog, grade and gameplay modifiers layered on top
 // of the day and night cycle.
 import * as THREE from 'three';
+import { FRONT, FRONT_N } from './water.js';
 
 export const WEATHER = {
   clear: { name: 'Clear', sun: 1, hemi: 1, fog: 1, sky: '#d9bf95', skyK: 0, sepia: 1, exp: 1, rain: 0, snow: 0, sand: 0, cover: 0 },
@@ -18,9 +19,10 @@ export const WEATHER = {
 const KEYS = ['sun', 'hemi', 'fog', 'skyK', 'sepia', 'exp', 'rain', 'snow', 'sand', 'cover'];
 
 const PRECIP_VS = /* glsl */`
-uniform vec3 uCenter, uSize; uniform float uTime, uSpeed, uLen, uMode, uFocus; uniform vec2 uWind;
+uniform vec3 uCenter, uSize; uniform float uTime, uSpeed, uLen, uMode, uFocus, uMask, uBack; uniform vec2 uWind, uOrigin, uDir, uTan;
 attribute vec4 aSeed;
 varying float vA;
+${FRONT}
 void main() {
   vec3 p = aSeed.xyz * uSize;
   float t = uTime * uSpeed * (0.8 + aSeed.x * 0.4);
@@ -34,6 +36,7 @@ void main() {
   vA = 1.0 - smoothstep(0.65, 1.0, max(abs(rel.x), max(abs(rel.y), abs(rel.z))));
   vec4 mv = viewMatrix * vec4(p, 1.0);
   vA *= 1.0 - smoothstep(0.1, 0.32, abs(-mv.z - uFocus) / uFocus); // only near the sharp band, the blur would hide the rest
+  if (uMask > 0.5) { vec2 r = p.xz - uOrigin; vA *= smoothstep(0.0, 30.0, frontAt(dot(r, uTan)) - dot(r, uDir) - uBack); } // a cold front: only behind it
   gl_PointSize = uLen * 380.0 / -mv.z;
   gl_Position = projectionMatrix * mv;
 }`;
@@ -58,7 +61,8 @@ function precip(n, mode, color, pairs) {
   g.setAttribute('aSeed', new THREE.BufferAttribute(seed, 4));
   const mat = new THREE.ShaderMaterial({
     vertexShader: PRECIP_VS, fragmentShader: PRECIP_FS, transparent: true, depthWrite: false,
-    uniforms: { uCenter: { value: new THREE.Vector3() }, uSize: { value: new THREE.Vector3(1, 1, 1) }, uTime: { value: 0 }, uSpeed: { value: 1 }, uLen: { value: 1 }, uMode: { value: mode }, uFocus: { value: 400 }, uWind: { value: new THREE.Vector2(0.6, 0.25) }, uColor: { value: new THREE.Color(color) }, uAlpha: { value: 0 } },
+    uniforms: { uCenter: { value: new THREE.Vector3() }, uSize: { value: new THREE.Vector3(1, 1, 1) }, uTime: { value: 0 }, uSpeed: { value: 1 }, uLen: { value: 1 }, uMode: { value: mode }, uFocus: { value: 400 }, uWind: { value: new THREE.Vector2(0.6, 0.25) }, uColor: { value: new THREE.Color(color) }, uAlpha: { value: 0 },
+      uMask: { value: 0 }, uBack: { value: 25 }, uOrigin: { value: new THREE.Vector2() }, uDir: { value: new THREE.Vector2(1, 0) }, uTan: { value: new THREE.Vector2(0, 1) }, uFront: { value: new Float32Array(FRONT_N) }, uPile: { value: new Float32Array(FRONT_N) }, uHalfW: { value: 1 }, uSegW: { value: 1 } },
   });
   const obj = pairs ? new THREE.LineSegments(g, mat) : new THREE.Points(g, mat);
   obj.frustumCulled = false; obj.renderOrder = 6; obj.visible = false;
@@ -66,6 +70,13 @@ function precip(n, mode, color, pairs) {
 }
 
 export class Weather {
+  // snow (and sleet) only behind a sweeping cold front (fronts.js ColdWave), or everywhere again (null)
+  snowBehind(sw) {
+    for (const o of [this.snow, this.rain]) {
+      const u = o.material.uniforms; u.uMask.value = sw ? 1 : 0; if (!sw) continue;
+      u.uOrigin.value = sw.origin; u.uDir.value = sw.dir; u.uTan.value = sw.tan; u.uFront.value = sw.F; u.uPile.value = sw.P; u.uHalfW.value = sw.halfW; u.uSegW.value = sw.segW;
+    }
+  }
   constructor(ctx) {
     this.ctx = ctx; // { scene, sun, hemi, post, city, camera, controls, fire, traffic, people, disasters, low }
     const { scene, post, low } = ctx;
