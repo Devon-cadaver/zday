@@ -109,9 +109,9 @@ export class Lives {
   // free to stop and talk: out and about on their own account (not on a plan, not already standing about)
   free(j) { const P = this.P, S = this.S, s = P.st[j]; if (P.kind[j] !== this.KIND.CIVILIAN || P.inf[j] || P.lvl[j] !== -1) return false; if (s === S.WALK) return true; if (s !== S.GO) return false; const T = this.trips.get(j); return !!T && !T.plan && !T.at; }
   // standing a moment facing someone (talking, arguing, grieving), then back to what they were doing
-  pause(i, secs, j) {
+  pause(i, secs, j, talk) {
     const P = this.P, S = this.S, was = P.st[i] === S.GO ? this.trips.get(i) : null;
-    this.trips.set(i, { pts: [], k: 0, at: true, stay: secs, resume: was || null });
+    this.trips.set(i, { pts: [], k: 0, at: true, stay: secs, resume: was || null, with: j, talk }); // talk: chat, argue or grieve (for their card)
     P.st[i] = S.GO; P.fx[i] = 8; P.face(i, P.x[j], P.z[j]);
   }
   // friends or enemies who meet in the street (each one's think, every two seconds or so)
@@ -120,11 +120,11 @@ export class Lives {
     if (P.time < this.chatT[i] || !this.free(i)) return false;
     const close = (j, d) => j >= 0 && Math.abs(P.x[j] - P.x[i]) < d && Math.abs(P.z[j] - P.z[i]) < d && this.free(j);
     for (const j of [this.f1[i], this.f2[i]]) if (close(j, 3.5)) { // a chat
-      const t = 3 + P.r() * 5; this.pause(i, t, j); this.pause(j, t, i); this.chatT[i] = this.chatT[j] = P.time + 45; return true;
+      const t = 3 + P.r() * 5; this.pause(i, t, j, 'chat'); this.pause(j, t, i, 'chat'); this.chatT[i] = this.chatT[j] = P.time + 45; return true;
     }
     const e = this.foe[i];
     if (close(e, 4)) { // words, and maybe a shove
-      const t = 3 + P.r() * 3; this.pause(i, t, e); this.pause(e, t, i); this.chatT[i] = this.chatT[e] = P.time + 60;
+      const t = 3 + P.r() * 3; this.pause(i, t, e, 'argue'); this.pause(e, t, i, 'argue'); this.chatT[i] = this.chatT[e] = P.time + 60;
       if ((this.t.brave[i] + this.t.greed[i] - this.t.loyal[i]) / 255 > 0.45) { const dx = P.x[e] - P.x[i], dz = P.z[e] - P.z[i], d = Math.hypot(dx, dz) || 1, nx = P.x[e] + dx / d * 0.9, nz = P.z[e] + dz / d * 0.9; if (P.walkable(nx, nz)) { P.x[e] = nx; P.z[e] = nz; } }
       if (!this.saidArgue) { this.saidArgue = true; P.events.push({ type: 'argue', x: P.x[i], z: P.z[i] }); }
       return true;
@@ -142,7 +142,7 @@ export class Lives {
       const d = Math.hypot(P.x[j] - P.x[i], P.z[j] - P.z[i]);
       if (d > 40 || P.kind[i] !== this.KIND.CIVILIAN || P.inf[i] || P.lvl[i] !== -1) continue;
       if (s === S.ZOMBIE && b > 150 && d < 15 && P.st[i] !== S.FIGHT) { P.fightBack(i, j); return; } // going for what their friend became
-      if (this.free(i) || P.st[i] === S.FLEE) { this.pause(i, 4 + P.r() * 4, j); if (!this.saidMourn) { this.saidMourn = true; P.events.push({ type: 'mourn', x: P.x[i], z: P.z[i] }); } return; }
+      if (this.free(i) || P.st[i] === S.FLEE) { this.pause(i, 4 + P.r() * 4, j, 'grieve'); if (!this.saidMourn) { this.saidMourn = true; P.events.push({ type: 'mourn', x: P.x[i], z: P.z[i] }); } return; }
     }
   }
   // the city's trust in the police and rescuers: up with rescues, arrests, zombies shot, people treated; down with

@@ -208,9 +208,10 @@ export class Commander {
     this.g.toast(id === 'heroes' ? 'Tap where to shine the hero signal' : id === 'barrier' ? 'Tap a street ahead of the wave: the barrier goes up across its path' : id === 'build' ? 'Tap a fallen building to rebuild it' : id === 'camp' ? 'Tap where the medical camp should go' : id === 'hazmat' ? 'Tap the area to decontaminate' : 'Tap the map where the ' + c.u.name.toLowerCase() + ' should go');
   }
 
+  busy() { return !!this.sel || this.ended; } // a unit picked: taps send it (none: a tap on a person shows who they are)
   tap(x, z) {
     if (this.ended) return;
-    if (!this.sel) { this.g.toast('Pick a unit below, then tap the map'); return; }
+    if (!this.sel) { this.g.toast('Pick a unit below, then tap the map. Tap a person to see who they are'); return; }
     const id = this.sel;
     if (id === 'police') this.sendPolice(x, z);
     else if (id === 'fire') this.sendFire(x, z);

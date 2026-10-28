@@ -332,6 +332,7 @@ export class BeTheDisaster {
   }
 
   tap() {}
+  busy() { return true; } // a finger here drives the disaster
   phase() { return 0.1 + (this.t / RUN) * 0.25; }
 
   update(sdt, dt) {

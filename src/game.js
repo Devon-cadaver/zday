@@ -12,6 +12,7 @@ import { Responders } from './response.js';
 import { curvedHit } from './curve.js';
 import { PLACES, PATH, placeKey, travel, settle } from './places.js';
 import { dragScroll } from './ui.js';
+import { Folk } from './folk.js';
 
 const CSS = `
 #zd-top{position:fixed;left:0;right:0;top:0;display:flex;gap:6px;align-items:center;justify-content:center;flex-wrap:wrap;
@@ -250,6 +251,7 @@ export class Game {
     this.profile = new Profile();
     this.buildUI();
     this.bindInput();
+    this.folk = new Folk(this); // a tap on a person: who they are
     this.menu = document.createElement('div'); this.menu.id = 'zd-menu'; this.menu.hidden = true;
     document.body.appendChild(this.menu);
     this.modeName = mode;
@@ -271,6 +273,7 @@ export class Game {
   }
   // a mode stops for good: its touch handlers go quiet (dead), what it put on the screen goes
   endMode() {
+    if (this.folk) this.folk.hide();
     if (this.followSub || this.follow >= 0) this.setFollow(-1);
     const m = this.mode;
     if (m) { m.dead = true; if (m.gauge && m.gauge.el) m.gauge.el.remove(); if (m.panel) m.panel.remove(); }
@@ -516,7 +519,7 @@ export class Game {
       if (e.type !== 'pointerup' || wasMulti || e.button > 0 || (this.globe && this.globe.active)) return; // up on the globe, taps are the globe's
       if (Math.hypot(e.clientX - d.x, e.clientY - d.y) < 10 && performance.now() - d.t < 400) {
         const hit = this.worldPoint(e.clientX, e.clientY);
-        if (hit) this.mode.tap(hit.x, hit.z);
+        if (hit && !(this.folk && this.folk.tap(e.clientX, e.clientY))) this.mode.tap(hit.x, hit.z); // someone tapped: their card; else the mode's tap
       }
     };
     dom.addEventListener('pointerup', up);
@@ -564,7 +567,7 @@ export class Game {
   // other disaster (a tornado, a storm front, a falling meteor, a volcano...), then zombies. The good guys: the super heroes, helicopters, rescue vehicles on the move, then the responders on foot
   // nearest the view (police, firefighters, soldiers, the crews rebuilding)
   subjects(side = 'bad') {
-    const out = [], D = this.disasters; if (!D) return out;
+    const out = [], D = this.disasters; if (!D || side === 'person') return out; // a person followed from their card: nobody after them
     if (side === 'good') {
       for (const e of D.list) if (e.alive && e.type === 'heroes') for (const h of e.who) out.push({ obj: h, name: h.name, pos: () => (h.state === 'fly' ? [h.x, h.y + 2.5, h.z] : null) });
       if (this.helis) for (const hl of this.helis.list) out.push({ obj: hl, name: 'Helicopter', kind: 'heli', pos: () => (this.helis.list.includes(hl) && hl.state !== 'out' ? [hl.x, hl.y, hl.z] : null) }); // flying off: done
@@ -634,7 +637,8 @@ export class Game {
   }
   followSubject(s, side = this.followSide || 'bad') {
     this.follow = -1; this.followSub = s; this.followSide = side; this.dir = null; this.camDir = null; this.zoomTo = 0; this.manualCam = false; this.followIn = false; this.outT = 0; this.lockControls(true);
-    const on = side === 'good' ? this.goodBtn : this.followBtn, off = side === 'good' ? this.followBtn : this.goodBtn;
+    const on = side === 'good' ? this.goodBtn : side === 'bad' ? this.followBtn : null, off = side === 'good' ? this.followBtn : this.goodBtn;
+    if (side === 'person' && this.followBtn) { this.followBtn.classList.remove('on'); this.setLabel(this.followBtn, 'Follow disaster'); }
     if (on) { on.classList.add('on'); this.setLabel(on, side === 'good' ? 'Next rescue' : 'Next disaster'); }
     if (off) { off.classList.remove('on'); this.setLabel(off, off === this.goodBtn ? 'Follow rescue' : 'Follow disaster'); }
     if (this.followChip) this.followChip.querySelector('b').textContent = s.name;
@@ -671,6 +675,7 @@ export class Game {
     if (s.kind === 'car') return { key: 'car', dist: 220, pol: 0.62, base: hd + P, off: 0.4 }; // chasing it down the street, high enough to see over the buildings
     if (s.kind === 'heli') return { key: 'heli', dist: 280, pol: 0.86, base: hd, off: 0.9 };
     if (s.kind === 'foot') return { key: 'foot', dist: 150, pol: 0.62 }; // close enough to watch them work, looking down into the street
+    if (s.kind === 'person') return { key: 'person', dist: 110, pol: 0.6 }; // someone from their card: close, down in the street with them
     if (s.kind === 'disaster') return this.disasterShot(o);
     return null;
   }
@@ -762,7 +767,7 @@ export class Game {
     this.focusAt = null;
     if (this.followSub) {
       const q = this.followSub.pos();
-      const inCity = (p) => this.inCity(p);
+      const inCity = (p) => this.inCity(p, this.followSide === 'person' ? -60 : 12); // someone from their card may live out on the edge
       if (q && inCity(q)) { this.followIn = true; this.outT = 0; } else this.outT = (this.outT || 0) + dt;
       if (!q || (this.followIn && !inCity(q)) || this.outT > 2.5) { // gone, on its way out of the city, or out there too long: on to another of the same side, or stop
         const side = this.followSide || 'bad', cur = this.followSub.obj, next = this.subjects(side).find(s => s.obj !== cur && inCity(s.pos()));
@@ -776,6 +781,7 @@ export class Game {
         this.direct(q, dt);
       }
     }
+    if (this.folk) this.folk.step(dt);
     if (this.zoomTo) {
       const tg = this.controls.target, off = this.camera.position.clone().sub(tg), d = off.length();
       const nd = d + (this.zoomTo - d) * (1 - Math.exp(-dt * 3));
@@ -914,6 +920,7 @@ class Sandbox {
     };
     dom.addEventListener('pointerup', up); dom.addEventListener('pointercancel', up);
   }
+  busy() { return !!this.pending || this.gauge.active || performance.now() < (this.noTapUntil || 0); } // a tap now is for a disaster, not a person's card
   tap(x, z) {
     const g = this.g;
     if (this.gauge.active || performance.now() < (this.noTapUntil || 0)) return; // that press was sizing a disaster
@@ -929,7 +936,7 @@ class Sandbox {
       g.disasters.start(h, x, z); this.close(); if (this.clock < 0) this.clock = 0;
       return;
     }
-    if (performance.now() > (this.hintAt || 0)) { this.hintAt = performance.now() + 5000; g.toast('Open Disasters to drop zombies or unleash a disaster'); }
+    if (performance.now() > (this.hintAt || 0)) { this.hintAt = performance.now() + 5000; g.toast('Open Disasters to drop zombies or unleash a disaster. Tap a person to see who they are'); }
   }
   onEvent(e) { this.auto.onEvent(e); }
   reset() {
