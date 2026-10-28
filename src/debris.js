@@ -168,8 +168,9 @@ export class Debris {
         if (w > 0.4 && o.position.y <= w) { d.mode = M.FLOAT; if (this.onSplash) this.onSplash(o.position.x, w, o.position.z, 3); d.v.y = 0; }
         else if (o.position.y <= this.groundY(o.position.x, o.position.z)) { o.position.y = this.groundY(o.position.x, o.position.z); d.mode = M.REST; d.t = 0; o.rotation.x = Math.random() < 0.5 ? 0 : Math.PI; o.rotation.z = (Math.random() - 0.5) * 0.4; if (d.onLand) d.onLand(o); }
       } else if (d.mode === M.FLOAT) {
-        const w = wy ? wy(o.position.x, o.position.z) : -99;
-        const f = Math.exp(-0.3 * h); d.v.x *= f; d.v.z *= f;
+        const w = wy ? wy(o.position.x, o.position.z) : -99, fl = this.flowAt ? this.flowAt(o.position.x, o.position.z) : null; // a whirlpool's pull
+        if (fl) { d.v.x += fl[0] * h; d.v.z += fl[1] * h; if (fl[3] && fl[3](o.position.x, o.position.z)) { this.drop(n); continue; } } // down the hole
+        const f = Math.exp(-(fl ? 0.15 : 0.3) * h); d.v.x *= f; d.v.z *= f;
         o.position.x += d.v.x * h; o.position.z += d.v.z * h; o.rotation.y += h * 0.15;
         if (w < 0.25) { o.position.y = 0.2; d.mode = M.REST; d.t = 0; }
         else o.position.y = w - 0.4 + Math.sin(d.t * 1.5) * 0.15;

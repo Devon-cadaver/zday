@@ -12,7 +12,7 @@ const IN = RW / 2;        // lanes stop this far before an intersection centre
 const ACC = 3.5, BRAKE = 8, BRAKE_PANIC = 4.5;
 const LEN = 4.3, HALF_L = 2.2, HALF_W = 0.95;
 const CELL = 10;
-const DRIVE = 0, WRECK = 1, REST = 2, PARKED = 3, EXT = 4, AIR = 5;
+const DRIVE = 0, WRECK = 1, REST = 2, PARKED = 3, EXT = 4, AIR = 5, FLOAT = 6; // FLOAT: adrift in flood water
 export const CAR_MODE = { DRIVE, WRECK, REST, PARKED, EXT, AIR };
 const MISSION_CAP = 72; // emergency vehicles out at once (Sean: as many police cars as the points will buy)
 const MISSION_KINDS = { police: { geo: () => cruiserGeometry(), cap: 48, cruise: 14 }, fire: { geo: () => VEHICLES.fire_truck.build(), cap: 14, cruise: 11 }, apc: { geo: () => VEHICLES.stryker.build(), cap: 6, cruise: 12, tough: true }, bus: { geo: () => VEHICLES.bus.build(), cap: 8, cruise: 10 },
@@ -425,8 +425,34 @@ export class Traffic {
       if (car.mode === DRIVE) this.driveStep(car, h, P);
       else if (car.mode === AIR) this.airStep(car, h);
       else if (car.mode === WRECK) this.wreckStep(car, h, P);
+      else if (car.mode === FLOAT) this.floatStep(car, h);
+    }
+    // water deep enough to lift a car: stalled, wrecked and abandoned cars float off (not the emergency vehicles)
+    if (this.waterAt && (this.floatT = (this.floatT || 0) - h) <= 0) {
+      this.floatT = 0.5;
+      for (const car of this.cars) {
+        if (car.mission || car.gone || tough(car) || (car.mode !== DRIVE && car.mode !== REST && car.mode !== WRECK)) continue;
+        if (this.waterAt(car.x, car.z) - (this.groundAt ? this.groundAt(car.x, car.z) : 0) > 1.1 && this.grab(car)) { car.mode = FLOAT; car.vx = car.vx || 0; car.vz = car.vz || 0; car.w = (this.r() - 0.5) * 0.5; car.ft = this.r() * 9; }
+      }
     }
     this.collisions(P);
+  }
+
+  // adrift: it turns slowly and bobs on the flood's eddies (and a whirlpool's pull: flowAt), knocking off walls; aground again where the water is shallow
+  floatStep(car, h) {
+    const w = this.waterAt ? this.waterAt(car.x, car.z) : -99, gy = this.groundAt ? this.groundAt(car.x, car.z) : 0;
+    if (w - gy < 0.7) { car.mode = REST; car.y = gy; car.vx = car.vz = 0; car.roll = 0; car.pitch = 0; return; }
+    car.ft += h;
+    const f = this.flowAt ? this.flowAt(car.x, car.z) : null;
+    if (f && f[2]) { if (f[2](car)) return; } // swallowed by a whirlpool
+    const ex = Math.sin(car.z * 0.013 + car.ft * 0.05 + car.id) * 0.7, ez = Math.cos(car.x * 0.011 + car.ft * 0.04 + car.id * 1.7) * 0.7; // the flood's slow eddies
+    car.vx += ((f ? f[0] : 0) + ex) * h; car.vz += ((f ? f[1] : 0) + ez) * h;
+    const k = Math.exp(-(f ? 0.15 : 0.4) * h); car.vx *= k; car.vz *= k;
+    const nx = car.x + car.vx * h, nz = car.z + car.vz * h;
+    if (this.people && !this.people.walkable(nx, nz)) { car.vx *= -0.4; car.vz *= -0.4; car.w = -car.w; } else { car.x = nx; car.z = nz; } // a wall: it knocks off it and turns
+    car.yaw += (car.w + (f ? Math.hypot(f[0], f[1]) * 0.05 : 0)) * h;
+    car.y += (w - 0.95 + Math.sin(car.ft * 1.6 + car.id) * 0.12 - car.y) * Math.min(1, h * 3);
+    car.roll = Math.sin(car.ft * 1.3 + car.id) * 0.09; car.pitch = Math.cos(car.ft * 1.1 + car.id * 0.7) * 0.06;
   }
 
   driveStep(car, h, P) {
@@ -545,7 +571,7 @@ export class Traffic {
 
   collisions(P) {
     for (const car of this.cars) {
-      if (car.mode === REST || car.mode === PARKED || car.mode === EXT || car.mode === AIR) continue;
+      if (car.mode === REST || car.mode === PARKED || car.mode === EXT || car.mode === AIR || car.mode === FLOAT) continue;
       // run over anyone in the footprint
       if (P && car.mode === DRIVE && car.v > 0.2 && car.v <= 2) { // creeping through a crowd: people step out of the way
         P.around(car.x, car.z, 3.2, (j) => {

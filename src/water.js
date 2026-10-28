@@ -48,7 +48,8 @@ void main() {
   vec3 V = normalize(cameraPosition - vW);
   float fres = pow(1.0 - max(0.0, dot(N, V)), 3.0);
   vec3 col = mix(uDeep, uShallow, n) * uLight;
-  col = mix(col, uSky * 0.75, 0.1 + fres * 0.55);
+  col = mix(col, uSky * 0.75, 0.16 + fres * 0.55);
+  col += vec3(0.07, 0.08, 0.08) * smoothstep(0.6, 0.78, fbm(vW.xz * 0.35 + vec2(uTime * 0.6, uTime * 0.4))) * uLight; // ripples catching the light
   vec3 H = normalize(uSunDir + V);
   col += pow(max(0.0, dot(N, H)), 90.0) * 0.8 * uSunI;
   // churned white water just behind the wave, scum streaks elsewhere
@@ -154,7 +155,7 @@ export class Splash {
 }
 
 const PALETTE = {
-  flood: [new THREE.Color(0.075, 0.065, 0.042), new THREE.Color(0.17, 0.145, 0.09), new THREE.Color(0.5, 0.46, 0.36)],
+  flood: [new THREE.Color(0.085, 0.1, 0.085), new THREE.Color(0.23, 0.25, 0.19), new THREE.Color(0.55, 0.53, 0.44)], // muddy olive, a shade off the sepia streets so it reads as water (it was lost among them)
   sea: [new THREE.Color(0.03, 0.065, 0.075), new THREE.Color(0.1, 0.16, 0.16), new THREE.Color(0.86, 0.9, 0.9)],
 };
 const NO_FRONT = new Float32Array(FRONT_N).fill(1e6), FLAT = new Float32Array(FRONT_N).fill(1);
@@ -193,6 +194,16 @@ export class WaterSurface {
   update(h) {
     const { people, traffic } = this.D.ctx, on = this.active;
     people.waterAt = on ? this.levelAt : null; traffic.waterAt = on ? this.levelAt : null; this.D.debris.waterY = on ? this.levelAt : null;
+    if (on && (this.parkT = (this.parkT || 0) - h) <= 0) { // parked cars in deep water float off their spaces, a few at a time
+      this.parkT = 0.5; const D = this.D; let n = 0;
+      for (const pc of traffic.parkedList) {
+        if (!pc.alive || n >= 5 || D.debris.objs.length > 130) continue;
+        if (this.levelAt(pc.x, pc.z) - people.groundY(pc.x, pc.z) < 1.1 || Math.random() > 0.35) continue;
+        traffic.takeParked(pc); n++;
+        const m = new THREE.Mesh(traffic.geometryOf(pc.type), D.carMat(pc.burnt ? '#1a1714' : pc.hex)); m.castShadow = true; m.position.set(pc.x, this.level - 0.6, pc.z); m.rotation.y = pc.rot;
+        D.debris.addObject(m, 'float', { v: [(Math.random() - 0.5) * 0.6, 0, (Math.random() - 0.5) * 0.6] });
+      }
+    }
     this.splash.update(h);
   }
   sync(dt, realT) {
