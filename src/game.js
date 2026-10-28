@@ -400,7 +400,7 @@ export class Game {
     if (which === 'tv') { const ks = Object.keys(PLACES), key = ks[Math.floor(Math.random() * ks.length)]; G.choose({ title: 'DISASTER TV · LIVE', sub: 'The end of the world, as it happens. First: ' + PLACES[key].name, key, arrive }); return; } // the whole world, then down into a town of its own choosing
     if (which === 'sandbox') { G.choose({ title: 'SANDBOX', sub: 'Pick a city: tap it to play there', arrive, back: () => this.showMenu() }); return; }
     const key = this.profile.town(which);
-    G.choose({ title: (which === 'be' ? 'BE THE DISASTER' : 'COMMANDER') + ' \u00B7 LEVEL ' + (PATH.indexOf(key) + 1), sub: PLACES[key].name, key, road: true, status: this.townStatus(which), arrive });
+    G.choose({ title: (which === 'be' ? 'BE THE DISASTER' : 'COMMANDER') + ' \u00B7 LEVEL ' + (PATH.indexOf(key) + 1), sub: PLACES[key].name, key, road: true, mode: which, status: this.townStatus(which), arrive });
   }
   // how a place stands on the road for a mode (Commander, Be The Disaster): its number, won, open or locked
   townStatus(mode) {

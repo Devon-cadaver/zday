@@ -532,6 +532,8 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
   - Saucer: half the time straight through it at 95 m/s (it bursts, shootDown, spirals down burning and crashes as before; 'X flew straight through a saucer!'); else grabbed ('held'), swung round twice in 1.4 s, then flung up at 140 m/s and climbing, out of sight past 700 m: gone, counted as down (spaced), the invasion ends when every saucer is down or spaced.
   - herofight.orphans (each invasion step): a machine whose hero was knocked away or left mid-move falls and crumples (tripod) or gets away (saucer), so nothing hangs in the air. Tested at Northgate: heroes ended a full invasion in about 30 s.
 
+- Globe road as a trail (Sean: only where you came from, never where you are going; the menu shows none until you travel): Globe.buildRoad(n) draws the road only from the first town to town n (rebuilt when n changes; n < 1 none) and showRoad(on, mode) uses globe.trail(mode) = profile.been(mode): the furthest town played in that mode (profile.played now records data.been[mode]; older saves: max of the last town played and the towns cleared). In Commander or Be The Disaster (the in-game globe, the road picker) that mode's trail; on the menu the furthest of either. A fresh save shows no lines.
+
 ## Next
 - Sean tests v1.3 on his phone; tune from his notes. Candidates: Be The Disaster score scales and ranks once real scores come in, the saucer size at close zoom, how often zombie outbreaks turn up in Commander, incident pacing, card bar height on the phone.
 

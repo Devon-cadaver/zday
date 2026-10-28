@@ -56,7 +56,13 @@ export class Profile {
   // the town to go to next time (the last one played, else the furthest open)
   reach(mode) { return Math.min((this.data.path || {})[mode] || 0, PATH.length - 1); }
   town(mode) { const last = (this.data.last || {})[mode], i = PATH.indexOf(last); return i >= 0 && i <= this.reach(mode) ? last : PATH[this.reach(mode)]; }
-  played(mode, key) { if (PATH.indexOf(key) < 0) return; (this.data.last || (this.data.last = {}))[mode] = key; this.save(); }
+  played(mode, key) { const i = PATH.indexOf(key); if (i < 0) return; (this.data.last || (this.data.last = {}))[mode] = key; const b = this.data.been || (this.data.been = {}); b[mode] = Math.max(b[mode] ?? -1, i); this.save(); }
+  // the furthest town along the road played in mode (both modes: null); -1 none. Older saves: the towns cleared and the last one played
+  been(mode) {
+    if (!mode) return Math.max(this.been('commander'), this.been('be'));
+    const last = PATH.indexOf((this.data.last || {})[mode]);
+    return Math.min(PATH.length - 1, Math.max((this.data.been || {})[mode] ?? -1, last, this.reach(mode) - 1));
+  }
   // won in the furthest open town: the next one opens; returns its key (null if nothing new opened)
   clear(mode, key) {
     const i = PATH.indexOf(key); if (i < 0 || i !== this.reach(mode) || i + 1 >= PATH.length) return null;

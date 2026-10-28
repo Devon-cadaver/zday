@@ -189,16 +189,23 @@ export class Globe {
     this.scene.add(this.here); this.setHere();
   }
   // the road through the towns (PATH), along the surface from each to the next
-  buildRoad() {
+  // the road drawn only as far as town n (the trail of the towns played so far: never where you are going); n < 1: no road
+  buildRoad(n = -1) {
+    if (this.road && this.roadN === n) return;
+    if (this.road) { this.scene.remove(this.road); this.road.geometry.dispose(); }
+    this.roadN = n; const vis = this.road ? this.road.visible : false;
+    if (n < 1) { this.road = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial()); this.road.visible = false; this.road.userData.empty = true; this.scene.add(this.road); return; }
     const pts = [];
-    for (let i = 0; i + 1 < PATH.length; i++) {
+    for (let i = 0; i + 1 <= n && i + 1 < PATH.length; i++) {
       const a = toVec(...this.spots[PATH[i]], 1).normalize(), b = toVec(...this.spots[PATH[i + 1]], 1).normalize(), ang = a.angleTo(b), n = Math.max(4, Math.ceil(ang * 40));
       for (let k = i ? 1 : 0; k <= n; k++) { const t = k / n, s = Math.sin(ang); pts.push(a.clone().multiplyScalar(Math.sin((1 - t) * ang) / s).addScaledVector(b, Math.sin(t * ang) / s).multiplyScalar(R * 1.004)); }
     }
     const curve = new THREE.CatmullRomCurve3(pts);
     this.road = new THREE.Mesh(new THREE.TubeGeometry(curve, pts.length * 2, 0.017, 5, false), new THREE.MeshBasicMaterial({ color: '#ffd27a', transparent: true, opacity: 0.6, depthWrite: false }));
-    this.road.visible = false; this.scene.add(this.road);
+    this.road.visible = vis; this.scene.add(this.road);
   }
+  // the trail for a mode (or for either, on the menu), shown or not
+  showRoad(on, mode) { this.buildRoad(this.trail ? this.trail(mode) : -1); this.road.visible = !!on && !this.road.userData.empty; }
   // the ring round where you are (again after moving to another place in this page)
   setHere() {
     if (!this.here) return;
@@ -297,7 +304,7 @@ export class Globe {
     if (this.active) return;
     if (!this.built) this.build();
     this.active = true; this.fly = null; this.state = 'game'; this.arrive = null; this.shiftTo = 0;
-    this.status = this.statusFor ? this.statusFor() : null; this.road.visible = !!this.status; this.here.visible = true; this.relabel();
+    this.status = this.statusFor ? this.statusFor() : null; this.showRoad(!!this.status, this.mode ? this.mode() : null); this.here.visible = true; this.relabel();
     this.uiEl.firstChild.textContent = 'THE WORLD'; this.say('Spin it, tap a town to go there'); this.backBtn.textContent = 'Back to ' + PLACES[placeKey()].name;
     const [lat, lon] = this.spots[placeKey()], p = toVec(lat, lon, 1).normalize();
     const r0 = opts.clouds ? R * 1.07 : R * 1.15; // out of the clouds: from just over the place
@@ -323,7 +330,7 @@ export class Globe {
     const was = this.active;
     this.active = true; this.state = 'menu'; this.status = null; this.arrive = null; this.fly = this.rise = this.turn = null; this.armed = false;
     this.uiEl.style.display = 'none'; this.backBtn.style.display = 'none'; this.metBtn.style.display = 'none';
-    this.here.visible = false; this.road.visible = true; this.relabel();
+    this.here.visible = false; this.showRoad(true, null); this.relabel(); // the menu: the trail of the towns played in either mode
     if (!was) { // looking at the middle of the road, from a little above
       const c = new THREE.Vector3(); for (const k of PATH) c.add(toVec(...this.spots[k], 1).normalize());
       const [lat, lon] = toLatLon(c); this.cam.position.copy(toVec(Math.min(1.1, lat + 0.35), lon, this.fit())); this.cam.lookAt(0, 0, 0); this.controls.target.set(0, 0, 0);
@@ -340,7 +347,7 @@ export class Globe {
   choose(opts) {
     if (!this.built) this.build();
     this.active = true; this.state = opts.key ? 'path' : 'pick'; this.status = opts.status || null; this.arrive = opts.arrive; this.onBack = opts.back;
-    this.controls.autoRotate = false; this.controls.enabled = !opts.key; this.shiftTo = 0; this.road.visible = !!opts.road; this.relabel();
+    this.controls.autoRotate = false; this.controls.enabled = !opts.key; this.shiftTo = 0; this.showRoad(!!opts.road, opts.mode || null); this.relabel();
     this.uiEl.firstChild.textContent = opts.title || ''; this.say(opts.sub || ''); this.uiEl.style.display = '';
     this.metBtn.style.display = 'none'; this.backBtn.textContent = 'Back'; this.backBtn.style.display = opts.back ? '' : 'none';
     if (opts.key) this.turn = { t: 0, key: opts.key, r: Math.min(this.cam.position.length(), R * 3), to: toVec(...this.spots[opts.key], 1).normalize() };
