@@ -11,6 +11,7 @@ import { PLACES, PATH, placeKey } from './places.js';
 
 export const UNITS = [
   { id: 'police', name: 'Police', cost: 50, cd: 20, alert: 0 },
+  { id: 'fire', name: 'Fire truck', cost: 80, cd: 30, alert: 0 }, // from the first round: riots and outbreaks start fires
   { id: 'bus', name: 'Evac bus', cost: 60, cd: 30, alert: 0 },
   { id: 'boat', name: 'Rescue boat', cost: 80, cd: 20, alert: 0 }, // only once the streets flood
   { id: 'coast', name: 'Coast Guard', cost: 250, cd: 60, alert: 0 }, // a flood: boats and helicopters at once to the worst spots in the water, no tap
@@ -21,7 +22,6 @@ export const UNITS = [
   { id: 'camp', name: 'Medical camp', cost: 120, cd: 40, alert: 0 }, // shelters people nearby until the rebuilding is done
   { id: 'hazmat', name: 'Hazmat team', cost: 120, cd: 30, alert: 0 }, // clears radiation so building can start, decontaminates people
   { id: 'heroes', name: 'Hero signal', cost: 300, cd: 120, alert: 0 }, // Dragonfly, Nova and Tempo: catch meteors and missiles, slow what flies
-  { id: 'fire', name: 'Fire truck', cost: 80, cd: 30, alert: 2 },
   { id: 'water', name: 'Water heli', cost: 150, cd: 60, alert: 2 },
   { id: 'rescue', name: 'Rescue heli', cost: 120, cd: 45, alert: 2 },
   { id: 'apc', name: 'Army APC', cost: 250, cd: 60, alert: 3 },

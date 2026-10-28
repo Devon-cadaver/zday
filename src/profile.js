@@ -8,7 +8,7 @@ export const LEVELS = [0, 6000, 14000, 26000, 44000, 70000, 105000, 150000, 2100
 export const MAX_LEVEL = LEVELS.length;
 
 // level at which each unit becomes available
-export const UNLOCK = { build: 1, camp: 2, hazmat: 3, heroes: 4, police: 1, bus: 1, chaser: 2, boat: 2, coast: 3, barrier: 5, fire: 2, seeder: 3, water: 3, rescue: 3, apc: 4, strike: 5, nuke: 6 };
+export const UNLOCK = { build: 1, camp: 2, hazmat: 3, heroes: 4, police: 1, bus: 1, chaser: 2, boat: 2, coast: 3, barrier: 5, fire: 1, seeder: 3, water: 3, rescue: 3, apc: 4, strike: 5, nuke: 6 };
 
 // level from which each kind of incident and weather can turn up in a Commander round
 export const HAZARD_LEVEL = { zombies: 1, quake: 1, riot: 1, flood: 2, sinkhole: 2, tornado: 3, coldwave: 3, tsunami: 4, haboob: 4, aliens: 5, villains: 5, solar: 6, worm: 6, kaiju: 8, volcano: 7, meteor: 8, nuclear: 9, meltdown: 10, blackhole: 11 };

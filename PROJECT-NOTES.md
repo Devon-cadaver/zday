@@ -378,6 +378,7 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
   - The scope (Commander.scope, aimAt, scopeStep on the real clock): red outer ring, inner ring, centre dot and four ticks flat on the ground (depthTest off), 4.5x wide and turning, closing to 0.6 of the search radius in 1.1 s, pulsing, gone by 7.2 s.
   - Units: no cooldowns except the nuke (once a round); spend() keeps the card picked while the points cover another, so each tap on the map sends one more; cards grey only for points, alert level, the nuke used, or what the flood allows.
   - Globe labels: where two would overlap, the one nearer the middle of the view shows (your place and the town being flown to first); widths cached per label (d._w, reset by relabel).
+- Fire trucks from level 1 (Sean: level 1 needs fire rescue for the fires: riots and outbreaks start them): UNLOCK.fire 1, the card needs no alert level, and it sits next to Police.
   - Headless screenshots: scratchpad shot.cjs drives Playwright's chromium_headless_shell-1248 with SwiftShader (the cached playwright-core expects 1247, so executablePath is given); one at a time, several at once time out.
 - Kaiju pacing: the hero signal waits until the kaiju is 15 s old (response.js); Heroes.holds adds a 12 s hold while a kaiju is up (heroes arrive about 28 s in, was 4 s). Tempo's kaiju bubble: 5 s every 24 s (was 6 s every 9 s); between bubbles he punches the heads with the others (doMonster switches to the slow job when cd is ready). Tested: kaiju slowed 19% of its time (about a quarter of the fight), driven off at 110 s.
 
