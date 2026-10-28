@@ -9,10 +9,11 @@ import * as THREE from 'three';
 const MAX = 18, COL = new THREE.Color(1.0, 0.94, 0.78);
 const VS = /* glsl */`varying float vL; varying vec3 vN, vW;
 void main() { vL = uv.y; vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; vN = normalize(mat3(modelMatrix) * normal); gl_Position = projectionMatrix * viewMatrix * w; }`;
-const FS = /* glsl */`uniform float uOp; uniform vec3 uCol; varying float vL; varying vec3 vN, vW;
+const FS = /* glsl */`uniform float uOp; uniform vec3 uCol, uAx; varying float vL; varying vec3 vN, vW;
 void main() {
   vec3 V = normalize(cameraPosition - vW); float side = abs(dot(normalize(vN), V)); // brightest through the middle of the cone, soft at its edges
-  gl_FragColor = vec4(uCol * uOp * pow(side, 1.6) * (1.0 - vL * 0.7) * smoothstep(0.0, 0.05, vL), 1.0);
+  float endOn = 1.0 - smoothstep(0.72, 0.95, abs(dot(uAx, V))); // looked at down its length, a cone shows as rings: it fades out
+  gl_FragColor = vec4(uCol * uOp * pow(side, 1.6) * pow(1.0 - vL, 1.3) * smoothstep(0.0, 0.05, vL) * endOn, 1.0); // fading away to nothing at the far end (an open end showed as a hard ring)
 }`;
 const sstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
@@ -25,11 +26,11 @@ function poolTexture() {
 export class Searchlights {
   constructor(scene, { game, traffic, helis, city, daylight }) {
     Object.assign(this, { scene, game, traffic, helis, city, daylight });
-    const cone = new THREE.CylinderGeometry(1, 0.06, 1, 18, 1, true).translate(0, 0.5, 0); // the lamp at the origin, the wide end one unit up
+    const cone = new THREE.CylinderGeometry(1, 0.06, 1, 18, 12, true).translate(0, 0.5, 0); // the lamp at the origin, the wide end one unit up (rings along it, to bend with the world's curve)
     const quad = new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2), tex = poolTexture();
     this.slots = [];
     for (let i = 0; i < MAX; i++) {
-      const beam = new THREE.Mesh(cone, new THREE.ShaderMaterial({ vertexShader: VS, fragmentShader: FS, uniforms: { uOp: { value: 0 }, uCol: { value: COL } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+      const beam = new THREE.Mesh(cone, new THREE.ShaderMaterial({ vertexShader: VS, fragmentShader: FS, uniforms: { uOp: { value: 0 }, uCol: { value: COL }, uAx: { value: new THREE.Vector3(0, 1, 0) } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
       const pool = new THREE.Mesh(quad, new THREE.MeshBasicMaterial({ map: tex, color: COL, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }));
       beam.renderOrder = 7; pool.renderOrder = 2; beam.frustumCulled = pool.frustumCulled = false; beam.visible = pool.visible = false;
       scene.add(beam, pool);
@@ -88,11 +89,13 @@ export class Searchlights {
       if (s.on < 0.01) { s.beam.visible = s.pool.visible = false; if (!s.want) s.key = null; continue; }
       s.a.lerp(s.wa, e); s.b.lerp(s.wb, e);
       const d = this._d.subVectors(s.b, s.a), len = d.length(); if (len < 1) continue;
-      const R = Math.min(14, Math.max(3, len * 0.07));
-      s.beam.position.copy(s.a); s.beam.quaternion.setFromUnitVectors(this._up, d.multiplyScalar(1 / len)); s.beam.scale.set(R, len, R);
-      s.beam.material.uniforms.uOp.value = 0.24 * k * s.on; s.beam.visible = true;
-      const low = s.b.y < 8; s.pool.visible = low;
-      if (low) { s.pool.position.set(s.b.x, 0.15, s.b.z); s.pool.scale.setScalar(R * 1.3); s.pool.material.opacity = 0.65 * k * s.on; }
+      d.multiplyScalar(1 / len);
+      // a real beam goes on past what it lights, fading, until it meets the ground
+      const toGround = d.y < -0.03 ? (s.a.y - 0.2) / -d.y : 1e9, L = Math.min(len * 1.7 + 25, toGround), R = Math.min(12, Math.max(2.5, L * 0.055));
+      s.beam.visible = L > 16; // a lamp right on top of what it lights: only the pool
+      if (s.beam.visible) { s.beam.position.copy(s.a); s.beam.quaternion.setFromUnitVectors(this._up, d); s.beam.scale.set(R, L, R); const u = s.beam.material.uniforms; u.uOp.value = 0.32 * k * s.on; u.uAx.value.copy(d); }
+      const low = toGround < 1e8 && toGround <= L + 1; s.pool.visible = low; // where it lands on the ground
+      if (low) { s.pool.position.set(s.a.x + d.x * toGround, 0.15, s.a.z + d.z * toGround); s.pool.scale.setScalar(Math.max(4, R * 1.3)); s.pool.material.opacity = 0.65 * k * s.on; }
     }
   }
 }
