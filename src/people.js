@@ -1195,8 +1195,8 @@ export class People {
       let best = R * R, bi = -1, near = 0, clump = 0, cx = 0, cz = 0;
       this.around(x, z, R, (j, d2) => { if (!HOSTILE[this.st[j]]) return; if (d2 < 36) near++; if (d2 < best) { best = d2; bi = j; } if (sol && d2 > 100 && d2 < 900) { clump++; cx += this.x[j]; cz += this.z[j]; } });
       if (!mop && bi >= 0 && Math.hypot(this.x[bi] - this.s[i], this.z[bi] - this.lat[i]) > (this.holdPosts ? 24 : sol ? 45 : 100)) bi = -1; // too far from the post (an outbreak on: they hold their street)
-      if (bi < 0 && this.smallPiles && this.smallPiles.length) { // nothing in the street: a small pile at a building's foot within 22 m (it can't reach the roof and nobody could shoot it)
-        for (const k of this.smallPiles) { const b = this.bld[k]; if (Math.hypot(b.wall[0] - x, b.wall[1] - z) > 22) continue; for (let j = 0; j < this.active; j++) if (this.st[j] === S.PILE && this.bt[j] === k) { this.unpile(j); bi = j; break; } if (bi >= 0) break; }
+      if (bi < 0 && this.smallPiles && this.smallPiles.length) { // nothing in the street: a small pile at a building's foot within 22 m, or 160 m once only a few are left (it can't reach the roof and nobody could shoot it)
+        for (const k of this.smallPiles) { const b = this.bld[k]; if (Math.hypot(b.wall[0] - x, b.wall[1] - z) > (mop ? 160 : 22)) continue; for (let j = 0; j < this.active; j++) if (this.st[j] === S.PILE && this.bt[j] === k) { this.unpile(j); bi = j; break; } if (bi >= 0) break; }
       }
       this.target[i] = bi;
       if (sol && clump >= 6 && this.grenadeCd <= 0) { this.grenadeCd = 4; this.grenade(i, cx / clump, cz / clump); }

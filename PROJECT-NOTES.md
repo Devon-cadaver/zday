@@ -453,6 +453,11 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
   - The last few: with three or fewer zombies left, any with nobody to chase head for the nearest officer (people.cops, listed each tally) like zombies drawn by gunfire: officers walk straight at their targets and could not get round a block to the last two or three, which held rounds open for minutes.
   - The nuclear strike in a Commander round is smaller with a longer warning (size 170, was 280; warning 30 s, was 20): Harbor, 20% dead 90 s in (it was 44% in the first minute, so 2 stars were out of reach).
   - Still: floods, tsunamis and cold waves cost 25-35% whatever is sent (rescue moves it 3-10%); three barriers cut tsunami deaths 11-13%.
+- Commander playtest round 5: road beaten (every town first try but Metro, whose first try hit the crash below); hard towns 15 of 20 at 2+ stars (was 13), none lost; Metro 3 of 4 (was 1). Changes from it:
+  - Crash: a flood starting while a tsunami was coming in cleared the water front under it, and WaterSurface.frontAt read null. frontAt returns far ahead when there is no front, and a flood leaves a live tsunami's front alone.
+  - The incident banner and the toast sat in the same place; while a banner is up the toast drops below it (game.placeToast).
+  - Officers reach for a small pile from 160 m once only a few zombies are left (22 m before).
+  - Nuclear rounds: the strike now kills 10-38% (was 44%), but a sensible bot still only holds out at 1 star (the fallout zombies keep growing); a player who seals ground zero fast may do better. Meltdown is winnable.
 - Kaiju pacing: the hero signal waits until the kaiju is 15 s old (response.js); Heroes.holds adds a 12 s hold while a kaiju is up (heroes arrive about 28 s in, was 4 s). Tempo's kaiju bubble: 5 s every 24 s (was 6 s every 9 s); between bubbles he punches the heads with the others (doMonster switches to the slow job when cd is ready). Tested: kaiju slowed 19% of its time (about a quarter of the fight), driven off at 110 s.
 
 ## Next

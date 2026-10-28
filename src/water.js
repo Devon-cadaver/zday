@@ -184,6 +184,7 @@ export class WaterSurface {
     };
   }
   frontAt(t) {
+    if (!this.front) return 1e9; // no wave front (a flood): the water is everywhere
     const f = (t + this.halfW) / this.segW, i = Math.max(0, Math.min(FRONT_N - 2, Math.floor(f))), k = Math.min(1, Math.max(0, f - i));
     return this.front[i] * (1 - k) + this.front[i + 1] * k;
   }
@@ -213,7 +214,7 @@ export class Flood {
   constructor(D, opts = {}) {
     this.type = 'flood'; this.D = D; this.t = 0; this.alive = true;
     this.maxL = opts.level ?? 1.75; this.rise = 26; this.hold = 75; this.fall = 35;
-    D.water.colors('flood'); D.water.front = null;
+    D.water.colors('flood'); if (!D.list.some(e => e.type === 'tsunami' && e.alive)) D.water.front = null; // a tsunami still coming in keeps its front (clearing it under the wave stopped the game)
     const w = D.weather.type; if (w === 'clear' || w === 'heat' || w === 'sand' || w === 'fog') D.weather.set('rain');
     D.ctx.people.alarm(25);
     D.emit({ type: 'warn', hazard: 'flood', text: 'Flash flood! The river has burst its banks. Get people to high ground' });

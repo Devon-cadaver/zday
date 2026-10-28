@@ -486,8 +486,8 @@ export class Game {
     let f = this.el.flash; if (!f) { f = this.el.flash = document.createElement('div'); f.id = 'zd-flash'; f.innerHTML = '<b></b><span></span>'; document.body.appendChild(f); }
     f.style.top = (this.top.getBoundingClientRect().bottom + 10) + 'px';
     const b = f.querySelector('b'); b.textContent = name; b.style.animation = 'none'; void b.offsetWidth; b.style.animation = '';
-    f.querySelector('span').textContent = hint || ''; f.classList.add('on');
-    clearTimeout(this._ft); this._ft = setTimeout(() => f.classList.remove('on'), 3200);
+    f.querySelector('span').textContent = hint || ''; f.classList.add('on'); this.placeToast();
+    clearTimeout(this._ft); this._ft = setTimeout(() => { f.classList.remove('on'); this.placeToast(); }, 3200);
     let c = this.el.chip; if (!c || !this.bar.contains(c)) { c = this.el.chip = document.createElement('div'); c.id = 'zd-alertchip'; c.innerHTML = '<i></i><b></b><button type="button" class="zd-btn">Show</button>'; this.extraRow().appendChild(c); }
     c.querySelector('b').textContent = name; c.querySelector('button').onclick = show; c.hidden = false;
     clearTimeout(this._ct); this._ct = setTimeout(() => { c.hidden = true; }, 45000);
@@ -504,8 +504,10 @@ export class Game {
     if (a !== this.roseA) { this.roseA = a; this.rose.setAttribute('transform', 'rotate(' + a + ' 24 24)'); }
   }
 
+  // the toast sits under the numbers, or under the incident banner while one is up (they overlapped)
+  placeToast() { const t = this.el.toast, f = this.el.flash; t.style.top = f && f.classList.contains('on') ? (f.getBoundingClientRect().bottom + 6) + 'px' : ''; }
   toast(msg, ms = 2600) {
-    const t = this.el.toast; t.textContent = msg; t.style.opacity = '1';
+    const t = this.el.toast; t.textContent = msg; t.style.opacity = '1'; this.placeToast();
     clearTimeout(this._tt); this._tt = setTimeout(() => { t.style.opacity = '0'; }, ms);
   }
 
