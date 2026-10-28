@@ -40,9 +40,11 @@ export class TvCam {
     document.body.append(this.label, this.frameEl, this.stat);
     const c = this.g.controls; this.saved = { min: c.minDistance, max: c.maxDistance, p0: c.minPolarAngle, p1: c.maxPolarAngle, en: c.enabled };
     c.minDistance = 1; c.maxDistance = 6000; c.minPolarAngle = 0; c.maxPolarAngle = Math.PI; c.enabled = false; // the director holds the camera
+    const o = this.g.post.opts; this.dof0 = { bandK: o.bandK, rangeK: o.rangeK, blurFrac: o.blurFrac }; // the tilt-shift look, put back after
     this.L = new THREE.Vector3(); this.P = new THREE.Vector3(); this.F = new THREE.Vector3(); this.fx = []; this.t = 0;
   }
   dispose() {
+    Object.assign(this.g.post.opts, this.dof0);
     const c = this.g.controls, s = this.saved; c.minDistance = s.min; c.maxDistance = s.max; c.minPolarAngle = s.p0; c.maxPolarAngle = s.p1; c.enabled = s.en;
     this.label.remove(); this.frameEl.remove(); this.stat.remove(); this.clearFx(); this.g.focusAt = null;
   }
@@ -117,6 +119,10 @@ export class TvCam {
     }
     if (this.attack && this.attack.fall) { const f = this.attack.fall; this.P.y -= f.drop; this.F.x += f.tilt * 30; this.F.y += f.tilt * 60; this.P.x += Math.sin(this.t * 30) * f.shake; this.P.z += Math.cos(this.t * 27) * f.shake; }
     cam.position.copy(this.P); tg.copy(this.F); cam.lookAt(this.F); g.zoomTo = 0;
+    { // a rooftop looks across the town: a much deeper sharp band and softer blur than the miniature look (Sean: too blurry); the helicopter a little deeper too
+      const o = g.post.opts, d = this.dof0, roof = c.kind === 'roof', k = 1 - Math.exp(-dt * 4);
+      o.bandK += ((roof ? 0.2 : d.bandK * 1.6) - o.bandK) * k; o.rangeK += ((roof ? 0.9 : d.rangeK * 1.4) - o.rangeK) * k; o.blurFrac += ((roof ? 0.011 : d.blurFrac) - o.blurFrac) * k;
+    }
     g.focusAt = this.F; // the depth of field on the action
     if (c.kind === 'heli' && (this.labT = (this.labT || 0) - dt) <= 0) { this.labT = 0.5; this.show(); }
   }
