@@ -89,9 +89,9 @@ export class Profile {
     const l = this.level;
     return {
       incidents: l <= 1 ? 2 : l <= 3 ? 3 : l <= 6 ? 4 : 5, // incidents per round
-      sites: l <= 1 ? 1 : l <= 3 ? 2 : 3,                 // outbreak sites in a zombie incident
-      incubate: l <= 1 ? [20, 30] : l === 2 ? [15, 24] : [10, 18],
-      seeds: l >= 8 ? 4 : 3,
+      sites: l <= 3 ? 2 : 3,                              // outbreak sites in a zombie incident (Sean: level 1 was too easy)
+      incubate: l <= 1 ? [13, 21] : l === 2 ? [12, 20] : [10, 18],
+      seeds: l >= 8 ? 5 : 4,
       runners: l >= 10,
       policeCd: (l >= 5 ? 15 : 20) * (this.has('fastcops') ? 0.5 : 1),
       fireCd: 30 * (this.has('fastcops') ? 0.5 : 1),

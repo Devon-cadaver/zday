@@ -39,7 +39,10 @@ export function custodyBuses(g, district, onSent) {
   for (const c of p.custody) {
     if (c.done) continue;
     if (c.bus) {
-      const bus = c.bus; if (bus.gone || bus.mode !== 3 || bus.leaving) continue;
+      const bus = c.bus;
+      if (!c.freed && (bus.gone || (bus.mode !== 3 && p.time - c.sentAt > 120))) { p.releaseHeld(c.id); c.freed = true; } // it never got to them: let off with a warning
+      if (bus.gone) { c.done = true; continue; }
+      if (bus.mode !== 3 || bus.leaving) continue;
       bus.loadT = (bus.loadT || 0) + 1; let boarding = 0;
       for (let i = 0; i < p.active; i++) if (p.st[i] === ST.BOARD && p.bt[i] === bus.id) boarding++;
       if ((!boarding && bus.loadT > 2) || bus.loadT > 35) { p.releaseBus(bus.id); g.traffic.depart(bus); c.done = true; }
@@ -52,7 +55,7 @@ export function custodyBuses(g, district, onSent) {
       onArrive: (ax, az, bus) => { bus.loadT = 0; bus.loaded = 0; const k = p.custodyToBus(c.id, ax, az, bus.id); g.toast('Police bus loading ' + k + ' arrested rioters in the ' + district(ax, az)); },
       onLost: (bus) => { p.releaseBus(bus.id); c.done = true; },
       onGone: (bus) => { g.toast('Police bus away with ' + (bus.loaded || 0) + ' rioters', 3000); } });
-    if (car) { c.bus = car; if (onSent) onSent(car); }
+    if (car) { c.bus = car; c.sentAt = p.time; if (onSent) onSent(car); }
   }
 }
 

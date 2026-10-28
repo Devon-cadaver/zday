@@ -260,11 +260,12 @@ export class Audio {
     this.button();
     const go = () => { this.unlock(); if (this.music) this.music.prime(); if (this.hint) { this.hint.remove(); this.hint = null; } }; // browsers only allow sound after a tap
     for (const ev of ['pointerdown', 'touchend', 'keydown']) window.addEventListener(ev, go, { passive: true });
-    document.addEventListener('visibilitychange', () => { if (!this.ctx) return; if (document.hidden) this.ctx.suspend(); else if (!this.muted || this.music.level) this.ctx.resume(); });
+    document.addEventListener('visibilitychange', () => { if (!this.ctx) return; if (document.hidden) this.ctx.suspend(); else if (!this.muted || this.music.level || this.radioOn()) this.ctx.resume(); });
+    this.radioOn = () => false; // the radio says when it is on (radio.js)
   }
   // a new page (another town) cannot make a sound until it is tapped once: say so, small, until then
   askTap() {
-    if (this.ctx || (!this.level && !(this.music && this.music.level))) return;
+    if (this.ctx || (!this.level && !(this.music && this.music.level) && !this.radioOn())) return;
     const h = this.hint = document.createElement('div');
     h.style.cssText = 'position:fixed;left:0;right:0;margin:0 auto;width:max-content;top:38%;z-index:31;padding:8px 14px;border-radius:18px;background:rgba(18,14,10,.8);border:1px solid rgba(255,236,200,.2);color:#f6ead2;font:600 13px/1.2 system-ui,-apple-system,"Segoe UI",sans-serif;pointer-events:none;letter-spacing:.02em';
     h.textContent = '\u{1F50A} Tap anywhere for sound'; document.body.appendChild(h);
@@ -280,7 +281,7 @@ export class Audio {
     show();
   }
   unlock() {
-    if (this.ctx) { if (this.ctx.state !== 'running' && (!this.muted || this.music.level) && !document.hidden) this.ctx.resume(); return; }
+    if (this.ctx) { if (this.ctx.state !== 'running' && (!this.muted || this.music.level || this.radioOn()) && !document.hidden) this.ctx.resume(); return; }
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
     try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) { /* older Safari */ } // play even with the phone's silent switch on
     const c = this.ctx = new AC();

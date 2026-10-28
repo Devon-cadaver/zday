@@ -7,6 +7,8 @@
 // first time it is wanted. Through the sound button's volume; the words show even
 // with the sound off.
 const BASE = import.meta.env.BASE_URL || './'; // the line files carry ?v=2: a browser may still hold the silent first cut
+import { sideButton } from './ui.js';
+import { levelIcon } from './music.js';
 const TEXT = [
   "You're listening to K-D-I-S, Disaster Radio. Stay tuned... and stay safe.",
   "We're getting reports of people... biting people. Lock your doors and stay off the streets!",
@@ -36,6 +38,7 @@ const TEXT = [
 // which line for which disaster (Be The Disaster's own kinds too)
 const FOR = { zombies: 2, tornado: 3, quake: 4, flood: 5, tsunami: 6, riot: 7, aliens: 8, saucer: 8, tripod: 8, meteor: 9, sinkhole: 10, volcano: 11, lava: 11, haboob: 12, coldwave: 13, solar: 14, nuclear: 15, meltdown: 16, blackhole: 17, villains: 18, worm: 19, kaiju: 20, heroes: 21 };
 const IDENT = 1, CLEAR = [22, 23, 24];
+const LEVELS = [0, 0.55, 1, 1.6]; // off, quiet, medium, loud (its own button; starts at medium: about 5 dB under the old radio, loud just under it)
 
 const CSS = `
 #zd-radio{position:fixed;left:0;right:0;margin:0 auto;width:max-content;bottom:calc(var(--zd-bar-h, 64px) + 8px);z-index:4;max-width:min(calc(100vw - 24px),460px);box-sizing:border-box;
@@ -54,6 +57,17 @@ export class Radio {
     const st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
     const el = this.el = document.createElement('div'); el.id = 'zd-radio'; el.setAttribute('aria-live', 'polite');
     el.innerHTML = '<b>KDIS</b><span></span>'; document.body.appendChild(el); this.words = el.querySelector('span');
+    let lv = 2; try { const s = localStorage.getItem('zday_radio'); if (s != null) lv = +s; } catch (e) { /* no storage */ }
+    this.level = Number.isFinite(lv) ? Math.max(0, Math.min(3, lv)) : 2;
+    const b = this.btn = sideButton('zd-radiob', 'Radio'), show = () => { b.innerHTML = levelIcon('\u{1F4FB}', this.level); };
+    b.onclick = (e) => { // loud, medium, quiet, off, loud...
+      e.stopPropagation(); this.level = (this.level + 3) % 4; show();
+      try { localStorage.setItem('zday_radio', String(this.level)); } catch (er) { /* no storage */ }
+      if (this.out) this.out.gain.setTargetAtTime(LEVELS[this.level], this.out.context.currentTime, 0.05);
+      if (!this.level) { this.queue.length = 0; this.el.classList.remove('on'); }
+    };
+    show();
+    if (audio) audio.radioOn = () => this.level > 0; // keeps the sound running with the effects off
   }
   // a game has begun: the call sign in a moment, unless something more urgent is said first (kind: Be The Disaster's
   // disaster, announced instead)
@@ -61,6 +75,7 @@ export class Radio {
   // a line for a disaster by kind (Be The Disaster names its own)
   cue(kind) { if (FOR[kind]) this.say(FOR[kind]); }
   say(n) {
+    if (!this.level) return; // the radio switched off: no voice, no words
     if (this.t - (this.said[n] ?? -1e9) < 45 || this.queue.includes(n)) return; // not the same line again so soon
     this.queue.push(n); if (this.queue.length > 2) this.queue.shift(); // only the latest news
     this.fetch(n);
@@ -99,22 +114,27 @@ export class Radio {
     this.until = this.t + dur + 0.4;
     this.words.textContent = TEXT[n - 1]; this.el.classList.add('on');
     const A = this.audio, c = A && A.ctx;
-    if (!buf || !c || A.muted || c.state !== 'running') return;
-    const now = c.currentTime, src = c.createBufferSource(), hp = c.createBiquadFilter(), lp = c.createBiquadFilter(), mid = c.createBiquadFilter(), sh = c.createWaveShaper(), g = c.createGain();
-    src.buffer = buf; hp.type = 'highpass'; hp.frequency.value = 340; lp.type = 'lowpass'; lp.frequency.value = 3600;
-    mid.type = 'peaking'; mid.frequency.value = 1900; mid.Q.value = 0.9; mid.gain.value = 5; // the little speaker's honk
-    if (!this.curve) { const k = new Float32Array(512); for (let i = 0; i < 512; i++) { const x = i / 255.5 - 1; k[i] = Math.tanh(x * 2.2) / Math.tanh(2.2); } this.curve = k; }
-    sh.curve = this.curve; g.gain.value = 1.15;
-    src.connect(hp); hp.connect(mid); mid.connect(lp); lp.connect(sh); sh.connect(g); g.connect(A.bus);
+    if (!buf || !c || !this.level || c.state !== 'running') return;
+    if (!this.out) { // its own way out: a hard compressor (squashing the voice flat, like an AM set) into its own volume
+      this.out = c.createGain(); this.out.gain.value = LEVELS[this.level]; this.out.connect(c.destination);
+      this.comp = c.createDynamicsCompressor(); this.comp.threshold.value = -32; this.comp.knee.value = 4; this.comp.ratio.value = 14; this.comp.attack.value = 0.002; this.comp.release.value = 0.12;
+      this.comp.connect(this.out);
+    }
+    const now = c.currentTime, src = c.createBufferSource(), hp = c.createBiquadFilter(), lp = c.createBiquadFilter(), mid = c.createBiquadFilter(), drive = c.createGain(), sh = c.createWaveShaper(), g = c.createGain();
+    src.buffer = buf; hp.type = 'highpass'; hp.frequency.value = 420; lp.type = 'lowpass'; lp.frequency.value = 3200;
+    mid.type = 'peaking'; mid.frequency.value = 1800; mid.Q.value = 1.1; mid.gain.value = 7; // the little speaker's honk
+    if (!this.curve) { const k = new Float32Array(1024); for (let i = 0; i < 1024; i++) { const x = i / 511.5 - 1; k[i] = (Math.tanh(x * 4 + 0.18) - Math.tanh(0.18)) / Math.tanh(4.18); } this.curve = k; } // hard, a little lopsided: valve crunch
+    sh.curve = this.curve; sh.oversample = '2x'; drive.gain.value = 2.6; g.gain.value = 0.9;
+    src.connect(hp); hp.connect(mid); mid.connect(lp); lp.connect(drive); drive.connect(sh); sh.connect(g); g.connect(this.comp);
     // static under it: a hiss that comes up with the voice and a crackle at either end
     if (!this.hiss) { const L = c.sampleRate, h = c.createBuffer(1, L, L), d = h.getChannelData(0); for (let i = 0; i < L; i++) d[i] = (Math.random() * 2 - 1) * (Math.random() < 0.002 ? 3 : 1); this.hiss = h; }
     const ns = c.createBufferSource(), nf = c.createBiquadFilter(), ng = c.createGain();
     ns.buffer = this.hiss; ns.loop = true; nf.type = 'bandpass'; nf.frequency.value = 2600; nf.Q.value = 0.5;
     ng.gain.setValueAtTime(0, now); ng.gain.linearRampToValueAtTime(0.09, now + 0.05); ng.gain.linearRampToValueAtTime(0.025, now + 0.35);
     ng.gain.setValueAtTime(0.025, now + dur); ng.gain.linearRampToValueAtTime(0.08, now + dur + 0.08); ng.gain.linearRampToValueAtTime(0, now + dur + 0.3);
-    ns.connect(nf); nf.connect(ng); ng.connect(A.bus);
+    ns.connect(nf); nf.connect(ng); ng.connect(this.comp);
     src.start(now + 0.12); ns.start(now); ns.stop(now + dur + 0.4);
-    src.onended = () => { src.disconnect(); hp.disconnect(); mid.disconnect(); lp.disconnect(); sh.disconnect(); g.disconnect(); };
+    src.onended = () => { src.disconnect(); hp.disconnect(); mid.disconnect(); lp.disconnect(); drive.disconnect(); sh.disconnect(); g.disconnect(); };
     ns.onended = () => { ns.disconnect(); nf.disconnect(); ng.disconnect(); };
     if (A.music) A.music.hold(0.6, dur + 0.2); // the music steps back while he talks
   }

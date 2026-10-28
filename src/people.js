@@ -773,7 +773,7 @@ export class People {
 
   // everyone still running for bus busId gives up
   releaseBus(busId) {
-    for (let i = 0; i < this.active; i++) if (this.st[i] === S.BOARD && this.bt[i] === busId && this.watch[i] !== 2) { this.st[i] = S.IDLE; this.bt[i] = -1; this.fx[i] = 0; this.watch[i] = 0; this.panic(i, this.tx[i], this.tz[i], -1); }
+    for (let i = 0; i < this.active; i++) if (this.st[i] === S.BOARD && this.bt[i] === busId && this.watch[i] !== 2) { this.st[i] = S.IDLE; this.bt[i] = -1; this.fx[i] = 0; this.watch[i] = 0; this.panic(i, this.tx[i], this.tz[i], -1); if (this.st[i] === S.IDLE) this.startReturn(i); } // back to their street, not left standing in the queue
     this.doors.delete(busId);
   }
 
@@ -789,12 +789,14 @@ export class People {
       return;
     }
     this.t1[i] -= h;
+    const bus = this.traffic && this.traffic.cars[this.bt[i]], giveUp = () => { this.bt[i] = -1; this.fx[i] = 0; this.watch[i] = 0; this.startReturn(i); };
+    if (bus && bus.gone) { giveUp(); return; } // the bus has gone without them
     if (D && d < 2.6) { // at the door: in turn
-      if (this.time < D.free) { this.watch[i] = 1; this.face(i, D.d[2], D.d[3]); return; }
+      if (this.time < D.free) { if (this.t1[i] < -20) { giveUp(); return; } this.watch[i] = 1; this.face(i, D.d[2], D.d[3]); return; }
       D.free = this.time + 0.42; this.watch[i] = 2; this.t1[i] = 0.9; this.px[i] = this.x[i]; this.pz[i] = this.z[i]; this.face(i, D.d[2], D.d[3]); return;
     }
     if (!D && d < 2.2) { aboard(); return; }
-    if (this.t1[i] <= 0) { this.st[i] = S.IDLE; this.bt[i] = -1; this.fx[i] = 0; return; }
+    if (this.t1[i] <= 0) { giveUp(); return; } // could not get to it: back to their street
     if (this.inc[i] > 0) { this.inc[i] -= h; if (!this.move(i, this.hx[i], this.hz[i], this.wt[i] * h)) this.inc[i] = 0; return; }
     this.hx[i] = dx / d; this.hz[i] = dz / d;
     if (!this.move(i, dx / d, dz / d, this.wt[i] * h) && this.randomCardinal(i, 1.5)) this.inc[i] = 1.2;
