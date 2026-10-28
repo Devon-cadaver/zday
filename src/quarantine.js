@@ -131,7 +131,7 @@ export class Quarantine {
     }
   }
   // inside a sealed zone (the police let nobody in on an errand)
-  closed(x, z) { const c = this.seedOf(x, z); if (c < 0) return false; const zn = this.comp[c] ? this.zones[this.comp[c] - 1] : null; return !!zn && zn.sealed; }
+  closed(x, z) { if (!this.zones.length || this.P !== this.g.people) return false; const c = this.seedOf(x, z); if (c < 0) return false; const zn = this.comp[c] ? this.zones[this.comp[c] - 1] : null; return !!zn && zn.sealed; }
   zoneAt(x, z) { const c = this.cell(x, z); if (c < 0) return null; const id = this.comp[c]; if (id) return this.zones[id - 1]; let best = null, bd = 1e9; for (const zn of this.zones) if (zn.cells) { const d = Math.hypot(zn.cx - x, zn.cz - z) - zn.r; if (d < bd) { bd = d; best = zn; } } return bd < 6 ? best : null; }
 
   // ---------- each frame (from Commander.update)
