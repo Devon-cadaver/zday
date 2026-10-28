@@ -91,6 +91,7 @@ export class VolcanoCtl {
 
 // The dust storm: the wall surges towards your finger; a new one rolls in out of the desert when it has passed
 export class DustCtl {
+  follow() { const F = this.be.g.front(this.ev); return F && !F.gone ? [F.x, F.z] : null; } // the camera rides along the wall of dust
   constructor(be) { this.be = be; this.n = 0; this.next(); be.D.list.push(wrap(this)); }
   next() {
     this.n++; let me = null;
@@ -180,12 +181,12 @@ export class SolarCtl {
 export class NukeCtl {
   constructor(be) { this.be = be; this.heads = 3; this.regen = 0; be.D.list.push(wrap(this)); }
   down(x, z) {
-    if (this.heads <= 0) { this.be.g.toast('No warheads left: the next one is ' + Math.ceil(60 - this.regen) + ' s away'); return; }
+    if (this.heads <= 0) { this.be.g.toast('No warheads left: the next one is ' + Math.ceil(30 - this.regen) + ' s away'); return; }
     this.be.gauge.start('nuclear', x, z);
   }
   move(x, z) { this.be.gauge.move(x, z); }
   up() { const r = this.be.gauge.release(); if (!r) return; this.heads--; this.be.D.start('nuclear', r.x, r.z, { ...r.opts, warn: 5.2, quiet: true }); }
-  update(h) { if (this.heads < 3 && (this.regen += h) >= 60) { this.regen = 0; this.heads++; } }
+  update(h) { if (this.heads < 3 && (this.regen += h) >= 30) { this.regen = 0; this.heads++; } } // a new warhead every 30 s (a minute left long dead stretches)
   label() { return this.heads + ' warheads'; }
 }
 

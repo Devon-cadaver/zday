@@ -458,6 +458,11 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
   - The incident banner and the toast sat in the same place; while a banner is up the toast drops below it (game.placeToast).
   - Officers reach for a small pile from 160 m once only a few zombies are left (22 m before).
   - Nuclear rounds: the strike now kills 10-38% (was 44%), but a sensible bot still only holds out at 1 star (the fallout zombies keep growing); a player who seals ground zero fast may do better. Meltdown is winnable.
+- Be The Disaster playtest round 2: the road beaten in 11 runs from a fresh profile, every town on the first try (no grinding: level follows the road); Metro cleared by 13 of 21 (was 4); Bayview fixed; the nuclear wash fades; see-through clean. Changes from it:
+  - Ranks: against a bar of goal x (2167 / buildings)^0.4 (the win line stays the goal): one finger reaches every street of a hamlet but not of a city, so scores grow with about the 0.4 power of the town (19 of 21 were S at Red Mesa, none at Metro).
+  - The ones short of Metro's goal: zombies 2.2 -> 4, riot 7 -> 13, lava 1.6 -> 2.6, solar 1 -> 1.25, tripod 5.5 -> 7, worm 1.3 -> 1.8, kaiju 3 -> 5.5, villains 1 -> 1.8.
+  - The camera rides the tsunami and dust fronts (follow() through game.front: the view's point on the front; it stayed put and lost them). A warhead every 30 s (was 60: long dead stretches). The Be list says which town to clear to unlock each disaster.
+  - Still: the dust storm reads as brown haze; flat tails once a small town is used up; building collapses cost 20-30 ms steps.
 - Kaiju pacing: the hero signal waits until the kaiju is 15 s old (response.js); Heroes.holds adds a 12 s hold while a kaiju is up (heroes arrive about 28 s in, was 4 s). Tempo's kaiju bubble: 5 s every 24 s (was 6 s every 9 s); between bubbles he punches the heads with the others (doMonster switches to the slow job when cd is ready). Tested: kaiju slowed 19% of its time (about a quarter of the fight), driven off at 110 s.
 
 ## Next

@@ -328,7 +328,7 @@ export class Game {
       body = '<div class="tag">' + Object.keys(BE).filter(k => lvl >= BE_LEVEL[k]).length + ' of ' + Object.keys(BE).length + ' open · one finger drives it, two move the camera</div>' + rank +
         '<div class="list">' + Object.keys(BE).sort((a, b) => BE_LEVEL[a] - BE_LEVEL[b]).map(k => {
           const ok = lvl >= BE_LEVEL[k];
-          return '<div class="row' + (ok ? '' : ' locked') + '"><div><div class="n">' + BE[k].name + '</div><div class="d">' + (ok ? BE[k].hint + (bests[k] ? ' · best ' + bests[k].toLocaleString() : '') : 'Unlocks at commander level ' + BE_LEVEL[k]) + '</div></div>' +
+          return '<div class="row' + (ok ? '' : ' locked') + '"><div><div class="n">' + BE[k].name + '</div><div class="d">' + (ok ? BE[k].hint + (bests[k] ? ' · best ' + bests[k].toLocaleString() : '') : (PATH[BE_LEVEL[k] - 2] ? 'Clear ' + PLACES[PATH[BE_LEVEL[k] - 2]].name + ' to unlock' : 'Unlocks at level ' + BE_LEVEL[k])) + '</div></div>' +
             (ok ? '<button class="zd-btn own-go" type="button" data-be="' + k + '">Play</button>' : '<span class="s">L' + BE_LEVEL[k] + '</span>') + '</div>';
         }).join('') + '</div>' +
         '<div class="btns back"><button class="zd-btn" type="button" data-go="main">Back</button></div>';
