@@ -143,6 +143,30 @@ const CSS = `
 #zd-menu .zd-btn.mode[data-play="tv"]{background:linear-gradient(#ffa52b,#d1450a);box-shadow:0 0 14px rgba(255,165,43,.5)}
 #zd-menu .mode span{opacity:.9}
 #zd-menu .zd-side-btn{background:rgba(64,22,110,.85);border-color:rgba(196,128,255,.45);box-shadow:0 0 10px rgba(138,59,255,.35)}
+#zd-menu .box.saucer{background:transparent;border:0;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;overflow:visible;max-width:440px} /* the saucer (Sean's picture) */
+#zd-menu .box.saucer .mbody{overflow:visible;padding:0 0 4px}
+#zd-menu .ufo{position:relative;margin:0 -16px;aspect-ratio:400/248}
+#zd-menu .ufo .hull{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+#zd-menu .ufo .modes{position:absolute;left:5%;right:5%;top:38%;height:39%;margin:0;display:grid;grid-template-columns:repeat(4,1fr);gap:1.6%;perspective:420px}
+#zd-menu .ufo .zd-btn.mode{height:100%;box-sizing:border-box;justify-content:center;gap:3px;padding:8px 3px 7px;border-radius:15px;border:2.5px solid var(--c);color:#fff;text-transform:uppercase;letter-spacing:.01em;
+  background:linear-gradient(180deg,var(--c1),var(--c2));box-shadow:0 0 12px var(--c),0 0 26px var(--g),inset 0 0 14px rgba(255,255,255,.2),inset 0 10px 18px rgba(255,255,255,.12);text-shadow:0 1px 3px rgba(0,0,0,.6)}
+#zd-menu .ufo .mode b{font-size:11.5px;font-weight:900;line-height:1.05}#zd-menu .ufo .mode span{font-size:8.5px;font-weight:600;text-transform:none;opacity:.92}
+#zd-menu .ufo .mode svg{width:24px;height:24px;filter:drop-shadow(0 0 4px rgba(255,255,255,.7))}
+#zd-menu .ufo .mode[data-play="commander"]{--c:#4fc3ff;--c1:#1f6fe6;--c2:#0a2a72;--g:rgba(79,195,255,.45);transform:rotateY(24deg) rotateZ(-8deg) translateY(4%)}
+#zd-menu .ufo .mode[data-go="be"]{--c:#ff4a78;--c1:#d6164a;--c2:#5a061f;--g:rgba(255,74,120,.45);transform:rotateX(16deg) rotateZ(-2.5deg) translateY(9%)}
+#zd-menu .ufo .mode[data-play="sandbox"]{--c:#45ef75;--c1:#14a847;--c2:#05461c;--g:rgba(69,239,117,.4);transform:rotateX(16deg) rotateZ(2.5deg) translateY(9%)}
+#zd-menu .ufo .mode[data-play="tv"]{--c:#ff9a2e;--c1:#ec600c;--c2:#6a2300;--g:rgba(255,154,46,.45);transform:rotateY(-24deg) rotateZ(8deg) translateY(4%)}
+#zd-menu .ufo .rim{position:absolute;top:83%;padding:4px 10px;min-width:0;font-size:9.5px;letter-spacing:.08em;border-radius:10px;background:rgba(10,14,26,.9);border:1px solid rgba(95,220,255,.55);color:#bff4ff;box-shadow:0 0 8px rgba(95,220,255,.35)}
+#zd-menu .ufo .rim.l{left:27%}#zd-menu .ufo .rim.r{right:27%}
+#zd-menu .box.saucer .xp{margin:6px 10px 0;padding:8px 14px 9px;background:linear-gradient(180deg,rgba(14,20,36,.92),rgba(6,9,18,.94));border:1px solid rgba(95,220,255,.6);box-shadow:0 0 12px rgba(60,180,255,.3),inset 0 0 10px rgba(60,180,255,.12);
+  clip-path:polygon(10px 0,calc(100% - 10px) 0,100% 10px,100% calc(100% - 10px),calc(100% - 10px) 100%,10px 100%,0 calc(100% - 10px),0 10px)} /* notched corners */
+#zd-menu .box.saucer .xp .rank{margin:0 0 6px;color:#e8f6ff}#zd-menu .box.saucer .xp .rank b{color:#5fe0ff}#zd-menu .box.saucer .xp .bar{margin:0;background:rgba(95,220,255,.15)}
+#zd-menu .box.saucer .xp .bar i{background:linear-gradient(90deg,#2ecc71,#7dff9a);box-shadow:0 0 8px #3ee86a}
+#zd-menu .box.saucer .foot{margin-top:6px}
+body.zd-menu-on.zd-main #zd-side{display:flex;position:fixed} /* the main menu: the sound buttons float out in space */
+body.zd-menu-on.zd-main #zd-side > *{animation:zdFloat 4s ease-in-out infinite}body.zd-menu-on.zd-main #zd-side > :nth-child(2n){animation-delay:-1.3s}body.zd-menu-on.zd-main #zd-side > :nth-child(3n){animation-delay:-2.6s}
+body.zd-menu-on.zd-main #zd-side .zd-side-btn{background:rgba(12,18,34,.75);border-color:rgba(95,220,255,.5);box-shadow:0 0 10px rgba(60,180,255,.35)}
+@keyframes zdFloat{50%{transform:translate(-2px,-5px)}}
 #zd-menu .zd-btn.dim{opacity:.8}
 #zd-menu .list{text-align:left;margin:14px 0 0;display:flex;flex-direction:column;gap:6px}
 #zd-menu .row{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:8px 10px;border-radius:9px;background:rgba(160,90,255,.09);border:1px solid rgba(196,128,255,.2)}
@@ -234,6 +258,29 @@ const ICON = {
 };
 ICON['zd-restart'] = ICON['zd-reset'];
 // the three ways to play, on the menu
+// the main menu's flying saucer, seen from a little above: the domed top with its glowing ring, the hull and the deck
+// the four modes stand on, the rim under it with its lights and the beam orb (the buttons go over it: .ufo .modes)
+const SAUCER = '<svg class="hull" viewBox="0 0 400 230" preserveAspectRatio="none" aria-hidden="true"><defs>' +
+  '<radialGradient id="ufH" cx="50%" cy="22%" r="78%"><stop offset="0" stop-color="#8f9bbd"/><stop offset=".42" stop-color="#434b63"/><stop offset="1" stop-color="#151925"/></radialGradient>' +
+  '<linearGradient id="ufR" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6a7492"/><stop offset=".5" stop-color="#262b3b"/><stop offset="1" stop-color="#06070b"/></linearGradient>' +
+  '<radialGradient id="ufD" cx="50%" cy="25%" r="75%"><stop offset="0" stop-color="#7c89a8"/><stop offset=".5" stop-color="#2c3247"/><stop offset="1" stop-color="#0e1119"/></radialGradient>' +
+  '<radialGradient id="ufO" cx="50%" cy="45%" r="50%"><stop offset="0" stop-color="#fff"/><stop offset=".3" stop-color="#9af0ff"/><stop offset=".7" stop-color="#1e8cff"/><stop offset="1" stop-color="#1e8cff" stop-opacity="0"/></radialGradient>' +
+  '<filter id="ufG" x="-30%" y="-80%" width="160%" height="260%"><feGaussianBlur stdDeviation="2.4"/></filter></defs>' +
+  '<ellipse cx="200" cy="132" rx="182" ry="84" fill="#07080d"/>' + // the underside
+  '<path d="M44 170 A182 84 0 0 0 356 170" fill="none" stroke="#5fdcff" stroke-width="3.2" stroke-dasharray="15 11" filter="url(#ufG)"/>' +
+  '<path d="M44 170 A182 84 0 0 0 356 170" fill="none" stroke="#c9f6ff" stroke-width="1.6" stroke-dasharray="15 11"/>' +
+  '<path d="M4 118 A196 84 0 0 0 396 118 A196 72 0 0 1 4 118Z" fill="url(#ufR)"/>' + // the rim, edge on
+  '<ellipse cx="200" cy="118" rx="196" ry="72" fill="url(#ufH)" stroke="#8b97b8" stroke-width="1.4"/>' + // the hull
+  '<path d="M18 92 A196 72 0 0 1 70 64" fill="none" stroke="#4fd8ff" stroke-width="3" filter="url(#ufG)"/><path d="M382 92 A196 72 0 0 0 330 64" fill="none" stroke="#4fd8ff" stroke-width="3" filter="url(#ufG)"/>' +
+  '<ellipse cx="200" cy="124" rx="182" ry="60" fill="rgba(4,7,14,.6)" stroke="rgba(120,200,255,.3)" stroke-width="1.2"/>' + // the deck
+  '<path d="M60 70 L40 160 M340 70 L360 160 M120 58 L112 178 M280 58 L288 178 M200 66 L200 184" stroke="rgba(255,255,255,.12)" stroke-width="1.2"/><circle cx="34" cy="104" r="2.4" fill="#8ff0ff"/><circle cx="52" cy="84" r="2.4" fill="#8ff0ff"/><circle cx="348" cy="84" r="2.4" fill="#8ff0ff"/><circle cx="366" cy="104" r="2.4" fill="#8ff0ff"/>' +
+  '<ellipse cx="200" cy="56" rx="96" ry="21" fill="#1c2133" stroke="#2f364d" stroke-width="2"/>' +
+  '<ellipse cx="200" cy="57" rx="88" ry="17" fill="none" stroke="#5fe0ff" stroke-width="4" filter="url(#ufG)"/><ellipse cx="200" cy="57" rx="88" ry="17" fill="none" stroke="#bff4ff" stroke-width="1.6"/>' + // the dome's glowing ring
+  '<path d="M126 55 Q128 10 200 7 Q272 10 274 55 Q200 70 126 55Z" fill="url(#ufD)" stroke="#6c7896" stroke-width="1.2"/>' + // the dome
+  '<path d="M150 30 Q200 14 250 30" fill="none" stroke="rgba(255,255,255,.28)" stroke-width="2"/>' +
+  [150, 172, 200, 228, 250].map((x, i) => '<circle cx="' + x + '" cy="' + [47, 51, 52, 51, 47][i] + '" r="2.2" fill="#a8f2ff"/>').join('') +
+  '<circle cx="200" cy="204" r="22" fill="#1e8cff" opacity=".35" filter="url(#ufG)"/><circle cx="200" cy="204" r="14" fill="#141826" stroke="#3a4258" stroke-width="3"/><circle cx="200" cy="204" r="11" fill="url(#ufO)"/>' + // the beam orb
+  '</svg>';
 const MICON = {
   commander: svg('<path d="M7 18v-6a5 5 0 0 1 10 0v6"/><path d="M5 21h14M12 3v2M4.2 6.2l1.4 1.4M19.8 6.2l-1.4 1.4"/>'),
   be: svg('<path d="M3 5h18M5.5 9h13M8 13h9M10 17h5.5M11.5 21h2"/>'),
@@ -325,15 +372,15 @@ export class Game {
     if (panel === 'travel') { // the places in the world: the big city and the towns
       const here = placeKey();
       body = top('Travel') + '<div class="btns">' + Object.keys(PLACES).map(k => '<button class="zd-btn' + (k === here ? ' main' : '') + '" type="button" data-place="' + k + '">' + PLACES[k].name + (k === here ? ' · you are here' : '') + '<div style="font-size:11px;opacity:0.7;margin-top:2px">' + PLACES[k].blurb + '</div></button>').join('') + '</div>';
-    } else if (panel === 'main') { // over the globe: the three ways to play, each saying where it goes
+    } else if (panel === 'main') { // over the globe: the four ways to play on the deck of a flying saucer (Sean), each saying where it goes; the level under it
       const town = (m) => { const k = pr.town(m); return 'Level ' + (PATH.indexOf(k) + 1) + ' · ' + PLACES[k].name; };
-      body = '<div class="rank sm"><span>Commander level <b>' + lvl + '</b></span><span>' + pr.xp.toLocaleString() + (next ? ' / ' + next.toLocaleString() : '') + ' XP</span></div>' +
-        '<div class="bar sm"><i style="width:' + Math.round(pr.progress * 100) + '%"></i></div>' +
-        '<div class="modes"><button class="zd-btn mode main" type="button" data-play="commander">' + MICON.commander + '<b>Commander</b><span>' + town('commander') + '</span></button>' +
+      body = '<div class="ufo">' + SAUCER + '<div class="modes"><button class="zd-btn mode main" type="button" data-play="commander">' + MICON.commander + '<b>Commander</b><span>' + town('commander') + '</span></button>' +
         '<button class="zd-btn mode" type="button" data-go="be">' + MICON.be + '<b>Be the Disaster</b><span>' + town('be') + '</span></button>' +
         '<button class="zd-btn mode" type="button" data-play="sandbox">' + MICON.sandbox + '<b>Sandbox</b><span>Pick any city</span></button>' +
         '<button class="zd-btn mode" type="button" data-play="tv">' + MICON.tv + '<b>Disaster TV</b><span>Sit back and watch</span></button></div>' +
-        '<div class="mrow"><button class="zd-btn" type="button" data-go="unlocks">Units' + (pr.bank >= 3000 && UPGRADES.some(u => pr.canBuy(u.id)) ? ' \u2022' : '') + '</button><button class="zd-btn" type="button" data-go="roster">Roster</button><div class="mside"></div></div>' +
+        '<button class="zd-btn rim l" type="button" data-go="unlocks">Units' + (pr.bank >= 3000 && UPGRADES.some(u => pr.canBuy(u.id)) ? ' \u2022' : '') + '</button><button class="zd-btn rim r" type="button" data-go="roster">Roster</button></div>' +
+        '<div class="xp"><div class="rank sm"><span>Commander level <b>' + lvl + '</b></span><span>' + pr.xp.toLocaleString() + (next ? ' / ' + next.toLocaleString() : '') + ' XP</span></div>' +
+        '<div class="bar sm"><i style="width:' + Math.round(pr.progress * 100) + '%"></i></div></div>' +
         '<div class="foot">' + pr.data.rounds + ' rounds played · best score ' + pr.data.best.toLocaleString() + ' · ' + pr.data.stars + ' stars' + (pr.ok ? '' : ' · progress is not being saved on this device') + '</div>';
     } else if (panel === 'roster') { // every model, turning on its plinth (roster.js, loaded only now)
       head = top('Roster');
@@ -365,12 +412,12 @@ export class Game {
         '<div class="btns back"><button class="zd-btn" type="button" data-go="main">Back</button></div>';
     }
     this.stopRoster(); this.menuPanel = panel;
-    this.menu.innerHTML = '<div class="mtitle"><h1>MY LITTLE<br>DISASTER</h1><div class="tag">Save it, wreck it, or sit back and bet on it!</div></div><div class="box' + (panel === 'roster' ? ' tall' : '') + '">' + head + '<div class="mbody">' + body + '</div></div>';
+    this.menu.innerHTML = '<div class="mtitle"><h1>MY LITTLE<br>DISASTER</h1><div class="tag">Save it, wreck it, or sit back and bet on it!</div></div><div class="box' + (panel === 'roster' ? ' tall' : panel === 'main' ? ' saucer' : '') + '">' + head + '<div class="mbody">' + body + '</div></div>';
     if (panel === 'roster') {
       const cv = document.createElement('canvas'); cv.className = 'rgl'; this.menu.appendChild(cv);
       import('./roster.js').then(m => { if (!cv.isConnected) return; const sec = this.menu.querySelector('.rsec'); sec.innerHTML = ''; this.roster = m.startRoster({ canvas: cv, list: this.menu.querySelector('.mbody'), root: sec }); });
     }
-    clearTimeout(this._gone); this.menu.classList.remove('gone'); this.menu.hidden = false; document.body.classList.add('zd-menu-on');
+    clearTimeout(this._gone); this.menu.classList.remove('gone'); this.menu.hidden = false; document.body.classList.add('zd-menu-on'); document.body.classList.toggle('zd-main', panel === 'main'); // the main menu: the saucer
     this.dockSide();
     if (this.globe) this.globe.backdrop(panel === 'main'); // the town names only round the main menu
     dragScroll(this.menu.querySelector('.mbody'), 'y');
