@@ -1,19 +1,34 @@
 // Searchlights at night: white beams that point out the trouble. Helicopters
 // shine down on the disaster nearest them (or sweep the street below), rescue
 // vehicles on a scene aim theirs at it, and lamps on the tallest roofs near each
-// disaster track it. Each beam is a soft additive cone with a pool of light
-// where it lands - no real lights, so the city's own shading costs nothing more.
+// disaster track it. Each beam is a light shaft: a flat strip along the beam that
+// turns about its own length to face the camera, soft across its width and fading
+// out along it (a cone showed its outline and its open end as hard rings from some
+// angles), with a pool of light where it lands - no real lights, so the city's own
+// shading costs nothing more.
 // They fade in after dusk and out at dawn.
 import * as THREE from 'three';
 
 const MAX = 18, COL = new THREE.Color(1.0, 0.94, 0.78);
-const VS = /* glsl */`varying float vL; varying vec3 vN, vW;
-void main() { vL = uv.y; vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; vN = normalize(mat3(modelMatrix) * normal); gl_Position = projectionMatrix * viewMatrix * w; }`;
-const FS = /* glsl */`uniform float uOp; uniform vec3 uCol, uAx; varying float vL; varying vec3 vN, vW;
+// the shaft: x across it (-0.5..0.5), y along it (0 at the lamp, 1 at the far end); laid out in the world facing the camera
+const VS = /* glsl */`uniform vec3 uA, uD; uniform float uL, uR0, uR; varying vec2 vUv; varying float vEnd, vNear;
 void main() {
-  vec3 V = normalize(cameraPosition - vW); float side = abs(dot(normalize(vN), V)); // brightest through the middle of the cone, soft at its edges
-  float endOn = 1.0 - smoothstep(0.72, 0.95, abs(dot(uAx, V))); // looked at down its length, a cone shows as rings: it fades out
-  gl_FragColor = vec4(uCol * uOp * pow(side, 1.6) * pow(1.0 - vL, 1.3) * smoothstep(0.0, 0.05, vL) * endOn, 1.0); // fading away to nothing at the far end (an open end showed as a hard ring)
+  float y = position.y; vec3 P = uA + uD * (y * uL);
+  vec3 V = cameraPosition - P; float dv = length(V); V /= max(dv, 0.001);
+  vec3 S = cross(uD, V); float sl = length(S); S = sl > 0.001 ? S / sl : vec3(1.0, 0.0, 0.0);
+  float R = mix(uR0, uR, y);
+  vec3 w = P + S * position.x * 2.0 * R;
+  vUv = vec2(position.x * 2.0, y);
+  vEnd = abs(dot(uD, V)); // 1 looking straight down its length
+  vNear = smoothstep(R * 1.2, R * 4.0, dv); // the camera right in it: gone
+  gl_Position = projectionMatrix * viewMatrix * vec4(w, 1.0);
+}`;
+const FS = /* glsl */`uniform float uOp; uniform vec3 uCol; varying vec2 vUv; varying float vEnd, vNear;
+void main() {
+  float across = exp(-vUv.x * vUv.x * 4.5); // soft at its edges, brightest down the middle
+  float along = pow(1.0 - vUv.y, 1.4) * smoothstep(0.0, 0.04, vUv.y);
+  float side = 1.0 - smoothstep(0.7, 0.96, vEnd); // seen down its length it would be a blob: it fades out
+  gl_FragColor = vec4(uCol * uOp * across * along * side * vNear, 1.0);
 }`;
 const sstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
@@ -26,11 +41,11 @@ function poolTexture() {
 export class Searchlights {
   constructor(scene, { game, traffic, helis, city, daylight }) {
     Object.assign(this, { scene, game, traffic, helis, city, daylight });
-    const cone = new THREE.CylinderGeometry(1, 0.06, 1, 18, 12, true).translate(0, 0.5, 0); // the lamp at the origin, the wide end one unit up (rings along it, to bend with the world's curve)
+    const shaft = new THREE.PlaneGeometry(1, 1, 1, 12).translate(0, 0.5, 0); // laid out by the vertex shader (12 steps along it, to bend with the world's curve)
     const quad = new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2), tex = poolTexture();
     this.slots = [];
     for (let i = 0; i < MAX; i++) {
-      const beam = new THREE.Mesh(cone, new THREE.ShaderMaterial({ vertexShader: VS, fragmentShader: FS, uniforms: { uOp: { value: 0 }, uCol: { value: COL }, uAx: { value: new THREE.Vector3(0, 1, 0) } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+      const beam = new THREE.Mesh(shaft, new THREE.ShaderMaterial({ vertexShader: VS, fragmentShader: FS, uniforms: { uOp: { value: 0 }, uCol: { value: COL }, uA: { value: new THREE.Vector3() }, uD: { value: new THREE.Vector3(0, 1, 0) }, uL: { value: 1 }, uR0: { value: 0.35 }, uR: { value: 3 } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
       const pool = new THREE.Mesh(quad, new THREE.MeshBasicMaterial({ map: tex, color: COL, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }));
       beam.renderOrder = 7; pool.renderOrder = 2; beam.frustumCulled = pool.frustumCulled = false; beam.visible = pool.visible = false;
       scene.add(beam, pool);
@@ -93,7 +108,7 @@ export class Searchlights {
       // a real beam goes on past what it lights, fading, until it meets the ground
       const toGround = d.y < -0.03 ? (s.a.y - 0.2) / -d.y : 1e9, L = Math.min(len * 1.7 + 25, toGround), R = Math.min(12, Math.max(2.5, L * 0.055));
       s.beam.visible = L > 16; // a lamp right on top of what it lights: only the pool
-      if (s.beam.visible) { s.beam.position.copy(s.a); s.beam.quaternion.setFromUnitVectors(this._up, d); s.beam.scale.set(R, L, R); const u = s.beam.material.uniforms; u.uOp.value = 0.32 * k * s.on; u.uAx.value.copy(d); }
+      if (s.beam.visible) { const u = s.beam.material.uniforms; u.uA.value.copy(s.a); u.uD.value.copy(d); u.uL.value = L; u.uR.value = R; u.uOp.value = 0.42 * k * s.on; }
       const low = toGround < 1e8 && toGround <= L + 1; s.pool.visible = low; // where it lands on the ground
       if (low) { s.pool.position.set(s.a.x + d.x * toGround, 0.15, s.a.z + d.z * toGround); s.pool.scale.setScalar(Math.max(4, R * 1.3)); s.pool.material.opacity = 0.65 * k * s.on; }
     }
