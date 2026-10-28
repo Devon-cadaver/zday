@@ -690,7 +690,7 @@ export class People {
       if (this.st[i] !== S.ZOMBIE || this.lvl[i] !== -1) continue;
       const Z = ZTYPES[this.zt[i]];
       if (Z.rad && this.zrad[i] === 2) { // only the nuclear kind gives off enough to infect without a bite
-        this.around(this.x[i], this.z[i], 6.5, (j) => { if (this.isPrey(j) && this.kind[j] === KIND.CIVILIAN && this.r() < 0.05) { this.inf[j] = 1; this.zrad[j] = 2; this.inc[j] = this.inc0[j] = 5 + this.r() * 8; this.dirty[j] = 1; } });
+        this.around(this.x[i], this.z[i], 6.5, (j) => { if (this.isPrey(j) && this.kind[j] === KIND.CIVILIAN && this.r() < 0.02) { this.inf[j] = 1; this.zrad[j] = 2; this.inc[j] = this.inc0[j] = 5 + this.r() * 8; this.dirty[j] = 1; } });
       } else if (Z.spit && (this.spitT[i] -= 0.5) <= 0) {
         let tg = -1, bd = 1e9;
         this.around(this.x[i], this.z[i], 9, (j, d2) => { if (d2 > 4 && d2 < bd && this.isPrey(j) && this.kind[j] === KIND.CIVILIAN) { bd = d2; tg = j; } });
@@ -1195,6 +1195,9 @@ export class People {
       let best = R * R, bi = -1, near = 0, clump = 0, cx = 0, cz = 0;
       this.around(x, z, R, (j, d2) => { if (!HOSTILE[this.st[j]]) return; if (d2 < 36) near++; if (d2 < best) { best = d2; bi = j; } if (sol && d2 > 100 && d2 < 900) { clump++; cx += this.x[j]; cz += this.z[j]; } });
       if (!mop && bi >= 0 && Math.hypot(this.x[bi] - this.s[i], this.z[bi] - this.lat[i]) > (this.holdPosts ? 24 : sol ? 45 : 100)) bi = -1; // too far from the post (an outbreak on: they hold their street)
+      if (bi < 0 && this.smallPiles && this.smallPiles.length) { // nothing in the street: a small pile at a building's foot within 22 m (it can't reach the roof and nobody could shoot it)
+        for (const k of this.smallPiles) { const b = this.bld[k]; if (Math.hypot(b.wall[0] - x, b.wall[1] - z) > 22) continue; for (let j = 0; j < this.active; j++) if (this.st[j] === S.PILE && this.bt[j] === k) { this.unpile(j); bi = j; break; } if (bi >= 0) break; }
+      }
       this.target[i] = bi;
       if (sol && clump >= 6 && this.grenadeCd <= 0) { this.grenadeCd = 4; this.grenade(i, cx / clump, cz / clump); }
       if (bi < 0) { // nothing to shoot: pick a rioter to arrest
@@ -1392,7 +1395,8 @@ export class People {
     return [...m.values()].map(e => [e[0] / e[2], e[1] / e[2], e[2]]).sort((a, b) => b[2] - a[2]).slice(0, n);
   }
   // the one afloat nearest (x, z) within R, or -1
-  nearestSwimmer(x, z, R) { let best = -1, bd = R * R; this.around(x, z, R, (j, d2) => { if (this.st[j] === S.SWIM && d2 < bd) { bd = d2; best = j; } }); return best; }
+  // the swimmer to go for: the nearest of those closest to going under (on a raft they can wait)
+  nearestSwimmer(x, z, R) { let best = -1, bs = 1e9; this.around(x, z, R, (j, d2) => { if (this.st[j] !== S.SWIM) return; const s = Math.sqrt(d2) + (this.fx[j] === 1 ? 150 : this.t1[j]) * 1.2; if (s < bs) { bs = s; best = j; } }); return best; }
   // pulled out of the water and set down on the roof of building k (by a hero): they join whoever is up there
   toRoof(i, k) {
     const b = this.bld[k], sp = this.roofSpot(k), q = this.roofSpot(k);
@@ -1908,8 +1912,10 @@ export class People {
   }
 
   buildingTick(dt) {
+    const small = this.smallPiles || (this.smallPiles = []); small.length = 0; // piles of one to three: officers nearby knock them down (copStep)
     for (let k = 0; k < this.bld.length; k++) {
       if (this.bPile[k] === 0 && !this.bBreach[k]) continue;
+      if (this.bPile[k] <= 3 && !this.bBreach[k]) small.push(k);
       const lone = this.bPile[k] <= 2 && this.bRoof[k] === 0 && !this.bBreach[k]; // one or two scratching at a door with people indoors: they give up in a while (else nobody can shoot them)
       if ((this.bRoof[k] === 0 && this.bIn[k] === 0) || lone) {
         this.bEmpty[k] += dt;
@@ -1918,6 +1924,8 @@ export class People {
     }
   }
 
+  // shot at from the street: one of a small pile drops back down to face the officer
+  unpile(j) { const k = this.bt[j]; if (k >= 0 && this.bPile[k] > 0) this.bPile[k]--; this.st[j] = S.ZOMBIE; this.lvl[j] = -1; this.bt[j] = -1; this.y[j] = this.groundY(this.x[j], this.z[j]); this.target[j] = -1; }
   // survivors gone: the pile spills back into the street
   collapse(k, gaveUp = false) { // gaveUp: a small pile that came to nothing (no overrun)
     for (let i = 0; i < this.active; i++) {

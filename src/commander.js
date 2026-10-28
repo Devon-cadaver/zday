@@ -144,7 +144,7 @@ export class Commander {
       const type = bag[Math.floor(R() * bag.length)];
       for (let j = bag.length - 1; j >= 0; j--) if (bag[j] === type) bag.splice(j, 1);
       // each comes in by this time at the latest, or sooner once the city has gone quiet again
-      this.incidents.push({ type, at: k === 0 ? 4 : 4 + k * 420 / Math.max(1, n - 1) * (0.85 + R() * 0.3), fired: false });
+      this.incidents.push({ type, at: k === 0 ? 4 : 4 + k * 260 / Math.max(1, n - 1) * (0.85 + R() * 0.3), fired: false });
     }
     this.sites = []; this.quietT = 0; this.lastInc = 0;
     this.alertFloor = 0; this.saucers = 0; this.tripods = 0; this.arrests0 = 0; this.alienK0 = 0; this.riotsBroken = 0; this.hit = [];
@@ -171,7 +171,7 @@ export class Commander {
   // nothing left to deal with: no disaster under way, no zombies or bitten, no buildings burning
   quiet() {
     const p = this.g.people;
-    return !this.g.disasters.list.some(e => e.type !== 'heroes' && !spent(e)) && p.stats.zombies === 0 && p.stats.infected === 0 && this.fires <= 2 && this.sites.every(s => s.fired); // a couple of buildings burning out on their own don't hold it up
+    return !this.g.disasters.list.some(e => e.type !== 'heroes' && !spent(e)) && p.stats.zombies === 0 && p.stats.infected === 0 && this.fires <= Math.max(2, Math.round(this.g.fire.bFire.length * 0.04)) && this.sites.every(s => s.fired); // a few buildings burning out on their own don't hold it up (a volcano leaves dozens)
   }
 
   // a 911 call or an incident: its name blinks with what to do, then waits in a chip above the bar; Show flies there
@@ -691,7 +691,7 @@ export class Commander {
     const score = Math.round(this.earned + 10 * (s.humans + s.rescued + s.bused) + 20 * intact);
     const frac = (s.humans + s.rescued + s.bused) / tot;
     let stars = 0;
-    if (reason === 'contained') stars = frac >= 0.9 ? 3 : 2;
+    if (reason === 'contained') stars = frac >= 0.9 ? 3 : frac >= 0.45 ? 2 : 1; // secured, but with half the town dead it is no two-star day
     else if (reason === 'holdout') stars = frac >= 0.7 ? 2 : 1;
     if (this.nuked) stars = Math.min(stars, 1);
     const title = reason === 'contained' ? 'City secured' : reason === 'holdout' ? 'The city held out' : 'The city is lost';

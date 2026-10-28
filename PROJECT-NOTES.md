@@ -443,6 +443,12 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
   - Endings: the last town (Metro) says the road is done, in both modes (2+ stars in Commander, the goal in Be The Disaster).
   - See-through per mode: Commander and Sandbox as before; in Be The Disaster only for the ones that are someone in the streets (saucer, tripod, zombies, riot, villains, kaiju, worm), out to 600 m (its camera sits further back). It speckled the very buildings a tornado was wrecking.
   - Still open: some disasters' camera does not follow (tsunami, lava, the earthquake's fault tip); floods and dust storms read as brown haze; the side buttons sit on the playfield.
+- Commander playtest round 3: the road beaten again (13 rounds, 10 contained, was 7); hard towns 9 of 20 at 2+ stars (was 7); bonus farm confirmed closed; no hangs. Changes from it:
+  - Small piles: buildingTick lists piles of 1-3 (people.smallPiles); an officer with nothing to shoot within 22 m knocks one of them down (unpile: back to ZOMBIE in the street) and shoots it. The 20 s give-up only covered empty roofs, and the stuck ones were under roofs with survivors.
+  - Incidents come closer together: 4 + k x 260/(n-1) s (was 420): the playtester's test over 20 hard-town rounds gave 14 at 2+ stars (was 9) and 6 holdouts (was 15).
+  - Fires: City secured allows up to 4% of buildings still burning (a volcano left dozens); stars: secured with under 45% alive is 1 star (it was 2 at any survival).
+  - Rescue: boats and helicopters go for the swimmer nearest to going under (distance + seconds left x 1.2; on a raft they wait): rescue barely changed deaths before.
+  - Nuclear and meltdown hordes grew without end: the nuclear kind's aura 5% -> 2% a half second, nuclear doses 12% -> 7%, meltdown fallout 0.02 -> 0.012 x strength.
 - Kaiju pacing: the hero signal waits until the kaiju is 15 s old (response.js); Heroes.holds adds a 12 s hold while a kaiju is up (heroes arrive about 28 s in, was 4 s). Tempo's kaiju bubble: 5 s every 24 s (was 6 s every 9 s); between bubbles he punches the heads with the others (doMonster switches to the slow job when cd is ready). Tested: kaiju slowed 19% of its time (about a quarter of the fight), driven off at 110 s.
 
 ## Next
