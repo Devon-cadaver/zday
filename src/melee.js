@@ -6,7 +6,8 @@
 // their own (Nova's eyes, Tempo's hands) can also lock beams: they face off at a
 // distance, staring each other down, the two beams meet between them in a growing
 // ball of light that is pushed back and forth, and it bursts in a shock wave that
-// knocks them both back and blows out the windows round it.
+// knocks them both back and blows out the windows round it. The sky slam and the
+// space dive: stunts.js.
 import * as THREE from 'three';
 import { sfx } from './audio.js';
 import { toss } from './brawl.js';
@@ -40,6 +41,18 @@ const fwd = (f) => [Math.sin(f.yaw), Math.cos(f.yaw)];
 // the pose for a figure in a fight, laid over its own (call in its sync, before tumble and detail)
 export function fightPose(r, f) {
   const A = r.arms, L = r.legs, m = f.move;
+  if (f.downT > 0) { // flat on their back in a crater (stunts.js)
+    r.body.rotation.x = -1.45; r.body.position.y = 0.3; r.head.rotation.x = 0.3;
+    for (const a of A.slice(0, 2)) { a.sh.rotation.set(0.2, 0, a.sx * 1.2); a.el.rotation.set(-0.3, 0, 0); } for (const l of L) { l.hip.rotation.x = 0.1; l.knee.rotation.x = 0.4; }
+    return;
+  }
+  if (f.stunt) { // a big move (stunts.js): an uppercut, a hammer blow, rising fist first, diving fist first
+    r.body.rotation.x = 0;
+    if (m && m.kind === 'hammer') { const u = clamp(m.t / m.T, 0, 1); for (const a of A.slice(0, 2)) { a.sh.rotation.set(-3.0 + 2.3 * u, 0, -a.sx * 0.15); a.el.rotation.set(0, 0, 0); } r.torso.rotation.x = 0.35 * u; for (const l of L) l.knee.rotation.x = 0.5; return; }
+    if (!m && f.stuntPose === 'rise') { A[1].sh.rotation.set(-3.0, 0, 0.1); A[1].el.rotation.set(0, 0, 0); A[0].sh.rotation.set(0.2, 0, -0.15); for (const l of L) { l.hip.rotation.x = 0; l.knee.rotation.x = 0.1; } return; }
+    if (!m && f.stuntPose === 'dive') { r.body.rotation.x = Math.PI; r.body.position.y = 4.2; for (const a of A.slice(0, 2)) { a.sh.rotation.set(-3.0, 0, a.sx * 0.12); a.el.rotation.set(0, 0, 0); } for (const l of L) { l.hip.rotation.x = 0; l.knee.rotation.x = 0.05; } return; }
+    if (!m) return; // the one sent flying tumbles
+  } else if (!f.fight && !f.beam) return;
   if (f.beam) { // locked in a beam clash: leaning into it, fists back (Tempo: both hands out, the beam between them)
     r.torso.rotation.x = 0.18; r.head.rotation.x = -0.12; r.body.rotation.x = 0;
     if (f.name === 'Tempo') for (const a of A.slice(0, 2)) { a.sh.rotation.set(-1.55, 0, -a.sx * 0.12); a.el.rotation.set(0, 0, 0); }
@@ -47,10 +60,10 @@ export function fightPose(r, f) {
     for (const l of L) { l.hip.rotation.x = 0.1; l.knee.rotation.x = 0.35; }
     return;
   }
-  if (!f.fight) return;
+  if (!f.fight && !f.stunt) return;
   r.body.rotation.x = 0;
   if (f.name === 'Weaver') { r.hips.position.y = 0.94; r.head.rotation.x = 0; } // up off his haunches to fight
-  if (!m) { // squared up: fists up, one foot forward, bobbing
+  if (!m && f.fight) { // squared up: fists up, one foot forward, bobbing
     for (const a of A.slice(0, 2)) { a.sh.rotation.set(-1.0, 0, -a.sx * 0.15); a.el.rotation.set(-1.75, 0, 0); }
     r.torso.rotation.x = 0.12; r.head.rotation.x = -0.05; L[0].hip.rotation.x = -0.3; L[1].hip.rotation.x = 0.22; for (const l of L) l.knee.rotation.x = 0.3;
     r.body.position.y = Math.sin((f.t || 0) * 7) * 0.06;
@@ -193,6 +206,7 @@ export class Melee {
     if (winner !== A) { winner.move = { kind: w.kind, t: 0, T: MOVE_T[w.kind], side: 0 }; }
     const dx = loser.x - winner.x, dz = loser.z - winner.z, dl = Math.hypot(dx, dz) || 1, up = w.kind === 'upper' ? 16 : 8;
     for (const f of [...b.heroes, ...b.villains]) this.release(f, f === loser ? 0 : 0.6);
+    if (Math.random() < 0.4 && this.B.stunts.slam(winner, loser)) { b.over = b.t + 0.6; return; } // up into the sky and hammered back down
     const p = [(loser.x + winner.x) / 2, (loser.y || 0) + 3, (loser.z + winner.z) / 2];
     D.ctx.fire.burst(p[0], p[1], p[2], 22, 2.4); sfx('thud', p[0], p[1], p[2], { gain: 1.4, rate: 0.75 }); if (this.near(p[0], p[2])) D.shake(0.35);
     toss(loser, dx / dl * 30, up, dz / dl * 30);

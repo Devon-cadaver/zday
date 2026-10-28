@@ -10,6 +10,7 @@
 import * as THREE from 'three';
 import { sfx } from './audio.js';
 import { Melee } from './melee.js';
+import { Stunts } from './stunts.js';
 
 const AIR = 5, EXT = 4;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -63,8 +64,8 @@ function near(D, x, z) { const { camera, controls } = D.ctx, c = controls.target
 export function toss(f, vx, vy, vz) { if (f.dropHeld) f.dropHeld(); f.tossed = { vx, vy, vz, t: 0, inB: -1 }; f.busyT = 0; f.spinning = false; }
 
 export class Brawl {
-  constructor(D) { this.D = D; this.shots = []; this.spins = []; this.drags = []; this.said = {}; this.t = 0; this.melee = new Melee(this); } // melee: hand to hand, gang-ups, beam clashes
-  reset() { this.shots.length = 0; this.spins.length = 0; this.drags.length = 0; this.said = {}; this.melee.reset(); }
+  constructor(D) { this.D = D; this.shots = []; this.spins = []; this.drags = []; this.said = {}; this.t = 0; this.melee = new Melee(this); this.stunts = new Stunts(this); } // melee: hand to hand, gang-ups, beam clashes; stunts: the sky slam, the space dive
+  reset() { this.shots.length = 0; this.spins.length = 0; this.drags.length = 0; this.said = {}; this.melee.reset(); this.stunts.reset(); }
   say(key, text) { if ((this.said[key] || -99) + 8 > this.t) return; this.said[key] = this.t; this.D.emit({ type: 'brawl', text }); }
   // the side's fighters on the map now
   fighters(side) { const out = []; for (const e of this.D.list) if (e.alive && e.type === (side === 'hero' ? 'heroes' : 'villains')) for (const f of e.who) if (alive(f)) out.push(f); return out; }
@@ -165,7 +166,7 @@ export class Brawl {
     return true;
   }
   update(h) {
-    this.t += h; this.melee.update(h);
+    this.t += h; this.melee.update(h); this.stunts.update(h);
     const D = this.D, { city, traffic, fire } = D.ctx;
     for (let i = this.drags.length - 1; i >= 0; i--) if (this.dragStep(this.drags[i], h)) this.drags.splice(i, 1);
     for (let i = this.spins.length - 1; i >= 0; i--) {

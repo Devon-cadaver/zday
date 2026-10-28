@@ -145,10 +145,10 @@ void main() {
 export class NukeBlast {
   constructor(D, x, z, R, o = {}) {
     this.type = 'nukeblast'; this.D = D; this.x = x; this.z = z; this.R = R; this.t = 0; this.f = 0; this.alive = true;
-    this.speed = R / 3.4; this.byPlayer = !!o.byPlayer; this.ash = []; this.heat = 1;
-    if (D.contaminate) D.contaminate(x, z, R * 0.9); // the ground stays hot until a hazmat team clears it
+    this.speed = R / 3.4; this.byPlayer = !!o.byPlayer; this.ash = []; this.heat = 1; this.clean = !!o.clean; // clean: no fallout zone, no doses (a villain's mini nuke)
+    if (D.contaminate && !this.clean) D.contaminate(x, z, R * 0.9); // the ground stays hot until a hazmat team clears it
     const { fire, scene } = D.ctx;
-    D.flash(o.bigFlash ? 1.8 : 1.3); D.shake(3); // a blink of white, then the orange heat wash (post.js uHeat) carries it
+    D.flash(o.mini ? 0.8 : o.bigFlash ? 1.8 : 1.3); D.shake(o.mini ? 1.8 : 3); // a blink of white, then the orange heat wash (post.js uHeat) carries it
     fire.nuke(x, z, R * 0.9, { cloud: false });
     new Mushroom(D, x, z, R * 0.7);
     this.mat = new THREE.ShaderMaterial({ vertexShader: WALL_VS, fragmentShader: WALL_FS, transparent: true, depthWrite: false, side: THREE.DoubleSide, uniforms: { uTime: { value: 0 }, uK: { value: 1 } } });
@@ -204,7 +204,7 @@ export class NukeBlast {
           people.kill(j, ox * 14, oz * 14, 'burn');
           if (this.byPlayer) { if (wasZ) { people.stats.disasterZ--; people.stats.nukedZ++; } else if (civ) { people.stats.disasterCiv--; people.stats.nukedCiv++; } }
         }
-      } else if (people.isPrey(j) && people.kind[j] === 0 && Math.random() < 0.07) { people.inf[j] = 1; people.zrad[j] = 2; people.inc[j] = people.inc0[j] = 10 + Math.random() * 25; people.dirty[j] = 1; } // a dose of radiation
+      } else if (!this.clean && people.isPrey(j) && people.kind[j] === 0 && Math.random() < 0.07) { people.inf[j] = 1; people.zrad[j] = 2; people.inc[j] = people.inc0[j] = 10 + Math.random() * 25; people.dirty[j] = 1; } // a dose of radiation
     }
     traffic.near(x, z, r1, (car) => {
       if (car.gone || car.mode === 4 || car.mode === 5) return;
