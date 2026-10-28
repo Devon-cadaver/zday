@@ -48,7 +48,7 @@ export class Traffic {
     const B = city.bounds;
     this.gx0 = B.x0 - 20; this.gz0 = B.z0 - 20;
     this.gw = Math.ceil((B.x1 - B.x0 + 40) / CELL) + 1; this.gh = Math.ceil((B.z1 - B.z0 + 40) / CELL) + 1;
-    this.head = new Int32Array(this.gw * this.gh);
+    this.head = new Int32Array(this.gw * this.gh).fill(-1); // empty: zeros would point every cell at car 0 forever (Bayview froze on its first errand)
 
     const carMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.1 });
     this.nCars = opts.cars ?? 260;
@@ -184,6 +184,7 @@ export class Traffic {
   }
 
   reset() {
+    this.head.fill(-1); // nobody in the hash until the next step builds it
     const r = this.r = rng(this.opts.seed ?? 99);
     for (const n of this.nodes) n.occ = -1;
     this.cars = [];

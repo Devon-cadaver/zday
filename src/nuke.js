@@ -227,7 +227,7 @@ export class NukeBlast {
     const D = this.D, end = this.R * 1.25, k = Math.max(0, 1 - this.f / end);
     this.wall.scale.set(Math.max(1, this.f), 8 + 22 * k, Math.max(1, this.f));
     this.mat.uniforms.uTime.value = realT; this.mat.uniforms.uK.value = this.f >= end ? Math.max(0, this.mat.uniforms.uK.value - dt * 0.8) : 0.35 + 0.65 * k;
-    D.ctx.post.opts.heat = Math.max(D.ctx.post.opts.heat || 0, this.heat);
+    const o = D.ctx.post.opts; o.heat = Math.max(o.heatAt === realT ? o.heat || 0 : 0, this.heat); o.heatAt = realT; // the hottest blast this frame, so it fades (it held the screen at its hottest ever)
   }
   dispose() { this.D.ctx.scene.remove(this.wall); this.wall.geometry.dispose(); this.mat.dispose(); this.D.ctx.post.opts.heat = 0; }
 }

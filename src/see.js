@@ -8,7 +8,7 @@
 // which already carry their world position for the ground holes (holes.js).
 import * as THREE from 'three';
 
-export const SEE = { on: true }; // off for comparisons (window.__z.see)
+export const SEE = { on: true, far: 430 }; // on, and from how far out (modes set it; window.__z.see for comparisons)
 const U = { uSeeA: { value: new THREE.Vector3() }, uSeeB: { value: new THREE.Vector3() }, uSee: { value: new THREE.Vector2(0, 0) } };
 
 export function seeThrough(mat) {
@@ -28,9 +28,9 @@ export function seeThrough(mat) {
   return mat;
 }
 
-// each frame: the tube from the camera to what it looks at, how wide, how strong (fading in from 430 m to 330 m)
+// each frame: the tube from the camera to what it looks at, how wide, how strong (fading in over the last 100 m inside SEE.far)
 export function seeFrame(camera, focus, dist) {
-  const on = SEE.on ? Math.min(1, Math.max(0, (430 - dist) / 100)) : 0;
+  const on = SEE.on ? Math.min(1, Math.max(0, (SEE.far - dist) / 100)) : 0;
   U.uSeeA.value.copy(camera.position); U.uSeeB.value.set(focus.x, (focus.y || 0) + 1.5, focus.z);
   U.uSee.value.set(Math.min(24, Math.max(9, dist * 0.07)), on);
 }

@@ -12,31 +12,34 @@ import { ST, KIND } from './people.js';
 import { roofTop } from './tripod.js';
 import { Gauge, SIZED } from './gauge.js';
 import { PLACES, PATH, placeKey } from './places.js';
+import { SEE } from './see.js';
+const SEE_KINDS = new Set(['saucer', 'tripod', 'zombies', 'riot', 'villains', 'kaiju', 'worm']); // see-through helps: someone in the streets to keep in sight
 import { ZombiesCtl, RiotCtl, FloodCtl, VolcanoCtl, DustCtl, BlizzardCtl, SolarCtl, NukeCtl, ReactorCtl, RoamingHoleCtl, TripodCtl, VillainsCtl, WormCtl, KaijuCtl } from './be-more.js';
 
 const RUN = 180;
-const RANKS = [[0, 'F'], [8000, 'D'], [20000, 'C'], [40000, 'B'], [65000, 'A'], [95000, 'S']];
+// ranks against the town's goal (30 a building), so a hamlet and the city rank alike (playtests: fixed scores made the small towns all S and Metro all C)
+const RANKS = [[0, 'F'], [0.25, 'D'], [0.6, 'C'], [1, 'B'], [1.6, 'A'], [2.5, 'S']];
 export const BE = {
   tornado: { name: 'Tornado', k: 0.9, hint: 'Drag to steer the tornado. It grows as it feeds' },
   sinkhole: { name: 'Sinkhole', k: 0.6, hint: 'Hold to size a sinkhole (up to ten blocks wide), let go and the ground gives way' },
   zombies: { name: 'Zombie outbreak', k: 2.2, zom: true, hint: 'Tap to bite someone. Hold and drag and the horde follows your finger' },
   riot: { name: 'Riot', k: 7, hint: 'Drag to lead the mob. It smashes and burns wherever you take it, and grows' },
-  quake: { name: 'Earthquake', k: 1, hint: 'Drag across the city to tear a fault line through it' },
+  quake: { name: 'Earthquake', k: 0.6, hint: 'Drag across the city to tear a fault line through it' },
   flood: { name: 'Flood', k: 0.8, hint: 'Hold to make it pour: the water rises while you hold and drains when you let go' },
-  meteor: { name: 'Meteor shower', k: 0.45, hint: 'Hold to size the rock, from a fireball to a planet killer. Let go and it comes down there' },
+  meteor: { name: 'Meteor shower', k: 0.3, hint: 'Hold to size the rock, from a fireball to a planet killer. Let go and it comes down there' },
   lava: { name: 'Lava', k: 1.6, hint: 'Drag to pour lava. It runs down the streets and swallows what it touches' },
-  haboob: { name: 'Dust storm', k: 0.62, hint: 'Drag to pull the wall of dust through the streets. It lifts cars and people' },
+  haboob: { name: 'Dust storm', k: 0.9, hint: 'Drag to pull the wall of dust through the streets. It lifts cars and people' },
   coldwave: { name: 'Blizzard', k: 4, hint: 'Drag to steer a freezing blizzard. Everyone it catches freezes solid' },
-  tsunami: { name: 'Tsunami', k: 0.35, hint: 'Drag to pull the wave. The water surges toward your finger' },
+  tsunami: { name: 'Tsunami', k: 0.5, hint: 'Drag to pull the wave. The water surges toward your finger' },
   saucer: { name: 'Alien saucer', k: 3.5, hint: 'Drag to fly and blast the streets. Hold still over a crowd to beam them up' },
   solar: { name: 'Solar flare', k: 1, hint: 'Hold to charge a flare, let go to strike. The longer you hold, the wider it hits' },
-  tripod: { name: 'Alien tripod', k: 3.5, hint: 'Drag to walk it. Hold under it to beam people up. Tap to sweep the heat ray' },
-  volcano: { name: 'Volcano', k: 2.5, hint: 'Hold to size the volcano and let go where it bursts out. Then hold anywhere to rain lava bombs there' },
+  tripod: { name: 'Alien tripod', k: 5.5, hint: 'Drag to walk it. Hold under it to beam people up. Tap to sweep the heat ray' },
+  volcano: { name: 'Volcano', k: 1.9, hint: 'Hold to size the volcano and let go where it bursts out. Then hold anywhere to rain lava bombs there' },
   blackhole: { name: 'Black hole', k: 1.4, hint: 'Drag to move the black hole. It grows with everything it swallows' },
-  nuclear: { name: 'Nuclear strike', k: 0.2, hint: 'Hold to set the yield, let go to launch. Three warheads, another every minute' },
-  meltdown: { name: 'Meltdown', k: 1.4, zom: true, hint: 'Hold to overload the reactor until it blows, then drag to steer the fallout over the city' },
+  nuclear: { name: 'Nuclear strike', k: 0.16, hint: 'Hold to set the yield, let go to launch. Three warheads, another every minute' },
+  meltdown: { name: 'Meltdown', k: 3, zom: true, hint: 'Hold to overload the reactor until it blows, then drag to steer the fallout over the city' },
   worm: { name: 'Giant worm', k: 1.3, hint: 'Drag to steer it under the streets. Let go and it bursts out of the ground there' },
-  kaiju: { name: 'Kaiju', k: 0.9, hint: 'Drag to walk it. Tap a car to throw it, tap people to send a tentacle, tap a building to swipe it, tap open ground to roar' },
+  kaiju: { name: 'Kaiju', k: 3, hint: 'Drag to walk it. Tap a car to throw it, tap people to send a tentacle, tap a building to swipe it, tap open ground to roar' },
   villains: { name: 'Super villains', k: 1, hint: 'Play as Blur, Tyrant or Weaver; Switch changes who. Blur runs where you drag, Tyrant grabs and throws what you tap, Weaver webs the street' },
 };
 
@@ -190,24 +193,26 @@ class SaucerCtl {
     const D = this.be.D, { people, traffic } = D.ctx;
     const dx = this.tx - this.x, dz = this.tz - this.z, d = Math.hypot(dx, dz) || 0.001, v = Math.min(30, d * 1.5);
     this.vx = dx / d * v; this.vz = dz / d * v; this.x += this.vx * h; this.z += this.vz * h;
-    const beaming = this.held && d < 8;
+    const beaming = this.held && d < 16; this.off = beaming ? 0 : (this.off || 0) + h; const drop = this.off > 0.8; // a drifting finger doesn't drop them at once
     this.y += (Math.max(beaming ? 22 : 32, roofTop(D.ctx.city, this.x, this.z, 8.5).top + 7) - this.y) * Math.min(1, h * 1.6); // over the roofs, never through them
     this.beam.visible = beaming;
     if (beaming && (this.n -= h) <= 0) {
       this.n = 0.3; let got = 0;
-      people.around(this.x, this.z, 8, (j) => { if (got < 3 && this.lift.length < 20 && people.lvl[j] === -1 && people.grab(j)) { this.lift.push(j); got++; } });
+      people.around(this.x, this.z, 10, (j) => { if (got < 3 && this.lift.length < 20 && people.lvl[j] === -1 && people.grab(j)) { this.lift.push(j); got++; } });
       if (!this.car && Math.random() < 0.2) traffic.near(this.x, this.z, 8, (car) => { if (!this.car && !car.mission && !car.gone && (car.mode === 0 || car.mode === 2) && Math.hypot(car.x - this.x, car.z - this.z) < 8 && traffic.grab(car)) this.car = car; });
     }
     for (let k = this.lift.length - 1; k >= 0; k--) {
       const j = this.lift[k];
       if (people.st[j] !== ST.EXT) { this.lift.splice(k, 1); continue; }
-      if (!beaming) { people.fling(j, (Math.random() - 0.5) * 3, 0, (Math.random() - 0.5) * 3); this.lift.splice(k, 1); continue; } // dropped
+      if (drop) { people.fling(j, (Math.random() - 0.5) * 3, 0, (Math.random() - 0.5) * 3); this.lift.splice(k, 1); continue; } // dropped
+      if (!beaming) continue; // held a moment
       people.x[j] += (this.x - people.x[j]) * Math.min(1, h * 1.5); people.z[j] += (this.z - people.z[j]) * Math.min(1, h * 1.5); people.y[j] += 3.4 * h;
       if (people.y[j] > this.y - 1.5) { people.st[j] = ST.EVAC; people.lvl[j] = -1; people.stats.abducted++; this.abducted++; this.lift.splice(k, 1); }
     }
     if (this.car) {
       const c = this.car;
-      if (!beaming) { traffic.fling(c, 0, 0, 0); this.car = null; }
+      if (drop) { traffic.fling(c, 0, 0, 0); this.car = null; }
+      else if (!beaming) { /* held a moment */ }
       else { c.x += (this.x - c.x) * Math.min(1, h * 1.2); c.z += (this.z - c.z) * Math.min(1, h * 1.2); c.y = (c.y || 0) + 2.6 * h; c.yaw += h; if (c.y > this.y - 2) { traffic.remove(c); this.car = null; } }
     }
     if (!beaming && (this.zapT -= h) <= 0) { this.zapT = 0.35; this.zap(); } // it fires on anything below while it flies
@@ -250,6 +255,8 @@ class SaucerCtl {
 
 export class BeTheDisaster {
   constructor(g, kind = 'tornado') {
+    g.profile.mode = 'be'; // its level keeps step with its road of towns
+    SEE.on = SEE_KINDS.has(kind); SEE.far = 600; // see-through for the ones that are someone in the streets; not for the ones that flatten a whole area (playtests: it speckled the very buildings a tornado was wrecking)
     this.g = g; this.D = g.disasters; this.kind = BE[kind] ? kind : 'tornado'; this.msgs = {};
     this.el = {
       score: g.addPill('zd-rp', 'Score'), what: g.addPill('zd-al', '', 'zd-ef'),
@@ -370,13 +377,16 @@ export class BeTheDisaster {
     this.gauge.cancel();
     if (this.ctl && this.ctl.up) this.ctl.up();
     if (this.ctl && this.ctl.finish) this.ctl.finish();
-    let rank = 'F'; for (const [s, r] of RANKS) if (this.score >= s) rank = r;
+    const goal = 30 * g.city.buildings.length;
+    let rank = 'F'; for (const [s, rk] of RANKS) if (this.score >= s * goal) rank = rk;
     const r = g.profile.addBe(this.kind, this.score), best = (g.profile.data.beBest || {})[this.kind] || 0;
     const lines = [['Buildings destroyed', G.b], ['Victims', (G.dead + G.abd).toLocaleString()], ['Cars wrecked', G.cars], ['Fires started', G.fires]];
     // the road: wreck enough of this town (a score of 30 a building) and the next one opens
-    const here = placeKey(), at = PATH.indexOf(here), goal = 30 * g.city.buildings.length, opened = this.score >= goal ? g.profile.clear('be', here) : null;
+    const here = placeKey(), at = PATH.indexOf(here), opened = this.score >= goal ? g.profile.clear('be', here) : null;
+    if (g.profile.level > r.level) { r.level = g.profile.level; r.levelUp = r.level > r.before; } // a new town: a level with it
+    const done = at === PATH.length - 1 && this.score >= goal; // the last town wrecked: the road is done
     const nextKey = PATH[at + 1], nextOpen = at >= 0 && nextKey && at + 1 <= g.profile.reach('be');
-    const road = at < 0 ? '' : opened ? '<div class="lvl">New town open: ' + PLACES[opened].name + '</div>' : nextKey && !nextOpen ? '<div class="xp">Score ' + goal.toLocaleString() + ' here to open ' + PLACES[nextKey].name + '</div>' : '';
+    const road = at < 0 ? '' : done ? '<div class="lvl">That was the last town. The whole road is in ruins: you are the disaster</div>' : opened ? '<div class="lvl">New town open: ' + PLACES[opened].name + '</div>' : nextKey && !nextOpen ? '<div class="xp">Score ' + goal.toLocaleString() + ' here to open ' + PLACES[nextKey].name + '</div>' : '';
     if (G.abd) lines.splice(2, 0, ['Beamed up', G.abd.toLocaleString()]);
     if (G.zom) lines.splice(2, 0, ['Zombies made', G.zom.toLocaleString()]);
     g.endScreen(this.end, '<h2>' + BE[this.kind].name + '</h2><div>Rank ' + rank + (r.best ? ' · new best!' : ' · best ' + best.toLocaleString()) + '</div>' +

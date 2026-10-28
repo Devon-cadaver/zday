@@ -13,6 +13,7 @@ import { curvedHit } from './curve.js';
 import { PLACES, PATH, placeKey, travel, settle } from './places.js';
 import { dragScroll } from './ui.js';
 import { Folk } from './folk.js';
+import { SEE } from './see.js';
 
 const CSS = `
 #zd-top{position:fixed;left:0;right:0;top:0;display:flex;gap:6px;align-items:center;justify-content:center;flex-wrap:wrap;
@@ -259,6 +260,7 @@ export class Game {
     else if (mode === 'commander') this.mode = new Commander(this);
     else if (mode === 'be' || mode === 'storm') { // ?mode=be&kind=lava starts that disaster, ?mode=be alone opens the picker
       const d = new URLSearchParams(location.search).get('kind') || (mode === 'storm' ? 'tornado' : '');
+      this.profile.mode = 'be';
       if (BE[d] && this.profile.level >= BE_LEVEL[d]) this.mode = new BeTheDisaster(this, d);
       else { this.mode = new Idle(); this.showMenu('be'); }
     } else { this.mode = new Idle(); this.showMenu(); }
@@ -275,6 +277,7 @@ export class Game {
   endMode() {
     if (this.folk) this.folk.hide();
     if (this.profile) this.profile.mode = null;
+    SEE.on = true; SEE.far = 430; // back to the usual see-through (Be The Disaster sets its own)
     if (this.followSub || this.follow >= 0) this.setFollow(-1);
     const m = this.mode;
     if (m) { m.dead = true; if (m.gauge && m.gauge.el) m.gauge.el.remove(); if (m.panel) m.panel.remove(); }
@@ -297,6 +300,7 @@ export class Game {
 
   // ---------- main menu and unlocks
   showMenu(panel = 'main') {
+    if (!this.mode || this.mode instanceof Idle) this.profile.mode = panel === 'be' ? 'be' : panel === 'commander' || panel === 'main' ? 'commander' : null; // the level shown is that mode's (it keeps step with its road)
     const pr = this.profile, lvl = pr.level, next = pr.nextXp;
     const rank = '<div class="rank"><span>Commander level <b>' + lvl + '</b></span><span>' + pr.xp.toLocaleString() + ' XP' + (next ? ' / ' + next.toLocaleString() : '') + '</span></div>' +
       '<div class="bar"><i style="width:' + Math.round(pr.progress * 100) + '%"></i></div>' +

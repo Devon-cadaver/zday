@@ -723,7 +723,8 @@ export class Commander {
     const r = this.pr.addRound(score, stars);
     const here = placeKey(), at = PATH.indexOf(here), opened = stars >= 2 ? this.pr.clear('commander', here) : null, nextKey = PATH[at + 1], nextOpen = at >= 0 && nextKey && at + 1 <= this.pr.reach('commander');
     if (this.pr.level > r.level) { r.level = this.pr.level; r.levelUp = r.level > r.before; } // a new town: a level with it
-    const road = at < 0 ? '' : opened ? '<div class="lvl">New town open: ' + PLACES[opened].name + '</div>' : nextKey && !nextOpen ? '<div class="xp">Win with two stars to open ' + PLACES[nextKey].name + '</div>' : '';
+    const done = at === PATH.length - 1 && stars >= 2; // Metro held: the road is done
+    const road = at < 0 ? '' : done ? '<div class="lvl">That was the last town. Every town on the road came through: you beat My Little Disaster</div>' : opened ? '<div class="lvl">New town open: ' + PLACES[opened].name + '</div>' : nextKey && !nextOpen ? '<div class="xp">Win with two stars to open ' + PLACES[nextKey].name + '</div>' : '';
     const xpLine = '<div class="xp">+' + r.xp.toLocaleString() + ' XP · level ' + r.level + (this.pr.nextXp ? ' · ' + (this.pr.nextXp - this.pr.xp).toLocaleString() + ' to next' : '') + '</div>' +
       (r.levelUp ? '<div class="lvl">Level up! Commander level ' + r.level + this.g.nextUnlockText(r.level) + '</div>' : '');
     g.endScreen(this.end, '<h2>' + title + '</h2><div>' + sub + '</div>' +

@@ -59,7 +59,16 @@ export class RiotCtl {
 export class FloodCtl {
   constructor(be) { const D = be.D; this.be = be; this.level = -0.3; D.water.colors('flood'); D.water.front = null; D.weather.set('rain'); D.list.push(wrap(this)); }
   down() { this.held = true; this.be.D.weather.set('storm'); } move() {} up() { this.held = false; this.be.D.weather.set('rain'); }
-  update(h) { this.level = this.held ? Math.min(6, this.level + h * 0.16) : Math.max(-0.4, this.level - h * 0.04); this.be.D.water.level = this.level; }
+  update(h) {
+    this.level = this.held ? Math.min(6, this.level + h * 0.16) : Math.max(-0.4, this.level - h * 0.04); this.be.D.water.level = this.level;
+    if (this.level < 2.5) return;
+    const D = this.be.D, city = D.ctx.city; this.sink = (this.sink || 0) + h * (this.level - 1.5) * 0.15; // deep water starts taking buildings (there was nothing left to wreck after a minute)
+    while (this.sink > 0.5) {
+      this.sink -= 0.5; let best = -1, bh = 1e9;
+      for (let n = 0; n < 12; n++) { const k = Math.floor(Math.random() * city.buildings.length); if (city.dead[k]) continue; const b = city.buildings[k], hg = b.top - b.baseY; if (hg < bh) { bh = hg; best = k; } } // the lowest of a dozen
+      if (best >= 0 && bh <= this.level * 3 + 4) D.destroyBuilding(best, 'collapse', {});
+    }
+  }
   label() { return 'Water ' + Math.max(0, this.level).toFixed(1) + ' m' + (this.held ? ' · rising' : ''); }
   dispose() { this.be.D.water.level = -1; }
 }
@@ -84,16 +93,16 @@ export class VolcanoCtl {
 export class DustCtl {
   constructor(be) { this.be = be; this.n = 0; this.next(); be.D.list.push(wrap(this)); }
   next() {
-    this.n++;
+    this.n++; let me = null;
     const pull = (t, F) => {
-      if (!this.held || !this.ev) return 0.55;
-      const sw = this.ev.sw, dx = this.fx - sw.origin.x, dz = this.fz - sw.origin.y, d = Math.abs(t - (dx * sw.tan.x + dz * sw.tan.y));
+      if (!this.held || this.ev !== me) return 0.55; // only the newest wall follows the finger
+      const sw = me.sw, dx = this.fx - sw.origin.x, dz = this.fz - sw.origin.y, d = Math.abs(t - (dx * sw.tan.x + dz * sw.tan.y));
       return d < 200 && dx * sw.dir.x + dz * sw.dir.y > F - 30 ? 0.55 + 2 * (1 - d / 200) : 0.55;
     };
-    this.ev = this.be.D.start('haboob', null, null, { side: this.n % 2 ? 2 : 3, pull, quiet: true });
+    me = this.ev = this.be.D.start('haboob', null, null, { side: this.n % 2 ? 2 : 3, pull, quiet: true });
   }
   down(x, z) { this.held = true; this.fx = x; this.fz = z; } move(x, z) { this.fx = x; this.fz = z; } up() { this.held = false; }
-  update() { if (!this.ev.alive) this.next(); }
+  update() { const ev = this.ev; if (!ev.alive || (ev.phase === 'sweep' && ev.sw && ev.sw.lead() > ev.sw.extent * 0.6)) this.next(); } // the next wall once this one is most of the way across (it waited 50 s after each had gone)
   label() { return 'Storm ' + this.n; }
 }
 
