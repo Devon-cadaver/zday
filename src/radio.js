@@ -6,7 +6,7 @@
 // all over; the station's call sign when a game begins. Each line is fetched the
 // first time it is wanted. Through the sound button's volume; the words show even
 // with the sound off.
-const BASE = import.meta.env.BASE_URL || './'; // the line files carry ?v=2: a browser may still hold the silent first cut
+const BASE = import.meta.env.BASE_URL || './'; // the line files carry ?v=3: a browser may still hold an older cut (v1 silent; v2 had the end of line 8 at the start of line 9)
 import { sideButton } from './ui.js';
 import { levelIcon } from './music.js';
 const TEXT = [
@@ -83,7 +83,7 @@ export class Radio {
   fetch(n) {
     const c = this.audio && this.audio.ctx; if (!c || this.bufs[n]) return;
     this.bufs[n] = 'loading';
-    fetch(BASE + 'radio/' + String(n).padStart(2, '0') + '.mp3?v=2').then(r => r.arrayBuffer())
+    fetch(BASE + 'radio/' + String(n).padStart(2, '0') + '.mp3?v=3').then(r => r.arrayBuffer())
       .then(ab => new Promise((ok, no) => c.decodeAudioData(ab, ok, no))).then(b => { this.bufs[n] = b; }).catch(() => { this.bufs[n] = null; });
   }
   update(dt, g) {
