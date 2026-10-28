@@ -280,7 +280,7 @@ export class Game {
     SEE.on = true; SEE.far = 430; // back to the usual see-through (Be The Disaster sets its own)
     if (this.followSub || this.follow >= 0) this.setFollow(-1);
     const m = this.mode;
-    if (m) { m.dead = true; if (m.gauge && m.gauge.el) m.gauge.el.remove(); if (m.panel) m.panel.remove(); if (m.hits) m.hits.dispose(); if (m.targets) m.targets.dispose(); }
+    if (m) { m.dead = true; if (m.gauge && m.gauge.el) m.gauge.el.remove(); if (m.panel) m.panel.remove(); if (m.hits) m.hits.dispose(); if (m.targets) m.targets.dispose(); if (m.mix) m.mix.dispose(); }
     this.slowT = 0;
     for (const e of document.querySelectorAll('#zd-end')) e.remove();
     document.body.classList.remove('zd-panel');
