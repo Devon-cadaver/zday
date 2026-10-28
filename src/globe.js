@@ -391,7 +391,7 @@ export class Globe {
     const v = new THREE.Vector3(), camDir = this.cam.position.clone().normalize(), cand = [], placed = [];
     for (const key in this.tags) {
       const [lat, lon] = this.spots[key], p = toVec(lat, lon, R * 1.01), el = this.tags[key], dot = p.clone().normalize().dot(camDir);
-      if (!this.active || (this.quiet && this.state === 'menu') || dot < 0.25 || this.fly || this.rise) { el.style.display = 'none'; continue; }
+      if (!this.active || this.leaving || (this.quiet && this.state === 'menu') || dot < 0.25 || this.fly || this.rise) { el.style.display = 'none'; continue; }
       v.copy(p).project(this.cam);
       cand.push({ el, x: (v.x + 1) / 2 * innerWidth, y: (1 - v.y) / 2 * innerHeight, pri: dot + (key === placeKey() && this.state === 'game' ? 2 : 0) + (this.turn && this.turn.key === key ? 3 : 0) });
     }
@@ -406,6 +406,6 @@ export class Globe {
     if (this.shift > 0.002) this.cam.setViewOffset(innerWidth, innerHeight, 0, this.shift * innerHeight, innerWidth, innerHeight); else if (this.cam.view && this.cam.view.enabled) this.cam.clearViewOffset();
     this.renderer.setRenderTarget(null); this.renderer.render(this.scene, this.cam);
   }
-  travelling(key) { Sky.leaving(); this.uiEl.firstChild.textContent = 'TRAVELLING TO ' + PLACES[key].name.toUpperCase(); this.say(''); this.uiEl.style.display = ''; this.backBtn.style.display = 'none'; }
+  travelling(key) { this.leaving = true; Sky.leaving(); this.uiEl.firstChild.textContent = 'TRAVELLING TO ' + PLACES[key].name.toUpperCase(); this.say(''); this.uiEl.style.display = ''; this.backBtn.style.display = 'none'; }
   resize() { if (this.cam) { this.cam.aspect = innerWidth / innerHeight; this.cam.updateProjectionMatrix(); } }
 }

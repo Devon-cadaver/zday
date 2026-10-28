@@ -258,9 +258,16 @@ export class Audio {
     this.level = Number.isFinite(lv) ? Math.max(0, Math.min(3, lv)) : 3; this.muted = this.level === 0;
     this.music = new Music(); // the songs, with their own button and volume
     this.button();
-    const go = () => { this.unlock(); if (this.music) this.music.prime(); }; // browsers only allow sound after a tap
+    const go = () => { this.unlock(); if (this.music) this.music.prime(); if (this.hint) { this.hint.remove(); this.hint = null; } }; // browsers only allow sound after a tap
     for (const ev of ['pointerdown', 'touchend', 'keydown']) window.addEventListener(ev, go, { passive: true });
     document.addEventListener('visibilitychange', () => { if (!this.ctx) return; if (document.hidden) this.ctx.suspend(); else if (!this.muted || this.music.level) this.ctx.resume(); });
+  }
+  // a new page (another town) cannot make a sound until it is tapped once: say so, small, until then
+  askTap() {
+    if (this.ctx || (!this.level && !(this.music && this.music.level))) return;
+    const h = this.hint = document.createElement('div');
+    h.style.cssText = 'position:fixed;left:0;right:0;margin:0 auto;width:max-content;top:38%;z-index:31;padding:8px 14px;border-radius:18px;background:rgba(18,14,10,.8);border:1px solid rgba(255,236,200,.2);color:#f6ead2;font:600 13px/1.2 system-ui,-apple-system,"Segoe UI",sans-serif;pointer-events:none;letter-spacing:.02em';
+    h.textContent = '\u{1F50A} Tap anywhere for sound'; document.body.appendChild(h);
   }
   button() {
     const b = this.btn = sideButton('zd-sound', 'Sound');

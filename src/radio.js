@@ -84,7 +84,7 @@ export class Radio {
     const live = D && D.list.some(e => e.alive && e.type !== 'heroes' && FOR[e.type]);
     if (live || zom > 15) { this.hot = true; this.calm = 0; }
     else if (this.hot && (this.calm += dt) > 7) { this.hot = false; this.say(CLEAR[this.clearN++ % CLEAR.length]); }
-    if (this.started >= 0 && !this.identDone && this.t - this.started > 3) { this.identDone = true; if (!this.queue.length && !this.speaking()) this.say(IDENT); }
+    if (this.started >= 0 && !this.identDone && this.t - this.started > 3 && ((this.audio && this.audio.ctx) || this.t - this.started > 15)) { this.identDone = true; if (!this.queue.length && !this.speaking()) this.say(IDENT); }
     if (this.speaking() || !this.queue.length) { if (!this.speaking() && this.el.classList.contains('on') && this.t > this.until + 0.6) this.el.classList.remove('on'); return; }
     const n = this.queue[0], b = this.bufs[n];
     if (b === 'loading') return;

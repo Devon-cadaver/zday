@@ -170,6 +170,7 @@ const globe = game.globe = new Globe(renderer); let globeWas = false; // the wor
 globe.statusFor = () => game.townStatus(game.modeName); // Commander and Be The Disaster: towns further down the road are locked
 globe.sky = sky;
 globe.up = (after) => { game.setFollow(-1); sky.up(() => { globe.open({ clouds: true }); globe.after = after || null; }); }; // up through the clouds (then on to another town)
+if (viaSky) game.audio.askTap(); // the trip reloaded the page: sound needs a tap again
 if (viaSky) setTimeout(() => { if (globe.active) { sky.to(0, 0.8); return; } const r1 = game.zoomTo || 0; game.zoomTo = 0; sky.down(r1); }, 300); // out of the clouds over the streets
 if (!game.menu.hidden) { globe.backdrop(game.menuPanel === 'main'); game.dockSide(); } // the menu sits over the planet
 // what this place remembers: the buildings that came down here last time (Sandbox; Commander starts each round fresh)
