@@ -378,6 +378,7 @@ export class BeTheDisaster {
   tap() {}
   busy() { return true; } // a finger here drives the disaster
   phase() { return 0.1 + (this.t / RUN) * 0.25; }
+  zombieNight() { return this.kind === 'zombies'; } // the zombie run is a night run; the other runs' starting outbreaks do not bring the dark
 
   update(sdt, dt) {
     if (this.hits) this.hits.frame(dt, this.ended ? 0 : sdt);

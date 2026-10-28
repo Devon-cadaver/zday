@@ -771,9 +771,12 @@ export class Game {
     if (stepped) this.traffic.sync(this.realT); // cars and people only move on a step (30 a second): no need to rebuild their matrices on the frames between
     if (this.helis) this.helis.sync(sdt);
     if (this.daylight) {
-      const want = this.mode.phase ? this.mode.phase() : 0;
-      if (this.dayP == null || this.dayMode !== this.mode) { this.dayP = want; this.dayMode = this.mode; } // a new mode starts at its own hour
-      else { const d = ((want - this.dayP) % 1 + 1.5) % 1 - 0.5; this.dayP = Math.abs(d) < 0.004 ? want : (this.dayP + Math.sign(d) * Math.min(Math.abs(d), dt * 0.035) + 1) % 1; } // a jump (a new run, a new round, a new town) rolls round over a few seconds, never in one frame (Sean)
+      // a zombie outbreak brings the night with it, for as long as it lasts, so the glowing ones show (Sean); a mode can say for itself (zombieNight)
+      const zn = this.mode.zombieNight ? this.mode.zombieNight() : !!this.people && (this.people.stats.zombies >= 8 || (!!this.disasters && this.disasters.list.some(e => e.alive && e.type === 'spill')));
+      const want = zn ? 0.66 : this.mode.phase ? this.mode.phase() : 0;
+      if (zn !== this.zNight) { if (this.zNight != null) this.dayFwd = true; this.zNight = zn; } // into the night and out of it, always forward: through dusk, through dawn
+      if (this.dayP == null || this.dayMode !== this.mode) { this.dayP = want; this.dayMode = this.mode; this.dayFwd = false; } // a new mode starts at its own hour
+      else { let d = ((want - this.dayP) % 1 + 1.5) % 1 - 0.5; if (this.dayFwd && d < 0) d += 1; if (Math.abs(d) < 0.004) { this.dayP = want; this.dayFwd = false; } else this.dayP = (this.dayP + Math.sign(d) * Math.min(Math.abs(d), dt * 0.035) + 1) % 1; } // a jump (a new run, a new round, a new town) rolls round over a few seconds, never in one frame (Sean)
       this.daylight.set(this.dayP); if (this.disasters) { this.disasters.weather.apply(dt); this.disasters.afterLight(); } this.daylight.update(); }
     this.fire.update(sdt, this.realT, this.camera, this.renderer);
     if (stepped || p.lookDirty) p.sync();

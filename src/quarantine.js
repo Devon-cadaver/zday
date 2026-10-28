@@ -174,7 +174,14 @@ export class Quarantine {
       this.fill.renderOrder = 3; this.edge.renderOrder = 4; this.fill.frustumCulled = this.edge.frustumCulled = false;
       this.gapMat = new THREE.MeshBasicMaterial({ color: '#ffb23a', transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide });
       this.gapMesh = new THREE.InstancedMesh(new THREE.RingGeometry(4.2, 5.6, 32).rotateX(-Math.PI / 2), this.gapMat, 48); this.gapMesh.renderOrder = 4; this.gapMesh.frustumCulled = false;
-      scene.add(this.fill, this.edge, this.gapMesh);
+      { // in each ring a police car badge, so it says what it is for (Sean: what are the yellow circles?)
+        const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
+        x.fillStyle = 'rgba(255,178,58,0.9)'; x.beginPath(); x.arc(32, 32, 30, 0, 6.29); x.fill(); x.font = '38px system-ui, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('🚓', 32, 35);
+        const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+        this.badgeMat = new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+        this.badge = new THREE.InstancedMesh(new THREE.PlaneGeometry(5.4, 5.4).rotateX(-Math.PI / 2), this.badgeMat, 48); this.badge.renderOrder = 5; this.badge.frustumCulled = false;
+      }
+      scene.add(this.fill, this.edge, this.gapMesh, this.badge);
     }
     const F = [], E = [], W = this.W, y = 0.7, ye = 0.75, w = 0.8; // over the pavements and kerbs
     for (const zn of this.zones) {
@@ -190,8 +197,9 @@ export class Quarantine {
     const set = (m, arr) => { m.geometry.dispose(); m.geometry = new THREE.BufferGeometry(); m.geometry.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3)); m.visible = arr.length > 0; };
     set(this.fill, F); set(this.edge, E);
     const M = new THREE.Matrix4(), n = Math.min(48, this.gaps.length);
-    for (let k = 0; k < n; k++) { M.makeTranslation(this.gaps[k].x, 0.8, this.gaps[k].z); this.gapMesh.setMatrixAt(k, M); }
+    for (let k = 0; k < n; k++) { M.makeTranslation(this.gaps[k].x, 0.8, this.gaps[k].z); this.gapMesh.setMatrixAt(k, M); M.makeTranslation(this.gaps[k].x, 0.85, this.gaps[k].z); this.badge.setMatrixAt(k, M); }
     this.gapMesh.count = n; this.gapMesh.instanceMatrix.needsUpdate = true; this.gapMesh.visible = n > 0;
+    this.badge.count = n; this.badge.instanceMatrix.needsUpdate = true; this.badge.visible = n > 0;
   }
 
   // ---------- the mini nuke: clears a sealed zone (true: it went off)
