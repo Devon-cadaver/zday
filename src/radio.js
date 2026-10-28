@@ -38,7 +38,7 @@ const TEXT = [
 // which line for which disaster (Be The Disaster's own kinds too)
 const FOR = { zombies: 2, tornado: 3, quake: 4, flood: 5, tsunami: 6, riot: 7, aliens: 8, saucer: 8, tripod: 8, meteor: 9, sinkhole: 10, volcano: 11, lava: 11, haboob: 12, coldwave: 13, solar: 14, nuclear: 15, meltdown: 16, blackhole: 17, villains: 18, worm: 19, kaiju: 20, heroes: 21 };
 const IDENT = 1, CLEAR = [22, 23, 24];
-const LEVELS = [0, 0.55, 1, 1.6]; // off, quiet, medium, loud (its own button; starts at medium: about 5 dB under the old radio, loud just under it)
+const LEVELS = [0, 0.18, 0.33, 0.55]; // off, quiet, medium, loud (its own button; starts at quiet. Sean: much quieter - loud is the old quiet)
 
 const CSS = `
 #zd-radio{position:fixed;left:0;right:0;margin:0 auto;width:max-content;bottom:calc(var(--zd-bar-h, 64px) + 8px);z-index:4;max-width:min(calc(100vw - 24px),460px);box-sizing:border-box;
@@ -57,12 +57,12 @@ export class Radio {
     const st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
     const el = this.el = document.createElement('div'); el.id = 'zd-radio'; el.setAttribute('aria-live', 'polite');
     el.innerHTML = '<b>KDIS</b><span></span>'; document.body.appendChild(el); this.words = el.querySelector('span');
-    let lv = 2; try { const s = localStorage.getItem('zday_radio'); if (s != null) lv = +s; } catch (e) { /* no storage */ }
-    this.level = Number.isFinite(lv) ? Math.max(0, Math.min(3, lv)) : 2;
+    let lv = 1; try { const s = localStorage.getItem('zday_radio2'); if (s != null) lv = +s; } catch (e) { /* no storage */ } // zday_radio2: everyone back to quiet once
+    this.level = Number.isFinite(lv) ? Math.max(0, Math.min(3, lv)) : 1;
     const b = this.btn = sideButton('zd-radiob', 'Radio'), show = () => { b.innerHTML = levelIcon('\u{1F4FB}', this.level); };
     b.onclick = (e) => { // loud, medium, quiet, off, loud...
       e.stopPropagation(); this.level = (this.level + 3) % 4; show();
-      try { localStorage.setItem('zday_radio', String(this.level)); } catch (er) { /* no storage */ }
+      try { localStorage.setItem('zday_radio2', String(this.level)); } catch (er) { /* no storage */ }
       if (this.out) this.out.gain.setTargetAtTime(LEVELS[this.level], this.out.context.currentTime, 0.05);
       if (!this.level) { this.queue.length = 0; this.el.classList.remove('on'); }
     };

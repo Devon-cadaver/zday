@@ -7,40 +7,44 @@
 // or with it in view, you hear the song (not loud; the game's music drops back);
 // when the stage is wrecked - its building down, a disaster on it, fire, water,
 // a pit, the undead in the crowd - the music stops dead and everyone runs for it.
-// A reset of the world puts the show back on.
+// A reset of the world puts the show back on. In the towns of the Far Isles the band
+// is four goth metal girls instead - black with pink: pink and black pigtails, pink
+// leggings, a pink guitar, pink drums - playing the second theme song.
 import * as THREE from 'three';
 import { rig, relax, detail } from './villains.js';
 import { figureGeometry, figureMaterial, figureAttributes, ARCHETYPES } from './figures.js';
 import { Splash } from './water.js';
 import { CURB } from './city.js';
+import { PLACES, placeKey } from './places.js';
 import { sfx } from './audio.js';
 
 const BPS = 172 / 60; // the beat
 const ss = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const FW = [[3, 0.35, 0.25], [0.5, 3, 0.6], [3, 2.2, 0.5], [1.8, 2.2, 3.2], [3, 0.6, 2.6]]; // firework colours
 
-let MATS = null;
-function mats() {
-  if (MATS) return MATS;
+const MATS = {};
+function mats(girls) {
+  const key = girls ? 'girls' : 'punks'; if (MATS[key]) return MATS[key];
   const std = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.55, ...o });
-  MATS = {
-    band: { skin: std('#e9e1d6'), suit: std('#111111', { roughness: 0.4, metalness: 0.1 }), cape: std('#0b0b0b'), hair: std('#050505', { roughness: 0.3 }), boot: std('#0a0a0a'), glove: std('#e9e1d6') },
-    deck: std('#141414'), truss: std('#5a5a5e', { metalness: 0.6, roughness: 0.35 }), cab: std('#1c1c1c'), grille: std('#2a2a2a'), drum: std('#7a0d12'), chrome: std('#cfcfd4', { metalness: 0.9, roughness: 0.2 }),
-    gtrA: std('#e8e2d6'), gtrB: std('#8a0f14'), gtrC: std('#0d0d0d'), neck: std('#3a2a1c'),
+  const PINK = '#ff4fa3';
+  return (MATS[key] = {
+    band: { skin: std(girls ? '#f3e7e2' : '#e9e1d6'), suit: std('#111111', { roughness: 0.4, metalness: 0.1 }), cape: std('#0b0b0b'), hair: std('#050505', { roughness: 0.3 }), boot: std('#0a0a0a'), glove: std(girls ? '#f3e7e2' : '#e9e1d6') },
+    pink: std(PINK, { roughness: 0.35 }), pinkHair: std('#ff6fb8', { roughness: 0.3 }), // the girls' pink: leggings, hair
+    deck: std('#141414'), truss: std('#5a5a5e', { metalness: 0.6, roughness: 0.35 }), cab: std('#1c1c1c'), grille: std('#2a2a2a'), drum: std(girls ? PINK : '#7a0d12'), chrome: std('#cfcfd4', { metalness: 0.9, roughness: 0.2 }),
+    gtrA: std(girls ? PINK : '#e8e2d6'), gtrB: std(girls ? '#141414' : '#8a0f14'), gtrC: std('#0d0d0d'), neck: std(girls ? '#141414' : '#3a2a1c'),
     lamp: new THREE.MeshBasicMaterial({ color: new THREE.Color(3, 2.6, 2), fog: false }),
     rocket: new THREE.MeshBasicMaterial({ color: new THREE.Color(4, 3, 1.5), fog: false }),
     flash: new THREE.MeshBasicMaterial({ color: new THREE.Color(5, 5, 4.5), fog: false }),
-  };
-  return MATS;
+  });
 }
 // the banner over the stage
-function banner() {
+function banner(girls) {
   const c = document.createElement('canvas'); c.width = 512; c.height = 128; const x = c.getContext('2d');
   x.fillStyle = '#0a0a0a'; x.fillRect(0, 0, 512, 128);
   x.font = '900 62px Impact, "Arial Black", sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
-  x.fillStyle = '#7a0d12'; x.fillText('MY LITTLE DISASTER', 259, 68);
-  x.fillStyle = '#efe9df'; x.fillText('MY LITTLE DISASTER', 256, 64);
-  for (let i = 0; i < 26; i++) { const px = 30 + Math.random() * 452, w = 2 + Math.random() * 3; x.fillStyle = '#efe9df'; x.fillRect(px, 80 + Math.random() * 6, w, 6 + Math.random() * 22); } // dripping
+  x.fillStyle = girls ? '#efe9df' : '#7a0d12'; x.fillText('MY LITTLE DISASTER', 259, 68);
+  x.fillStyle = girls ? '#ff4fa3' : '#efe9df'; x.fillText('MY LITTLE DISASTER', 256, 64);
+  for (let i = 0; i < 26; i++) { const px = 30 + Math.random() * 452, w = 2 + Math.random() * 3; x.fillStyle = girls ? '#ff4fa3' : '#efe9df'; x.fillRect(px, 80 + Math.random() * 6, w, 6 + Math.random() * 22); } // dripping
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
 
@@ -48,6 +52,8 @@ export class Band {
   constructor(ctx) {
     this.ctx = ctx; // { scene, game, city, people, traffic, fire, disasters, camera, controls, music }
     this.v = new THREE.Vector3(); this.m4 = new THREE.Matrix4(); this.q = new THREE.Quaternion(); this.e = new THREE.Euler(); this.s1 = new THREE.Vector3(1, 1, 1);
+    this.girls = !!PLACES[placeKey()].style; // the Far Isles: the girl band, the second song
+    if (ctx.music) ctx.music.bandSong = this.girls ? 'theme2' : 'theme';
     this.venue = this.find();
     if (!this.venue) return;
     this.build();
@@ -87,7 +93,7 @@ export class Band {
   }
 
   build() {
-    const { scene } = this.ctx, V = this.venue, M = mats(), g = this.g = new THREE.Group(); g.position.set(V.x, V.y, V.z); if (V.flip) g.rotation.y = Math.PI; scene.add(g); // flip: facing the other way down the roof
+    const { scene } = this.ctx, V = this.venue, M = mats(this.girls), g = this.g = new THREE.Group(); g.position.set(V.x, V.y, V.z); if (V.flip) g.rotation.y = Math.PI; scene.add(g); // flip: facing the other way down the roof
     const box = (w, h, d, x, y, z, m) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); o.castShadow = true; o.receiveShadow = true; g.add(o); return o; };
     const W = V.W, D = V.D, H = V.H;
     box(W, H, D, 0, H / 2, 0, M.deck); // the stage
@@ -97,7 +103,7 @@ export class Band {
       box(1.6, 1.1, 1.4, sx * W * 0.28, H + 0.55, -D / 2 + 1.2, M.cab); // the amps
     }
     box(W, 0.4, 0.4, 0, H + 9, -D / 2 + 0.4, M.truss); box(W, 0.4, 0.4, 0, H + 9, D / 2 - 0.6, M.truss);
-    const ban = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.86, W * 0.86 / 4), new THREE.MeshBasicMaterial({ map: banner(), fog: false })); ban.position.set(0, H + 6.2, -D / 2 + 0.25); g.add(ban);
+    const ban = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.86, W * 0.86 / 4), new THREE.MeshBasicMaterial({ map: banner(this.girls), fog: false })); ban.position.set(0, H + 6.2, -D / 2 + 0.25); g.add(ban);
     // the drum kit, up at the back on a riser
     const dk = new THREE.Group(); dk.position.set(0, H, -D / 2 + 2.4); g.add(dk);
     const cyl = (r, h, x, y, z, m, rx = 0) => { const o = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 16), m); o.position.set(x, y, z); o.rotation.x = rx; o.castShadow = true; dk.add(o); return o; };
@@ -106,7 +112,12 @@ export class Band {
     // the band: singer front and centre, guitars either side, drums behind
     const parts = [['vox', 0, D / 2 - 1.6], ['gtr', -W * 0.3, D / 2 - 2.2], ['bass', W * 0.3, D / 2 - 2.2], ['drums', 0, -D / 2 + 1.6]];
     this.members = parts.map(([role, x, z], i) => {
-      const r = rig({ mats: M.band, slim: role === 'vox', longHair: role === 'gtr' }); r.cape.mesh.visible = false;
+      const pinkHair = this.girls && (role === 'bass' || role === 'drums'), mt = this.girls ? { ...M.band, hair: pinkHair ? M.pinkHair : M.band.hair, leg: role === 'vox' || role === 'bass' ? M.pink : undefined } : M.band;
+      const r = rig({ mats: mt, slim: this.girls || role === 'vox', longHair: !this.girls && role === 'gtr' }); r.cape.mesh.visible = false;
+      if (this.girls) for (const sx of [-1, 1]) { // pigtails, pink on black hair and black on pink, each with a pink tie
+        const tail = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.3, 0.055).translate(0, -0.15, 0), pinkHair ? M.band.hair : M.pinkHair), tie = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.04, 0.07), M.pink);
+        tail.position.set(sx * 0.1, 0.06, -0.035); tail.rotation.z = sx * 0.45; tie.position.copy(tail.position); for (const o of [tail, tie]) { o.userData.keep = true; o.castShadow = true; r.head.add(o); }
+      }
       const lock = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.16, 0.035), M.band.hair); lock.position.set(0.012, -0.02, 0.112); lock.rotation.z = 0.25; lock.userData.keep = true; r.head.add(lock); // the devilock down over the face
       if (role === 'gtr' || role === 'bass') { // the guitar slung across the body
         const gt = new THREE.Group(), body = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.36, 0.07), role === 'gtr' ? M.gtrA : M.gtrB), neck = new THREE.Mesh(new THREE.BoxGeometry(0.045, role === 'bass' ? 0.62 : 0.52, 0.03), M.neck);
@@ -241,12 +252,12 @@ export class Band {
     if ((this.pyroT -= dt) <= 0) {
       this.pyroT = 4 * 2 / BPS * (Math.random() < 0.3 ? 0.5 : 1);
       for (const s of [-1, -0.33, 0.33, 1]) this.pyro.emit(sx + s * V.W * 0.45, V.y + V.H + 0.3, sz + V.D / 2 - 0.4, 22, { up: [12, 19], spread: 1.2, life: 0.75, size: 2.4 });
-      if (cam.distanceTo(this.v.set(sx, V.y, sz)) < 320) sfx('whoomph', sx, V.y + 3, sz, { gain: 0.6 });
+      if (cam.distanceTo(this.v.set(sx, V.y, sz)) < 320) sfx('whoomph', sx, V.y + 3, sz, { gain: 0.12 }); // soft (Sean: much quieter)
     }
     // fireworks, from behind the stage
     if ((this.fwT -= dt) <= 0) {
       this.fwT = 1.2 + Math.random() * 2.8;
-      const m = new THREE.Mesh(this.flashes.geometry, mats().rocket); m.scale.setScalar(1.6); m.position.set(sx + (Math.random() - 0.5) * V.W * 1.2, V.y + V.H + 2, sz - V.D / 2 - 1); this.ctx.scene.add(m);
+      const m = new THREE.Mesh(this.flashes.geometry, mats(this.girls).rocket); m.scale.setScalar(1.6); m.position.set(sx + (Math.random() - 0.5) * V.W * 1.2, V.y + V.H + 2, sz - V.D / 2 - 1); this.ctx.scene.add(m);
       this.rockets.push({ m, vx: (Math.random() - 0.5) * 6, vy: 34 + Math.random() * 14, vz: (Math.random() - 0.5) * 6, t: 0, T: 1.4 + Math.random() * 0.5, c: Math.floor(Math.random() * this.fw.length) });
     }
     for (let i = this.rockets.length - 1; i >= 0; i--) {
@@ -255,7 +266,7 @@ export class Band {
       if (rk.t >= rk.T) { // the burst: a ball of coloured sparks, a crackle of a second colour
         this.fw[rk.c].emit(p.x, p.y, p.z, 70, { up: [-9, 11], spread: 20, life: 1.9, size: 1.5 });
         this.fw[(rk.c + 2) % this.fw.length].emit(p.x, p.y, p.z, 25, { up: [-5, 6], spread: 11, life: 1.2, size: 1.1 });
-        if (cam.distanceTo(p) < 600) sfx('boom', p.x, p.y, p.z, { gain: 0.35, rate: 1.4 });
+        if (cam.distanceTo(p) < 600) sfx('boom', p.x, p.y, p.z, { gain: 0.07, rate: 1.4 });
         this.ctx.scene.remove(rk.m); this.rockets.splice(i, 1);
       }
     }

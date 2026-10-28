@@ -1,12 +1,12 @@
 // Small pieces of interface shared by every screen: the column of round buttons down
-// the right side (sound, music, the globe), and finger scrolling for rows and panels
+// the right side (pause, the compass, sound, music, the globe), and finger scrolling for rows and panels
 // that are longer than the screen.
 const CSS = `
 #zd-side{position:fixed;right:max(10px, env(safe-area-inset-right));top:50%;transform:translateY(-50%);z-index:30;display:flex;flex-direction:column;gap:8px}
 .zd-side-btn{width:40px;height:40px;border-radius:20px;border:1px solid rgba(255,236,200,.18);background:rgba(28,20,12,.72);color:#f6ead2;padding:0;cursor:pointer;
   font-size:16px;line-height:1;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);touch-action:manipulation}
 .zd-side-btn:active{transform:translateY(1px)}
-#zd-sound{order:1}#zd-music{order:2}#zd-radiob{order:3}#zd-see{order:4}#zd-globe{order:5}
+#zd-pause{order:-2}#zd-compass{order:-1}#zd-sound{order:1}#zd-music{order:2}#zd-radiob{order:3}#zd-see{order:4}#zd-globe{order:5}
 body.zd-panel #zd-side{display:none}
 body.zd-menu-on #zd-side{display:none}
 body.zd-menu-on #zd-menu #zd-side{display:flex;position:static;transform:none;flex-direction:row}
@@ -15,16 +15,22 @@ body.zd-globe-on #zd-globe{display:none}
 body.zd-globe-on #zd-side{top:calc(12px + env(safe-area-inset-top));transform:none}
 `;
 let side = null;
-// a round button in the right-hand column
-export function sideButton(id, title) {
+// the right-hand column, made the first time something goes in it
+function column() {
   if (!side) {
     const st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
     side = document.createElement('div'); side.id = 'zd-side'; document.body.appendChild(side);
   }
+  return side;
+}
+// a round button in it
+export function sideButton(id, title) {
   const b = document.createElement('button'); b.type = 'button'; b.id = id; b.title = title; b.className = 'zd-side-btn';
-  b.setAttribute('aria-label', title); side.appendChild(b);
+  b.setAttribute('aria-label', title); column().appendChild(b);
   return b;
 }
+// a button of the game's own in the column (the pause button and the compass: at its top, by their CSS order)
+export function sideAdd(el) { column().appendChild(el); }
 
 // Drag a row (axis 'x') or a panel ('y') with a finger or the mouse, with a little glide after letting go. Done by hand
 // rather than left to the browser, so it works the same on every phone; a drag never counts as a tap on the button it

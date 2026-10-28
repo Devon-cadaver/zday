@@ -248,7 +248,7 @@ const GAP = { nuke: 2, thunder: 0.4, splashBig: 1, glass: 0.9, glassBig: 1.4, cr
 const CAP = { shot: 5, rifle: 5, glass: 1, glassBig: 1, crash: 2, collapse: 3, zap: 3, laser: 3 };
 const DUCK = { nuke: 0.85, boomBig: 0.45, collapse: 0.3, roar: 0.35, roarDeep: 0.35 }; // the music dips under these
 const MAXV = 22;
-const LEVELS = [0, 0.3, 0.55, 0.85]; // the sound button: off, quiet, medium, loud
+const LEVELS = [0, 0.2, 0.38, 0.6]; // the sound button: off, quiet, medium, loud (Sean: quieter, and it starts at quiet)
 
 let AUDIO = null;
 // play a sound at a place in the world (the game's code calls this; it does nothing while sound is off)
@@ -258,8 +258,8 @@ export class Audio {
   constructor(camera, controls) {
     AUDIO = this; this.camera = camera; this.controls = controls;
     this.ctx = null; this.bufs = {}; this.loops = {}; this.last = {}; this.live = {}; this.voices = 0; this.t = 0; this._v = new THREE.Vector3();
-    let lv = 3; try { const s = localStorage.getItem('zday_sound'); lv = s === 'off' ? 0 : s == null || s === 'on' ? 3 : +s; } catch (e) { /* no storage */ }
-    this.level = Number.isFinite(lv) ? Math.max(0, Math.min(3, lv)) : 3; this.muted = this.level === 0;
+    let lv = 1; try { const s = localStorage.getItem('zday_sound2'); lv = s == null ? 1 : +s; } catch (e) { /* no storage */ } // zday_sound2: everyone back to quiet once
+    this.level = Number.isFinite(lv) ? Math.max(0, Math.min(3, lv)) : 1; this.muted = this.level === 0;
     this.music = new Music(); // the songs, with their own button and volume
     this.button();
     const go = () => { this.unlock(); if (this.music) this.music.prime(); if (this.hint) { this.hint.remove(); this.hint = null; } }; // browsers only allow sound after a tap
@@ -279,7 +279,7 @@ export class Audio {
     const show = () => { b.innerHTML = levelIcon('🔊', this.level); };
     b.onclick = (e) => { // loud, medium, quiet, off, loud...
       e.stopPropagation(); this.level = (this.level + 3) % 4; this.muted = this.level === 0; show();
-      try { localStorage.setItem('zday_sound', String(this.level)); } catch (er) { /* no storage */ }
+      try { localStorage.setItem('zday_sound2', String(this.level)); } catch (er) { /* no storage */ }
       if (this.ctx) { this.master.gain.setTargetAtTime(LEVELS[this.level], this.ctx.currentTime, 0.05); if (!this.muted) this.ctx.resume(); } else this.unlock();
     };
     show();

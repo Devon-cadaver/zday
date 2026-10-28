@@ -101,8 +101,8 @@ export function rig(o = {}) {
   const sl = o.slim ? 0.88 : 1;
   part(m.box, mt.suit, 0.3 * sl, 0.16, 0.18, 0, 0, 0, hips);
   const legs = [-1, 1].map(sx => {
-    const hip = pivot(hips, sx * 0.09, -0.04, 0); part(m.limb, mt.suit, 0.075 * sl, 0.46, 0.075 * sl, 0, 0, 0, hip);
-    const knee = pivot(hip, 0, -0.45, 0); part(m.limb, mt.suit, 0.06 * sl, 0.44, 0.06 * sl, 0, 0, 0, knee); part(m.box, mt.boot || mt.suit, 0.1, 0.07, 0.22, 0, -0.45, 0.05, knee);
+    const hip = pivot(hips, sx * 0.09, -0.04, 0); part(m.limb, mt.leg || mt.suit, 0.075 * sl, 0.46, 0.075 * sl, 0, 0, 0, hip); // leg: leggings in a colour of their own
+    const knee = pivot(hip, 0, -0.45, 0); part(m.limb, mt.leg || mt.suit, 0.06 * sl, 0.44, 0.06 * sl, 0, 0, 0, knee); part(m.box, mt.boot || mt.suit, 0.1, 0.07, 0.22, 0, -0.45, 0.05, knee);
     return { hip, knee };
   });
   const torso = pivot(hips, 0, 0.06, 0);
@@ -132,7 +132,7 @@ export function rig(o = {}) {
 function smoothBody(r) {
   const mt = r.mt, o = r.o, sl = o.slim ? 0.88 : 1, glo = (mm, c) => (mm.emissive ? mm.emissive[c] * (mm.emissiveIntensity ?? 1) : 0); // a neon suit keeps its glow up close
   const col = (mm, d = [1, 1, 1]) => (mm && mm.color ? [mm.color.r + glo(mm, 'r'), mm.color.g + glo(mm, 'g'), mm.color.b + glo(mm, 'b')] : d);
-  const suit = col(mt.suit), skin = col(mt.skin), boot = col(mt.boot || mt.suit), glove = col(mt.glove || mt.skin), hair = col(mt.hair), belt = mt.belt ? col(mt.belt) : null, badge = mt.badge ? col(mt.badge) : null;
+  const suit = col(mt.suit), skin = col(mt.skin), boot = col(mt.boot || mt.suit), glove = col(mt.glove || mt.skin), hair = col(mt.hair), belt = mt.belt ? col(mt.belt) : null, badge = mt.badge ? col(mt.badge) : null, leg = mt.leg ? col(mt.leg) : null;
   const body = new Body(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: mt.suit.roughness ?? 0.45, metalness: mt.suit.metalness ?? 0.05 }));
   const T = (q, pts, ref) => { const t = body.add({ lumps: 0, tile: 0.3, ...q }); t.src = pts; t.refSrc = ref; };
   const H = r.hips, Tq = r.torso, Hd = r.head;
@@ -144,7 +144,7 @@ function smoothBody(r) {
     [[Tq, 0, 0.58, 0], [Hd, 0, -0.12, 0], [Hd, 0, -0.06, 0.012], [Hd, 0, 0.03, 0], [Hd, 0, 0.14, -0.01]], [Hd, 0, 0, 1]);
   for (const L of r.legs) {
     const sx = Math.sign(L.hip.position.x) || 1;
-    T({ rings: 16, cols: 10, len: 1.0, radii: [0.085 * sl, 0.08 * sl, 0.058 * sl, 0.045, 0.045, 0.035], bulge: [0, 0.014, 0.012, 0, 0], capStart: true, capEnd: true, tint: (u) => (u > 0.72 ? boot : suit) },
+    T({ rings: 16, cols: 10, len: 1.0, radii: [0.085 * sl, 0.08 * sl, 0.058 * sl, 0.045, 0.045, 0.035], bulge: [0, 0.014, 0.012, 0, 0], capStart: true, capEnd: true, tint: (u) => (u > 0.72 ? boot : leg && u > 0.12 ? leg : suit) },
       [[H, sx * 0.06, 0.02, 0], [L.hip, 0, 0, 0], [L.knee, 0, 0, 0], [L.knee, 0, -0.4, 0], [L.knee, 0, -0.45, 0.06], [L.knee, 0, -0.46, 0.15]], [H, 0, 0, 1]);
   }
   for (const A of r.arms) {

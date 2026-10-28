@@ -11,7 +11,7 @@ import { Gauge, SIZED } from './gauge.js';
 import { Responders } from './response.js';
 import { curvedHit } from './curve.js';
 import { PLACES, PATH, placeKey, travel, settle } from './places.js';
-import { dragScroll } from './ui.js';
+import { dragScroll, sideAdd } from './ui.js';
 import { Folk } from './folk.js';
 import { SEE } from './see.js';
 import { DisasterTV } from './tv.js';
@@ -175,13 +175,13 @@ const CSS = `
 #zd-dis .zd-btn.hero{color:#ffe08a;border-color:rgba(255,224,138,.45)}
 #zd-dis .zd-btn.auto{color:#7be0ff;border-color:rgba(123,224,255,.4)}
 #zd-dis .zd-btn.auto.off{color:#f6ead2;opacity:.6;border-color:rgba(255,236,200,.18)}
-#zd-compass{position:fixed;left:max(10px, env(safe-area-inset-left));top:50%;transform:translateY(-50%);z-index:30;width:46px;height:46px;border-radius:23px;padding:0;cursor:pointer;
+#zd-compass{width:40px;height:40px;border-radius:20px;padding:0;cursor:pointer;
   border:1px solid rgba(255,236,200,.18);background:rgba(28,20,12,.72);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);touch-action:manipulation}
 #zd-compass svg{display:block;width:100%;height:100%}
 #zd-compass text{font:700 7.5px system-ui,-apple-system,"Segoe UI",sans-serif;fill:#f6ead2;text-anchor:middle;dominant-baseline:central}
 #zd-compass text.n{fill:#ff7a5a;font-size:9px}
 body.zd-menu-on #zd-compass,body.zd-panel #zd-compass{display:none}
-#zd-pause{position:fixed;left:max(13px, env(safe-area-inset-left));top:calc(50% - 56px);transform:translateY(-50%);z-index:30;width:40px;height:40px;border-radius:20px;padding:0;cursor:pointer;
+#zd-pause{width:40px;height:40px;border-radius:20px;padding:0;cursor:pointer;
   border:1px solid rgba(255,236,200,.18);background:rgba(28,20,12,.72);color:#f6ead2;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);touch-action:manipulation}
 #zd-pause svg{width:18px;height:18px;display:block;margin:auto;fill:currentColor}
 #zd-pause.on{border-color:#ffc233;color:#ffc233}
@@ -441,16 +441,16 @@ export class Game {
     document.body.append(this.top, this.bar, toast, fps);
     const old = document.getElementById('hud'); if (old) old.remove();
     this.el = { toast, fps };
-    // the compass on the left (the districts are named by it): it turns with the view; a tap turns the view to face north
+    // the compass, at the top of the right-hand column with the pause button (the districts are named by it): it turns with the view; a tap turns the view to face north
     const cp = this.compass = document.createElement('button'); cp.type = 'button'; cp.id = 'zd-compass'; cp.title = 'Compass: tap to face north'; cp.setAttribute('aria-label', 'Compass: tap to face north');
     cp.innerHTML = '<svg viewBox="0 0 48 48" aria-hidden="true"><g class="rose"><path d="M24 9 27.6 24 24 22 20.4 24z" fill="#ff5a3a"/><path d="M24 39 27.6 24 24 26 20.4 24z" fill="#f6ead2" opacity=".5"/>' +
       '<text class="n" x="24" y="6">N</text><text x="42" y="24.5">E</text><text x="24" y="42.5">S</text><text x="6" y="24.5">W</text></g></svg>';
     cp.onclick = () => { const off = this.camera.position.clone().sub(this.controls.target); this.faceNorth = { t: 0, from: Math.atan2(off.x, off.z) }; };
-    document.body.appendChild(cp); this.rose = cp.querySelector('.rose'); this.roseA = 999;
+    sideAdd(cp); this.rose = cp.querySelector('.rose'); this.roseA = 999;
     // pause: the world and the round clock stop (the camera still moves); a tap goes on
     const pz = this.pauseBtn = document.createElement('button'); pz.type = 'button'; pz.id = 'zd-pause'; pz.title = 'Pause'; pz.setAttribute('aria-label', 'Pause');
     const ps = this.pausedEl = document.createElement('div'); ps.id = 'zd-paused'; ps.hidden = true; ps.textContent = 'PAUSED';
-    pz.onclick = () => this.setPaused(!this.paused); document.body.append(pz, ps); this.setPaused(false);
+    pz.onclick = () => this.setPaused(!this.paused); sideAdd(pz); document.body.append(ps); this.setPaused(false);
     const barH = () => document.documentElement.style.setProperty('--zd-bar-h', this.bar.offsetHeight + 'px');
     if (window.ResizeObserver) new ResizeObserver(barH).observe(this.bar); else setInterval(barH, 500);
   }

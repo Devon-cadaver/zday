@@ -1,4 +1,5 @@
-// Music: the theme, My Little Disaster, on the menus (and played live by the band in the town: band.js, through
+// Music: the two theme songs, My Little Disaster (the punk one and the Far Isles' one), on the menus one after the
+// other (and played live by the band in the town, the second by the Far Isles' girl band: band.js, through
 // a player of its own whose volume the band sets from where you are looking); Sean's three tracks (made with Suno) - Calm Before the Storm while the
 // city is quiet, Desert Pursuit while disaster strikes, After the Storm for the
 // clean-up afterwards - crossfaded as things change, each faded back into its
@@ -8,14 +9,16 @@
 // master volume. The note button steps loud, medium, quiet, off.
 import { sideButton } from './ui.js';
 const BASE = import.meta.env.BASE_URL || './';
-const TRACKS = { calm: 'music/calm.mp3', storm: 'music/storm.mp3', rebuild: 'music/rebuild.mp3', theme: 'music/theme.mp3' };
+const TRACKS = { calm: 'music/calm.mp3', storm: 'music/storm.mp3', rebuild: 'music/rebuild.mp3', theme: 'music/theme.mp3', theme2: 'music/theme2.mp3' };
+const THEMES = ['theme', 'theme2'];
 const LEVELS = [0, 0.2, 0.38, 0.62]; // off, quiet, medium, loud
 const FADE = 4, TAIL = 6, AFTER = 150; // a mood change; the loop back to the start; how long the clean-up music plays after a disaster
 
 export class Music {
   constructor() {
-    let lv = 3; try { const s = localStorage.getItem('zday_music'); if (s != null) lv = +s; } catch (e) { /* no storage */ }
-    this.level = Number.isFinite(lv) ? Math.max(0, Math.min(3, lv)) : 3;
+    let lv = 2; try { const s = localStorage.getItem('zday_music2'); if (s != null) lv = +s; } catch (e) { /* no storage */ } // starts at medium (zday_music2: everyone back to it once)
+    this.level = Number.isFinite(lv) ? Math.max(0, Math.min(3, lv)) : 2;
+    this.menuSong = 'theme'; this.bandSong = 'theme';
     this.ctx = null; this.players = []; this.cur = -1; this.mood = null; this.t = 0; this.stormEnd = -1e9;
     this.button();
     document.addEventListener('visibilitychange', () => { const p = this.players[this.cur]; if (!p || !this.level) return; if (document.hidden) p.el.pause(); else p.el.play().catch(() => {}); });
@@ -28,7 +31,7 @@ export class Music {
   show() { this.btn.innerHTML = levelIcon('🎵', this.level); }
   setLevel(lv) {
     this.level = lv; this.show();
-    try { localStorage.setItem('zday_music', String(lv)); } catch (e) { /* no storage */ }
+    try { localStorage.setItem('zday_music2', String(lv)); } catch (e) { /* no storage */ }
     if (!this.ctx) return;
     if (lv && this.ctx.state !== 'running') this.ctx.resume();
     this.out.gain.setTargetAtTime(LEVELS[lv], this.ctx.currentTime, 0.15);
@@ -44,7 +47,10 @@ export class Music {
     for (let k = 0; k < 2; k++) {
       const el = document.createElement('audio'); el.preload = 'auto'; el.setAttribute('playsinline', '');
       const g = ctx.createGain(); g.gain.value = 0; ctx.createMediaElementSource(el).connect(g); g.connect(this.bgG);
-      this.players.push({ el, g, primed: false });
+      const pl = { el, g, primed: false }; this.players.push(pl);
+      el.addEventListener('timeupdate', () => { // on the menus (no game loop running there): near the end, on into the other theme song
+        if (this.menuOn && this.players[this.cur] === pl && THEMES.includes(this.mood) && el.duration && el.currentTime > el.duration - TAIL) { this.menuSong = THEMES[(THEMES.indexOf(this.mood) + 1) % 2]; this.play(this.menuSong, true); }
+      });
     }
   }
   // phones only let a player start on its own once it has been started from a tap: the first taps do that for both
@@ -53,7 +59,7 @@ export class Music {
     this.primeBand();
     this.players.forEach((p, k) => {
       if (p.primed) return; p.primed = true;
-      if (this.cur < 0 && k === 0) { this.play(this.mood || (this.menuOn ? 'theme' : 'calm')); return; }
+      if (this.cur < 0 && k === 0) { this.play(this.mood || (this.menuOn ? this.menuSong : 'calm')); return; }
       if (!p.el.src) p.el.src = BASE + TRACKS.calm;
       p.el.play().then(() => { if (this.players[this.cur] !== p) p.el.pause(); }).catch(() => { p.primed = false; });
     });
@@ -61,7 +67,7 @@ export class Music {
   // the band's player too: started from a tap, then held until the band is heard
   primeBand() {
     const el = this.bandEl; if (!el || this.bandPrimed || !this.level) return; this.bandPrimed = true;
-    el.src = BASE + TRACKS.theme; el.play().then(() => { if (!(this.bandK > 0.02)) el.pause(); }).catch(() => { this.bandPrimed = false; });
+    el.src = BASE + TRACKS[this.bandSong]; el.play().then(() => { if (!(this.bandK > 0.02)) el.pause(); }).catch(() => { this.bandPrimed = false; });
   }
   // the band (band.js): k 0..1, how much of it is heard where you are looking; stop: cut it dead (the stage wrecked). The song runs on
   // its own clock, so coming back to the show you hear it further on, as if it never stopped
@@ -70,7 +76,7 @@ export class Music {
     const el = this.bandEl, t = this.ctx.currentTime, now = performance.now(), on = k > 0.02 && this.level > 0 && !document.hidden;
     if (this.songAt == null) this.songAt = now;
     this.bandK = on ? k : 0;
-    if (on) { this.bandLast = now; if (el.paused) { if (!el.src) el.src = BASE + TRACKS.theme; if (el.duration) { try { el.currentTime = ((now - this.songAt) / 1000) % el.duration; } catch (e) { /* not ready */ } } el.play().catch(() => {}); } }
+    if (on) { this.bandLast = now; if (!el.src.endsWith(TRACKS[this.bandSong])) { el.pause(); el.src = BASE + TRACKS[this.bandSong]; } if (el.paused) { if (el.duration) { try { el.currentTime = ((now - this.songAt) / 1000) % el.duration; } catch (e) { /* not ready */ } } el.play().catch(() => {}); } }
     else if (!el.paused && now - (this.bandLast || 0) > 4000) el.pause(); // not heard for a while: stop streaming it
     const want = on ? k * 0.55 : 0; // not loud
     if (stop) { this.bandG.gain.cancelScheduledValues(t); this.bandG.gain.setValueAtTime(this.bandG.gain.value, t); this.bandG.gain.linearRampToValueAtTime(0, t + 0.08); this.bandW = 0; }
@@ -78,10 +84,10 @@ export class Music {
     const bg = 1 - 0.8 * Math.min(1, (on ? k : 0) * 1.3);
     if (Math.abs(bg - (this.bgW ?? -1)) > 0.01) { this.bgW = bg; this.bgG.gain.setTargetAtTime(bg, t, 0.5); }
   }
-  // the menus: the theme
+  // the menus: the theme songs, one after the other
   setMenu(on) {
     this.menuOn = on;
-    if (on) { this.setBand(0, true); if (this.ctx && this.level && this.mood !== 'theme' && this.players.some(p => p.primed)) this.play('theme'); else this.mood = 'theme'; }
+    if (on) { this.setBand(0, true); if (this.ctx && this.level && !THEMES.includes(this.mood) && this.players.some(p => p.primed)) this.play(this.menuSong); else if (!THEMES.includes(this.mood)) this.mood = this.menuSong; }
   }
   // what the moment calls for: the storm while any other disaster is on; the clean-up through a zombie outbreak (Sean: the
   // action music did not suit it) and for a while after anything; calm otherwise
@@ -90,16 +96,18 @@ export class Music {
     this.t += dt;
     const D = g.disasters, storm = D && D.list.some(e => e.alive && e.type !== 'heroes' && e.type !== 'spill'), outbreak = g.people.stats.zombies > 0 || (D && D.list.some(e => e.alive && e.type === 'spill'));
     if (storm || outbreak) this.stormEnd = this.t;
-    const mood = this.menuOn ? 'theme' : storm ? 'storm' : outbreak || this.t - this.stormEnd < AFTER ? 'rebuild' : 'calm', p = this.players[this.cur];
+    const mood = this.menuOn ? (THEMES.includes(this.mood) ? this.mood : this.menuSong) : storm ? 'storm' : outbreak || this.t - this.stormEnd < AFTER ? 'rebuild' : 'calm', p = this.players[this.cur];
     if (!this.level) { this.mood = mood; return; }
     if (mood !== this.mood && this.cur >= 0) this.play(mood); // out of the menus the theme gives way to the game's own
-    else if (p && p.el.duration && !p.el.paused && p.el.currentTime > p.el.duration - TAIL) this.play(mood, true); // nearly at its ending: round again, crossfaded
+    else if (p && p.el.duration && !p.el.paused && p.el.currentTime > p.el.duration - TAIL) { // nearly at its ending: round again, crossfaded (on the menus: into the other theme song)
+      if (this.menuOn) { this.menuSong = THEMES[(THEMES.indexOf(mood) + 1) % 2]; this.play(this.menuSong, true); } else this.play(mood, true);
+    }
   }
   play(mood, again = false) {
     const c = this.ctx, t = c.currentTime, f = again ? TAIL - 1 : FADE, old = this.players[this.cur], k = (this.cur + 1) % 2, p = this.players[k];
     this.mood = mood; this.cur = k;
     if (!p.el.src.endsWith(TRACKS[mood])) p.el.src = BASE + TRACKS[mood];
-    p.el.loop = mood === 'theme'; // the menus may sit a while: the theme goes round
+    p.el.loop = false; // round again (or on to the other theme song) from update, crossfaded
     try { p.el.currentTime = 0; } catch (e) { /* not loaded yet */ }
     p.el.play().catch(() => {});
     p.g.gain.cancelScheduledValues(t); p.g.gain.setValueAtTime(0, t); p.g.gain.linearRampToValueAtTime(1, t + f);
