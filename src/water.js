@@ -163,7 +163,7 @@ export class WaterSurface {
   constructor(D) {
     this.D = D;
     const B = D.ctx.city.bounds, M = 260;
-    const geo = new THREE.PlaneGeometry(B.x1 - B.x0 + M * 2, B.z1 - B.z0 + M * 2, 1, 1); geo.rotateX(-Math.PI / 2);
+    const geo = new THREE.PlaneGeometry(B.x1 - B.x0 + M * 2, B.z1 - B.z0 + M * 2, 96, 96); geo.rotateX(-Math.PI / 2); // enough vertices to bend with the world's curve (as one 1x1 sheet its far corners dropped and the water sank out of sight zoomed out)
     this.mat = new THREE.ShaderMaterial({
       vertexShader: SURF_VS, fragmentShader: SURF_FS, transparent: true, depthWrite: false,
       uniforms: { uTime: { value: 0 }, uAlpha: { value: 0.9 }, uFogDensity: { value: 0.0006 }, uLight: { value: 1 }, uSunI: { value: 1 },

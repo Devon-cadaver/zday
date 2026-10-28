@@ -380,7 +380,7 @@ export class ColdWave {
     this.wall = new DustWall(D, sw, { H: 190, lit: '#ffffff', shade: '#b4c3d6', dark: '#8797ad', pale: '#f2f6fb' }); // the dust storm's wall, in white (Sean)
     this.powder = new Splash(D.ctx.scene, 1600); this.powder.mat.uniforms.uColor.value.set('#f2f6fc');
     D.weather.snowBehind(sw); // the snow falls behind the front, never ahead of it
-    const B = D.ctx.city.bounds, geo = new THREE.PlaneGeometry(B.x1 - B.x0 + 300, B.z1 - B.z0 + 300, 1, 1); geo.rotateX(-Math.PI / 2);
+    const B = D.ctx.city.bounds, geo = new THREE.PlaneGeometry(B.x1 - B.x0 + 300, B.z1 - B.z0 + 300, 64, 64); geo.rotateX(-Math.PI / 2); // vertices enough to bend with the world's curve
     this.frostMat = new THREE.ShaderMaterial({ vertexShader: FROST_VS, fragmentShader: FROST_FS, transparent: true, depthWrite: false,
       uniforms: { uTime: { value: 0 }, uLight: { value: 1 }, uFade: { value: 1 }, uOrigin: { value: sw.origin }, uDir: { value: sw.dir }, uTan: { value: sw.tan }, uFront: { value: sw.F }, uPile: { value: sw.P }, uHalfW: { value: sw.halfW }, uSegW: { value: sw.segW } } });
     this.frost = new THREE.Mesh(geo, this.frostMat); this.frost.position.set((B.x0 + B.x1) / 2, 0.215, (B.z0 + B.z1) / 2); this.frost.renderOrder = 2; this.frost.frustumCulled = false;

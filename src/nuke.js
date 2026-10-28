@@ -344,7 +344,7 @@ export class Meltdown {
     nuclearDamage(D, this.x, this.z, this.R);
     const B = city.bounds, tx = (B.x0 + B.x1) / 2, tz = (B.z0 + B.z1) / 2, d = Math.hypot(tx - this.x, tz - this.z) || 1;
     this.fall = { x: this.x, z: this.z, vx: (tx - this.x) / d * 5, vz: (tz - this.z) / d * 5, R: 170, t: 0, k: 0, life: this.fallLife, doseT: 2 };
-    const geo = new THREE.PlaneGeometry(420, 420, 1, 1); geo.rotateX(-Math.PI / 2);
+    const geo = new THREE.PlaneGeometry(420, 420, 24, 24); geo.rotateX(-Math.PI / 2); // vertices enough to bend with the world's curve
     this.cloud = new THREE.Mesh(geo, new THREE.ShaderMaterial({ vertexShader: FALLOUT_VS, fragmentShader: FALLOUT_FS, transparent: true, depthWrite: false,
       uniforms: { uTime: { value: 0 }, uR: { value: 170 }, uK: { value: 0 }, uLight: { value: 1 }, uC: { value: new THREE.Vector2() } } }));
     this.cloud.renderOrder = 6; this.cloud.frustumCulled = false; scene.add(this.cloud);

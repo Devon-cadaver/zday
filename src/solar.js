@@ -70,7 +70,7 @@ export class SolarStorm {
       m.position.set(cx, y, cz + dz); m.rotation.y = yaw; m.frustumCulled = false; m.renderOrder = 8;
       D.ctx.scene.add(m); return m;
     });
-    const gg = new THREE.PlaneGeometry(B.x1 - B.x0 + 400, B.z1 - B.z0 + 400, 1, 1); gg.rotateX(-Math.PI / 2);
+    const gg = new THREE.PlaneGeometry(B.x1 - B.x0 + 400, B.z1 - B.z0 + 400, 64, 64); gg.rotateX(-Math.PI / 2); // vertices enough to bend with the world's curve
     this.glow = new THREE.Mesh(gg, new THREE.ShaderMaterial({ vertexShader: GLOW_VS, fragmentShader: GLOW_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, uniforms: { uTime: { value: 0 }, uK: { value: 0 } } }));
     this.glow.position.set(cx, 26, cz); this.glow.renderOrder = 8; this.glow.frustumCulled = false; D.ctx.scene.add(this.glow);
     this.sparks = new Splash(D.ctx.scene, 1500); this.sparks.mat.blending = THREE.AdditiveBlending; this.sparks.mat.uniforms.uColor.value.setRGB(2.2, 2.6, 3.4);

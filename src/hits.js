@@ -94,7 +94,7 @@ export class Hits {
     if ((this.cool[text] || -99) > this.t - 6) return;
     this.cool[text] = this.t;
     this.say(text);
-    sfx('stinger', ...this.here());
+    if (!this.quiet) sfx('stinger', ...this.here()); // no arcade sounds on Disaster TV (Sean)
     const g = this.g; if (g.disasters) g.disasters.shake(0.5);
     if (slow && this.slowCool <= this.t) { g.slowT = Math.max(g.slowT || 0, slow); this.slowCool = this.t + 7; }
   }
