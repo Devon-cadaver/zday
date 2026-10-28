@@ -446,10 +446,10 @@ export class Traffic {
     const f = this.flowAt ? this.flowAt(car.x, car.z) : null;
     if (f && f[2]) { if (f[2](car)) return; } // swallowed by a whirlpool
     const ex = Math.sin(car.z * 0.013 + car.ft * 0.05 + car.id) * 0.7, ez = Math.cos(car.x * 0.011 + car.ft * 0.04 + car.id * 1.7) * 0.7; // the flood's slow eddies
-    car.vx += ((f ? f[0] : 0) + ex) * h; car.vz += ((f ? f[1] : 0) + ez) * h;
-    const k = Math.exp(-(f ? 0.15 : 0.4) * h); car.vx *= k; car.vz *= k;
+    if (f) { const k = Math.min(1, h * 1.2); car.vx += (f[0] * 5 - car.vx) * k; car.vz += (f[1] * 5 - car.vz) * k; } // carried round with the swirl (it would otherwise orbit like a moon)
+    else { car.vx += ex * h; car.vz += ez * h; const k = Math.exp(-0.4 * h); car.vx *= k; car.vz *= k; }
     const nx = car.x + car.vx * h, nz = car.z + car.vz * h;
-    if (this.people && !this.people.walkable(nx, nz)) { car.vx *= -0.4; car.vz *= -0.4; car.w = -car.w; } else { car.x = nx; car.z = nz; } // a wall: it knocks off it and turns
+    if (this.people && !(f && f[4]) && !this.people.walkable(nx, nz)) { car.vx *= -0.4; car.vz *= -0.4; car.w = -car.w; } else { car.x = nx; car.z = nz; } // a wall: it knocks off it and turns
     car.yaw += (car.w + (f ? Math.hypot(f[0], f[1]) * 0.05 : 0)) * h;
     car.y += (w - 0.95 + Math.sin(car.ft * 1.6 + car.id) * 0.12 - car.y) * Math.min(1, h * 3);
     car.roll = Math.sin(car.ft * 1.3 + car.id) * 0.09; car.pitch = Math.cos(car.ft * 1.1 + car.id * 0.7) * 0.06;

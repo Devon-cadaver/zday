@@ -6,6 +6,7 @@
 // advance on their own, rushing down open streets, held back and piling up
 // against buildings, and bursting into spray where it hits them.
 import * as THREE from 'three';
+import { Whirlpools } from './whirlpool.js';
 
 export const NOISE = /* glsl */`
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -176,6 +177,7 @@ export class WaterSurface {
     this.mesh.renderOrder = 2; this.mesh.visible = false; this.mesh.frustumCulled = false;
     D.ctx.scene.add(this.mesh);
     this.splash = new Splash(D.ctx.scene, D.ctx.low ? 1800 : 3600);
+    this.pools = new Whirlpools(D); // sinkholes and worm holes under the flood drain it
     this.level = -1; this.front = null; this.lag = 9; this.wetLag = 1; this.halfW = 1; this.segW = 1; // the flat surface starts lag behind the wave front (the wave's own body before it); for people, cars and boats the water starts right behind it
     this.origin = new THREE.Vector2(); this.dir = new THREE.Vector2(1, 0); this.tan = new THREE.Vector2(0, 1);
     this.levelAt = (x, z) => {
@@ -204,10 +206,10 @@ export class WaterSurface {
         D.debris.addObject(m, 'float', { v: [(Math.random() - 0.5) * 0.6, 0, (Math.random() - 0.5) * 0.6] });
       }
     }
-    this.splash.update(h);
+    this.splash.update(h); this.pools.update(h);
   }
   sync(dt, realT) {
-    this.splash.sync(this.D.lightK, this.D.ctx.fire.uniforms.uScale.value);
+    this.splash.sync(this.D.lightK, this.D.ctx.fire.uniforms.uScale.value); this.pools.sync(realT);
     this.mesh.visible = this.active;
     if (!this.mesh.visible) return;
     const { scene, sun } = this.D.ctx, u = this.mat.uniforms;
@@ -218,7 +220,7 @@ export class WaterSurface {
     u.uSunDir.value.copy(sun.position).sub(sun.target.position).normalize();
     u.uLight.value = this.D.lightK; u.uSunI.value = this.D.sunK;
   }
-  reset() { this.level = -1; this.front = null; this.mesh.visible = false; this.splash.reset(); this.update(0); }
+  reset() { this.level = -1; this.front = null; this.mesh.visible = false; this.splash.reset(); this.pools.reset(); this.update(0); }
 }
 
 export class Flood {
@@ -238,7 +240,7 @@ export class Flood {
   }
   update(h) {
     this.t += h;
-    this.D.water.level = this.level;
+    const L = this.level, dr = this.drained || 0; this.D.water.level = L > 0.35 ? Math.max(0.35, L - dr) : L; // less what whirlpools have drained away
     if (this.t > this.rise + this.hold + this.fall) { this.alive = false; this.D.water.level = -1; this.D.emit({ type: 'floodend', text: 'The flood water has drained away' }); }
   }
   sync() {}
