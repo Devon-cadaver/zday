@@ -60,6 +60,8 @@ const MSGS = {
   fightback: 'Civilians are fighting back with whatever they can find',
   stolen: 'Someone hotwired a parked car and fled',
   looting: 'Looters are breaking into shops in the chaos',
+  argue: 'Two neighbours are having it out in the street',
+  mourn: 'Someone has lost a friend and stopped in the street',
 };
 
 export class Commander {
@@ -67,7 +69,7 @@ export class Commander {
     this.g = g; this.msgs = MSGS;
     this.el = {
       h: g.addPill('zd-h', 'Humans'), z: g.addPill('zd-z', 'Zombies'), d: g.addPill('zd-d', 'Dead'),
-      rp: g.addPill('zd-rp', 'Points'), inc: g.addPill('', 'Incidents'), alert: g.addPill('zd-al', '', 'zd-alert'), clock: g.addPill('', '', 'zd-clock'),
+      rp: g.addPill('zd-rp', 'Points'), inc: g.addPill('', 'Incidents'), tr: g.addPill('zd-tr', 'Trust'), alert: g.addPill('zd-al', '', 'zd-alert'), clock: g.addPill('', '', 'zd-clock'),
     };
     this.el.alertPill = this.el.alert.parentElement;
     this.pr = g.profile; this.diff = this.pr.difficulty();
@@ -640,6 +642,7 @@ export class Commander {
     e.h.textContent = s.humans; e.z.textContent = s.zombies; e.d.textContent = s.dead;
     e.rp.textContent = Math.floor(this.rp);
     e.inc.textContent = this.incidents.filter(i => i.fired).length + '/' + this.incidents.length;
+    const tq = p.lives.trust; e.tr.textContent = Math.round(tq * 100) + '%'; e.tr.style.color = tq < 0.35 ? '#ff8a7a' : tq > 0.7 ? '#9be08a' : ''; // how far the city trusts the police and rescuers: red when it has lost faith
     e.alert.textContent = this.alert ? 'Alert ' + this.alert + ' · ' + ALERTS[this.alert] : ALERTS[0];
     e.alertPill.className = 'zd-pill zd-al a' + this.alert;
     const left = Math.max(0, ROUND - this.t), m = Math.floor(left / 60), sec = Math.floor(left % 60);

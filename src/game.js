@@ -818,6 +818,8 @@ const SANDBOX_MSGS = {
   fightback: 'Some people are fighting back with whatever they can find',
   stolen: 'Someone hotwired a parked car and sped off',
   looting: 'Looters are breaking into the shops and running off with armfuls',
+  argue: 'Two neighbours are having a shouting match in the street',
+  mourn: 'Someone has lost a friend and stopped in the street',
 };
 const START_DROPS = 3;
 

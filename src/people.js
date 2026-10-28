@@ -781,6 +781,7 @@ export class People {
     let k = 0;
     for (const [, j] of c) {
       if (k >= n) break;
+      if (this.r() > 0.35 + this.lives.trust * 0.65) continue; // not everyone trusts the bus (the city's mood)
       this.st[j] = S.BOARD; this.tx[j] = x; this.tz[j] = z; this.bt[j] = busId; this.t1[j] = 25; this.inc[j] = 0; this.fx[j] = 0; this.watch[j] = 0;
       this.wt[j] = RUN[0] + this.r() * (RUN[1] - RUN[0]); k++;
     }
@@ -1424,7 +1425,7 @@ export class People {
   // police on the spot before a flood: everyone on the street near (x, z) heads up onto the rooftops. How many went
   alarmAt(x, z, R) {
     let n = 0;
-    this.around(x, z, R, (i) => { const s = this.st[i]; if (this.kind[i] === KIND.CIVILIAN && !this.inf[i] && (s === S.WALK || s === S.IDLE || s === S.RETURN || s === S.GO || s === S.FLEE || s === S.FILM) && this.trySeek(i)) n++; });
+    this.around(x, z, R, (i) => { const s = this.st[i]; if (this.kind[i] === KIND.CIVILIAN && !this.inf[i] && (s === S.WALK || s === S.IDLE || s === S.RETURN || s === S.GO || s === S.FLEE || s === S.FILM) && this.r() < 0.4 + this.lives.trust * 0.6 && this.trySeek(i)) n++; }); // how many do as the police say: the city's trust
     return n;
   }
   // tsunami and flood sirens: civilians head for the rooftops
