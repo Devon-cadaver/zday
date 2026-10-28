@@ -24,8 +24,12 @@ const CSS = `
 #zd-live .on{background:#d8321e;padding:5px 7px;border-radius:5px;display:flex;align-items:center;gap:5px}
 #zd-live .on i{width:7px;height:7px;border-radius:50%;background:#fff;animation:zdlive 1.2s infinite}
 #zd-live .ch{background:rgba(20,14,8,.72);padding:5px 8px;border-radius:5px;color:#f6ead2}
-#zd-live .calls{color:#a6ff4d}
-#zd-live .calls:empty{display:none}
+#zd-score{position:fixed;right:max(10px, env(safe-area-inset-right));top:calc(8px + env(safe-area-inset-top));z-index:6;pointer-events:none;background:rgba(20,14,8,.78);border:1px solid rgba(255,236,200,.18);border-radius:8px;padding:5px 9px;
+  font:800 10px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:.06em;color:#f6ead2;text-align:right}
+#zd-score b{font-size:13px;letter-spacing:0;font-variant-numeric:tabular-nums;color:#a6ff4d;margin-left:6px}
+#zd-score .pts b{color:#ffd166}
+#zd-score.pop{animation:zdpop .5s ease-out}
+@keyframes zdpop{30%{transform:scale(1.18)}}
 @keyframes zdlive{50%{opacity:.25}}
 #zd-tick{position:fixed;left:0;right:0;bottom:calc(var(--zd-bar-h, 64px) + 8px);z-index:6;pointer-events:none;display:flex;align-items:stretch;height:26px;
   font:700 12.5px/26px system-ui,-apple-system,"Segoe UI",sans-serif;color:#f6ead2;background:rgba(20,14,8,.78);border-top:2px solid #d8321e}
@@ -63,9 +67,10 @@ const VERB = { tornado: 'touches down in', quake: 'shakes', flood: 'floods', tsu
 const NAME = { aliens: 'Aliens', meteor: 'Meteors', villains: 'Super villains', haboob: 'A dust storm', coldwave: 'A cold wave', solar: 'A solar flare', blackhole: 'A black hole', worm: 'A giant worm', kaiju: 'A kaiju' };
 const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 let FIRST = true; // the very first town of a broadcast gets the opening title
+let CLOCK = 0.16; // the broadcast's time of day: one day and night every 12 minutes, carried on from town to town
 
 // the viewer's calls, kept on this device
-function calls() { try { return JSON.parse(localStorage.getItem('zday_tvcalls')) || { right: 0, total: 0 }; } catch (e) { return { right: 0, total: 0 }; } }
+function calls() { let c = null; try { c = JSON.parse(localStorage.getItem('zday_tvcalls')); } catch (e) { /* no storage */ } return { right: 0, total: 0, points: 0, ...(c || {}) }; }
 function saveCalls(c) { try { localStorage.setItem('zday_tvcalls', JSON.stringify(c)); } catch (e) { /* no storage */ } }
 
 export class DisasterTV {
@@ -74,20 +79,22 @@ export class DisasterTV {
     if (g.profile) g.profile.mode = null;
     if (!document.getElementById('zd-tv-css')) { const s = document.createElement('style'); s.id = 'zd-tv-css'; s.textContent = CSS; document.head.appendChild(s); }
     const live = this.live = document.createElement('div'); live.id = 'zd-live';
-    live.innerHTML = '<span class="on"><i></i>LIVE</span><span class="ch"></span><span class="ch calls"></span>';
+    live.innerHTML = '<span class="on"><i></i>LIVE</span><span class="ch"></span>';
     const tick = this.tick = document.createElement('div'); tick.id = 'zd-tick';
     tick.innerHTML = '<span class="k">NEWS</span><span class="w"><span class="m"></span></span>';
     const nx = this.nextEl = document.createElement('div'); nx.id = 'zd-next';
     const mk = this.mktEl = document.createElement('div'); mk.id = 'zd-mkt'; mk.hidden = true;
     mk.innerHTML = '<div class="t">What hits next? <b></b><small>Call it right and help comes early</small></div><div class="row"></div>';
-    document.body.append(live, tick, nx, mk);
-    this.chEl = live.querySelector('.ch'); this.callsEl = live.querySelector('.calls'); this.mEl = tick.querySelector('.m');
+    const sc = this.scoreEl = document.createElement('div'); sc.id = 'zd-score'; // the viewer's scoreboard: calls right out of calls made, points won
+    document.body.append(live, tick, nx, mk, sc);
+    this.chEl = live.querySelector('.ch'); this.mEl = tick.querySelector('.m');
     this.cdEl = mk.querySelector('.t b'); this.rowEl = mk.querySelector('.row');
     this.hits = new Hits(g, null, { quiet: true }); // no points on TV: just the big moments
     this.chain = new Chain(this.D, (text, slow) => this.hits.moment(text, slow));
     this.cam = new TvCam(this); // the helicopter and the rooftop cameras
     this.auto = new Responders(g); this.auto.on = false; // the crews rebuild between disasters; the rescue comes only when the viewers call it
     document.body.classList.add('zd-tv'); // the radio's words sit over the ticker
+    g.addButton('zd-tvcam', 'Change camera', () => this.cam.change());
     g.addButton('zd-tvnext', 'Next disaster', () => this.next());
     g.addButton('zd-tvtown', 'Next town', () => this.moveOn());
     g.addButton('zd-menu-btn', 'Menu', () => { location.href = location.pathname; });
@@ -137,7 +144,10 @@ export class DisasterTV {
   }
   closeMarket() { this.mktEl.hidden = true; const m = this.mkt; this.mkt = null; return m; }
   draw(m) { let r = Math.random() * 100; for (let i = 0; i < m.opts.length; i++) { if ((r -= m.pct[i]) <= 0) return m.opts[i]; } return m.opts[m.opts.length - 1]; }
-  showCalls() { const c = calls(); this.callsEl.textContent = c.total ? 'CALLS ' + c.right + '/' + c.total : ''; }
+  showCalls(pop) {
+    const c = calls(); this.scoreEl.innerHTML = '<div>CALLS<b>' + c.right + ' / ' + c.total + '</b></div><div class="pts">POINTS<b>' + c.points.toLocaleString() + '</b></div>';
+    if (pop) { this.scoreEl.classList.remove('pop'); void this.scoreEl.offsetWidth; this.scoreEl.classList.add('pop'); }
+  }
 
   // the next disaster now (the button, or the market closing)
   next() {
@@ -150,19 +160,20 @@ export class DisasterTV {
     if (type === 'meteor') startExtra(D, 'meteor', x, z); // a shower, not one rock with a long warning
     else ev = D.start(type, HAZARDS[type].tap ? x : null, HAZARDS[type].tap ? z : null, LIFE[type] ? { life: LIFE[type] } : {});
     this.cur = ev; this.curT = 0; this.kind = type; this.calm = -1; this.attacks = 0; this.n++;
-    this.helped = false; D.boats.auto = false;
+    this.helped = false; D.boats.auto = false; this.heroT = HERO_KINDS.has(type) && type !== 'meteor' ? 30 : -1; // the heroes come anyway after a while (Sean: a villain hovered for a minute with nobody to fight)
     this.say('BREAKING: ' + (NAME[type] || 'A ' + HAZARDS[type].name.toLowerCase()) + ' ' + VERB[type] + ' ' + this.town + (HAZARDS[type].tap ? '’s ' + D.district(x, z) + ' district' : ''));
     this.card('', '');
     if (m && m.pick) { // the viewer's call
       const c = calls(); c.total++;
-      if (m.pick === type) { c.right++; this.called(type, x, z); } else this.hits.say('Missed it: ' + HAZARDS[type].name, 'small');
-      saveCalls(c); this.showCalls();
+      const won = m.pick === type ? Math.round(10000 / m.pct[m.opts.indexOf(type)]) : 0; // a call pays 100 x its odds: the long shots pay most
+      if (won) { c.right++; c.points += won; this.called(type, x, z, won); } else this.hits.say('Missed it: ' + HAZARDS[type].name, 'small');
+      saveCalls(c); this.showCalls(!!won);
     }
   }
   // called right: help comes early
-  called(type, x, z) {
+  called(type, x, z, won) {
     const D = this.D;
-    this.hits.say('You called it!', 'combo');
+    this.hits.say('You called it! +' + won.toLocaleString(), 'combo');
     if (HERO_KINDS.has(type)) {
       const H = D.start('heroes', x, z, { brief: true });
       if (H) { H.holds = () => { H.hold = 0; H.vHold = 0; }; H.holds(); for (const hr of H.who) hr.waitT = Math.min(hr.waitT, 1.5); } // no waiting: on their way now
@@ -192,7 +203,7 @@ export class DisasterTV {
 
   busy() { return false; }
   tap() {}
-  phase() { return 0.1 + (this.t / 400) % 0.5; } // the day goes by slowly
+  phase() { return CLOCK; }
 
   onEvent(e) {
     const c = this.g.city;
@@ -206,7 +217,7 @@ export class DisasterTV {
 
   update(sdt, dt) {
     const g = this.g, D = this.D;
-    this.t += sdt; this.curT += sdt;
+    this.t += sdt; this.curT += sdt; CLOCK = (CLOCK + sdt / 720) % 1;
     this.hits.frame(dt, sdt); this.chain.step(sdt);
     // the crews rebuild in the lulls; the rescue services work only when the viewers called it
     this.auto.update(sdt);
@@ -216,6 +227,10 @@ export class DisasterTV {
     this.mx -= dt * TICK_SPEED; if (this.mx < -w) this.mx = W; this.mEl.style.transform = 'translateX(' + this.mx.toFixed(1) + 'px)';
     this.cam.update(dt, sdt);
     if (this.cardT > 0 && (this.cardT -= dt) <= 0) this.card('', '');
+    if (this.heroT > 0 && (this.heroT -= sdt) <= 0 && !D.list.some(e => e.type === 'heroes' && e.alive && !e.leaving)) { // nobody called it: the heroes come all the same
+      const c = this.cur, B = g.city.bounds, x = c && c.x != null ? c.x : (B.x0 + B.x1) / 2, z = c && c.z != null ? c.z : (B.z0 + B.z1) / 2;
+      D.start('heroes', x, z, { brief: true }); this.say('The hero signal is lit over ' + this.town + '!');
+    }
     if (this.leaving >= 0) { if ((this.leaving -= dt) < 0) { this.leaving = 1e9; this.dead = true; g.journey(this.toKey); } return; }
     // what is on: anything still going that is not a helper
     const on = D.list.some(e => e.alive && e.type !== 'heroes' && e.type !== 'player');
