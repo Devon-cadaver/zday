@@ -147,6 +147,7 @@ export class Volcano {
     }
     const te = this.t - this.warnT, waning = te > this.eruptT, k = waning ? Math.max(0, 1 - (te - this.eruptT) / this.waneT) : 1;
     D.shake(0.1 * k + 0.03);
+    this.boilStep(h, k); // under flood water: it boils
     // the fountain and the flow
     this.lava.pour(this.x, this.z, 115 * this.k * this.k * k * h);
     if (k > 0) this.splash.emit(this.x, 1, this.z, Math.round((10 * k + 1) * Math.min(2.5, this.k)), { up: [(12 * k + 4) * Math.sqrt(this.k), (30 * k + 6) * Math.sqrt(this.k)], spread: 9 * this.k, life: 2.4, size: 2.4 * Math.sqrt(this.k) });
@@ -170,6 +171,43 @@ export class Volcano {
     }
   }
   poi() { return { x: this.x, z: this.z, danger: this.phase === 'rumble' ? 25 : 75, range: 480 }; }
+  // the vent under flood water: the water boils over a widening ring, steam goes up in towering plumes, and the hot water is deadly:
+  // anyone in it dies, floating cars blacken and sink
+  boilStep(h, k) {
+    const D = this.D, W = D.water, { people, traffic, fire } = D.ctx;
+    const wet = W.active && W.levelAt(this.x, this.z) - people.groundY(this.x + 12, this.z) > 0.4;
+    if (!wet || k <= 0) { if (this.boil) { this.boil.k = Math.max(0, this.boil.k - h * 0.3); if (this.boil.k <= 0 && W.hot === this.boil) W.hot = null; } return; } // the water gone, or the eruption over: it stops boiling
+    const B = this.boil || (this.boil = { x: this.x, z: this.z, R: 20, k: 0, t: 0, plumeT: 0, colT: 0, hurtT: 0, cooked: new Map() });
+    if (!B.said) { B.said = true; D.emit({ type: 'boil', x: this.x, z: this.z, text: 'The flood water is boiling over the volcano! Get out of the water' }); }
+    B.t += h; B.k = Math.min(1, B.t / 4) * Math.max(0.3, k); B.R = Math.min(170 * Math.sqrt(this.k), 30 + 40 * this.k + B.t * 2.2); W.hot = B;
+    const lv = W.level, now = fire.uniforms.uTime.value;
+    // steam: billows off the whole boiling patch, and a towering column over the vent
+    if ((B.plumeT -= h) <= 0) {
+      B.plumeT = 0.4;
+      { const a = Math.random() * 6.28, r = Math.sqrt(Math.random()) * B.R * 0.9, m = fire.mist.alloc(5, this.x + Math.cos(a) * r, lv + 1.5, this.z + Math.sin(a) * r, 6, 6, 5 + Math.random() * 3, now); fire.later(1.6 + Math.random(), () => fire.mist.end(m, fire.uniforms.uTime.value)); fire.later(12, () => fire.mist.release(m)); }
+    }
+    if ((B.colT -= h) <= 0) {
+      B.colT = 0.5;
+      for (let y = 6; y <= 70 * Math.sqrt(this.k) + 20; y += 14) { const m = fire.mist.alloc(7, this.x + (Math.random() - 0.5) * 8, lv + y, this.z + (Math.random() - 0.5) * 8, 6 + y * 0.18, 6 + y * 0.18, 8 + y * 0.08, now); fire.later(2.5, () => fire.mist.end(m, fire.uniforms.uTime.value)); fire.later(11, () => fire.mist.release(m)); }
+    }
+    // bubbles bursting all over it
+    for (let n = 0; n < 6; n++) { const a = Math.random() * 6.28, r = Math.sqrt(Math.random()) * B.R; W.splash.emit(this.x + Math.cos(a) * r, lv, this.z + Math.sin(a) * r, 2, { up: [1, 3 + 4 * (1 - r / B.R)], spread: 0.8, life: 0.7, size: 1 }); }
+    if (Math.random() < h * 1.5) fire.steam(this.x + (Math.random() - 0.5) * B.R, this.z + (Math.random() - 0.5) * B.R, 6);
+    if ((B.hurtT -= h) > 0) return;
+    B.hurtT = 0.5;
+    // the scalding water: anyone in it, any car afloat in it
+    people.around(this.x, this.z, B.R, (j) => {
+      const s = people.st[j]; if (people.lvl[j] !== -1 || s === 8 || s === 10 || s === 17 || s === 19 || s === 20) return;
+      if (W.levelAt(people.x[j], people.z[j]) - people.groundY(people.x[j], people.z[j]) < 0.3 || Math.random() > 0.55 * B.k) return;
+      people.kill(j, 0, 0, 'burn');
+    });
+    for (const car of traffic.cars) {
+      if (car.gone || car.mode !== 6 || Math.hypot(car.x - this.x, car.z - this.z) > B.R) continue;
+      const c = (B.cooked.get(car) || 0) + 0.5; B.cooked.set(car, c);
+      if (c === 0.5 && !car.mission) traffic.tint(car, '#2a2420'); // blistered black
+      if (c >= 3) { fire.steam(car.x, car.z, 4); traffic.remove(car); } // and gone under
+    }
+  }
   erupt() {
     const D = this.D, { people, city, fire } = D.ctx;
     this.phase = 'erupt';
@@ -193,7 +231,8 @@ export class Volcano {
     this.bombs.push({ m, vx: Math.cos(a) * d / T, vz: Math.sin(a) * d / T, vy: (-4 + 4.9 * T * T) / T, trail: 0 });
   }
   land(x, z) {
-    const D = this.D, { people, traffic, city, fire } = D.ctx;
+    const D = this.D, { people, traffic, city, fire } = D.ctx, W = D.water;
+    if (W.active && W.levelAt(x, z) - people.groundY(x, z) > 0.5) { fire.steam(x, z, 6); W.splash.emit(x, W.level, z, 18, { up: [4, 10], spread: 3, life: 1.3, size: 1.8 }); people.around(x, z, 5, (j) => { if (people.lvl[j] === -1 && people.hittable(j)) people.kill(j, 0, 0, 'burn'); }); return; } // into the water: a burst of steam
     fire.burst(x, 1, z, 16, 2.6); D.decals.add('scour', x, z, 5, 5);
     let hit = -1; city.buildingsNear(x, z, 0.5, (k, d) => { if (d === 0) hit = k; });
     if (hit >= 0) { if (Math.random() < 0.7) fire.igniteBuilding(hit); }

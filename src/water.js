@@ -29,7 +29,7 @@ const SURF_VS = /* glsl */`
 varying vec3 vW;
 void main() { vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`;
 const SURF_FS = /* glsl */`
-uniform float uTime, uAlpha, uFogDensity, uLight, uSunI, uHasFront, uLag; uniform vec2 uOrigin, uDir, uTan;
+uniform float uTime, uAlpha, uFogDensity, uLight, uSunI, uHasFront, uLag; uniform vec2 uOrigin, uDir, uTan; uniform vec4 uHot; // uHot: boiling water (x, z, radius, strength) over a volcano
 uniform vec3 uDeep, uShallow, uSky, uSunDir, uFogColor;
 varying vec3 vW;
 ${NOISE}
@@ -56,6 +56,11 @@ void main() {
   // churned white water just behind the wave, scum streaks elsewhere
   float churn = smoothstep(45.0, 0.0, behind) * smoothstep(0.42, 0.7, fbm(vW.xz * 0.11 + vec2(uTime * 0.4, -uTime * 0.25)));
   col = mix(col, vec3(0.62, 0.6, 0.55) * uLight, max(smoothstep(0.66, 0.8, n2) * 0.25, churn * 0.85));
+  if (uHot.w > 0.0) { // boiling: pale, frothing, bubbles bursting all over
+    float hk = (1.0 - smoothstep(uHot.z * 0.55, uHot.z, length(vW.xz - uHot.xy))) * uHot.w;
+    float bub = smoothstep(0.55, 0.75, fbm(vW.xz * 0.6 + vec2(uTime * 1.7, -uTime * 1.3))) + smoothstep(0.6, 0.8, fbm(vW.xz * 1.4 - vec2(uTime * 2.3, uTime * 1.9)));
+    col = mix(col, vec3(0.78, 0.76, 0.7) * uLight, hk * (0.45 + 0.45 * min(1.0, bub)));
+  }
   float dist = length(cameraPosition - vW);
   col = mix(col, uFogColor, (1.0 - exp(-pow(dist * uFogDensity, 2.0))) * 0.85);
   gl_FragColor = vec4(col, uAlpha);
@@ -170,7 +175,7 @@ export class WaterSurface {
       vertexShader: SURF_VS, fragmentShader: SURF_FS, transparent: true, depthWrite: false,
       uniforms: { uTime: { value: 0 }, uAlpha: { value: 0.9 }, uFogDensity: { value: 0.0006 }, uLight: { value: 1 }, uSunI: { value: 1 },
         uHasFront: { value: 0 }, uLag: { value: 9 }, uFront: { value: NO_FRONT }, uPile: { value: FLAT }, uHalfW: { value: 1 }, uSegW: { value: 1 },
-        uOrigin: { value: new THREE.Vector2() }, uDir: { value: new THREE.Vector2(1, 0) }, uTan: { value: new THREE.Vector2(0, 1) },
+        uOrigin: { value: new THREE.Vector2() }, uDir: { value: new THREE.Vector2(1, 0) }, uTan: { value: new THREE.Vector2(0, 1) }, uHot: { value: new THREE.Vector4(0, 0, 1, 0) },
         uDeep: { value: PALETTE.flood[0].clone() }, uShallow: { value: PALETTE.flood[1].clone() }, uSky: { value: new THREE.Color() }, uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uFogColor: { value: new THREE.Color() } },
     });
     this.mesh = new THREE.Mesh(geo, this.mat); this.mesh.position.set((B.x0 + B.x1) / 2, -1, (B.z0 + B.z1) / 2);
@@ -219,8 +224,9 @@ export class WaterSurface {
     u.uSky.value.copy(scene.background); u.uFogColor.value.copy(scene.background); u.uFogDensity.value = scene.fog ? scene.fog.density : 0.0006;
     u.uSunDir.value.copy(sun.position).sub(sun.target.position).normalize();
     u.uLight.value = this.D.lightK; u.uSunI.value = this.D.sunK;
+    const H = this.hot; if (H && H.k > 0) u.uHot.value.set(H.x, H.z, H.R, H.k); else u.uHot.value.w = 0; // a volcano under the water sets it
   }
-  reset() { this.level = -1; this.front = null; this.mesh.visible = false; this.splash.reset(); this.pools.reset(); this.update(0); }
+  reset() { this.hot = null; this.level = -1; this.front = null; this.mesh.visible = false; this.splash.reset(); this.pools.reset(); this.update(0); }
 }
 
 export class Flood {
