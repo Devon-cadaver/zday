@@ -41,11 +41,61 @@ function mats(girls) {
 function banner(girls) {
   const c = document.createElement('canvas'); c.width = 512; c.height = 128; const x = c.getContext('2d');
   x.fillStyle = '#0a0a0a'; x.fillRect(0, 0, 512, 128);
-  x.font = '900 62px Impact, "Arial Black", sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.font = '900 62px Impact, Futura-CondensedExtraBold, "Arial Black", sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
   x.fillStyle = girls ? '#efe9df' : '#7a0d12'; x.fillText('MY LITTLE DISASTER', 259, 68);
   x.fillStyle = girls ? '#ff4fa3' : '#efe9df'; x.fillText('MY LITTLE DISASTER', 256, 64);
   for (let i = 0; i < 26; i++) { const px = 30 + Math.random() * 452, w = 2 + Math.random() * 3; x.fillStyle = girls ? '#ff4fa3' : '#efe9df'; x.fillRect(px, 80 + Math.random() * 6, w, 6 + Math.random() * 22); } // dripping
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+
+// one of the band (role vox, gtr, bass, drums; girls: the Far Isles' band): its figure, hair, guitar
+export function bandMember(role, girls) {
+  const M = mats(girls), pinkHair = girls && (role === 'bass' || role === 'drums'), mt = girls ? { ...M.band, hair: pinkHair ? M.pinkHair : M.band.hair, leg: role === 'vox' || role === 'bass' ? M.pink : undefined } : M.band;
+  const r = rig({ mats: mt, slim: girls || role === 'vox', longHair: !girls && role === 'gtr' }); r.cape.mesh.visible = false;
+  if (girls) for (const sx of [-1, 1]) { // pigtails, pink on black hair and black on pink, each with a pink tie
+    const tail = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.3, 0.055).translate(0, -0.15, 0), pinkHair ? M.band.hair : M.pinkHair), tie = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.04, 0.07), M.pink);
+    tail.position.set(sx * 0.1, 0.06, -0.035); tail.rotation.z = sx * 0.45; tie.position.copy(tail.position); for (const o of [tail, tie]) { o.userData.keep = true; o.castShadow = true; r.head.add(o); }
+  }
+  const lock = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.16, 0.035), M.band.hair); lock.position.set(0.012, -0.02, 0.112); lock.rotation.z = 0.25; lock.userData.keep = true; r.head.add(lock); // the devilock down over the face
+  if (role === 'gtr' || role === 'bass') { // the guitar slung across the body
+    const gt = new THREE.Group(), body = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.36, 0.07), role === 'gtr' ? M.gtrA : M.gtrB), neck = new THREE.Mesh(new THREE.BoxGeometry(0.045, role === 'bass' ? 0.62 : 0.52, 0.03), M.neck);
+    neck.position.set(0, 0.42, 0); gt.add(body, neck); gt.position.set(0.02, 0.12, 0.15); gt.rotation.z = 1.05; for (const m of [body, neck]) { m.userData.keep = true; m.castShadow = true; } r.torso.add(gt);
+  }
+  return r;
+}
+// a member playing at beat phase ph (off: their own offset), t seconds into the show, side: which side of the stage;
+// returns how far off the floor they are (the singer bouncing, a guitarist's leap)
+export function playPose(r, role, ph, off, t, side) {
+  relax(r); const A = r.arms, L = r.legs, s = Math.sin(ph + off), hb = Math.sin(ph * 0.5 + off);
+  if (role === 'drums') {
+    r.hips.position.y = 0.55; for (const l of L) { l.hip.rotation.x = -1.45; l.knee.rotation.x = 1.4; }
+    A[0].sh.rotation.set(-0.7 + 0.35 * Math.max(0, s), 0, -0.35); A[1].sh.rotation.set(-0.7 + 0.35 * Math.max(0, -s), 0, 0.35); for (const a of A) a.el.rotation.set(-1.0, 0, 0);
+    r.head.rotation.x = 0.2 + 0.25 * Math.max(0, hb); r.root.rotation.y = 0;
+    return 0;
+  }
+  if (role === 'vox') {
+    A[0].sh.rotation.set(-1.25, 0, -0.25); A[0].el.rotation.set(-2.0, 0, 0); // the mic at the mouth
+    A[1].sh.rotation.set(-2.4 + 0.4 * Math.max(0, hb), 0, 0.45); A[1].el.rotation.set(-0.3, 0, 0); // a fist up
+    r.torso.rotation.x = 0.15 + 0.12 * Math.max(0, s); r.head.rotation.x = -0.1; L[0].hip.rotation.set(-0.3, 0, -0.15); L[1].hip.rotation.set(0.25, 0, 0.15);
+    r.root.rotation.y = Math.sin(t * 0.4) * 0.35;
+    return Math.max(0, Math.sin(ph * 0.25)) * 0.25;
+  }
+  A[0].sh.rotation.set(-0.95, 0, -0.55); A[0].el.rotation.set(-1.3, 0, 0); // the fretting hand up the neck
+  A[1].sh.rotation.set(-0.45, 0, 0.25); A[1].el.rotation.set(-1.35 + 0.35 * Math.sin(ph * 2), 0, 0); // strumming
+  r.torso.rotation.x = 0.25 + 0.2 * Math.max(0, hb); r.head.rotation.x = 0.35 + 0.45 * Math.max(0, hb); // headbanging
+  L[0].hip.rotation.z = -0.22; L[1].hip.rotation.z = 0.22; for (const l of L) l.knee.rotation.x = 0.25;
+  r.root.rotation.y = side < 0 ? 0.35 : -0.35;
+  const jump = Math.sin(t * BPS * Math.PI / 16 + off); return jump > 0.92 ? (jump - 0.92) * 12 : 0; // a leap every few bars
+}
+// for the roster: one of the band playing, the drummer at a little kit, the singer at a mic stand
+export function bandModel(role, girls) {
+  const M = mats(girls), r = bandMember(role, girls), g = new THREE.Group(); g.add(r.root);
+  const part = (geo, m, x, y, z, rx = 0) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.rotation.x = rx; o.castShadow = true; g.add(o); return o; };
+  if (role === 'drums') { part(new THREE.CylinderGeometry(0.42, 0.42, 0.45, 16), M.drum, 0, 0.42, 0.62, Math.PI / 2); part(new THREE.CylinderGeometry(0.2, 0.2, 0.22, 14), M.drum, -0.45, 0.72, 0.42); part(new THREE.CylinderGeometry(0.36, 0.36, 0.02, 16), M.chrome, 0.55, 1.2, 0.45); }
+  if (role === 'vox') part(new THREE.CylinderGeometry(0.03, 0.03, 1.5, 6), M.chrome, 0.05, 0.75, 0.55);
+  let t = 0; const step = (dt) => { t += dt; r.root.position.y = playPose(r, role, t * BPS * Math.PI * 2, 0, t, -1); detail(r, null, true); };
+  g.userData.tick = step; step(0);
+  return g;
 }
 
 export class Band {
@@ -112,17 +162,7 @@ export class Band {
     // the band: singer front and centre, guitars either side, drums behind
     const parts = [['vox', 0, D / 2 - 1.6], ['gtr', -W * 0.3, D / 2 - 2.2], ['bass', W * 0.3, D / 2 - 2.2], ['drums', 0, -D / 2 + 1.6]];
     this.members = parts.map(([role, x, z], i) => {
-      const pinkHair = this.girls && (role === 'bass' || role === 'drums'), mt = this.girls ? { ...M.band, hair: pinkHair ? M.pinkHair : M.band.hair, leg: role === 'vox' || role === 'bass' ? M.pink : undefined } : M.band;
-      const r = rig({ mats: mt, slim: this.girls || role === 'vox', longHair: !this.girls && role === 'gtr' }); r.cape.mesh.visible = false;
-      if (this.girls) for (const sx of [-1, 1]) { // pigtails, pink on black hair and black on pink, each with a pink tie
-        const tail = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.3, 0.055).translate(0, -0.15, 0), pinkHair ? M.band.hair : M.pinkHair), tie = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.04, 0.07), M.pink);
-        tail.position.set(sx * 0.1, 0.06, -0.035); tail.rotation.z = sx * 0.45; tie.position.copy(tail.position); for (const o of [tail, tie]) { o.userData.keep = true; o.castShadow = true; r.head.add(o); }
-      }
-      const lock = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.16, 0.035), M.band.hair); lock.position.set(0.012, -0.02, 0.112); lock.rotation.z = 0.25; lock.userData.keep = true; r.head.add(lock); // the devilock down over the face
-      if (role === 'gtr' || role === 'bass') { // the guitar slung across the body
-        const gt = new THREE.Group(), body = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.36, 0.07), role === 'gtr' ? M.gtrA : M.gtrB), neck = new THREE.Mesh(new THREE.BoxGeometry(0.045, role === 'bass' ? 0.62 : 0.52, 0.03), M.neck);
-        neck.position.set(0, 0.42, 0); gt.add(body, neck); gt.position.set(0.02, 0.12, 0.15); gt.rotation.z = 1.05; for (const m of [body, neck]) { m.userData.keep = true; m.castShadow = true; } r.torso.add(gt);
-      }
+      const r = bandMember(role, this.girls);
       r.root.scale.setScalar(0.85); r.root.position.set(x, H, z); g.add(r.root); // a touch larger than life, to read from the stands
       return { role, r, x, z, ph: i * 1.3 };
     });
@@ -209,24 +249,7 @@ export class Band {
     // the band
     for (const mb of this.members) {
       const r = mb.r; if (!this.on) { if (this.endT > 0.4) r.root.visible = false; continue; } // off the stage the moment it stops
-      relax(r); const A = r.arms, L = r.legs, s = Math.sin(ph + mb.ph), hb = Math.sin(ph * 0.5 + mb.ph);
-      if (mb.role === 'drums') {
-        r.hips.position.y = 0.55; for (const l of L) { l.hip.rotation.x = -1.45; l.knee.rotation.x = 1.4; }
-        A[0].sh.rotation.set(-0.7 + 0.35 * Math.max(0, s), 0, -0.35); A[1].sh.rotation.set(-0.7 + 0.35 * Math.max(0, -s), 0, 0.35); for (const a of A) a.el.rotation.set(-1.0, 0, 0);
-        r.head.rotation.x = 0.2 + 0.25 * Math.max(0, hb); r.root.rotation.y = 0;
-      } else if (mb.role === 'vox') {
-        A[0].sh.rotation.set(-1.25, 0, -0.25); A[0].el.rotation.set(-2.0, 0, 0); // the mic at his mouth
-        A[1].sh.rotation.set(-2.4 + 0.4 * Math.max(0, hb), 0, 0.45); A[1].el.rotation.set(-0.3, 0, 0); // a fist up
-        r.torso.rotation.x = 0.15 + 0.12 * Math.max(0, s); r.head.rotation.x = -0.1; L[0].hip.rotation.set(-0.3, 0, -0.15); L[1].hip.rotation.set(0.25, 0, 0.15);
-        r.root.position.y = V.H + Math.max(0, Math.sin(ph * 0.25)) * 0.25; r.root.rotation.y = Math.sin(this.t * 0.4) * 0.35;
-      } else {
-        A[0].sh.rotation.set(-0.95, 0, -0.55); A[0].el.rotation.set(-1.3, 0, 0); // the fretting hand up the neck
-        A[1].sh.rotation.set(-0.45, 0, 0.25); A[1].el.rotation.set(-1.35 + 0.35 * Math.sin(ph * 2), 0, 0); // strumming
-        r.torso.rotation.x = 0.25 + 0.2 * Math.max(0, hb); r.head.rotation.x = 0.35 + 0.45 * Math.max(0, hb); // headbanging
-        L[0].hip.rotation.z = -0.22; L[1].hip.rotation.z = 0.22; for (const l of L) l.knee.rotation.x = 0.25;
-        const jump = Math.sin(this.t * BPS * Math.PI / 16 + mb.ph); r.root.position.y = V.H + (jump > 0.92 ? (jump - 0.92) * 12 : 0); // a leap every few bars
-        r.root.rotation.y = (mb.x < 0 ? 0.35 : -0.35);
-      }
+      const lift = playPose(r, mb.role, ph, mb.ph, this.t, mb.x); if (mb.role !== 'drums') r.root.position.y = V.H + lift;
       detail(r, D);
     }
     for (const cy of this.cymbals) cy.rotation.z = Math.sin(ph * 2) * 0.08;

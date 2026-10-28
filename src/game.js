@@ -101,8 +101,8 @@ const CSS = `
 #zd-menu.gone{opacity:0}
 #zd-menu.gone .box{transform:translateY(60px)}
 #zd-menu .mtitle{position:absolute;left:0;right:0;top:max(18px, env(safe-area-inset-top));text-align:center;pointer-events:none}
-#zd-menu .mtitle .tag{margin:6px 0 0;text-shadow:0 1px 8px rgba(0,0,0,.7)}
-#zd-menu .box{width:100%;max-width:420px;background:rgba(24,18,12,.86);border:1px solid rgba(255,236,200,.16);border-radius:16px;text-align:center;max-height:calc(100% - 96px);
+#zd-menu .mtitle .tag{margin:8px 0 0;font-size:13px;font-weight:700;letter-spacing:.03em;text-transform:none;opacity:1;color:#ffd6ef;text-shadow:0 0 10px rgba(255,79,163,.7),0 1px 6px rgba(0,0,0,.8)}
+#zd-menu .box{width:100%;max-width:420px;background:rgba(27,10,46,.88);border:1px solid rgba(196,128,255,.32);box-shadow:0 0 28px rgba(140,60,255,.25);border-radius:16px;text-align:center;max-height:calc(100% - 96px);
   display:flex;flex-direction:column;overflow:hidden;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:transform .35s}
 #zd-menu .mbody{overflow-y:auto;overscroll-behavior:contain;padding:14px 14px 12px;min-height:0;flex:1 1 auto}
 #zd-menu .modes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
@@ -113,33 +113,39 @@ const CSS = `
 #zd-menu .mrow{display:flex;gap:8px;align-items:center;margin-top:10px}
 #zd-menu .mrow .zd-btn{flex:1 1 0;min-width:0;padding:11px 6px;font-size:11px;text-decoration:none;display:block}
 #zd-menu .mside{flex:none;display:flex}
-#zd-menu .box.tall{height:calc(100% - 96px);backdrop-filter:none;-webkit-backdrop-filter:none;background:rgba(24,18,12,.93)}
+#zd-menu .box.tall{height:calc(100% - 96px);backdrop-filter:none;-webkit-backdrop-filter:none;background:rgba(27,10,46,.95)}
 #zd-menu .rgl{position:fixed;inset:0;width:100%;height:100%;z-index:2;pointer-events:none}
 #zd-menu .rsec{text-align:left}
-#zd-menu .rsec h2{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#d8c49e;margin:14px 0 8px;display:flex;align-items:center;gap:10px}
-#zd-menu .rsec h2::after{content:"";flex:1;height:1px;background:rgba(255,236,200,.18)}
+#zd-menu .rsec h2{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#e2c2ff;margin:14px 0 8px;display:flex;align-items:center;gap:10px}
+#zd-menu .rsec h2::after{content:"";flex:1;height:1px;background:rgba(196,128,255,.3)}
 #zd-menu .rsec .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:7px}
-#zd-menu .rsec .tile{aspect-ratio:1/1;position:relative;border-radius:9px;background:rgba(255,236,200,.04);border:1px solid rgba(255,236,200,.08)}
-#zd-menu .rsec .lbl{position:absolute;z-index:3;left:50%;bottom:5px;transform:translateX(-50%);max-width:92%;box-sizing:border-box;text-align:center;background:rgba(28,20,12,.88);
-  border:1px solid rgba(255,236,200,.2);color:#f6ead2;padding:3px 6px;border-radius:5px;font:700 8.5px/1.15 system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase}
-#zd-menu .mhead{display:flex;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid rgba(255,236,200,.14);flex:none;background:rgba(24,18,10,.6)}
+#zd-menu .rsec .tile{aspect-ratio:1/1;position:relative;border-radius:9px;background:rgba(160,90,255,.07);border:1px solid rgba(196,128,255,.16)}
+#zd-menu .rsec .lbl{position:absolute;z-index:3;left:50%;bottom:5px;transform:translateX(-50%);max-width:92%;box-sizing:border-box;text-align:center;background:rgba(38,14,66,.9);
+  border:1px solid rgba(196,128,255,.35);color:#fff;padding:3px 6px;border-radius:5px;font:700 8.5px/1.15 system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase}
+#zd-menu .mhead{display:flex;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid rgba(196,128,255,.28);flex:none;background:rgba(40,14,70,.7)}
 #zd-menu .mhead .zd-btn{padding:9px 12px;font-size:12px;min-width:0;flex:none}
-#zd-menu .mhead .mt{flex:1;text-align:left;font-weight:800;font-size:15px;letter-spacing:.14em;text-transform:uppercase;color:#fff4e0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#zd-menu h1{margin:0;font-size:27px;line-height:1.05;letter-spacing:.14em;color:#fff4e0;text-shadow:0 2px 14px rgba(0,0,0,.7)}
+#zd-menu .mhead .mt{flex:1;text-align:left;font-weight:800;font-size:15px;letter-spacing:.14em;text-transform:uppercase;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#zd-menu h1{margin:0;font:900 38px/0.95 Impact,Futura-CondensedExtraBold,\"Arial Black\",sans-serif;letter-spacing:.04em;color:#f4eee4;text-shadow:3px 3px 0 #7a0d12,0 0 22px rgba(255,79,163,.55)} /* the PLAY screen's logo */
 #zd-menu .tag{font-size:12px;letter-spacing:.12em;text-transform:uppercase;opacity:.7;margin:2px 0 14px}
 #zd-menu .rank{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;margin:0 0 6px}
 #zd-menu .rank b{font-size:16px;color:#a6ff4d}
-#zd-menu .bar{height:8px;border-radius:4px;background:rgba(255,236,200,.12);overflow:hidden;margin:0 0 4px}
+#zd-menu .bar{height:8px;border-radius:4px;background:rgba(196,128,255,.18);overflow:hidden;margin:0 0 4px}
 #zd-menu .bar i{display:block;height:100%;background:linear-gradient(90deg,#7be0ff,#a6ff4d)}
 #zd-menu .next{font-size:11px;opacity:.7;margin:0 0 16px}
 #zd-menu .rank.sm{font-size:12px;margin:0 2px 6px}#zd-menu .rank.sm b{font-size:14px}
 #zd-menu .bar.sm{height:6px;margin:0 2px}
 #zd-menu .btns{display:flex;flex-direction:column;gap:9px}
-#zd-menu .zd-btn{padding:14px 16px;font-size:14px}
-#zd-menu .zd-btn.main{background:rgba(70,98,34,.9);border-color:rgba(166,255,77,.5)}
+#zd-menu .zd-btn{padding:14px 16px;font-size:14px;color:#fff;background:linear-gradient(#8a3bff,#5216c2);border-color:rgba(255,255,255,.3);box-shadow:0 0 12px rgba(138,59,255,.4);text-shadow:0 1px 2px rgba(0,0,0,.35)} /* neon buttons, white writing */
+#zd-menu .zd-btn.main{background:linear-gradient(#ff4fa3,#b3123f);border-color:rgba(255,255,255,.4);box-shadow:0 0 14px rgba(255,79,163,.5)}
+#zd-menu .zd-btn.mode[data-play="commander"]{background:linear-gradient(#22d3ff,#0a5bd6);box-shadow:0 0 14px rgba(34,211,255,.5)}
+#zd-menu .zd-btn.mode[data-go="be"]{background:linear-gradient(#ff4fa3,#b3123f);box-shadow:0 0 14px rgba(255,79,163,.5)}
+#zd-menu .zd-btn.mode[data-play="sandbox"]{background:linear-gradient(#3ee86a,#0b8a3a);box-shadow:0 0 14px rgba(62,232,106,.45)}
+#zd-menu .zd-btn.mode[data-play="tv"]{background:linear-gradient(#ffa52b,#d1450a);box-shadow:0 0 14px rgba(255,165,43,.5)}
+#zd-menu .mode span{opacity:.9}
+#zd-menu .zd-side-btn{background:rgba(64,22,110,.85);border-color:rgba(196,128,255,.45);box-shadow:0 0 10px rgba(138,59,255,.35)}
 #zd-menu .zd-btn.dim{opacity:.8}
 #zd-menu .list{text-align:left;margin:14px 0 0;display:flex;flex-direction:column;gap:6px}
-#zd-menu .row{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:8px 10px;border-radius:9px;background:rgba(255,236,200,.05);border:1px solid rgba(255,236,200,.1)}
+#zd-menu .row{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:8px 10px;border-radius:9px;background:rgba(160,90,255,.09);border:1px solid rgba(196,128,255,.2)}
 #zd-menu .row.locked{opacity:.5}
 #zd-menu .row .n{font-weight:700;font-size:13px}
 #zd-menu .row .d{font-size:11px;opacity:.75}
@@ -147,8 +153,8 @@ const CSS = `
 #zd-menu .row .zd-btn{padding:8px 10px;font-size:11px;min-width:0}
 #zd-menu .row > div{min-width:0}
 #zd-menu .row .zd-btn, #zd-menu .row .s{flex:none}
-#zd-menu .row .zd-btn.own-go{background:rgba(70,98,34,.9);border-color:rgba(166,255,77,.5)}
-#zd-menu .row .zd-btn.own{background:rgba(70,98,34,.9);border-color:rgba(166,255,77,.5);pointer-events:none}
+#zd-menu .row .zd-btn.own-go{background:linear-gradient(#3ee86a,#0b8a3a);box-shadow:0 0 10px rgba(62,232,106,.45)}
+#zd-menu .row .zd-btn.own{background:linear-gradient(#3ee86a,#0b8a3a);pointer-events:none}
 #zd-menu .back{margin-top:12px}
 #zd-menu .foot{font-size:11px;opacity:.55;margin:12px 0 0}
 #zd-end .xp{font-size:13px;color:#7be0ff;margin:4px 0 0}
@@ -359,7 +365,7 @@ export class Game {
         '<div class="btns back"><button class="zd-btn" type="button" data-go="main">Back</button></div>';
     }
     this.stopRoster(); this.menuPanel = panel;
-    this.menu.innerHTML = '<div class="mtitle"><h1>MY LITTLE<br>DISASTER</h1><div class="tag">Save the city, or be the disaster</div></div><div class="box' + (panel === 'roster' ? ' tall' : '') + '">' + head + '<div class="mbody">' + body + '</div></div>';
+    this.menu.innerHTML = '<div class="mtitle"><h1>MY LITTLE<br>DISASTER</h1><div class="tag">Save it, wreck it, or sit back and bet on it!</div></div><div class="box' + (panel === 'roster' ? ' tall' : '') + '">' + head + '<div class="mbody">' + body + '</div></div>';
     if (panel === 'roster') {
       const cv = document.createElement('canvas'); cv.className = 'rgl'; this.menu.appendChild(cv);
       import('./roster.js').then(m => { if (!cv.isConnected) return; const sec = this.menu.querySelector('.rsec'); sec.innerHTML = ''; this.roster = m.startRoster({ canvas: cv, list: this.menu.querySelector('.mbody'), root: sec }); });

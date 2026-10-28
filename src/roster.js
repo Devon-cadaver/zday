@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { figureGeometry, figureMaterial, figureAttributes, ARCHETYPES, OFFICER_LOOK, FIREFIGHTER_LOOK, SOLDIER_LOOK, CREW_LOOK, HAZMAT_LOOK, MEDIC_LOOK, ZTYPES, FLAG } from './figures.js';
 import { heroModel } from './heroes.js';
 import { villainModel } from './villains.js';
+import { bandModel } from './band.js';
 import { siteModel, tentModel } from './rebuild.js';
 import { disasterExamples } from './examples.js';
 import { VEHICLES, buildVehicle } from './vehicles.js';
@@ -25,7 +26,7 @@ export function startRoster({ canvas, list, root }) {
 
   function plinth(size) {
     const g = new THREE.CylinderGeometry(size, size * 1.08, size * 0.12, 6);
-    const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: '#4a3c2a', roughness: 0.8 }));
+    const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: '#3b2458', roughness: 0.8 }));
     m.position.y = -size * 0.06; m.receiveShadow = true; m.rotation.y = Math.PI / 6;
     return m;
   }
@@ -77,6 +78,7 @@ export function startRoster({ canvas, list, root }) {
   // ---------- heroes, villains and the rebuilding
   for (const n of ['Dragonfly', 'Nova', 'Tempo']) add('Super heroes', n, heroModel(n), 4.8);
   for (const n of ['Blur', 'Tyrant', 'Weaver']) add('Super villains', n, villainModel(n), 4.8);
+  for (const girls of [false, true]) for (const [role, n] of [['vox', 'singer'], ['gtr', 'guitarist'], ['bass', 'bassist'], ['drums', 'drummer']]) add('The bands', (girls ? 'Goth ' : 'Punk ') + n, bandModel(role, girls), 3.6); // the punks; the Far Isles' girls
   add('Rebuilding', 'Construction site', siteModel(), 30);
   add('Rebuilding', 'Medical tent', tentModel(false), 3.4);
   add('Rebuilding', 'Hazmat decon tent', tentModel(true), 3.4);

@@ -557,6 +557,9 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 - Volumes (Sean): the stage's flame jets and fireworks a fifth as loud (gain 0.12, 0.07); the announcer much quieter (LEVELS 0, 0.18, 0.33, 0.55: loud is the old quiet) starting at quiet; the sound effects quieter (0, 0.2, 0.38, 0.6) starting at quiet; music starting at medium. New storage keys (zday_sound2, zday_music2, zday_radio2) so every player starts once at the new defaults.
 - The pause button and the compass now sit at the top of the right-hand column (ui.js sideAdd, CSS order -2 and -1), above the sound button: every round button on one side.
 
+- Roster: a section The bands, all eight (band.js bandMember / playPose, shared with the stage; bandModel: playing, the drummer at a little kit, the singer at a mic stand).
+- Menus restyled (Sean): dark purple panels, neon gradient buttons with white writing (Commander cyan, Be the Disaster pink, Sandbox green, Disaster TV orange, the rest violet, main pink), the PLAY screen's logo at the top (Impact, Futura-CondensedExtraBold on iPhones) with the line Save it, wreck it, or sit back and bet on it! (on the PLAY screen too); the roster's plinths purple.
+
 ## Next
 - Sean tests v1.3 on his phone; tune from his notes. Candidates: Be The Disaster score scales and ranks once real scores come in, the saucer size at close zoom, how often zombie outbreaks turn up in Commander, incident pacing, card bar height on the phone.
 
