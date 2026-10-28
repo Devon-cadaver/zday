@@ -259,7 +259,7 @@ export class Globe {
   relabel() {
     for (const key in this.tags) {
       const d = this.tags[key], s = this.status && this.state !== 'menu' ? this.status(key) : null;
-      d.textContent = (s ? s.text : PLACES[key].name) + (this.state === 'game' && key === placeKey() ? ' · here' : '');
+      d.textContent = (s ? s.text : PLACES[key].name) + (this.state === 'game' && key === placeKey() ? ' · here' : ''); d._w = 0; // measured again
       d.style.opacity = s && s.locked ? '0.55' : this.state === 'menu' ? '0.85' : '1';
       d.style.pointerEvents = this.state === 'menu' ? 'none' : '';
       d.style.fontSize = this.state === 'menu' ? '11px' : '12px'; d.style.zIndex = this.state === 'menu' ? '5' : '41'; // under the menu card
@@ -386,12 +386,21 @@ export class Globe {
       this.cam.position.copy(dir.multiplyScalar(this.cam.position.length() + (T.r - this.cam.position.length()) * Math.min(1, dt * 3))); this.cam.lookAt(0, 0, 0);
       if (k >= 1) { this.turn = null; this.go(T.key); }
     } else this.controls.update();
-    // labels over the places on the side facing you
-    const v = new THREE.Vector3(), camDir = this.cam.position.clone().normalize();
+    // labels over the places on the side facing you; where two would overlap, the one nearer the middle of the view
+    // shows (your own place and the one you are heading for first)
+    const v = new THREE.Vector3(), camDir = this.cam.position.clone().normalize(), cand = [], placed = [];
     for (const key in this.tags) {
-      const [lat, lon] = this.spots[key], p = toVec(lat, lon, R * 1.01), el = this.tags[key];
-      if (!this.active || (this.quiet && this.state === 'menu') || p.clone().normalize().dot(camDir) < 0.25 || this.fly || this.rise) { el.style.display = 'none'; continue; }
-      v.copy(p).project(this.cam); el.style.display = ''; el.style.left = ((v.x + 1) / 2 * innerWidth) + 'px'; el.style.top = ((1 - v.y) / 2 * innerHeight) + 'px';
+      const [lat, lon] = this.spots[key], p = toVec(lat, lon, R * 1.01), el = this.tags[key], dot = p.clone().normalize().dot(camDir);
+      if (!this.active || (this.quiet && this.state === 'menu') || dot < 0.25 || this.fly || this.rise) { el.style.display = 'none'; continue; }
+      v.copy(p).project(this.cam);
+      cand.push({ el, x: (v.x + 1) / 2 * innerWidth, y: (1 - v.y) / 2 * innerHeight, pri: dot + (key === placeKey() && this.state === 'game' ? 2 : 0) + (this.turn && this.turn.key === key ? 3 : 0) });
+    }
+    cand.sort((a, b) => b.pri - a.pri);
+    for (const c of cand) {
+      if (!c.el._w) { c.el.style.display = ''; c.el._w = c.el.offsetWidth || 90; }
+      const r = { x0: c.x - c.el._w / 2 - 3, x1: c.x + c.el._w / 2 + 3, y0: c.y - 42, y1: c.y - 12 };
+      if (placed.some(q => r.x0 < q.x1 && r.x1 > q.x0 && r.y0 < q.y1 && r.y1 > q.y0)) { c.el.style.display = 'none'; continue; }
+      placed.push(r); c.el.style.display = ''; c.el.style.left = c.x + 'px'; c.el.style.top = c.y + 'px';
     }
     this.shift += (this.shiftTo - this.shift) * Math.min(1, dt * 3);
     if (this.shift > 0.002) this.cam.setViewOffset(innerWidth, innerHeight, 0, this.shift * innerHeight, innerWidth, innerHeight); else if (this.cam.view && this.cam.view.enabled) this.cam.clearViewOffset();
