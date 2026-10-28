@@ -470,6 +470,8 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
   - 1. Hit rewards (src/hits.js, Be The Disaster only): each building down, building set alight and car wrecked (each car once: traffic events now carry car/other) pops up its points over where it happened (gathered per 45 m patch every 0.25 s, 18 pooled divs, drawn on the curved ground). Hits within 3.5 s build a combo: x1.5 at 6 hits, x2 at 16, x2.5 at 32, x3 at 56; a burst counts at most about 3 hits a second (tokens), so a nuke or meteor does not max it at once. The bonus (points x (mult - 1)) is added to the score. The multiplier and a draining bar sit on the score pill; the score rolls up and bumps.
   - Named moments (big words mid-screen, a stinger sound, a jolt): Big one! (one of the tallest 4% in the town), Whole block! (7 buildings in 1.5 s), Pile-up! (7 cars in 2 s), Up in flames! (6 fires in 4 s); each at most every 6 s. Big one and Whole block also give a beat of slow motion (game.slowT: the world at 0.3 speed, at most every 7 s). Go! at the start, 10 seconds! and Time! at the end; the end card lists the best combo and the combo bonus. Sounds: chime (combo steps) and stinger, synthesized in audio.js. Nothing pops up over people (the score still counts victims as before).
 
+- See-through switch (Sean asked for one): an eye in the column of round buttons (see.js seeButton, under the radio): ON/OFF, remembered in localStorage zday_see; SEE.user is the player's switch, ANDed with the mode's SEE.on in seeFrame.
+
 ## Next
 - Sean tests v1.3 on his phone; tune from his notes. Candidates: Be The Disaster score scales and ranks once real scores come in, the saucer size at close zoom, how often zombie outbreaks turn up in Commander, incident pacing, card bar height on the phone.
 

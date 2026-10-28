@@ -16,7 +16,7 @@ import { Sirens } from './sirens.js';
 import { Searchlights } from './searchlights.js';
 import { Audio } from './audio.js';
 import { CURVE, curveFrame } from './curve.js';
-import { seeFrame, SEE } from './see.js';
+import { seeFrame, SEE, seeButton } from './see.js';
 import { PLACES, placeKey, settle } from './places.js';
 import { Globe } from './globe.js';
 import { Sky } from './sky.js';
@@ -197,6 +197,7 @@ game.buildWorld = buildWorld; // the menu builds the place it picks, here
 game.moveWorld = moveWorld;
 game.audio = new Audio(camera, controls); // sound: switched on by the first tap
 game.radio = new Radio(game.audio); // the announcer
+seeButton((on) => game.toast('See through buildings: ' + (on ? 'on' : 'off'))); // the eye: walls between you and the action fade, or not
 if (game.menu.hidden) game.radio.begin(game.modeName === 'be' && game.mode ? game.mode.kind : null);
 const globe = game.globe = new Globe(renderer); let globeWas = false; // the world from orbit: the big city and the towns
 globe.statusFor = () => game.townStatus(game.modeName); // Commander and Be The Disaster: towns further down the road are locked

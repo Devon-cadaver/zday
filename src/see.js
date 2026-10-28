@@ -7,8 +7,10 @@
 // are (the shadow pass has its own materials). Patches the city's own materials,
 // which already carry their world position for the ground holes (holes.js).
 import * as THREE from 'three';
+import { sideButton } from './ui.js';
 
-export const SEE = { on: true, far: 430 }; // on, and from how far out (modes set it; window.__z.see for comparisons)
+let mine = true; try { mine = localStorage.getItem('zday_see') !== 'off'; } catch (e) { /* no storage */ }
+export const SEE = { on: true, far: 430, user: mine }; // on, and from how far out (modes set it; window.__z.see for comparisons); user: the player's own switch (the eye button)
 const U = { uSeeA: { value: new THREE.Vector3() }, uSeeB: { value: new THREE.Vector3() }, uSee: { value: new THREE.Vector2(0, 0) } };
 
 export function seeThrough(mat) {
@@ -30,7 +32,15 @@ export function seeThrough(mat) {
 
 // each frame: the tube from the camera to what it looks at, how wide, how strong (fading in over the last 100 m inside SEE.far)
 export function seeFrame(camera, focus, dist) {
-  const on = SEE.on ? Math.min(1, Math.max(0, (SEE.far - dist) / 100)) : 0;
+  const on = SEE.on && SEE.user ? Math.min(1, Math.max(0, (SEE.far - dist) / 100)) : 0;
   U.uSeeA.value.copy(camera.position); U.uSeeB.value.set(focus.x, (focus.y || 0) + 1.5, focus.z);
   U.uSee.value.set(Math.min(24, Math.max(9, dist * 0.07)), on);
+}
+
+// the eye in the column of round buttons: see-through on or off, remembered on this device
+export function seeButton(said) {
+  const b = sideButton('zd-see', 'See through buildings');
+  const show = () => { b.innerHTML = '<span style="display:block;font-size:17px;margin-top:1px;' + (SEE.user ? '' : 'opacity:0.4;') + '">👁️</span><span style="display:block;font:800 8px/1 system-ui,sans-serif;letter-spacing:.04em;margin-top:2px;' + (SEE.user ? 'color:#a6ff4d' : 'opacity:0.6') + '">' + (SEE.user ? 'ON' : 'OFF') + '</span>'; b.title = 'See through buildings: ' + (SEE.user ? 'on' : 'off'); };
+  b.onclick = (e) => { e.stopPropagation(); SEE.user = !SEE.user; try { localStorage.setItem('zday_see', SEE.user ? 'on' : 'off'); } catch (er) { /* no storage */ } show(); if (said) said(SEE.user); };
+  show(); return b;
 }

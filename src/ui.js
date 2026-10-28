@@ -6,7 +6,7 @@ const CSS = `
 .zd-side-btn{width:40px;height:40px;border-radius:20px;border:1px solid rgba(255,236,200,.18);background:rgba(28,20,12,.72);color:#f6ead2;padding:0;cursor:pointer;
   font-size:16px;line-height:1;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);touch-action:manipulation}
 .zd-side-btn:active{transform:translateY(1px)}
-#zd-sound{order:1}#zd-music{order:2}#zd-radiob{order:3}#zd-globe{order:4}
+#zd-sound{order:1}#zd-music{order:2}#zd-radiob{order:3}#zd-see{order:4}#zd-globe{order:5}
 body.zd-panel #zd-side{display:none}
 body.zd-menu-on #zd-side{display:none}
 body.zd-menu-on #zd-menu #zd-side{display:flex;position:static;transform:none;flex-direction:row}
