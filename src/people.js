@@ -702,7 +702,7 @@ export class People {
     }
   }
 
-  infectAt(x, z, n, inc = [3, 8]) {
+  infectAt(x, z, n, inc = [3, 8], rad = 0) {
     this.buildHash();
     const c = [];
     this.around(x, z, 16, (j, d2) => { if (this.isPrey(j) && this.kind[j] === 0 && this.st[j] !== S.ROOF) c.push([d2, j]); });
@@ -710,7 +710,7 @@ export class People {
     let done = 0;
     for (const [, j] of c) {
       if (done >= n) break;
-      this.inf[j] = 1; this.inc[j] = this.inc0[j] = inc[0] + this.r() * (inc[1] - inc[0]); this.dirty[j] = 1; done++;
+      this.inf[j] = 1; this.zrad[j] = rad; this.inc[j] = this.inc0[j] = inc[0] + this.r() * (inc[1] - inc[0]); this.dirty[j] = 1; done++;
     }
     return done;
   }
@@ -972,6 +972,7 @@ export class People {
             this.inf[i] = 1;
             this.inc[i] = this.inc0[i] = this.incubate[0] + this.r() * (this.incubate[1] - this.incubate[0]);
             const b = this.target[i];
+            if (b >= 0 && this.zt[b] === RADIOACTIVE) this.zrad[i] = 1; // a radioactive bite carries it on: the whole outbreak glows
             if (this.kind[i] === KIND.OFFICER) { this.st[i] = S.COP; this.target[i] = -1; break; }
             if (this.kind[i] === KIND.FIREFIGHTER) { this.st[i] = S.FIREMAN; this.target[i] = -1; break; }
             this.st[i] = this.lvl[i] >= 0 ? S.ROOF : S.IDLE; // released, a civilian again (infected)

@@ -76,7 +76,7 @@ export class Spill {
         this.tick = 0.5;
         people.around(this.x, this.z, this.R, (j) => {
           if (this.left <= 0 || people.kind[j] !== KIND.CIVILIAN || people.inf[j] || !people.isPrey(j) || Math.random() > 0.22) return;
-          people.inf[j] = 1; people.inc[j] = people.inc0[j] = this.inc[0] + Math.random() * (this.inc[1] - this.inc[0]); people.dirty[j] = 1;
+          people.inf[j] = 1; people.zrad[j] = 1; people.inc[j] = people.inc0[j] = this.inc[0] + Math.random() * (this.inc[1] - this.inc[0]); people.dirty[j] = 1;
           people.panic(j, this.x, this.z, -1); this.left--;
         });
       }
