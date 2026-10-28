@@ -212,7 +212,7 @@ export class Disasters {
     fire.gone(k);
     if (opts.vanish) { people.clearBuilding(k, 'crush'); fire.gone(k); city.hideBuilding(k); this.stats.buildings++; this.emit({ type: 'collapse', k, how, x: cx, z: cz }); return true; } // vaporised: no shell, no debris
     const shell = city.extractBuilding(k); city.hideBuilding(k);
-    const dbr = this.debris;
+    const dbr = this.debris; let fall = null; // the way it is tipped as it goes down (debris 'sink' leans its top toward (-sin, cos))
     if (how === 'tear') {
       dbr.addObject(shell, 'lift', { vort: opts.vort, dur: 1.4 + Math.min(1.6, hgt * 0.03), h: hgt });
       const n = Math.min(36, 10 + Math.round(hgt * 0.9));
@@ -222,8 +222,8 @@ export class Disasters {
       }
       if (!opts.noRubble) city.addRubble(k, 0.7);
     } else {
-      const dur = 2.2 + Math.random() * 1.4;
-      dbr.addObject(shell, 'sink', { dur, h: hgt + 2, dir: opts.dir ?? Math.random() * 6.28, onDone: () => { if (!opts.noRubble) city.addRubble(k, 0.75); } });
+      const dur = 2.2 + Math.random() * 1.4; fall = opts.dir ?? Math.random() * 6.28;
+      dbr.addObject(shell, 'sink', { dur, h: hgt + 2, dir: fall, onDone: () => { if (!opts.noRubble) city.addRubble(k, 0.75); } });
       fire.dustCloud(cx, cz, Math.max(w, d) * 0.6, hgt);
       for (let i = 0; i < 14; i++) {
         const a = Math.random() * 6.28, sp = 3 + Math.random() * 6, s = 0.6 + Math.random() * 1.6;
@@ -233,7 +233,7 @@ export class Disasters {
       this.shake(0.35);
     }
     this.stats.buildings++;
-    this.emit({ type: 'collapse', k, how, x: cx, z: cz });
+    this.emit({ type: 'collapse', k, how, x: cx, z: cz, fall });
     return true;
   }
 
