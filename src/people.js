@@ -1679,6 +1679,10 @@ export class People {
         if (tg < 0 && d2 < best && !this.inf[j] && CIV[this.st[j]]) { best = d2; bi = j; }
       });
       this.target[i] = bi;
+      if (bi < 0 && this.stats.zombies <= 3 && this.cops && this.cops.length) { // one of the last few: drawn to the nearest police (officers can't find their way round blocks to them)
+        let cd = 1e12, cj = -1; for (const c of this.cops) { const d2 = (this.x[c] - zx) ** 2 + (this.z[c] - zz) ** 2; if (d2 < cd) { cd = d2; cj = c; } }
+        if (cj >= 0) { const dd = Math.sqrt(cd) || 1; this.hx[i] = (this.x[cj] - zx) / dd; this.hz[i] = (this.z[cj] - zz) / dd; this.wt[i] = 4; this.fx[i] = 3; this.bt[i] = -1; }
+      }
       if (Z.scream && civNear > 0) { this.inc[i] -= 0.4; if (this.inc[i] <= 0) { this.scream(i); return; } }
       if (bi >= 0) this.bt[i] = -1;
       else if (this.bt[i] < 0 && this.r() < 0.7) this.bt[i] = this.pileTarget(zx, zz);
@@ -1941,6 +1945,7 @@ export class People {
   sync() {
     const arr = this.mesh.instanceMatrix.array, anim = this.anim;
     const m = this._m4, q = this._q, e = this._e, p = this._p;
+    const cops = []; // officers at work (the last few zombies are drawn to them)
     let humans = 0, infected = 0, zombies = 0, dead = 0, roof = 0, officers = 0, aliens = 0, rioters = 0, colDirty = this.lookDirty, film = 0, afloat = 0;
     this.bRoof.fill(0); this.bRoofAll.fill(0);
     const t = this.time;
@@ -1993,7 +1998,7 @@ export class People {
       }
       if (s === S.ROOF) { roof++; const k = this.lvl[i]; this.bRoofAll[k]++; if (!this.inf[i]) this.bRoof[k]++; }
       else if (s === S.SWIM) afloat++;
-      if (s === S.COP || (this.kind[i] === KIND.OFFICER && CIV[s])) officers++;
+      if (s === S.COP || (this.kind[i] === KIND.OFFICER && CIV[s])) { officers++; if (s === S.COP && cops.length < 64) cops.push(i); }
       if (this.inf[i] || s === S.GRABBED) infected++; else if (this.kind[i] === KIND.CIVILIAN) humans++;
       if (this.dirty[i] === 1 && this.inf[i]) {
         const k = Math.min(1, Math.max(0, 1 - this.inc[i] / this.inc0[i]));
@@ -2045,7 +2050,7 @@ export class People {
     for (const f of this.flashList) { m.identity(); m.setPosition(f.x, f.y, f.z); this.flashes.setMatrixAt(fc++, m); }
     this.flashes.count = fc;
     this.flashes.instanceMatrix.needsUpdate = true;
-    Object.assign(this.stats, { humans, infected, zombies, dead, roof, officers, aliens, rioters, afloat }); this.filmN = film;
+    Object.assign(this.stats, { humans, infected, zombies, dead, roof, officers, aliens, rioters, afloat }); this.filmN = film; this.cops = cops;
   }
 
   nearestZombie(x, z, skip = -1) {

@@ -449,6 +449,10 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
   - Fires: City secured allows up to 4% of buildings still burning (a volcano left dozens); stars: secured with under 45% alive is 1 star (it was 2 at any survival).
   - Rescue: boats and helicopters go for the swimmer nearest to going under (distance + seconds left x 1.2; on a raft they wait): rescue barely changed deaths before.
   - Nuclear and meltdown hordes grew without end: the nuclear kind's aura 5% -> 2% a half second, nuclear doses 12% -> 7%, meltdown fallout 0.02 -> 0.012 x strength.
+- Commander playtest round 4: road beaten again; hard towns 13 of 20 at 2+ stars (was 9), 6 holdouts (was 15); lone piles gone; meltdown winnable (3 stars with a response). Changes from it:
+  - The last few: with three or fewer zombies left, any with nobody to chase head for the nearest officer (people.cops, listed each tally) like zombies drawn by gunfire: officers walk straight at their targets and could not get round a block to the last two or three, which held rounds open for minutes.
+  - The nuclear strike in a Commander round is smaller with a longer warning (size 170, was 280; warning 30 s, was 20): Harbor, 20% dead 90 s in (it was 44% in the first minute, so 2 stars were out of reach).
+  - Still: floods, tsunamis and cold waves cost 25-35% whatever is sent (rescue moves it 3-10%); three barriers cut tsunami deaths 11-13%.
 - Kaiju pacing: the hero signal waits until the kaiju is 15 s old (response.js); Heroes.holds adds a 12 s hold while a kaiju is up (heroes arrive about 28 s in, was 4 s). Tempo's kaiju bubble: 5 s every 24 s (was 6 s every 9 s); between bubbles he punches the heads with the others (doMonster switches to the slow job when cd is ready). Tested: kaiju slowed 19% of its time (about a quarter of the fight), driven off at 110 s.
 
 ## Next

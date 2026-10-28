@@ -36,6 +36,8 @@ const GROUND = new Set(['police', 'bus', 'fire', 'apc', 'chaser', 'build', 'camp
 const ROUND = 600;
 // the long ones are shorter in a round (playtests: villains, the kaiju and the worm outlasted the round, so it could never end secured)
 const LIFE = { villains: 240, kaiju: 200, worm: 160, aliens: 140 };
+// the nuclear strike in a round: a smaller warhead and a longer warning, so people can be got clear (it killed 44% of the town before anything could be done)
+const OPTS = { nuclear: { size: 170, warn: 30 } };
 const START_RP = 250; // enough for a first cordon (playtests: 100 bought two cruisers and the outbreak got away)
 const SITE_AT = [0, 11, 23]; // the sites of one zombie outbreak break out this far apart
 
@@ -157,7 +159,7 @@ export class Commander {
   incident(inc) {
     const g = this.g, p = g.people;
     inc.fired = true; this.hit.push(inc.type); this.lastInc = this.t; this.quietT = 0;
-    if (inc.type !== 'zombies') { g.disasters.start(inc.type, null, null, LIFE[inc.type] ? { life: LIFE[inc.type] } : {}); return; }
+    if (inc.type !== 'zombies') { g.disasters.start(inc.type, null, null, { ...(LIFE[inc.type] ? { life: LIFE[inc.type] } : {}), ...(OPTS[inc.type] || {}) }); return; }
     const B = g.city.bounds, pts = [], R = Math.random; // well apart, away from the edge
     for (let tries = 0; tries < 200 && pts.length < this.diff.sites; tries++) {
       const x = B.x0 + 50 + R() * (B.x1 - B.x0 - 100), z = B.z0 + 50 + R() * (B.z1 - B.z0 - 100);
