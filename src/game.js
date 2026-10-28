@@ -269,6 +269,21 @@ export class Game {
     people.fire = fire; traffic.people = people; traffic.fire = fire; people.traffic = traffic;
     people.onOverrun = (k, why) => { if (Math.random() < (why === 'breach' ? 0.25 : 0.3)) this.pendingFires.push({ k, t: this.simT + 3 + Math.random() * 8 }); };
   }
+  // a mode stops for good: its touch handlers go quiet (dead), what it put on the screen goes
+  endMode() {
+    if (this.followSub || this.follow >= 0) this.setFollow(-1);
+    const m = this.mode;
+    if (m) { m.dead = true; if (m.gauge && m.gauge.el) m.gauge.el.remove(); if (m.panel) m.panel.remove(); }
+    for (const e of document.querySelectorAll('#zd-end')) e.remove();
+    document.body.classList.remove('zd-panel');
+    this.mode = new Idle();
+  }
+  // leaving this place for another built in this page: the mode stops and the old city is let go
+  leaveWorld() {
+    this.endMode();
+    this.pendingFires = []; this.simT = 0; this.acc = 0; this.seen = {}; this.zoomTo = 0; this.flash = 0; this.shake = 0; this.focusAt = null;
+    this.people = this.traffic = this.fire = this.city = this.daylight = this.helis = this.disasters = null;
+  }
   startMode(which, kind) {
     this.menu.hidden = true; this.menuOff(); this.modeName = which;
     this.top.innerHTML = ''; this.bar.innerHTML = ''; this.followChip = this.stopBtn = null; this.el.chip = null; this.setPaused(false);
@@ -361,6 +376,7 @@ export class Game {
     const arrive = (key) => {
       if (!this.people && this.buildWorld) { settle(key, which, kind ? { kind } : null); this.buildWorld(); G.close(); this.startMode(which, kind); return; } // under the clouds: no page load, so the sound carries on
       if (key === placeKey()) { G.close(); this.startMode(which, kind); return; }
+      if (this.moveWorld) { this.moveWorld(key, which, kind); G.close(); this.startMode(which, kind); return; }
       G.travelling(key); travel(key, which, kind ? { kind } : null);
     };
     if (which === 'sandbox') { G.choose({ title: 'SANDBOX', sub: 'Pick a city: tap it to play there', arrive, back: () => this.showMenu() }); return; }
@@ -878,13 +894,13 @@ class Sandbox {
     const g = this.g, dom = g.renderer.domElement;
     this.gauge = new Gauge(g.disasters.ctx.scene);
     dom.addEventListener('pointerdown', (e) => {
-      if (!this.pending || !SIZED[this.pending] || e.button > 0 || this.gauge.active) return;
+      if (this.dead || !this.pending || !SIZED[this.pending] || e.button > 0 || this.gauge.active) return;
       const p = g.worldPoint(e.clientX, e.clientY); if (!p) return;
       this.gauge.start(this.pending, p.x, p.z); this.growId = e.pointerId; this.noTapUntil = Infinity;
     });
-    dom.addEventListener('pointermove', (e) => { if (this.gauge.active && e.pointerId === this.growId) { const p = g.worldPoint(e.clientX, e.clientY); if (p) this.gauge.move(p.x, p.z); } });
+    dom.addEventListener('pointermove', (e) => { if (!this.dead && this.gauge.active && e.pointerId === this.growId) { const p = g.worldPoint(e.clientX, e.clientY); if (p) this.gauge.move(p.x, p.z); } });
     const up = (e) => {
-      if (!this.gauge.active || e.pointerId !== this.growId) return;
+      if (this.dead || !this.gauge.active || e.pointerId !== this.growId) return;
       const r = this.gauge.release();
       this.pending = null; this.panel.querySelectorAll('[data-hz]').forEach(o => o.classList.remove('sel'));
       g.disasters.start(r.kind, r.x, r.z, r.opts);

@@ -186,7 +186,7 @@ export class Globe {
     if (domes.length) inst(new THREE.SphereGeometry(0.5, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), domes, 0.6);
     if (rings.length) inst(new THREE.TorusGeometry(0.42, 0.14, 4, 20).rotateX(Math.PI / 2).translate(0, 0.07, 0), rings, 0.8);
     this.here = new THREE.Mesh(new THREE.RingGeometry(0.62, 0.7, 48), new THREE.MeshBasicMaterial({ color: '#ffe08a', transparent: true, side: THREE.DoubleSide, depthWrite: false })); // a ring round where you are
-    const hs = this.spots[placeKey()], hp = toVec(hs[0], hs[1], R * 1.003); this.here.position.copy(hp); this.here.lookAt(hp.clone().multiplyScalar(2)); this.here.scale.setScalar(this.extent[placeKey()] * 1.6 / 0.66); this.scene.add(this.here);
+    this.scene.add(this.here); this.setHere();
   }
   // the road through the towns (PATH), along the surface from each to the next
   buildRoad() {
@@ -198,6 +198,11 @@ export class Globe {
     const curve = new THREE.CatmullRomCurve3(pts);
     this.road = new THREE.Mesh(new THREE.TubeGeometry(curve, pts.length * 2, 0.017, 5, false), new THREE.MeshBasicMaterial({ color: '#ffd27a', transparent: true, opacity: 0.6, depthWrite: false }));
     this.road.visible = false; this.scene.add(this.road);
+  }
+  // the ring round where you are (again after moving to another place in this page)
+  setHere() {
+    if (!this.here) return;
+    const hs = this.spots[placeKey()], hp = toVec(hs[0], hs[1], R * 1.003); this.here.position.copy(hp); this.here.lookAt(hp.clone().multiplyScalar(2)); this.here.scale.setScalar(this.extent[placeKey()] * 1.6 / 0.66);
   }
   // the marks the world carries: craters (glowing a while when fresh), smoke over places that have taken damage
   decorate() {
@@ -379,6 +384,7 @@ export class Globe {
         const key = F.key; this.fly = null;
         if (this.arrive) this.arrive(key); // the menu's modes: built here, or travelling (they call travelling)
         else if (key === placeKey()) this.close();
+        else if (this.moveTo) this.moveTo(key); // built here, in this page: the sound carries on
         else { this.travelling(key); travel(key, new URLSearchParams(location.search).get('mode') || 'sandbox'); }
       }
     } else if (this.turn) { // turning the planet to the next town, then down to it

@@ -273,14 +273,15 @@ export class BeTheDisaster {
     let driving = false;
     const at = (e) => g.worldPoint(e.clientX, e.clientY);
     dom.addEventListener('pointerdown', (e) => {
+      if (this.dead) return;
       held.add(e.pointerId);
       if (held.size > 1) { if (driving && this.ctl) this.ctl.up(); driving = false; return; } // a second finger: pan or zoom instead
       if (e.button !== 0 || this.ended || !this.ctl) return;
       const p = at(e); if (!p) return;
       driving = true; this.ctl.down(p.x, p.z);
     });
-    dom.addEventListener('pointermove', (e) => { if (!driving || held.size !== 1 || !this.ctl) return; const p = at(e); if (p) this.ctl.move(p.x, p.z); });
-    const up = (e) => { held.delete(e.pointerId); if (driving && !held.size) { driving = false; if (this.ctl) this.ctl.up(); } };
+    dom.addEventListener('pointermove', (e) => { if (this.dead || !driving || held.size !== 1 || !this.ctl) return; const p = at(e); if (p) this.ctl.move(p.x, p.z); });
+    const up = (e) => { held.delete(e.pointerId); if (!this.dead && driving && !held.size) { driving = false; if (this.ctl) this.ctl.up(); } };
     dom.addEventListener('pointerup', up); dom.addEventListener('pointercancel', up);
   }
 

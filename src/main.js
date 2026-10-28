@@ -16,7 +16,7 @@ import { Sirens } from './sirens.js';
 import { Searchlights } from './searchlights.js';
 import { Audio } from './audio.js';
 import { CURVE, curveFrame } from './curve.js';
-import { PLACES, placeKey } from './places.js';
+import { PLACES, placeKey, settle } from './places.js';
 import { Globe } from './globe.js';
 import { Sky } from './sky.js';
 import { Radio } from './radio.js';
@@ -113,6 +113,24 @@ function buildWorld() {
   if (game) worldReady();
   return W;
 }
+// leave this place for another in this page: what it remembers kept, everything of it out of the scene and freed (the
+// shared textures stay for the next), then the next one built and the view put back over its middle
+function moveWorld(key, m, kind) {
+  if (W) {
+    keepDamage(); game.leaveWorld();
+    const keep = new Set([sun, sun.target, hemi]);
+    for (const o of [...scene.children]) {
+      if (keep.has(o)) continue;
+      scene.remove(o);
+      o.traverse(n => { if (n.geometry) n.geometry.dispose(); for (const mt of Array.isArray(n.material) ? n.material : n.material ? [n.material] : []) mt.dispose(); });
+    }
+    W = null;
+  }
+  settle(key, m, kind ? { kind } : null);
+  setView(0, 0, coarse ? 430 : 470, 48, 45);
+  buildWorld();
+  globe.setHere();
+}
 const needWorld = mode === 'commander' || mode === 'sandbox' || ((mode === 'be' || mode === 'storm') && (P.has('kind') || mode === 'storm'));
 let game = null;
 if (needWorld) buildWorld();
@@ -174,12 +192,14 @@ requestAnimationFrame(frame);
 
 game = new Game({ camera, controls, renderer, mode, post, world: W });
 game.buildWorld = buildWorld; // the menu builds the place it picks, here
+game.moveWorld = moveWorld;
 game.audio = new Audio(camera, controls); // sound: switched on by the first tap
 game.radio = new Radio(game.audio); // the announcer
 if (game.menu.hidden) game.radio.begin(game.modeName === 'be' && game.mode ? game.mode.kind : null);
 const globe = game.globe = new Globe(renderer); let globeWas = false; // the world from orbit: the big city and the towns
 globe.statusFor = () => game.townStatus(game.modeName); // Commander and Be The Disaster: towns further down the road are locked
 globe.sky = sky;
+globe.moveTo = (key) => { const m = game.modeName, kind = m === 'be' && game.mode ? game.mode.kind : null; moveWorld(key, m, kind); globe.close(); game.startMode(m, kind); setTimeout(meteorIn, 800); }; // another town from the globe, built here
 globe.up = (after) => { game.setFollow(-1); sky.up(() => { globe.open({ clouds: true }); globe.after = after || null; }); }; // up through the clouds (then on to another town)
 if (viaSky) game.audio.askTap(); // the trip reloaded the page: sound needs a tap again
 if (viaSky) setTimeout(() => { if (globe.active) { sky.to(0, 0.8); return; } const r1 = game.zoomTo || 0; game.zoomTo = 0; sky.down(r1); }, 300); // out of the clouds over the streets

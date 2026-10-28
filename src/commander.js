@@ -696,7 +696,7 @@ export class Commander {
       '<div class="stars">' + '★'.repeat(stars) + '<span>' + '★'.repeat(3 - stars) + '</span></div>' +
       '<div class="score">Score ' + score.toLocaleString() + '</div>' + xpLine + road, lines,
       (nextOpen ? '<button class="zd-btn go" type="button" id="zd-next">On to ' + PLACES[nextKey].name + '</button>' : '') + '<button class="zd-btn' + (nextOpen ? '' : ' go') + '" type="button" id="zd-again">Play again</button><button class="zd-btn" type="button" id="zd-tomenu" style="background:rgba(28,20,12,.9);border-color:rgba(255,236,200,.25)">Menu</button>');
-    this.end.querySelector('#zd-again').onclick = () => { if (r.levelUp) { location.href = location.pathname + '?mode=commander'; return; } this.start(); };
+    this.end.querySelector('#zd-again').onclick = () => { if (r.levelUp) { g.endMode(); g.startMode('commander'); return; } this.start(); }; // a level up: the mode again, with its new cards
     this.end.querySelector('#zd-tomenu').onclick = () => { location.href = location.pathname; };
     if (nextOpen) this.end.querySelector('#zd-next').onclick = () => this.g.journey(nextKey);
     this.end.hidden = false;
