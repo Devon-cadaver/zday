@@ -24,6 +24,7 @@ import { Heroes } from './heroes.js';
 import { Brawl } from './brawl.js';
 import { Worm } from './worm.js';
 import { Kaiju } from './kaiju.js';
+import { Spill } from './spill.js';
 
 export const threatName = (h) => (h === 'zombies' ? 'Zombie outbreak' : HAZARDS[h].name);
 
@@ -153,6 +154,7 @@ export class Disasters {
     else if (type === 'flood') ev = new Flood(this, opts);
     else if (type === 'tsunami') ev = new Tsunami(this, opts);
     else if (type === 'riot') ev = new Riot(this, x, z, opts);
+    else if (type === 'spill') ev = new Spill(this, x, z, opts); // a chemical tanker crash: how zombie outbreaks start
     else if (type === 'aliens') ev = new Invasion(this, opts);
     else if (type === 'meteor') ev = new Meteor(this, x, z, opts);
     else if (type === 'sinkhole') ev = new Sinkhole(this, x, z, opts);

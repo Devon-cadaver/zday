@@ -590,7 +590,7 @@ export class Game {
       e.saucers.forEach((s, k) => out.push({ obj: s, name: 'Saucer ' + (k + 1), pos: () => (s.state === 'cruise' || s.state === 'act' ? [s.x, s.y, s.z] : null) }));
     }
     const own = new Set(['villains', 'kaiju', 'worm', 'riot', 'aliens', 'heroes']);
-    for (const e of D.list) if (e.alive && !own.has(e.type)) { const name = HAZARDS[e.type] ? HAZARDS[e.type].name : e.type === 'nukeblast' ? 'Nuclear blast' : null; if (name) out.push({ obj: e, name, kind: 'disaster', pos: () => this.disasterAt(e) }); }
+    for (const e of D.list) if (e.alive && !own.has(e.type)) { const name = HAZARDS[e.type] ? HAZARDS[e.type].name : e.type === 'nukeblast' ? 'Nuclear blast' : e.type === 'spill' ? 'Toxic spill' : null; if (name) out.push({ obj: e, name, kind: 'disaster', pos: () => this.disasterAt(e) }); }
     return out.filter(s => s.pos());
   }
   // a storm front sweeping the city (tsunami, dust storm, cold wave, solar flare): the point of it level with the view,
@@ -844,7 +844,7 @@ class Sandbox {
   buildPanel() {
     const g = this.g, d = document.createElement('div'); d.id = 'zd-dis'; d.hidden = true;
     d.innerHTML = '<div class="tabs"><button type="button" class="on" data-tab="dis">Disasters</button><button type="button" data-tab="wx">Weather</button><button type="button" data-tab="go">Travel</button></div><div class="pbody">' +
-      '<div data-pane="dis"><div class="g"><button class="zd-btn zb" type="button" data-zb>Zombies · ' + START_DROPS + '</button>' + Object.keys(HAZARDS).map(h => '<button class="zd-btn" type="button" data-hz="' + h + '">' + HAZARDS[h].name + '</button>').join('') + '</div>' +
+      '<div data-pane="dis"><div class="g"><button class="zd-btn zb" type="button" data-zb>Toxic spill · ' + START_DROPS + '</button>' + Object.keys(HAZARDS).map(h => '<button class="zd-btn" type="button" data-hz="' + h + '">' + HAZARDS[h].name + '</button>').join('') + '</div>' +
       '<div class="h">Help</div><div class="g two"><button class="zd-btn auto" type="button" data-auto>Auto responders: On</button><button class="zd-btn hero" type="button" data-hero>Hero signal \u262E</button></div></div>' +
       '<div data-pane="wx" hidden><div class="g">' + Object.keys(WEATHER).map(w => '<button class="zd-btn" type="button" data-wx="' + w + '">' + WEATHER[w].name.replace('Thunderstorm', 'Storm') + '</button>').join('') + '</div></div>' +
       '<div data-pane="go" hidden><div class="g">' + Object.keys(PLACES).map(k => '<button class="zd-btn' + (k === placeKey() ? ' sel' : '') + '" type="button" data-place="' + k + '">' + PLACES[k].name + '</button>').join('') + '</div></div></div>';
@@ -862,7 +862,7 @@ class Sandbox {
       if (this.dropsLeft <= 0) { g.toast('No Shamblers left. Tap Reset to start over'); return; }
       this.pending = 'zombies'; d.querySelectorAll('[data-hz]').forEach(o => o.classList.remove('sel'));
       this.showPanel(false); this.zombieLabel();
-      g.toast('Tap streets to drop Shambler zombies (' + this.dropsLeft + ' left)', 4000);
+      g.toast('Tap a street: a chemical tanker crashes there and its gas turns people into zombies (' + this.dropsLeft + ' left)', 4500);
     };
     d.querySelectorAll('[data-hz]').forEach(b => { b.onclick = () => {
       const h = b.dataset.hz;
@@ -879,7 +879,7 @@ class Sandbox {
     d.querySelectorAll('[data-wx]').forEach(b => { b.onclick = () => { g.disasters.weather.set(b.dataset.wx); g.toast('Weather: ' + WEATHER[b.dataset.wx].name); this.close(); }; });
   }
   zombieLabel() {
-    if (this.zbBtn) { this.zbBtn.textContent = 'Zombies · ' + this.dropsLeft; this.zbBtn.classList.toggle('empty', this.dropsLeft <= 0); }
+    if (this.zbBtn) { this.zbBtn.textContent = 'Toxic spill · ' + this.dropsLeft; this.zbBtn.classList.toggle('empty', this.dropsLeft <= 0); }
     if (this.pending === 'zombies') this.g.setLabel(this.disBtn, 'Done (' + this.dropsLeft + ' left)');
   }
   // the panel sits between the bar and the numbers at the top, and scrolls if the screen is too short for it
@@ -912,11 +912,10 @@ class Sandbox {
   tap(x, z) {
     const g = this.g;
     if (this.gauge.active || performance.now() < (this.noTapUntil || 0)) return; // that press was sizing a disaster
-    if (this.pending === 'zombies') {
-      const i = g.people.drop(x, z);
-      if (i < 0) { g.toast('Too far from a street. Tap closer to a road'); return; }
+    if (this.pending === 'zombies') { // a chemical tanker crashes there
+      g.disasters.start('spill', x, z, { max: 26 });
       this.dropsLeft--; if (this.clock < 0) this.clock = 0;
-      if (this.dropsLeft <= 0) { this.pending = null; this.close(); g.toast('That was the last Shambler'); }
+      if (this.dropsLeft <= 0) { this.pending = null; this.close(); g.toast('That was the last tanker'); }
       this.zombieLabel();
       return;
     }

@@ -582,6 +582,7 @@ export class Commander {
     for (const o of this.sites) {
       if (o.fired || this.t < o.at) continue;
       o.fired = true;
+      if (!this.sites.some(s => s.spilled)) { o.spilled = true; g.disasters.start('spill', o.x, o.z, { inc: this.diff.incubate, max: 10 + this.diff.seeds * 3 }); continue; } // the tanker reports itself
       p.infectAt(o.x, o.z, this.diff.seeds);
       this.report(o.x, o.z, '911 · ' + this.district(o.x, o.z) + ': "someone is biting people!"', 70, false, 'Zombies');
     }
