@@ -18,11 +18,15 @@ export const PLACES = {
   northgate: { name: 'Northgate', blurb: 'A busy city in the hills, an Art Deco tower over it', blocks: 10, seed: 6060, maxFloors: 10, tall: 0.07, landmarks: ['deco'], centers: 1, tint: { stone: 8, concrete: 6, brick: 4 }, people: 0.55, cars: 0.55, land: 'forest', shape: 'diamond' },
   kiyomura: { name: 'Kiyomura', blurb: 'An old temple town on the Far Isles: wooden houses, a pagoda, cherry trees', blocks: 7, seed: 8686, maxFloors: 3, tall: 0, landmarks: ['pagoda', 'temple'], centers: 1, diag: false, style: 'japan', tint: { white: 10, brown: 8, dark: 4 }, people: 0.32, cars: 0.18, land: 'forest', shape: 'round' },
   hoshimachi: { name: 'Hoshimachi', blurb: 'The neon city of the Far Isles: towers, a scramble crossing, trains overhead, a red lattice tower', blocks: 9, seed: 2929, maxFloors: 24, tall: 0.22, landmarks: ['lattice', 'spire', 'stadium'], centers: 2, diag: false, style: 'tokyo', tint: { concrete: 8, white: 8, glass: 6, dark: 3 }, people: 0.75, cars: 0.6, land: 'coast', shape: 'ragged' },
+  sakurazaka: { name: 'Sakurazaka', blurb: 'A little hill village of the Far East under its cherry trees, a pagoda on the slope', blocks: 5, seed: 1313, maxFloors: 2, tall: 0, landmarks: ['pagoda'], centers: 1, diag: false, style: 'japan', tint: { white: 10, brown: 10 }, people: 0.16, cars: 0.1, land: 'forest', shape: 'ell' },
+  umihama: { name: 'Umihama', blurb: 'A fishing town of the Far Isles curled round its bay, a temple over the harbour', blocks: 6, seed: 2424, maxFloors: 3, tall: 0, landmarks: ['temple'], centers: 1, diag: false, style: 'japan', tint: { white: 12, brown: 6, dark: 3 }, people: 0.24, cars: 0.14, land: 'coast', shape: 'crescent' },
+  minato: { name: 'Minato', blurb: 'A modern port of the Far East: a long strip of pencil towers and neon, trains along it', blocks: 7, seed: 3535, maxFloors: 16, tall: 0.12, landmarks: ['spire'], centers: 1, diag: false, style: 'tokyo', tint: { concrete: 8, white: 10, glass: 4 }, people: 0.45, cars: 0.4, land: 'coast', shape: 'long' },
+  takamori: { name: 'Takamori', blurb: 'Two neon downtowns of the Far East, a stadium between them, trains overhead', blocks: 8, seed: 4646, maxFloors: 20, tall: 0.16, landmarks: ['spire', 'stadium'], centers: 2, diag: false, style: 'tokyo', tint: { concrete: 8, white: 6, glass: 6, dark: 4 }, people: 0.6, cars: 0.5, land: 'grass', shape: 'twin' },
 };
 
-// the road through the world in Commander and Be The Disaster: the smallest town first, up to the big city, then on
-// across the sea to the towns of the Far Isles. Win in a place and the next one opens
-export const PATH = ['mesa', 'pines', 'crossing', 'dust', 'lakeside', 'harbor', 'sunvale', 'ironside', 'northgate', 'bayview', 'metro', 'kiyomura', 'hoshimachi'];
+// the road through the world in Commander and Be The Disaster: the smallest town first, round the west to the big city,
+// then across the sea to the Far East, from a hill village up to the neon city. Win in a place and the next one opens
+export const PATH = ['mesa', 'pines', 'crossing', 'dust', 'lakeside', 'harbor', 'sunvale', 'ironside', 'northgate', 'bayview', 'metro', 'sakurazaka', 'kiyomura', 'umihama', 'minato', 'takamori', 'hoshimachi'];
 
 export function placeKey() {
   let k = new URLSearchParams(location.search).get('place');

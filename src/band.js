@@ -3,8 +3,8 @@
 // on a stage: on the pitch of the stadium where the town has one, otherwise in a
 // park near the middle, or on a big flat roof. An audience of the town's people
 // (more in a bigger town) stands in front holding their phones up, flashes going
-// off; fireworks go up and flame jets fire along the front of the stage. Near it,
-// or with it in view, you hear the song (not loud; the game's music drops back);
+// off; fireworks go up and flame jets fire along the front of the stage. Looking
+// right at it from within a block, you hear the song (not loud; the game's music drops back);
 // when the stage is wrecked - its building down, a disaster on it, fire, water,
 // a pit, the undead in the crowd - the music stops dead and everyone runs for it.
 // A reset of the world puts the show back on. In the towns of the Far Isles the band
@@ -120,8 +120,8 @@ export class Band {
     }
     const n = Math.round(Math.min(70, Math.max(18, B.length / 18))); // a smaller crowd in a smaller town
     let best = null, bs = 1e9;
-    for (const L of city.open) {
-      const w = L.x1 - L.x0, d = L.z1 - L.z0; if (w < 22 || d < 22) continue;
+    for (const min of [22, 15]) for (const L of best ? [] : city.open) { // the best park; a smaller one in a village with no room for more
+      const w = L.x1 - L.x0, d = L.z1 - L.z0; if (w < min || d < min) continue;
       const lx = (L.x0 + L.x1) / 2, lz = (L.z0 + L.z1) / 2, dd = Math.hypot(lx - cx, lz - cz); if (dd > half * 0.95) continue; // anywhere in town: a roof is a last resort (its huts and tanks are part of the building)
       const s = dd - Math.min(w, d) * 1.5; if (s < bs) { bs = s; best = L; }
     }
@@ -240,11 +240,12 @@ export class Band {
     this.t += dt; this.fm.uTime.value += dt;
     if (this.on && (this.checkT -= dt) <= 0) { this.checkT = 0.5; this.check(); }
     const V = this.venue, beat = this.t * BPS, ph = beat * Math.PI * 2;
-    // how loud: close by, or in view (further off quieter)
+    // how loud (Sean: only pointing right at it, from within a block): the stage near the middle of the view, the point
+    // you are looking at within about a block of it, and not zoomed far out
     if (this.on && music) {
-      const v = this.v.set(V.x, V.y + 3, V.z).project(camera), inView = v.z < 1 && Math.abs(v.x) < 1.05 && Math.abs(v.y) < 1.05;
-      const d = camera.position.distanceTo(this.v.set(V.x, V.y + 3, V.z)), near = 1 - ss(110, 420, d), seen = inView ? 1 - ss(200, 900, d) : 0;
-      music.setBand(Math.max(near, seen * 0.75));
+      const v = this.v.set(V.x, V.y + 3, V.z).project(camera), mid = v.z < 1 ? 1 - ss(0.3, 0.6, Math.max(Math.abs(v.x), Math.abs(v.y))) : 0;
+      const tg = controls.target, df = Math.hypot(tg.x - V.x, tg.z - V.z), d = camera.position.distanceTo(this.v.set(V.x, V.y + 3, V.z));
+      music.setBand(mid * (1 - ss(45, 80, df)) * (1 - ss(260, 420, d)));
     }
     // the band
     for (const mb of this.members) {

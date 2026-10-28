@@ -209,6 +209,7 @@ globe.statusFor = () => game.townStatus(game.modeName); // Commander and Be The 
 globe.trail = (m) => game.profile.been(m === 'commander' || m === 'be' ? m : null); // the road only as far as the towns played (Sean: your trail, not where you are going)
 globe.mode = () => game.modeName;
 globe.sky = sky;
+globe.onFacing = (key) => game.audio.music.setMenuSong(PLACES[key].style ? 'theme2' : 'theme'); // on the menu: the Far East turned towards you, the second song
 globe.moveTo = (key) => { const m = game.modeName, kind = m === 'be' && game.mode ? game.mode.kind : null; moveWorld(key, m, kind); globe.close(); game.startMode(m, kind); setTimeout(meteorIn, 800); }; // another town from the globe, built here
 globe.up = (after) => { game.setFollow(-1); sky.up(() => { globe.open({ clouds: true }); globe.after = after || null; }); }; // up through the clouds (then on to another town)
 if (viaSky) game.audio.askTap(); // the trip reloaded the page: sound needs a tap again
