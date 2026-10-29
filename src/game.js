@@ -147,6 +147,12 @@ const CSS = `
 #zd-menu .box.saucer .mbody{overflow:visible;padding:0 0 4px}
 #zd-menu .ufo{position:relative;margin:0 -16px;aspect-ratio:400/248}
 #zd-menu .ufo .hull{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+#zd-menu .ufo .hull .spin{animation:zdSpin 2.4s linear infinite}#zd-menu .ufo .hull .s2{animation-duration:7s}#zd-menu .ufo .hull .s3{animation-duration:4s}#zd-menu .ufo .hull .s4{animation-duration:2s}
+@keyframes zdSpin{to{stroke-dashoffset:-104}} /* four or eight of each dash pattern: no jump as it loops */
+#zd-menu .ufo .mode{animation:zdBob 3.6s ease-in-out infinite} /* the buttons drift as in zero gravity, each its own way */
+#zd-menu .ufo .mode:nth-child(2){animation-duration:4.2s;animation-delay:-1.3s}#zd-menu .ufo .mode:nth-child(3){animation-duration:3.9s;animation-delay:-2.5s}#zd-menu .ufo .mode:nth-child(4){animation-duration:4.5s;animation-delay:-.7s}
+@keyframes zdBob{0%,100%{translate:0 0;rotate:0deg}30%{translate:1px -5px;rotate:.8deg}65%{translate:-1px 2px;rotate:-.6deg}}
+@media (prefers-reduced-motion:reduce){#zd-menu .ufo .mode,#zd-menu .ufo .hull .spin{animation:none}}
 #zd-menu .ufo .modes{position:absolute;left:5%;right:5%;top:38%;height:39%;margin:0;display:grid;grid-template-columns:repeat(4,1fr);gap:1.6%;perspective:420px}
 #zd-menu .ufo .zd-btn.mode{height:100%;box-sizing:border-box;justify-content:center;gap:3px;padding:8px 3px 7px;border-radius:15px;border:2.5px solid var(--c);color:#fff;text-transform:uppercase;letter-spacing:.01em;
   background:linear-gradient(180deg,var(--c1),var(--c2));box-shadow:0 0 12px var(--c),0 0 26px var(--g),inset 0 0 14px rgba(255,255,255,.2),inset 0 10px 18px rgba(255,255,255,.12);text-shadow:0 1px 3px rgba(0,0,0,.6)}
@@ -259,7 +265,8 @@ const ICON = {
 ICON['zd-restart'] = ICON['zd-reset'];
 // the three ways to play, on the menu
 // the main menu's flying saucer, seen from a little above: the domed top with its glowing ring, the hull and the deck
-// the four modes stand on, the rim under it with its lights and the beam orb (the buttons go over it: .ufo .modes)
+// the four modes stand on, the rim under it with its lights and the beam orb (the buttons go over it: .ufo .modes). It
+// spins: its lights and hull panels (.spin, dashed rings) run round it, the far side the other way
 const SAUCER = '<svg class="hull" viewBox="0 0 400 230" preserveAspectRatio="none" aria-hidden="true"><defs>' +
   '<radialGradient id="ufH" cx="50%" cy="22%" r="78%"><stop offset="0" stop-color="#8f9bbd"/><stop offset=".42" stop-color="#434b63"/><stop offset="1" stop-color="#151925"/></radialGradient>' +
   '<linearGradient id="ufR" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6a7492"/><stop offset=".5" stop-color="#262b3b"/><stop offset="1" stop-color="#06070b"/></linearGradient>' +
@@ -267,18 +274,19 @@ const SAUCER = '<svg class="hull" viewBox="0 0 400 230" preserveAspectRatio="non
   '<radialGradient id="ufO" cx="50%" cy="45%" r="50%"><stop offset="0" stop-color="#fff"/><stop offset=".3" stop-color="#9af0ff"/><stop offset=".7" stop-color="#1e8cff"/><stop offset="1" stop-color="#1e8cff" stop-opacity="0"/></radialGradient>' +
   '<filter id="ufG" x="-30%" y="-80%" width="160%" height="260%"><feGaussianBlur stdDeviation="2.4"/></filter></defs>' +
   '<ellipse cx="200" cy="132" rx="182" ry="84" fill="#07080d"/>' + // the underside
-  '<path d="M44 170 A182 84 0 0 0 356 170" fill="none" stroke="#5fdcff" stroke-width="3.2" stroke-dasharray="15 11" filter="url(#ufG)"/>' +
-  '<path d="M44 170 A182 84 0 0 0 356 170" fill="none" stroke="#c9f6ff" stroke-width="1.6" stroke-dasharray="15 11"/>' +
+  '<path d="M44 170 A182 84 0 0 0 356 170" fill="none" stroke="#5fdcff" stroke-width="3.2" stroke-dasharray="15 11" filter="url(#ufG)" class="spin"/>' +
+  '<path d="M44 170 A182 84 0 0 0 356 170" fill="none" stroke="#c9f6ff" stroke-width="1.6" stroke-dasharray="15 11" class="spin"/>' +
   '<path d="M4 118 A196 84 0 0 0 396 118 A196 72 0 0 1 4 118Z" fill="url(#ufR)"/>' + // the rim, edge on
   '<ellipse cx="200" cy="118" rx="196" ry="72" fill="url(#ufH)" stroke="#8b97b8" stroke-width="1.4"/>' + // the hull
   '<path d="M18 92 A196 72 0 0 1 70 64" fill="none" stroke="#4fd8ff" stroke-width="3" filter="url(#ufG)"/><path d="M382 92 A196 72 0 0 0 330 64" fill="none" stroke="#4fd8ff" stroke-width="3" filter="url(#ufG)"/>' +
   '<ellipse cx="200" cy="124" rx="182" ry="60" fill="rgba(4,7,14,.6)" stroke="rgba(120,200,255,.3)" stroke-width="1.2"/>' + // the deck
-  '<path d="M60 70 L40 160 M340 70 L360 160 M120 58 L112 178 M280 58 L288 178 M200 66 L200 184" stroke="rgba(255,255,255,.12)" stroke-width="1.2"/><circle cx="34" cy="104" r="2.4" fill="#8ff0ff"/><circle cx="52" cy="84" r="2.4" fill="#8ff0ff"/><circle cx="348" cy="84" r="2.4" fill="#8ff0ff"/><circle cx="366" cy="104" r="2.4" fill="#8ff0ff"/>' +
+  '<ellipse cx="200" cy="118" rx="189" ry="66" fill="none" stroke="rgba(8,12,22,.6)" stroke-width="2.4" stroke-dasharray="4 22" class="spin s2"/>' + // the hull's panels going round
+  '<ellipse cx="200" cy="118" rx="196" ry="72" fill="none" stroke="#8ff0ff" stroke-width="2.8" stroke-linecap="round" stroke-dasharray="0.5 25.5" class="spin s3"/>' + // lights round its edge
   '<ellipse cx="200" cy="56" rx="96" ry="21" fill="#1c2133" stroke="#2f364d" stroke-width="2"/>' +
   '<ellipse cx="200" cy="57" rx="88" ry="17" fill="none" stroke="#5fe0ff" stroke-width="4" filter="url(#ufG)"/><ellipse cx="200" cy="57" rx="88" ry="17" fill="none" stroke="#bff4ff" stroke-width="1.6"/>' + // the dome's glowing ring
   '<path d="M126 55 Q128 10 200 7 Q272 10 274 55 Q200 70 126 55Z" fill="url(#ufD)" stroke="#6c7896" stroke-width="1.2"/>' + // the dome
   '<path d="M150 30 Q200 14 250 30" fill="none" stroke="rgba(255,255,255,.28)" stroke-width="2"/>' +
-  [150, 172, 200, 228, 250].map((x, i) => '<circle cx="' + x + '" cy="' + [47, 51, 52, 51, 47][i] + '" r="2.2" fill="#a8f2ff"/>').join('') +
+  '<path d="M136 49 A64 7 0 0 0 264 49" fill="none" stroke="#a8f2ff" stroke-width="3.2" stroke-linecap="round" stroke-dasharray="0.5 12.5" class="spin s4"/>' + // the dome's lights going round
   '<circle cx="200" cy="204" r="22" fill="#1e8cff" opacity=".35" filter="url(#ufG)"/><circle cx="200" cy="204" r="14" fill="#141826" stroke="#3a4258" stroke-width="3"/><circle cx="200" cy="204" r="11" fill="url(#ufO)"/>' + // the beam orb
   '</svg>';
 const MICON = {
