@@ -18,7 +18,10 @@ import { CURB } from './city.js';
 import { PLACES, placeKey } from './places.js';
 import { sfx } from './audio.js';
 
-const BPS = 172 / 60; // the beat
+const BPS = 172 / 60; // the beat for the roster's dancing figures
+// the two theme songs' tempo and first beat (s), measured from the files (onset strength against a comb of beats over the
+// whole song): the band moves on it, and the band game (rhythm.js) lays its balls on it
+export const SONGS = { theme: { bpm: 109.35, first: 0.23 }, theme2: { bpm: 75.21, first: 0.138 } };
 const ss = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const FW = [[3, 0.35, 0.25], [0.5, 3, 0.6], [3, 2.2, 0.5], [1.8, 2.2, 3.2], [3, 0.6, 2.6]]; // firework colours
 
@@ -104,6 +107,7 @@ export class Band {
     this.v = new THREE.Vector3(); this.m4 = new THREE.Matrix4(); this.q = new THREE.Quaternion(); this.e = new THREE.Euler(); this.s1 = new THREE.Vector3(1, 1, 1);
     this.girls = !!PLACES[placeKey()].style; // the Far Isles: the girl band, the second song
     if (ctx.music) ctx.music.bandSong = this.girls ? 'theme2' : 'theme';
+    this.bps = (this.girls ? SONGS.theme2.bpm * 2 : SONGS.theme.bpm) / 60; // the girls' song in half time: they move at double
     this.venue = this.find();
     if (!this.venue) return;
     this.build();
@@ -239,7 +243,7 @@ export class Band {
     const { game, camera, controls, music, fire, disasters: D } = this.ctx; if (!game || game.paused) dt = 0;
     this.t += dt; this.fm.uTime.value += dt;
     if (this.on && (this.checkT -= dt) <= 0) { this.checkT = 0.5; this.check(); }
-    const V = this.venue, beat = this.t * BPS, ph = beat * Math.PI * 2;
+    const V = this.venue, beat = this.beatClock ? this.beatClock() : this.t * this.bps, ph = beat * Math.PI * 2; // beatClock: the band game's, on the song itself
     // how loud (Sean: only pointing right at it, from within a block): the stage near the middle of the view, the point
     // you are looking at within about a block of it, and not zoomed far out
     if (this.on && music) {
@@ -250,7 +254,8 @@ export class Band {
     // the band
     for (const mb of this.members) {
       const r = mb.r; if (!this.on) { if (this.endT > 0.4) r.root.visible = false; continue; } // off the stage the moment it stops
-      const lift = playPose(r, mb.role, ph, mb.ph, this.t, mb.x); if (mb.role !== 'drums') r.root.position.y = V.H + lift;
+      const lift = playPose(r, mb.role, ph, mb.ph, this.t, mb.x); let hop = 0; if (mb.hop > 0) { mb.hop = Math.max(0, mb.hop - dt); hop = Math.sin(Math.PI * mb.hop / 0.35) * (mb.role === 'drums' ? 0.25 : 0.8); } // hop: a note hit in the band game
+      if (mb.role !== 'drums') r.root.position.y = V.H + lift + hop; else r.root.position.y = V.H + hop;
       detail(r, D);
     }
     for (const cy of this.cymbals) cy.rotation.z = Math.sin(ph * 2) * 0.08;
@@ -274,7 +279,7 @@ export class Band {
     if (Math.random() < dt * 9) { const f = this.fans[Math.floor(Math.random() * this.fans.length)]; if (f.phone && this.flashL.length < 14) { const dx = sx - f.x, dz = sz - f.z, d = Math.hypot(dx, dz) || 1; this.flashL.push({ x: f.x + dx / d * 0.45, y: V.y + 1.75, z: f.z + dz / d * 0.45, t: 0.07 }); } }
     // flame jets along the front of the stage, every couple of bars
     if ((this.pyroT -= dt) <= 0) {
-      this.pyroT = 4 * 2 / BPS * (Math.random() < 0.3 ? 0.5 : 1);
+      this.pyroT = 4 * 2 / this.bps * (Math.random() < 0.3 ? 0.5 : 1);
       for (const s of [-1, -0.33, 0.33, 1]) this.pyro.emit(sx + s * V.W * 0.45, V.y + V.H + 0.3, sz + V.D / 2 - 0.4, 22, { up: [12, 19], spread: 1.2, life: 0.75, size: 2.4 });
       if (cam.distanceTo(this.v.set(sx, V.y, sz)) < 320) sfx('whoomph', sx, V.y + 3, sz, { gain: 0.12 }); // soft (Sean: much quieter)
     }

@@ -23,6 +23,13 @@ const heroSky = (id) => sky(id, '#1c2a5a', '#7a5aa8') + STARS + town('#1a1834', 
 const svg = (s) => '<svg viewBox="0 0 96 54" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' + s + '</svg>';
 
 export const THUMB = {
+  // the band: a punk on a stage, guitar up, the lights and the crowd's phones
+  band: svg(sky('band', '#140c24', '#3a1a4a') + STARS + '<path d="M18 8 L30 44 L6 44 Z" fill="#ff4fa3" opacity=".18"/><path d="M78 8 L90 44 L66 44 Z" fill="#ffd27a" opacity=".16"/>' +
+    '<rect x="14" y="36" width="68" height="6" fill="#1a1a1a"/><rect x="14" y="35" width="68" height="1.2" fill="#ff4fa3"/><g fill="#111"><rect x="20" y="27" width="5" height="9"/><rect x="71" y="27" width="5" height="9"/></g>' +
+    '<g fill="#0b0b0b"><circle cx="48" cy="14" r="3.2"/><rect x="45" y="17" width="6" height="10" rx="2"/><rect x="45.4" y="27" width="2.2" height="8"/><rect x="48.4" y="27" width="2.2" height="8"/><path d="M51 18 L57 11 L58.4 12.2 L52 19.4 Z"/></g>' +
+    '<path d="M44 23 L56 18 L57 20 L45 25 Z" fill="#e8e2d6"/><circle cx="45" cy="24" r="2.4" fill="#8a0f14"/>' +
+    '<g fill="#2a2238"><circle cx="20" cy="49" r="3"/><circle cx="30" cy="50" r="3"/><circle cx="40" cy="49" r="3"/><circle cx="56" cy="50" r="3"/><circle cx="66" cy="49" r="3"/><circle cx="76" cy="50" r="3"/></g><g fill="#fff"><rect x="29" y="43" width="1.6" height="2.6"/><rect x="65" y="42.6" width="1.6" height="2.6"/></g>' +
+    '<g fill="#ff8ad0"><circle cx="62" cy="12" r="2.6" opacity=".9"/><circle cx="70" cy="20" r="2.2" opacity=".7"/><circle cx="33" cy="15" r="2.4" opacity=".8"/></g>'),
   // the heroes: Nova pink with a streak of light behind her, Dragonfly green on four wings, Tempo cyan in a time bubble
   nova: svg(heroSky('nova') + flier('#ff3fcf', '#d9b25e', '<path d="M2 30 Q20 24 40 23" stroke="#ff9ae6" stroke-width="5" stroke-linecap="round" fill="none" opacity=".45"/><path d="M10 27 Q26 23 40 23" stroke="#fff" stroke-width="1.6" stroke-linecap="round" fill="none" opacity=".7"/>')),
   dragonfly: svg(heroSky('dragonfly') + flier('#3dff5c', '#4a3424', '<g fill="#c8ffd8" opacity=".55"><ellipse cx="52" cy="13" rx="9" ry="3" transform="rotate(-25 52 13)"/><ellipse cx="46" cy="14" rx="8" ry="2.6" transform="rotate(-50 46 14)"/></g>', '<g fill="#e8fff0" opacity=".5"><ellipse cx="53" cy="31" rx="9" ry="3" transform="rotate(20 53 31)"/></g>')),

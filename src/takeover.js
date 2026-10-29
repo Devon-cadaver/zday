@@ -13,6 +13,7 @@ const fwd = (yaw) => [Math.cos(yaw), -Math.sin(yaw)]; // the camera's way of tur
 // what can be taken over: its name, where it is (and how high to look), the camera behind it (distance, height), how it
 // moves toward a point ahead, its buttons, and whether it is still there to drive
 const KINDS = {
+  band: { name: 'Band', at: (u) => [u.b.venue.x, u.b.venue.y + u.b.venue.H + 2, u.b.venue.z], ok: (u) => u.b.on }, // not driven: played (rhythm.js)
   saucer: {
     name: 'Saucer', at: (u) => [u.s.x, u.s.y, u.s.z], cam: [32, 14], ahead: 30,
     take: (u) => { u.s.player = true; }, free: (u) => { u.s.player = false; },
@@ -99,6 +100,7 @@ export class TakeOver {
       if (e.type === 'kaiju' && e.state !== 'leave') out.push({ kind: 'kaiju', k: e });
       if (e.type === 'tornado' && e.tw && e.tw.phase === 'ground') out.push({ kind: 'tornado', tw: e.tw });
     }
+    const b = this.g.band; if (b && b.venue && b.on && this.g.bandGame) out.push({ kind: 'band', b }); // the band too: Control plays them (rhythm.js)
     return out;
   }
   // the pick: a label over each one; tap one, then Take over
@@ -110,12 +112,12 @@ export class TakeOver {
     const bar = this.pbar = document.createElement('div'); bar.id = 'zd-takebar';
     bar.innerHTML = '<button type="button" class="zd-btn act" data-t="go">Take over</button><button type="button" class="zd-btn exit" data-t="no">Cancel</button>';
     document.body.appendChild(bar); this.goBtn = bar.querySelector('[data-t="go"]'); this.goBtn.style.opacity = '0.45';
-    this.goBtn.onclick = () => { if (this.sel) { const u = this.sel; this.endPick(); this.start(u); } else g.toast('Tap one of the labels first'); };
+    this.goBtn.onclick = () => { if (this.sel) { const u = this.sel; this.endPick(); if (u.kind === 'band') g.bandGame.start(); else this.start(u); } else g.toast('Tap one of the labels first'); };
     bar.querySelector('[data-t="no"]').onclick = () => this.endPick();
     g.toast('Tap the one you want, then Take over', 3500);
     const loop = () => { if (!this.picking) return; this.placeMarks(); requestAnimationFrame(loop); }; loop();
   }
-  select(u, b) { this.sel = u; for (const m of this.marks) m.b.classList.toggle('sel', m.b === b); this.goBtn.textContent = 'Take over the ' + KINDS[u.kind].name.toLowerCase(); this.goBtn.style.opacity = '1'; }
+  select(u, b) { this.sel = u; for (const m of this.marks) m.b.classList.toggle('sel', m.b === b); this.goBtn.textContent = u.kind === 'band' ? 'Control the band' : 'Take over the ' + KINDS[u.kind].name.toLowerCase(); this.goBtn.style.opacity = '1'; }
   placeMarks() {
     const cam = this.ctx.camera, v = new THREE.Vector3();
     for (const m of this.marks) {

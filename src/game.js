@@ -773,6 +773,7 @@ export class Game {
       if (e.type !== 'pointerup' || wasMulti || e.button > 0 || (this.globe && this.globe.active)) return; // up on the globe, taps are the globe's
       if (Math.hypot(e.clientX - d.x, e.clientY - d.y) < 10 && performance.now() - d.t < 400) {
         const hit = this.worldPoint(e.clientX, e.clientY);
+        if (this.bandGame && this.bandGame.tapStage(e.clientX, e.clientY)) return; // the band's stage (the Sandbox): the offer to play them
         if (hit && !(this.folk && this.folk.tap(e.clientX, e.clientY))) this.mode.tap(hit.x, hit.z); // someone tapped: their card; else the mode's tap
       }
     };
@@ -1125,6 +1126,7 @@ class Sandbox {
       '<div class="h">Help</div><div class="g two"><button class="zd-btn auto" type="button" data-auto>Auto responders: On</button><button class="zd-btn hero" type="button" data-hero>Hero signal \u262E</button></div>' +
       '<div class="h">Fly a plane</div><div class="g cards">' + [['stunt', 'Stunt plane'], ['jet', 'F-16 fighter'], ['a10', 'A-10 Warthog'], ['seeder', 'Cloud seeder'], ['b2', 'B-2 bomber'], ['b52', 'B-52 bomber']].map(([k, n]) => '<button class="zd-btn fly" type="button" data-fly="' + k + '"><span class="th">' + THUMB[k] + '</span><span class="nm">' + n + '</span></button>').join('') + '</div>' +
       '<div class="h">Be a hero</div><div class="g cards">' + [['nova', 'Nova'], ['dragonfly', 'Dragonfly'], ['tempo', 'Tempo']].map(([k, n]) => '<button class="zd-btn fly" type="button" data-fly="' + k + '"><span class="th">' + THUMB[k] + '</span><span class="nm">' + n + '</span></button>').join('') + '</div>' + // flown like the planes, villains to fight (flight.js, heroduel.js)
+      '<div class="h">The band</div><div class="g"><button class="zd-btn fly" type="button" data-band style="flex-basis:100%"><span class="th">' + THUMB.band + '</span><span class="nm">Play as the band: tap to the beat</span></button></div>' + // rhythm.js
       '<div class="h">Be the disaster</div><div class="g"><button class="zd-btn fly" type="button" data-take style="flex-basis:100%">Take over a unit (saucer, walker, worm, kaiju, tornado)</button></div>' +
       '<div class="h">On the ground</div><div class="g two cards">' + [['tank', 'Tank'], ['cop', 'Police officer']].map(([k, n]) => '<button class="zd-btn fly" type="button" data-drive="' + k + '"><span class="th">' + THUMB[k] + '</span><span class="nm">' + n + '</span></button>').join('') + '</div></div>' +
       '<div data-pane="wx" hidden><div class="g">' + Object.keys(WEATHER).map(w => '<button class="zd-btn" type="button" data-wx="' + w + '">' + WEATHER[w].name.replace('Thunderstorm', 'Storm') + '</button>').join('') + '</div></div>' +
@@ -1140,6 +1142,7 @@ class Sandbox {
     autoBtn.onclick = () => { this.auto.setOn(!this.auto.on); autoBtn.textContent = 'Auto responders: ' + (this.auto.on ? 'On' : 'Off'); autoBtn.classList.toggle('off', !this.auto.on); g.toast(this.auto.on ? 'Responders will answer every disaster and rebuild afterwards' : 'Responders off: nobody comes to help', 3500); };
     d.querySelectorAll('[data-fly]').forEach(b => { b.onclick = () => { this.pending = null; this.close(); if (g.flight) g.flight.start(b.dataset.fly); }; }); // up in a plane (flight.js)
     d.querySelector('[data-take]').onclick = () => { this.pending = null; this.close(); if (g.takeover) g.takeover.pick(); }; // a disaster's own unit, yours (takeover.js)
+    d.querySelector('[data-band]').onclick = () => { this.pending = null; this.close(); if (g.bandGame) g.bandGame.start(); }; // the band, played (rhythm.js)
     d.querySelectorAll('[data-drive]').forEach(b => { b.onclick = () => { this.pending = null; this.close(); if (g.drive) g.drive.start(b.dataset.drive); }; }); // on the ground (drive.js)
     d.querySelector('[data-hero]').onclick = () => { const tg = g.controls.target; g.disasters.start('heroes', tg.x, tg.z); this.pending = null; this.close(); if (this.clock < 0) this.clock = 0; }; // the peace sign goes up over the middle of the view
     this.zbBtn.onclick = () => { // armed until the Shamblers run out or you tap Done: every tap on a street drops one

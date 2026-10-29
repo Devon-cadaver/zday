@@ -90,10 +90,10 @@ export class Music {
     this.bandK = on ? k : 0;
     if (on) { this.bandLast = now; if (!el.src.endsWith(TRACKS[this.bandSong])) { el.pause(); el.src = BASE + TRACKS[this.bandSong]; } if (el.paused) { if (el.duration) { try { el.currentTime = ((now - this.songAt) / 1000) % el.duration; } catch (e) { /* not ready */ } } el.play().catch(() => {}); } }
     else if (!el.paused && now - (this.bandLast || 0) > 4000) el.pause(); // not heard for a while: stop streaming it
-    const want = on ? k * 0.55 : 0; // not loud
+    const want = on ? k * (this.bandLoud ? 0.95 : 0.55) : 0; // not loud (playing as the band, rhythm.js: up front)
     if (stop) { this.bandG.gain.cancelScheduledValues(t); this.bandG.gain.setValueAtTime(this.bandG.gain.value, t); this.bandG.gain.linearRampToValueAtTime(0, t + 0.08); this.bandW = 0; }
     else if (Math.abs(want - (this.bandW ?? -1)) > 0.01) { this.bandW = want; this.bandG.gain.setTargetAtTime(want, t, 0.3); }
-    const bg = 1 - 0.8 * Math.min(1, (on ? k : 0) * 1.3);
+    const bg = 1 - (this.bandLoud ? 1 : 0.8) * Math.min(1, (on ? k : 0) * 1.3);
     if (Math.abs(bg - (this.bgW ?? -1)) > 0.01) { this.bgW = bg; this.bgG.gain.setTargetAtTime(bg, t, 0.5); }
   }
   // far off on the menus, close in a town: the echo only joined in while it is wanted (it costs a little all the time)

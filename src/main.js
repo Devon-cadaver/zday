@@ -18,6 +18,7 @@ import { Audio } from './audio.js';
 import { CURVE, curveFrame } from './curve.js';
 import { seeFrame, SEE, seeButton } from './see.js';
 import { Band } from './band.js';
+import { BandGame } from './rhythm.js';
 import { Rail } from './rail.js';
 import { Flight } from './flight.js';
 import { Drive } from './drive.js';
@@ -160,7 +161,7 @@ function frame() {
   sky.update(dt);
   if (globe.active || !W) { controls.enabled = false; if (globe.active) globe.frame(dt); frames++; fpsT += dt; requestAnimationFrame(frame); globeWas = true; return; } // up on the globe (or nothing built yet): the city waits
   if (globeWas) { globeWas = false; controls.enabled = !sky.busy(); }
-  const { city, outskirts, daylight, disasters, sirens } = W, B = city.bounds, pilot = [game.flight, game.drive, game.takeover].find(c => c && c.active) || null, fl = !!pilot; // flying a plane, on the ground (drive.js) or driving a disaster (takeover.js): it has the camera
+  const { city, outskirts, daylight, disasters, sirens } = W, B = city.bounds, pilot = [game.flight, game.drive, game.takeover, game.bandGame].find(c => c && c.active) || null, fl = !!pilot; // flying a plane, on the ground (drive.js), driving a disaster (takeover.js) or playing the band (rhythm.js): it has the camera
   if (!fl) controls.update();
   // keep the view over the city
   const tg = controls.target;
@@ -206,6 +207,7 @@ game.buildWorld = buildWorld; // the menu builds the place it picks, here
 game.flight = new Flight(game, { camera, controls, post, renderer }); // the Sandbox's planes
 game.drive = new Drive(game, { camera, controls, post, renderer }); // and on the ground: the tank, the police officer and their cars
 game.takeover = new TakeOver(game, { camera, controls, post, renderer }); // and a disaster's own units, driven from behind
+game.bandGame = new BandGame(game, { camera, controls, post, renderer }); // and the band, played to the beat
 game.moveWorld = moveWorld;
 game.audio = new Audio(camera, controls); // sound: switched on by the first tap
 game.radio = new Radio(game.audio); // the announcer
