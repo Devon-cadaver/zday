@@ -132,7 +132,7 @@ export class Flight {
     this.pos.set(cx + Math.cos(a) * R, 95, cz + Math.sin(a) * R);
     this.yaw = Math.atan2(-(cz - this.pos.z), cx - this.pos.x); this.pitch = 0; this.roll = 0;
     this.speed = this.thr = this.P.start; this.ix = this.iy = 0; this.state = 'fly'; this.t = 0; this.obj.visible = this.view === 'chase'; this.snap = true;
-    this.hull = 100; this.caught = null; this.thrown = []; this.seedTw = null; this.lock = null; this.punch = 0;
+    this.hull = 100; this.caught = null; this.thrown = []; this.seedTw = null; this.lock = null; this.punch = 0; this.act = null;
     if (this.P.hero) this.pos.y = 60;
   }
   ui() {
@@ -324,9 +324,10 @@ export class Flight {
     _f.set(1, 0, 0).applyQuaternion(this.q);
     if (this.duel && this.state === 'fly') { // a fight: over the hero's shoulder, the villain in front; held still while they spin
       const v = this.duel.v, fx = Math.cos(this.yaw), fz = -Math.sin(this.yaw), back = 13 * this.zoom, side = 7 * this.zoom;
-      if (this.duel.phase === 'spin') _v.copy(cam.position); else _v.set(this.pos.x - fx * back - fz * side, this.pos.y + 7 * Math.pow(this.zoom, 0.8), this.pos.z - fz * back + fx * side);
-      cam.position.lerp(_v, 1 - Math.exp(-dt * 4)); cam.up.set(0, 1, 0);
-      if (this.duel.phase === 'spin') cam.lookAt(this.pos); else cam.lookAt(_u.set(this.pos.x + (v.x - this.pos.x) * 0.65, Math.max(this.pos.y, (v.y || 0) + HIP) + 0.5, this.pos.z + (v.z - this.pos.z) * 0.65));
+      const ph = this.duel.phase;
+      if (ph === 'spin') _v.copy(cam.position); else _v.set(this.pos.x - fx * back - fz * side, this.pos.y + 7 * Math.pow(this.zoom, 0.8), this.pos.z - fz * back + fx * side);
+      cam.position.lerp(_v, 1 - Math.exp(-dt * (ph === 'slam' ? 12 : 4))); cam.up.set(0, 1, 0);
+      if (ph === 'spin') cam.lookAt(this.pos); else if (ph === 'slam') cam.lookAt(_u.set(v.x, (v.y || 0) + HIP, v.z)); else cam.lookAt(_u.set(this.pos.x + (v.x - this.pos.x) * 0.65, Math.max(this.pos.y, (v.y || 0) + HIP) + 0.5, this.pos.z + (v.z - this.pos.z) * 0.65));
     } else if (this.view === 'cockpit' && this.state === 'fly') {
       _v.set(P.seat[0], P.seat[1], 0).applyQuaternion(this.q); cam.position.copy(this.pos).add(_v);
       cam.quaternion.copy(this.q).multiply(SEAT_TURN); cam.up.set(0, 1, 0).applyQuaternion(this.q);
@@ -567,22 +568,33 @@ export class Flight {
       this.pos.x += (v.x + dx / d * 5.5 - this.pos.x) * k; this.pos.z += (v.z + dz / d * 5.5 - this.pos.z) * k; this.pos.y += (Math.max(2.4, (v.y || 0) + HIP) - this.pos.y) * k;
     }
     if (D.phase === 'spin') this.pos.y += (Math.max(this.pos.y, 14) - this.pos.y) * Math.min(1, dt * 1.2); // rising as they whirl round
-    let a = Math.atan2(-(v.z - this.pos.z), v.x - this.pos.x) - this.yaw; a = Math.atan2(Math.sin(a), Math.cos(a));
-    this.yaw += a * Math.min(1, dt * (D.phase === 'spin' ? 25 : 5)); this.pitch -= this.pitch * Math.min(1, dt * 4); this.roll -= this.roll * Math.min(1, dt * 4); this.speed = 0;
+    if (D.phase !== 'drag' && D.phase !== 'slam') { // dragging them (brawl.js steers) or the sky slam (heroduel.js places the hero): hands off
+      let a = Math.atan2(-(v.z - this.pos.z), v.x - this.pos.x) - this.yaw; a = Math.atan2(Math.sin(a), Math.cos(a));
+      this.yaw += a * Math.min(1, dt * (D.phase === 'spin' ? 25 : 5));
+    }
+    this.pitch -= this.pitch * Math.min(1, dt * 4); this.roll -= this.roll * Math.min(1, dt * 4); this.speed = 0;
   }
   // the fight over (heroduel.js): back to flying
-  duelOver(won) { this.duel = null; if (won) this.lock = null; this.obj.visible = this.view === 'chase' && this.state === 'fly'; SEE.on = this.view === 'cockpit' ? false : this.saved.see; this.speed = this.thr = Math.max(this.thr, this.P.start * 0.6); this.pitch = 0.5; } // nose up, clear of the street
+  duelOver(won) { this.duel = null; this.act = null; if (won) this.lock = null; this.obj.visible = this.view === 'chase' && this.state === 'fly'; SEE.on = this.view === 'cockpit' ? false : this.saved.see; this.speed = this.thr = Math.max(this.thr, this.P.start * 0.6); this.pitch = 0.5; } // nose up, clear of the street
   // a hero's pose: flat out along the way at speed, one fist ahead; upright and treading air slow or in a fight; a punch;
   // arms out holding on while spinning a villain round. The rig set so the hips are where the hero is
   heroPose(r, dt) {
-    const A = r.arms, D = this.duel, fast = D ? 0 : Math.max(0, Math.min(1, (this.speed - 10) / 14));
-    relax(r); this.lean = (this.lean || 0) + (1.35 * fast - (this.lean || 0)) * Math.min(1, dt * 3);
-    if (D && D.phase === 'spin') for (const a of A) { a.sh.rotation.set(-1.5, 0, a.sx * 0.15); a.el.rotation.set(0, 0, 0); }
+    const A = r.arms, L = r.legs, D = this.duel, fast = D ? 0 : Math.max(0, Math.min(1, (this.speed - 10) / 14)), act = this.act, kind = act && act.kind;
+    const u = act ? Math.min(1, act.t / act.T) : 0, k = Math.sin(Math.PI * u); // a move: how far through it; out and back
+    relax(r); this.lean = kind === 'dive' ? Math.PI : (this.lean || 0) + ((kind === 'drag' ? 0.9 : 1.35 * fast) - (this.lean || 0)) * Math.min(1, dt * 3); // head first after them in the dive
+    if (D && D.phase === 'spin') for (const a of A) { a.sh.rotation.set(-1.5, 0, -a.sx * 0.24); a.el.rotation.set(0, 0, 0); } // straight out and in together: the hands on the villain's ankles (heroduel.js HANDS)
+    else if (kind === 'kick') { L[1].hip.rotation.x = -1.7 * k; L[1].knee.rotation.x = 0.9 * (1 - k); L[0].knee.rotation.x = 0.3; r.torso.rotation.x = -0.35 * k; for (const a of A) { a.sh.rotation.set(-0.5, 0, a.sx * (0.6 + 0.4 * k)); a.el.rotation.set(-0.8, 0, 0); } }
+    else if (kind === 'laser') { if (this.P.hero === 'Nova') { for (const a of A) { a.sh.rotation.set(0.45, 0, a.sx * 0.25); a.el.rotation.set(-0.9, 0, 0); } r.torso.rotation.x = 0.15; } else for (const a of A) { a.sh.rotation.set(-1.55, 0, -a.sx * 0.12); a.el.rotation.set(0, 0, 0); } } // Nova's from her eyes, fists back; the others' from their hands
+    else if (kind === 'crouch') { A[1].sh.rotation.set(0.5, 0, 0.1); A[1].el.rotation.set(-1.4, 0, 0); A[0].sh.rotation.set(-1.0, 0, -0.15); A[0].el.rotation.set(-1.7, 0, 0); r.torso.rotation.x = 0.4; for (const l of L) { l.hip.rotation.x = -0.4; l.knee.rotation.x = 0.8; } } // wound up for the uppercut
+    else if (kind === 'upper') { A[1].sh.rotation.set(-0.4 - 2.4 * k, 0, 0.1); A[1].el.rotation.set(-1.2 * (1 - k), 0, 0); r.torso.rotation.x = 0.4 - 0.7 * k; }
+    else if (kind === 'rise') { A[1].sh.rotation.set(-3.0, 0, 0.1); A[0].sh.rotation.set(0.2, 0, -0.15); }
+    else if (kind === 'hammerUp' || kind === 'hammer' || kind === 'dive') { const s = kind === 'hammer' ? u : 0; for (const a of A) { a.sh.rotation.set(-3.0 + 2.3 * s, 0, -a.sx * 0.15); a.el.rotation.set(0, 0, 0); } r.torso.rotation.x = kind === 'hammerUp' ? -0.25 : 0.35 * s; } // fists together over the head, brought down
+    else if (kind === 'drag') { A[1].sh.rotation.set(0.9, 0, 0.25); A[1].el.rotation.set(0, 0, 0); A[0].sh.rotation.set(-2.9, 0, -0.1); } // one hand back on their throat, the other ahead
     else if (this.punch > 0) { A[1].sh.rotation.set(-1.6, 0, 0.1); A[0].sh.rotation.set(0.4, 0, -0.2); A[0].el.rotation.set(-1.4, 0, 0); r.torso.rotation.x = 0.3; }
     else if (fast > 0.5) { A[1].sh.rotation.set(-3.0, 0, 0.1); A[0].sh.rotation.set(0.25, 0, -0.1); }
     else { for (const a of A) a.sh.rotation.set(0.1, 0, a.sx * 0.3); for (const L of r.legs) { L.hip.rotation.x = 0.1; L.knee.rotation.x = 0.25; } }
     r.body.rotation.x = this.lean; r.head.rotation.x = -this.lean * 0.6;
-    r.root.position.set(-Math.sin(this.lean) * HIP, -Math.cos(this.lean) * HIP + (fast < 0.5 ? Math.sin((this.wingT || 0) * 2) * 0.15 : 0), 0);
+    r.root.position.set(-Math.sin(this.lean) * HIP, -Math.cos(this.lean) * HIP + (fast < 0.5 && !D ? Math.sin((this.wingT || 0) * 2) * 0.15 : 0), 0); // treading air (held still in a fight)
     r.cape.update(dt, this.lean > 0.5 ? 0.12 : Math.min(0.6, this.speed / 30), 0.3 + Math.min(0.7, this.speed / 20));
     this.wingT = (this.wingT || 0) + dt; r.wings.forEach((w, i) => { w.rotation.z = Math.sin(this.wingT * 55 + i * 1.3) * 0.45 + 0.15; });
     if (this.obj.visible) detail(r, null, true);

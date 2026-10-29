@@ -12,7 +12,7 @@
 // out of the water two at a time and fly them up onto a roof clear of it, and
 // Tempo holds back the incoming wave with his bubbles.
 import * as THREE from 'three';
-import { rig, relax, handsOnHips, tumble, detail } from './villains.js';
+import { rig, relax, handsOnHips, tumble, detail, pinPose } from './villains.js';
 import { tossStep, toss } from './brawl.js';
 import { fightPose } from './melee.js';
 import { alienStep } from './herofight.js';
@@ -439,7 +439,7 @@ class Hero {
     this.pitch += (pitch - this.pitch) * Math.min(1, dt * 3); r.body.rotation.x = this.pitch; r.head.rotation.x = -this.pitch * 0.6;
     if (!this.landed && this.hs < 10) r.body.position.y = Math.sin(this.t * 2) * 0.2;
     fightPose(r, this); // squared up, a punch or a kick, a block, reeling; or leaning into a beam clash
-    if (this.tossed || this.gripped || this.spinning) tumble(r, this.t, this.spinning);
+    if (this.pinned && !this.tossed) pinPose(r, this); else if (this.tossed || this.gripped || this.spinning) tumble(r, this.t, this.spinning);
     r.cape.update(dt, this.pitch > 0.5 ? 0.12 : Math.min(0.6, this.hs / 30), 0.3 + Math.min(0.7, this.hs / 20)); detail(r, this.D);
     if (this.wings) { const fl = this.landed ? 0 : 1; this.wings.forEach((w, i) => { w.rotation.z = fl ? Math.sin(this.t * 55 + i * 1.3) * 0.45 + 0.15 : -0.15; w.rotation.y = -(i < 2 ? 0.25 : 0.7) - (fl ? 0 : 0.6); }); }
     if (this.hands) for (const g of this.hands) g.visible = this.castT > 0;

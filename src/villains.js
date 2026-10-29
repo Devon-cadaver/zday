@@ -187,6 +187,33 @@ export function tumble(r, t, spinning) {
   for (const a of r.arms) a.sh.rotation.set(-1.2, 0, a.sx * 1.4);
   for (const L of r.legs) { L.hip.rotation.x = -0.5; L.knee.rotation.x = 0.8; }
 }
+// held still in a fight by the hero the player flies (heroduel.js), or hauled down the street by the throat (brawl.js drag), in
+// place of the tumble (f.pinned): 'reel' reeling from the blows (f.flinch: one just landed, 1 dying away to 0), 'dazed' seeing
+// stars, 'swing' swung round by the ankles stretched out flat, 'air' flung up into the sky limbs flailing, 'drag' on their
+// back with their hands up at the grip on their throat
+export function pinPose(r, f) {
+  const t = f.t || 0, A = r.arms, L = r.legs, P = f.pinned;
+  relax(r);
+  if (P === 'swing') {
+    r.body.rotation.x = 1.45 + Math.sin(t * 9) * 0.06;
+    for (const a of A) { a.sh.rotation.set(-2.9 + Math.sin(t * 13 + a.sx) * 0.25, 0, a.sx * 0.5); a.el.rotation.set(-0.2, 0, 0); }
+    for (const l of L) l.knee.rotation.x = 0.1;
+  } else if (P === 'air') {
+    r.body.rotation.x = Math.sin(t * 2.2) * 0.7; r.body.rotation.z = Math.sin(t * 1.7) * 0.4;
+    for (const a of A) { a.sh.rotation.set(-1.6 + Math.sin(t * 9 + a.sx * 2) * 0.6, 0, a.sx * 1.3); a.el.rotation.set(-0.4, 0, 0); }
+    L[0].hip.rotation.set(Math.sin(t * 8) * 0.5, 0, -0.3); L[1].hip.rotation.set(-Math.sin(t * 8) * 0.5, 0, 0.3); for (const l of L) l.knee.rotation.x = 0.5;
+  } else if (P === 'drag') {
+    r.body.rotation.x = -1.35; r.body.position.y = 0.35; r.head.rotation.x = 0.4;
+    for (const a of A.slice(0, 2)) { a.sh.rotation.set(-2.7, 0, a.sx * 0.35); a.el.rotation.set(-0.9, 0, 0); }
+    L[0].hip.rotation.x = Math.sin(t * 14) * 0.25; L[1].hip.rotation.x = -Math.sin(t * 14) * 0.25; for (const l of L) l.knee.rotation.x = 0.3;
+  } else {
+    const k = Math.max(0, Math.min(1, f.flinch || 0)), dz = P === 'dazed';
+    r.body.rotation.z = Math.sin(t * (dz ? 3 : 5)) * (dz ? 0.16 : 0.07);
+    r.torso.rotation.x = 0.25 - 0.75 * k; r.head.rotation.set((dz ? 0.35 : 0.1) - 0.7 * k, dz ? Math.sin(t * 3) * 0.5 : 0, dz ? Math.sin(t * 6) * 0.3 : 0);
+    for (const a of A) { a.sh.rotation.set(dz ? -0.25 : -0.7 + 0.5 * k, 0, a.sx * (0.35 + 0.8 * k)); a.el.rotation.set(-0.9, 0, 0); }
+    for (const l of L) { l.hip.rotation.x = 0.15; l.knee.rotation.x = 0.35; }
+  }
+}
 export function handsOnHips(r) {
   r.legs[0].hip.rotation.z = -0.09; r.legs[1].hip.rotation.z = 0.09;
   for (const a of r.arms) { a.sh.rotation.set(0.15, 0, a.sx * 0.6); a.el.rotation.set(-0.3, 0, -a.sx * 1.7); }
@@ -374,7 +401,7 @@ class Blur extends Villain {
     else if (this.dazed > 0) { r.body.rotation.z = Math.sin(this.t * 4) * 0.12; r.torso.rotation.x = 0.35; r.head.rotation.set(0.3, Math.sin(this.t * 3) * 0.4, Math.sin(this.t * 6) * 0.3); for (const a of r.arms) { a.sh.rotation.set(-0.3, 0, a.sx * 0.5); a.el.rotation.set(-0.6, 0, 0); } } // seeing stars, swaying on his feet
     else { handsOnHips(r); r.torso.rotation.x = Math.sin(this.t * 1.6) * 0.02; r.head.rotation.y = Math.sin(this.t * 0.7) * 0.5; } // between runs, weighing up where to go next
     fightPose(r, this);
-    if (this.tossed || this.gripped || this.spinning) tumble(r, this.t, this.spinning);
+    if (this.pinned && !this.tossed) pinPose(r, this); else if (this.tossed || this.gripped || this.spinning) tumble(r, this.t, this.spinning);
     r.cape.update(dt, Math.min(1, this.speed / 35), Math.min(1, this.speed / 25) + 0.15); detail(r, this.D);
   }
   dispose() { super.dispose(); this.trail.dispose(this.V.scene); }
@@ -671,7 +698,7 @@ class Tyrant extends Villain {
     this.pitch += (pitch - this.pitch) * Math.min(1, dt * 3); r.body.rotation.x = this.pitch; r.head.rotation.x = -this.pitch * 0.6;
     if (flying) r.body.position.y = Math.sin(this.t * 2) * 0.25;
     fightPose(r, this);
-    if (this.tossed || this.gripped || this.spinning) tumble(r, this.t, this.spinning);
+    if (this.pinned && !this.tossed) pinPose(r, this); else if (this.tossed || this.gripped || this.spinning) tumble(r, this.t, this.spinning);
     r.cape.update(dt, this.pitch > 0.5 ? 0.12 : Math.min(0.6, this.hs / 30), 0.3 + Math.min(0.7, this.hs / 20)); detail(r, this.D);
     const R = this.ray;
     if (R && r.eyes) {
@@ -894,7 +921,7 @@ class Weaver extends Villain {
     }
     if (!hanging && this.yanked && !this.yanked.car.gone) { r.root.updateMatrixWorld(true); handAt(A[1], _w); const c = this.yanked.car; aim(this.line, _w.x, _w.y, _w.z, c.x, (c.y || 0) + 1, c.z, 0.07); this.line.visible = true; }
     fightPose(r, this);
-    if (this.tossed || this.gripped || this.spinning) tumble(r, this.t, this.spinning);
+    if (this.pinned && !this.tossed) pinPose(r, this); else if (this.tossed || this.gripped || this.spinning) tumble(r, this.t, this.spinning);
     r.cape.update(dt, Math.min(0.85, this.speed / 30), 0.2 + Math.min(0.8, this.speed / 25)); detail(r, this.D);
   }
   dispose() { super.dispose(); this.V.scene.remove(this.line); for (const w of this.webs) { w.release(); w.dispose(); } this.webs.length = 0; }

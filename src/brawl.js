@@ -61,11 +61,11 @@ function smash(D, k, x, y, z, vx, vz, out) {
   if (near(D, x, z)) D.shake(0.35);
 }
 function near(D, x, z) { const { camera, controls } = D.ctx, c = controls.target; return Math.hypot(x - c.x, z - c.z) < camera.position.distanceTo(c) * 1.2; }
-export function toss(f, vx, vy, vz) { if (f.dropHeld) f.dropHeld(); f.tossed = { vx, vy, vz, t: 0, inB: -1 }; f.busyT = 0; f.spinning = false; }
+export function toss(f, vx, vy, vz) { if (f.dropHeld) f.dropHeld(); f.tossed = { vx, vy, vz, t: 0, inB: -1 }; f.busyT = 0; f.spinning = false; f.pinned = null; }
 
 export class Brawl {
   constructor(D) { this.D = D; this.shots = []; this.spins = []; this.drags = []; this.said = {}; this.t = 0; this.melee = new Melee(this); this.stunts = new Stunts(this); } // melee: hand to hand, gang-ups, beam clashes; stunts: the sky slam, the space dive
-  reset() { this.shots.length = 0; this.spins.length = 0; this.drags.length = 0; this.said = {}; this.melee.reset(); this.stunts.reset(); }
+  reset() { for (const S of this.drags) S.victim.pinned = null; this.shots.length = 0; this.spins.length = 0; this.drags.length = 0; this.said = {}; this.melee.reset(); this.stunts.reset(); }
   say(key, text) { if ((this.said[key] || -99) + 8 > this.t) return; this.said[key] = this.t; this.D.emit({ type: 'brawl', text }); }
   // the side's fighters on the map now
   fighters(side) { const out = []; for (const e of this.D.list) if (e.alive && e.type === (side === 'hero' ? 'heroes' : 'villains')) for (const f of e.who) if (alive(f)) out.push(f); return out; }
@@ -101,7 +101,7 @@ export class Brawl {
       if (s > bs) { bs = s; best = [dx, dz]; }
     }
     if (!best) return false;
-    holder.busyT = 3; holder.dragging = true; victim.gripped = true; victim.busyT = 3.5; if (victim.dropHeld) victim.dropHeld();
+    holder.busyT = 3; holder.dragging = true; victim.gripped = true; victim.busyT = 3.5; victim.pinned = 'drag'; if (victim.dropHeld) victim.dropHeld(); // on their back, not tumbling (villains.js pinPose)
     this.drags.push({ holder, victim, dx: best[0], dz: best[1], t: 0, T: 2.4, inB: -1, step: 0, sp: 0 });
     this.say('drag' + holder.name, holder.name + ' grabbed ' + victim.name + ' by the throat and is dragging them down the street!');
     return true;
@@ -112,7 +112,7 @@ export class Brawl {
     const nx = H.x + S.dx * S.sp * h, nz = H.z + S.dz * S.sp * h;
     const end = S.t > S.T || !alive(H) || !alive(V) || nx < B.x0 + 12 || nx > B.x1 - 12 || nz < B.z0 + 12 || nz > B.z1 - 12;
     if (end) { // let go with a fling onwards
-      H.dragging = false; H.busyT = 0.5; V.gripped = false;
+      H.dragging = false; H.busyT = 0.5; V.gripped = false; V.pinned = null;
       if (alive(V)) { toss(V, S.dx * 22, 7, S.dz * 22); this.hurt(V, 35, H); }
       if (S.inB >= 0) smash(D, S.inB, V.x, 1.5, V.z, S.dx * 30, S.dz * 30, true);
       return true;

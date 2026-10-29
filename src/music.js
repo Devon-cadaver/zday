@@ -154,25 +154,10 @@ export class Music {
       setTimeout(() => { if (this.players[this.cur] !== old) { if (THEMES.includes(oldMood)) this.pos[oldMood] = old.el.currentTime; old.el.pause(); } }, (f + 0.5) * 1000);
     }
   }
-  // the planet-buster (game.js). rec: what the songs play taped, the last 4 s over and over, so they can be run backwards
-  // (only from just before the orb is ready to let go: it costs a little while it runs)
-  rec(on) {
-    if (!this.ctx || !this.bgG) return;
-    if (on && !this.tap && this.ctx.createScriptProcessor) {
-      const c = this.ctx, n = Math.ceil(c.sampleRate * 4), sp = c.createScriptProcessor(4096, 2, 2), mute = c.createGain(); mute.gain.value = 0;
-      const T = this.tap = { sp, mute, L: new Float32Array(n), R: new Float32Array(n), at: 0, n, frozen: false };
-      sp.onaudioprocess = (e) => { if (T.frozen) return; const a = e.inputBuffer, l = a.getChannelData(0), r = a.numberOfChannels > 1 ? a.getChannelData(1) : l; for (let i = 0; i < l.length; i++) { T.L[T.at] = l[i]; T.R[T.at] = r[i]; T.at = (T.at + 1) % n; } };
-      this.bgG.connect(sp); sp.connect(mute); mute.connect(c.destination); // a processor only runs joined to the speakers: through a silent gain
-    } else if (!on && this.tap) {
-      const T = this.tap; this.tap = null; T.sp.onaudioprocess = null;
-      try { this.bgG.disconnect(T.sp); } catch (e) { /* already apart */ } T.sp.disconnect(); T.mute.disconnect();
-    }
-  }
-  // the planet bursts: the song stopped dead, its echo turned up to ring on for a second and die away. false: no song playing
+  // the planet-buster (game.js). The planet bursts: the song stopped dead, its echo turned up to ring on for a second and die away. false: no song playing
   blast() {
     const p = this.players[this.cur]; if (!this.ctx || !p || p.el.paused || !this.level || !this.lp) return false;
     const t = this.ctx.currentTime, dry = this.dryG.gain, wet = this.wetG.gain;
-    if (this.tap) this.tap.frozen = true; // the tape stops at the blast: the seconds before it, to run backwards
     this.bustP = p; this.bustPos = p.el.currentTime;
     if (!this.verbOn) { this.lp.connect(this.verb); this.verbOn = true; }
     dry.cancelScheduledValues(t); dry.setValueAtTime(dry.value, t); dry.linearRampToValueAtTime(0, t + 0.03);
@@ -180,28 +165,12 @@ export class Music {
     setTimeout(() => p.el.pause(), 60); // a moment more into the echo, then the song stops
     return true;
   }
-  // the black hole: the last secs of the song before the blast played backwards, then the song on from there (secs further
-  // back than where it stopped, as a tape run back)
-  rewind(secs = 2) {
-    const T = this.tap, p = this.bustP; if (!this.ctx || !p) return;
-    const c = this.ctx, t = c.currentTime;
-    this.applySpace(0.08); // close again (or as far off as the menu has it)
-    if (T) {
-      const n = Math.min(T.n, Math.floor(c.sampleRate * secs)), b = c.createBuffer(2, n, c.sampleRate), L = b.getChannelData(0), Rr = b.getChannelData(1);
-      for (let i = 0; i < n; i++) { const j = (T.at - 1 - i + T.n * 2) % T.n; L[i] = T.L[j]; Rr[i] = T.R[j]; } // newest first
-      const src = c.createBufferSource(), g = c.createGain(); src.buffer = b; src.connect(g); g.connect(this.duckG);
-      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(1, t + 0.12); g.gain.setValueAtTime(1, t + secs - 0.2); g.gain.linearRampToValueAtTime(0, t + secs);
-      src.onended = () => { src.disconnect(); g.disconnect(); }; src.start(t);
-    }
-    this.rewT = setTimeout(() => this.resume(secs), secs * 1000 - 150);
-  }
-  // the song going again where the rewind left it; the tape put away
-  resume(back = 0) {
-    clearTimeout(this.rewT); this.rec(false);
+  // the planet whole again: the song back where it stopped, easing in
+  resume() {
     const p = this.bustP; this.bustP = null; if (!p) return;
-    this.applySpace(0.2);
+    this.applySpace(0.5);
     if (this.players[this.cur] !== p || !this.level || !p.el.paused) return;
-    try { p.el.currentTime = Math.max(0, this.bustPos - back); } catch (e) { /* not seekable: on from where it stopped */ }
+    try { p.el.currentTime = this.bustPos; } catch (e) { /* not seekable: on from where it is */ }
     p.el.play().catch(() => {});
   }
   // the announcer talking: the music held down for secs, then back up
