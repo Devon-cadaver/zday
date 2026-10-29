@@ -201,7 +201,7 @@ game.buildWorld = buildWorld; // the menu builds the place it picks, here
 game.moveWorld = moveWorld;
 game.audio = new Audio(camera, controls); // sound: switched on by the first tap
 game.radio = new Radio(game.audio); // the announcer
-if (!game.menu.hidden) game.audio.music.setMenu(true); // the theme on the menus
+if (!game.menu.hidden) { game.audio.music.setMenu(true); game.audio.ufo(game.menuPanel === 'main'); } // the theme on the menus; the saucer humming
 seeButton((on) => game.toast('See through buildings: ' + (on ? 'on' : 'off'))); // the eye: walls between you and the action fade, or not
 if (game.menu.hidden) game.radio.begin(game.modeName === 'be' && game.mode ? game.mode.kind : null);
 const globe = game.globe = new Globe(renderer); let globeWas = false; // the world from orbit: the big city and the towns
@@ -209,6 +209,7 @@ globe.statusFor = () => game.townStatus(game.modeName); // Commander and Be The 
 globe.trail = (m) => game.profile.been(m === 'commander' || m === 'be' ? m : null); // the road only as far as the towns played (Sean: your trail, not where you are going)
 globe.mode = () => game.modeName;
 globe.sky = sky;
+globe.onZoom = (k) => game.audio.music.setZoom(k); // zoomed in on the planet: its songs closer
 globe.onFacing = (key) => game.audio.music.setMenuSong(PLACES[key].style ? 'theme2' : 'theme'); // on the menu: the Far East turned towards you, the second song
 globe.moveTo = (key) => { const m = game.modeName, kind = m === 'be' && game.mode ? game.mode.kind : null; moveWorld(key, m, kind); globe.close(); game.startMode(m, kind); setTimeout(meteorIn, 800); }; // another town from the globe, built here
 globe.up = (after) => { game.setFollow(-1); sky.up(() => { globe.open({ clouds: true }); globe.after = after || null; }); }; // up through the clouds (then on to another town)

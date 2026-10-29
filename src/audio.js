@@ -299,6 +299,23 @@ export class Audio {
     for (const name in LOOPS) jobs.push(() => { seed = 777 + name.length * 31; this.startLoop(name, this.toBuf(LOOPS[name]())); });
     const run = () => { const t0 = performance.now(); while (jobs.length && performance.now() - t0 < 12) jobs.shift()(); if (jobs.length) setTimeout(run, 30); };
     setTimeout(run, 50);
+    if (this.ufoWant) this.ufo(true); // the menu's saucer was waiting for the sound to start
+  }
+  // the saucer of the main menu humming (Sean: low, but whirling): two low saws a hair apart beating against each other
+  // and a sub tone, through a resonant lowpass that a slow wobble sweeps, a faint whine on top with vibrato; on the
+  // effects' volume. on: wanted (it starts once the first tap has made the sound engine)
+  ufo(on) {
+    this.ufoWant = on; const c = this.ctx; if (!c) return;
+    if (!this.hum && on) {
+      const g = c.createGain(), f = c.createBiquadFilter(); g.gain.value = 0; f.type = 'lowpass'; f.frequency.value = 320; f.Q.value = 7; f.connect(g); g.connect(this.bus);
+      const osc = (type, fr, gain, into) => { const o = c.createOscillator(), og = c.createGain(); o.type = type; o.frequency.value = fr; og.gain.value = gain; o.connect(og); og.connect(into); o.start(); return o; };
+      osc('sawtooth', 55, 0.5, f); osc('sawtooth', 55.8, 0.5, f); osc('sine', 110.4, 0.35, f);
+      const whine = osc('sine', 440, 0.04, g);
+      const lfo = (fr, depth, param) => { const o = c.createOscillator(), d = c.createGain(); o.frequency.value = fr; d.gain.value = depth; o.connect(d); d.connect(param); o.start(); };
+      lfo(0.42, 150, f.frequency); lfo(5.5, 7, whine.frequency); lfo(0.23, 40, whine.frequency); // the whirl
+      this.hum = g;
+    }
+    if (this.hum) this.hum.gain.setTargetAtTime(on ? 0.45 : 0, c.currentTime, on ? 1.2 : 0.4);
   }
   toBuf(x) { const b = this.ctx.createBuffer(1, x.length, SR); b.copyToChannel ? b.copyToChannel(x, 0) : b.getChannelData(0).set(x); return b; }
   startLoop(name, buf) {

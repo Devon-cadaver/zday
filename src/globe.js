@@ -149,7 +149,7 @@ export class Globe {
     this.buildRoad();
     this.decorate();
     this.labels();
-    this.controls = new OrbitControls(cam, this.renderer.domElement); this.controls.enablePan = false; this.controls.enableDamping = true; this.controls.dampingFactor = 0.08;
+    this.controls = new OrbitControls(cam, this.renderer.domElement); this.controls.addEventListener('start', () => { this.easing = false; }); // a finger on it: no easing back this.controls.enablePan = false; this.controls.enableDamping = true; this.controls.dampingFactor = 0.08;
     this.controls.minDistance = R * 1.25; this.controls.maxDistance = Math.max(R * 5, this.fit() * 1.15); this.controls.rotateSpeed = 0.5; this.controls.enabled = false;
     this.ui();
   }
@@ -467,7 +467,11 @@ export class Globe {
     }
     if (this.state === 'menu') { // the menu card changed (another panel): the planet eased back into the gap; left alone once there, so a pinch still zooms
       if ((this.fitT = (this.fitT || 0) - dt) <= 0) { this.fitT = 0.5; const mf = this.menuFit(); this.shiftTo = mf.shift; if (Math.abs(mf.d - (this.menuTo || 0)) > mf.d * 0.04) { this.menuTo = mf.d; this.controls.maxDistance = Math.max(this.controls.maxDistance, mf.d * 1.3); this.easing = true; } }
-      if (this.easing && !this.rise) { const L = this.cam.position.length(), L2 = L + (this.menuTo - L) * Math.min(1, dt * 2.5); this.cam.position.setLength(L2); if (Math.abs(this.menuTo - L2) < 0.05) this.easing = false; }
+      if (this.easing && !this.rise) { const L = this.cam.position.length(), L2 = L + (this.menuTo - L) * Math.min(1, dt * 2.5); this.cam.position.setLength(L2); if (Math.abs(this.menuTo - L2) < this.menuTo * 0.01 || (this.easeT = (this.easeT || 0) + dt) > 3) { this.easing = false; this.easeT = 0; } } // done (it never quite lands: the controls round it off)
+    }
+    if (this.state === 'menu' && this.onZoom && (this.zoomT = (this.zoomT || 0) - dt) <= 0) { // how far in on the planet the view is: 1 the menu's own view, 0 right in close
+      this.zoomT = 0.15; const far = this.menuTo || this.fit(), near = R * 1.6;
+      this.onZoom(Math.max(0, Math.min(1, (this.cam.position.length() - near) / Math.max(1, far - near))));
     }
     if (this.state === 'menu' && this.onFacing && (this.faceT = (this.faceT || 0) - dt) <= 0) { // the town nearest the middle of the view (the menu's song follows its side of the world)
       this.faceT = 0.5; let best = null, bd = -2;

@@ -580,6 +580,10 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 
 - The menu saucer spins and its buttons float (Sean): the hull's panels, the lights round its edge, the underside strip and the dome's lights are dashed rings (.spin) whose dash offset runs (zdSpin, 2 to 7 s, a whole number of dash patterns so no jump), the far side going the other way; the four mode buttons drift and tilt a little each on its own clock (zdBob on the translate and rotate properties, so their own tilt stays); both off for reduced motion.
 
+- Zooming in on the menu planet brings its songs closer (Sean): globe.onZoom (every 0.15 s on the menus) gives 1 at the menu's own view and 0 at 1.6 R; music.setZoom(k) -> applySpace: lowpass 2600 Hz to 20 kHz, dry 0.3 to 1, reverb 0.5 to 0 (only while space() is on; in a town it stays close).
+- The saucer hums on the main menu (audio.ufo(on); showMenu/menuOff and main.js start it): two saws at 55 and 55.8 Hz beating plus a sub at 110 Hz, through a resonant lowpass (320 Hz, Q 7) swept by a 0.42 Hz wobble, and a faint 440 Hz whine with vibrato; gain 0.45 on the effects bus, so the sound setting sets it. Waits for the first tap (ufoWant).
+- Fix: the menu planet's easing into its place never finished (the controls rounded the length off by more than 0.05), so it pulled every zoom back; it now ends within 1% or after 3 s, and any touch on the globe (controls 'start') stops it.
+
 ## Next
 - Sean tests v1.3 on his phone; tune from his notes. Candidates: Be The Disaster score scales and ranks once real scores come in, the saucer size at close zoom, how often zombie outbreaks turn up in Commander, incident pacing, card bar height on the phone.
 

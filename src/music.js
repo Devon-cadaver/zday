@@ -101,9 +101,17 @@ export class Music {
     if (!this.lp) return;
     const t = this.ctx.currentTime;
     if (on && !this.verbOn) { this.lp.connect(this.verb); this.verbOn = true; }
-    this.lp.frequency.setTargetAtTime(on ? 2600 : 20000, t, 0.5); this.dryG.gain.setTargetAtTime(on ? 0.3 : 1, t, 0.5); this.wetG.gain.setTargetAtTime(on ? 0.5 : 0, t, 0.5);
+    this.spaceOn = on; this.applySpace(0.5);
     clearTimeout(this.verbT); if (!on && this.verbOn) this.verbT = setTimeout(() => { if (!this.menuOn && this.verbOn) { this.lp.disconnect(this.verb); this.verbOn = false; } }, 5000);
   }
+  // how far off the songs sound: on the menus as far as the view is from the planet (zoomK 1: the menu's own view, from
+  // space; 0: zoomed right in on it, Sean: the echo down, the songs up); in a town, close
+  applySpace(tc = 0.4) {
+    if (!this.lp) return;
+    const t = this.ctx.currentTime, k = this.spaceOn ? (this.zoomK ?? 1) : 0;
+    this.lp.frequency.setTargetAtTime(2600 * Math.pow(20000 / 2600, 1 - k), t, tc); this.dryG.gain.setTargetAtTime(1 - 0.7 * k, t, tc); this.wetG.gain.setTargetAtTime(0.5 * k, t, tc);
+  }
+  setZoom(k) { if (Math.abs(k - (this.zoomK ?? 1)) < 0.02) return; this.zoomK = k; if (this.spaceOn) this.applySpace(0.25); }
   // the menus: the theme song for the side of the world in view (setMenuSong)
   setMenu(on) {
     if (on !== this.menuOn) this.space(on);

@@ -425,7 +425,7 @@ export class Game {
       const cv = document.createElement('canvas'); cv.className = 'rgl'; this.menu.appendChild(cv);
       import('./roster.js').then(m => { if (!cv.isConnected) return; const sec = this.menu.querySelector('.rsec'); sec.innerHTML = ''; this.roster = m.startRoster({ canvas: cv, list: this.menu.querySelector('.mbody'), root: sec }); });
     }
-    clearTimeout(this._gone); this.menu.classList.remove('gone'); this.menu.hidden = false; document.body.classList.add('zd-menu-on'); document.body.classList.toggle('zd-main', panel === 'main'); // the main menu: the saucer
+    clearTimeout(this._gone); this.menu.classList.remove('gone'); this.menu.hidden = false; document.body.classList.add('zd-menu-on'); document.body.classList.toggle('zd-main', panel === 'main'); if (this.audio) this.audio.ufo(panel === 'main'); // the main menu: the saucer, humming
     this.dockSide();
     if (this.globe) this.globe.backdrop(panel === 'main'); // the town names only round the main menu
     dragScroll(this.menu.querySelector('.mbody'), 'y');
@@ -444,7 +444,7 @@ export class Game {
     dragScroll(el.querySelector('.box'), 'y');
   }
   stopRoster() { if (this.roster) { this.roster.stop(); this.roster = null; } }
-  menuOff() { if (this.audio && this.audio.music) this.audio.music.setMenu(false); this.stopRoster(); document.body.classList.remove('zd-menu-on'); const side = document.getElementById('zd-side'); if (side && side.parentNode !== document.body) document.body.appendChild(side); }
+  menuOff() { if (this.audio && this.audio.music) this.audio.music.setMenu(false); if (this.audio) this.audio.ufo(false); this.stopRoster(); document.body.classList.remove('zd-menu-on'); const side = document.getElementById('zd-side'); if (side && side.parentNode !== document.body) document.body.appendChild(side); }
   // from the menu: Commander and Be The Disaster head for the town where you left off (the first town the first time),
   // Sandbox lets you pick any place on the globe; the menu drops away first
   playMode(which, kind) {
