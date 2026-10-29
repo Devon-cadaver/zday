@@ -11,9 +11,23 @@ const town = (c, lit = '#ffd77a', skip = [], k = 1) => BLD.map(([x, w, h], i) =>
 const ground = (c = '#231d2e') => '<rect y="' + G + '" width="96" height="8" fill="' + c + '"/>';
 const sky = (id, a, b) => '<defs><linearGradient id="zt-' + id + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + a + '"/><stop offset="1" stop-color="' + b + '"/></linearGradient></defs><rect width="96" height="54" fill="url(#zt-' + id + ')"/>';
 const STARS = '<g fill="#fff" opacity=".7"><circle cx="8" cy="6" r=".6"/><circle cx="21" cy="12" r=".5"/><circle cx="70" cy="5" r=".6"/><circle cx="86" cy="13" r=".5"/><circle cx="58" cy="9" r=".4"/><circle cx="33" cy="4" r=".4"/></g>';
+// a hero flying flat out to the right, fist first, cape streaming back over the legs (suit, hair: colours; x: in front of
+// the body, b: behind it)
+const flier = (suit, hair, b = '', x = '') => '<g transform="rotate(-9 50 24)">' + b +
+  '<path d="M58 20 Q44 15 30 17 Q24 14 18 16 Q26 21 34 21 Q46 23 58 24 Z" fill="' + suit + '" opacity=".8"/>' + // the cape
+  '<g stroke="' + suit + '" stroke-linecap="round" fill="none"><path d="M44 22.5 L25 21.5" stroke-width="3.2"/><path d="M44 25 L26 27" stroke-width="3.2"/><path d="M59 21.5 L75 19.2" stroke-width="2.6"/><path d="M57 25.5 L50 28.5" stroke-width="2.4"/></g>' +
+  '<rect x="42" y="20" width="19" height="7.4" rx="3.4" fill="' + suit + '"/><rect x="43" y="23" width="2" height="2" fill="#fff" opacity=".55"/>' + // the body, the belt
+  '<circle cx="76" cy="19.1" r="1.9" fill="#e8b48c"/><circle cx="65.6" cy="22.6" r="3.4" fill="#e8b48c"/><path d="M62.4 21.6 Q64 18.4 68.6 20.4" stroke="' + hair + '" stroke-width="2.2" fill="none" stroke-linecap="round"/>' +
+  '<g fill="#fff" opacity=".9"><rect x="22.8" y="20.2" width="3.2" height="2.6" rx="1"/><rect x="23.8" y="25.8" width="3.2" height="2.6" rx="1"/></g>' + x + '</g>';
+const heroSky = (id) => sky(id, '#1c2a5a', '#7a5aa8') + STARS + town('#1a1834', '#ffd77a') + ground('#221d36');
 const svg = (s) => '<svg viewBox="0 0 96 54" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' + s + '</svg>';
 
 export const THUMB = {
+  // the heroes: Nova pink with a streak of light behind her, Dragonfly green on four wings, Tempo cyan in a time bubble
+  nova: svg(heroSky('nova') + flier('#ff3fcf', '#d9b25e', '<path d="M2 30 Q20 24 40 23" stroke="#ff9ae6" stroke-width="5" stroke-linecap="round" fill="none" opacity=".45"/><path d="M10 27 Q26 23 40 23" stroke="#fff" stroke-width="1.6" stroke-linecap="round" fill="none" opacity=".7"/>')),
+  dragonfly: svg(heroSky('dragonfly') + flier('#3dff5c', '#4a3424', '<g fill="#c8ffd8" opacity=".55"><ellipse cx="52" cy="13" rx="9" ry="3" transform="rotate(-25 52 13)"/><ellipse cx="46" cy="14" rx="8" ry="2.6" transform="rotate(-50 46 14)"/></g>', '<g fill="#e8fff0" opacity=".5"><ellipse cx="53" cy="31" rx="9" ry="3" transform="rotate(20 53 31)"/></g>')),
+  tempo: svg(heroSky('tempo') + '<circle cx="54" cy="23" r="21" fill="#29e3ff" opacity=".14"/><circle cx="54" cy="23" r="21" fill="none" stroke="#9af4ff" stroke-width="1" stroke-dasharray="3 2" opacity=".8"/>' + flier('#29e3ff', '#2a2a2a', '', '<circle cx="76" cy="19.1" r="3.2" fill="#9af4ff" opacity=".5"/>') +
+    '<g stroke="#9af4ff" stroke-width="1" fill="none" opacity=".8"><circle cx="14" cy="12" r="5"/><path d="M14 12 L14 8.6 M14 12 L16.6 13.4"/></g>'),
   a10: svg(sky('a10', '#7fb4e0', '#d6ebf7') + town('#5a6a7a', '#fff2b0') + ground('#7a8a6a') + '<path d="M10 30h14M8 36h12" stroke="#fff" stroke-width="1" opacity=".7"/>' +
     '<g fill="#7a8468"><rect x="30" y="17" width="38" height="5" rx="2.5"/><rect x="44" y="8" width="6" height="24" rx="1"/><rect x="28" y="13" width="3" height="13" rx="1"/></g><g fill="#5e665a"><circle cx="36" cy="14" r="2.6"/><circle cx="36" cy="25" r="2.6"/></g>' +
     '<path d="M68 19.5 L74 19.5" stroke="#3a3a3a" stroke-width="1.4"/><rect x="60" y="18.2" width="4" height="2.6" rx="1.2" fill="#2b4a66"/><path d="M74 19.5 L92 17 M74 19.5 L92 21" stroke="#ffd36b" stroke-width=".8"/>'),

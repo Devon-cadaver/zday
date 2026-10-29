@@ -8,10 +8,16 @@
 // round you, and fight back (hazards: the tornado pulls the plane in, the kaiju throws cars at it, grabs it and burns it,
 // the dust storm's devils toss it about) - the hull takes the damage, and at nothing it goes down. main.js hands the
 // camera over while it is up (frame()), and game.js's Sandbox has the buttons.
+// Or a super hero (Nova, Dragonfly, Tempo), flown the same way but slower, able to hang in the air, skimming the ground
+// and bumping off walls rather than crashing: Lock on picks the nearest villain and flies straight at them, and up close
+// the fight is the kaiju game's (heroduel.js): tap the weak spots, spin and toss, fly at them again.
 import * as THREE from 'three';
 import { buildVehicle } from './vehicles.js';
 import { sfx } from './audio.js';
 import { SEE } from './see.js';
+import { heroRig } from './heroes.js';
+import { relax, detail } from './villains.js';
+import { Duel } from './heroduel.js';
 
 // speeds in metres a second; turn: how hard it turns at full bank; chase: the camera's distance behind and height above;
 // seat: the cockpit's place (forward, up) in the model
@@ -22,6 +28,10 @@ const PLANES = {
   seeder: { name: 'Cloud seeder', model: 'seeder_plane', scale: 1.8, min: 25, max: 75, start: 45, turn: 1.1, climb: 1.0, chase: [20, 6], seat: [2.8, 3.0], sound: 'stunt' },
   b2: { name: 'B-2 Spirit', model: 'b2', scale: 3, min: 50, max: 120, start: 75, turn: 0.7, climb: 0.6, chase: [40, 12], seat: [3.6, 5.2], sound: 'jet' },
   b52: { name: 'B-52', model: 'b52', scale: 2.4, min: 45, max: 110, start: 70, turn: 0.6, climb: 0.55, chase: [44, 13], seat: [9.0, 5.0], sound: 'jet' },
+  // the heroes: punch, how hard their blows land in a fight; slow, how much longer the weak spots last (Tempo slows time)
+  nova: { name: 'Nova', hero: 'Nova', min: 6, max: 72, start: 30, turn: 1.8, climb: 1.4, chase: [10, 3.4], seat: [1.9, 0.7], sound: 'wind', punch: 1.4 },
+  dragonfly: { name: 'Dragonfly', hero: 'Dragonfly', min: 6, max: 88, start: 34, turn: 2.1, climb: 1.5, chase: [10, 3.4], seat: [1.9, 0.7], sound: 'wind', punch: 1 },
+  tempo: { name: 'Tempo', hero: 'Tempo', min: 6, max: 64, start: 28, turn: 1.8, climb: 1.4, chase: [10, 3.4], seat: [1.9, 0.7], sound: 'wind', punch: 0.9, slow: 1.45 },
 };
 const CEIL = 650, KMH = 3.6, FOV_CHASE = 62, FOV_COCKPIT = 72, INVERT = 'zday_fly_invert';
 // what each plane carries, in the order the payload button goes round; wait: seconds before the next; R: the blast's reach; s: the bomb's size
@@ -29,6 +39,7 @@ const LOADS = { stunt: ['seed', 'small', 'big', 'napalm', 'nuke'], jet: ['small'
 const LOAD = { seed: { name: 'Storm seeding', wait: 8 }, small: { name: 'Small bomb', wait: 0.35, R: 12, s: 0.7, kaiju: 40 }, big: { name: 'Big bomb', wait: 1.2, R: 26, s: 1.3, kaiju: 120 }, napalm: { name: 'Napalm', wait: 2.5, s: 1.1, kaiju: 70 }, carpet: { name: 'Carpet bombs', wait: 3, R: 12, s: 0.7, kaiju: 40, stick: 8 }, nuke: { name: 'Nuke', wait: 10, R: 200, s: 2.4 } }; // kaiju: what a hit does to it, on top of the blast
 const SEED_REACH = 160; // a seeding run passing this close to a tornado weakens it (closer, more)
 const _f = new THREE.Vector3(), _u = new THREE.Vector3(), _v = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler(0, 0, 0, 'YZX');
+const HIP = 0.94 * 2.2; // a hero's hips above the feet (the rig's 0.94 at its scale): the hero is flown by the hips
 const SEAT_TURN = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2); // a camera looks down -z; the planes point along +x
 
 // a little red and white stunt plane, nose along +x, about 7 m long, its propeller turning (userData.prop)
@@ -54,6 +65,7 @@ function stuntModel() {
 }
 // any of the others: the airstrikes' own models, sized up
 function planeModel(kind, P) {
+  if (P.hero) { const g = new THREE.Group(), r = heroRig(P.hero); r.root.rotation.y = Math.PI / 2; g.add(r.root); g.userData.hero = r; return g; } // a hero lying along +x, posed each frame (heroPose)
   if (kind === 'stunt') return stuntModel();
   if (kind === 'jet') return jetModel();
   const g = new THREE.Group(), m = buildVehicle(P.model); m.scale.setScalar(P.scale); g.add(m); return g;
@@ -83,6 +95,8 @@ const CSS = `
 #zd-flybar .zd-btn.load{flex:2 1 0;background:linear-gradient(#3a2a6a,#241848)}
 #zd-flybar .zd-btn.drop{background:linear-gradient(#ffb02e,#e05a10);font-size:13px;letter-spacing:.1em}
 #zd-flybar .zd-btn.drop.wait{opacity:.45}
+#zd-flybar .zd-btn.lock{flex:1 1 0;background:linear-gradient(#ff5ad5,#a0168a);font-size:13px;letter-spacing:.08em}
+#zd-flybar .zd-btn.lock.on{background:linear-gradient(#ffd27a,#e08a10)}
 body.zd-flying #zd-bar,body.zd-flying #zd-dis,body.zd-flying #zd-followchip,body.zd-flying #zd-globe,body.zd-flying #zd-top{display:none!important} /* the numbers at the top too: the readout sits there */
 `;
 
@@ -102,19 +116,24 @@ export class Flight {
     const tg = new THREE.BufferGeometry(); tg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(32 * 6), 3)); tg.setDrawRange(0, 0); // the gun's tracers
     this.tracer = new THREE.LineSegments(tg, new THREE.LineBasicMaterial({ color: new THREE.Color(2.2, 1.8, 0.7), transparent: true, opacity: 0.9 })); this.tracer.frustumCulled = false; g.disasters.ctx.scene.add(this.tracer);
     camera.far = 4000; // past the fog anyway; a nearer far plane keeps the depth sharp with the near one so close
-    this.loads = LOADS[this.kind]; this.load = 0; this.bombs = []; this.coolT = 0; this.seedT = 0;
+    this.loads = LOADS[this.kind] || []; this.load = 0; this.bombs = []; this.coolT = 0; this.seedT = 0;
     try { this.invert = localStorage.getItem(INVERT) === '1'; } catch (e) { this.invert = false; }
     this.ui(); this.active = true; controls.enabled = false; post.opts.dof = false; g.setFollow(-1);
     document.body.classList.add('zd-flying');
     this.spawn(); this.setView(this.view);
-    this.tip('Drag anywhere to steer: left and right to turn, ' + (this.invert ? 'up to climb, down to dive' : 'down to climb, up to dive') + '. Let go and it levels out. Pick a payload, then Drop');
+    if (this.P.hero) { // villains to fight: three of them in the middle of town if there are none about
+      const D = g.disasters, B = g.city.bounds;
+      if (!D.list.some(e => e.alive && e.type === 'villains' && e.who.some(v => !v.gone && !v.beaten))) D.start('villains', (B.x0 + B.x1) / 2, (B.z0 + B.z1) / 2);
+      this.tip('Drag anywhere to fly. Press Lock on and ' + this.P.name + ' flies straight at the nearest villain');
+    } else this.tip('Drag anywhere to steer: left and right to turn, ' + (this.invert ? 'up to climb, down to dive' : 'down to climb, up to dive') + '. Let go and it levels out. Pick a payload, then Drop');
   }
   spawn() {
     const B = this.g.city.bounds, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2, a = Math.random() * Math.PI * 2, R = Math.max(B.x1 - B.x0, B.z1 - B.z0) * 0.5 + 60;
     this.pos.set(cx + Math.cos(a) * R, 95, cz + Math.sin(a) * R);
     this.yaw = Math.atan2(-(cz - this.pos.z), cx - this.pos.x); this.pitch = 0; this.roll = 0;
     this.speed = this.thr = this.P.start; this.ix = this.iy = 0; this.state = 'fly'; this.t = 0; this.obj.visible = this.view === 'chase'; this.snap = true;
-    this.hull = 100; this.caught = null; this.thrown = []; this.seedTw = null;
+    this.hull = 100; this.caught = null; this.thrown = []; this.seedTw = null; this.lock = null; this.punch = 0;
+    if (this.P.hero) this.pos.y = 60;
   }
   ui() {
     if (!document.getElementById('zd-fly-css')) { const s = document.createElement('style'); s.id = 'zd-fly-css'; s.textContent = CSS; document.head.appendChild(s); }
@@ -123,11 +142,12 @@ export class Flight {
     R.parentNode.insertBefore(ov, R.nextSibling); // over the town, under the numbers and buttons
     this.hud = ov.querySelector('.hud'); this.hz = ov.querySelector('.hz'); this.stick = ov.querySelector('.stick'); this.knob = ov.querySelector('.knob'); this.tipEl = ov.querySelector('.tip');
     const bar = this.bar = document.createElement('div'); bar.id = 'zd-flybar';
-    bar.innerHTML = '<div class="row"><button type="button" class="zd-btn load" data-f="load"></button><button type="button" class="zd-btn drop" data-f="drop">Drop</button></div>' +
+    bar.innerHTML = (this.P.hero ? '<div class="row"><button type="button" class="zd-btn lock" data-f="lock">\uD83C\uDFAF Lock on</button></div>' : '<div class="row"><button type="button" class="zd-btn load" data-f="load"></button><button type="button" class="zd-btn drop" data-f="drop">Drop</button></div>') +
       '<div class="row"><button type="button" class="zd-btn" data-f="view"></button><button type="button" class="zd-btn" data-f="slow">Slower</button><button type="button" class="zd-btn" data-f="fast">Faster</button><button type="button" class="zd-btn" data-f="inv"></button><button type="button" class="zd-btn exit" data-f="exit">Land</button></div>';
     document.body.appendChild(bar); this.viewBtn = bar.querySelector('[data-f="view"]'); this.loadBtn = bar.querySelector('[data-f="load"]'); this.dropBtn = bar.querySelector('[data-f="drop"]'); this.invBtn = bar.querySelector('[data-f="inv"]');
-    this.loadBtn.onclick = () => this.cycle(); this.dropBtn.onclick = () => this.drop(); this.invBtn.onclick = () => this.setInvert(!this.invert);
-    this.cycle(0); this.setInvert(this.invert, true);
+    this.lockBtn = bar.querySelector('[data-f="lock"]'); this.invBtn.onclick = () => this.setInvert(!this.invert);
+    if (this.lockBtn) this.lockBtn.onclick = () => this.lockOn(); else { this.loadBtn.onclick = () => this.cycle(); this.dropBtn.onclick = () => this.drop(); this.cycle(0); }
+    this.setInvert(this.invert, true);
     bar.querySelector('[data-f="view"]').onclick = () => this.setView(this.view === 'chase' ? 'cockpit' : 'chase');
     bar.querySelector('[data-f="slow"]').onclick = () => this.throttle(-1);
     bar.querySelector('[data-f="fast"]').onclick = () => this.throttle(1);
@@ -155,8 +175,8 @@ export class Flight {
       if (down && k === 'escape') { this.stop(); return; }
       if (down && (k === 'shift' || k === '+' || k === '=')) this.throttle(1);
       if (down && (k === 'control' || k === '-')) this.throttle(-1);
-      if (down && !e.repeat && k === ' ') this.drop();
-      if (down && !e.repeat && k === 'q') this.cycle();
+      if (down && !e.repeat && k === ' ') { if (this.P.hero) this.lockOn(); else this.drop(); }
+      if (down && !e.repeat && k === 'q' && this.loads.length) this.cycle();
       if (down && !e.repeat && k === 'i') this.setInvert(!this.invert);
       if (down && k === 'z') this.setZoom(this.zoom * 0.88); if (down && k === 'x') this.setZoom(this.zoom / 0.88);
       if (down) this.keys.add(k); else this.keys.delete(k);
@@ -177,7 +197,7 @@ export class Flight {
   }
   // Drop: storm seeding is a run of flares behind it (seeded() at the end); the rest a bomb falling from under it (bombStep, boom)
   drop() {
-    if (this.state !== 'fly' || this.coolT > 0 || this.seedT > 0) return;
+    if (this.state !== 'fly' || this.coolT > 0 || this.seedT > 0 || !this.loads.length) return;
     const id = this.loads[this.load], L = LOAD[id]; this.coolT = L.wait;
     if (id === 'seed') { this.seedT = 5; this.trailT = 0; this.seedHigh = 0; this.tip('Seeding the clouds...'); return; }
     if (L.stick) { this.stickN = L.stick; this.stickT = 0; this.stickId = id; return; } // a stick of them, one after another (frame)
@@ -237,7 +257,7 @@ export class Flight {
     if (tws.length) {
       let best = null; for (const tw of tws) if (runs && runs.has(tw) && (!best || tw._seedMin < best._seedMin)) best = tw;
       for (const tw of tws) { const m = tw._seedMin; tw._seedMin = undefined; if (tw !== best || m == null || m > SEED_REACH) continue;
-        tw.size = Math.max(0.6, tw.size - (0.12 + 0.28 * (1 - Math.max(0, m) / SEED_REACH))); // two or three close runs bring it down tw.applySize(); tw.life = Math.min(tw.life, tw.t + 25);
+        tw.size = Math.max(0.6, tw.size - (0.12 + 0.28 * (1 - Math.max(0, m) / SEED_REACH))); tw.applySize(); tw.life = Math.min(tw.life, tw.t + 25); // two or three close runs bring it down
         if (tw.size < 1.05 && tw.phase === 'ground') { tw.phase = 'rope'; tw.ropeT = 0; this.tip('The tornado is roping out and dying!'); }
         else this.tip('Seeded ' + Math.max(0, Math.round(m)) + ' m from the tornado: it is weakening (strength ' + tw.size.toFixed(1) + ')');
         return; }
@@ -260,8 +280,10 @@ export class Flight {
   stop(quiet = false) {
     if (!this.active) return;
     const g = this.g, { camera, controls, post } = this.ctx;
+    if (this.duel) this.duel.end('', false); this.lock = null;
     this.active = false; document.body.classList.remove('zd-flying');
-    g.disasters.ctx.scene.remove(this.obj); this.obj.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); // its own shapes and paint
+    const hr = this.obj.userData.hero; g.disasters.ctx.scene.remove(this.obj);
+    if (hr) hr.cape.g.dispose(); else this.obj.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); // its own shapes and paint (a hero's are shared with the rest: only the cape is its own)
     for (const b of this.bombs) g.disasters.ctx.scene.remove(b.m); this.bombs = [];
     g.disasters.ctx.scene.remove(this.tracer); this.tracer.geometry.dispose(); this.tracer.material.dispose();
     this.ov.remove(); this.bar.remove(); removeEventListener('keydown', this.onKey); removeEventListener('keyup', this.onKey); clearTimeout(this.tipT); this.tipEl = null;
@@ -287,17 +309,25 @@ export class Flight {
         if (this.seedT <= 0) this.seeded();
       }
     }
-    if (run && this.state === 'fly') this.fly(dt);
+    if (run && this.punch > 0) this.punch -= dt;
+    if (run && this.duel && this.state === 'fly') { this.hover(dt); if (this.duel) this.duel.step(dt); }
+    else if (run && this.state === 'fly') this.fly(dt);
     else if (run && this.state === 'down' && (this.t += dt) > 2.6) { this.spawn(); this.setView(this.view); }
     // the plane where it is
     _e.set(this.roll, this.yaw, this.pitch); this.q.setFromEuler(_e);
     this.obj.position.copy(this.pos); this.obj.quaternion.copy(this.q);
     const prop = this.obj.userData.prop, burner = this.obj.userData.burner, k = (this.thr - P.min) / (P.max - P.min);
     if (prop) prop.rotation.x += dt * (40 + 50 * k);
+    if (this.obj.userData.hero) this.heroPose(this.obj.userData.hero, dt);
     if (burner) { burner.scale.set(0.6 + k * 0.9, 1, 1); burner.material.opacity = 0.35 + 0.55 * k; }
     // the camera: behind and above it, easing after it (no roll, so the horizon stays put), or in its seat
     _f.set(1, 0, 0).applyQuaternion(this.q);
-    if (this.view === 'cockpit' && this.state === 'fly') {
+    if (this.duel && this.state === 'fly') { // a fight: over the hero's shoulder, the villain in front; held still while they spin
+      const v = this.duel.v, fx = Math.cos(this.yaw), fz = -Math.sin(this.yaw), back = 13 * this.zoom, side = 7 * this.zoom;
+      if (this.duel.phase === 'spin') _v.copy(cam.position); else _v.set(this.pos.x - fx * back - fz * side, this.pos.y + 7 * Math.pow(this.zoom, 0.8), this.pos.z - fz * back + fx * side);
+      cam.position.lerp(_v, 1 - Math.exp(-dt * 4)); cam.up.set(0, 1, 0);
+      if (this.duel.phase === 'spin') cam.lookAt(this.pos); else cam.lookAt(_u.set(this.pos.x + (v.x - this.pos.x) * 0.65, Math.max(this.pos.y, (v.y || 0) + HIP) + 0.5, this.pos.z + (v.z - this.pos.z) * 0.65));
+    } else if (this.view === 'cockpit' && this.state === 'fly') {
       _v.set(P.seat[0], P.seat[1], 0).applyQuaternion(this.q); cam.position.copy(this.pos).add(_v);
       cam.quaternion.copy(this.q).multiply(SEAT_TURN); cam.up.set(0, 1, 0).applyQuaternion(this.q);
     } else {
@@ -314,12 +344,14 @@ export class Flight {
     // what the pilot reads
     if ((this.hudT = (this.hudT || 0) - dt) <= 0) {
       this.hudT = 0.15;
-      const th = this.threat, hull = Math.max(0, Math.round(this.hull));
-      this.hud.textContent = P.name.toUpperCase() + ' · ' + Math.round(this.speed * KMH) + ' km/h · ' + Math.max(0, Math.round(this.pos.y)) + ' m · hull ' + hull + '%' + (this.P.gun ? ' · gun ' + (this.reload > 0 ? 'reloading' : this.ammo) : '') + (th && th.d < 600 ? '\n' + th.name.toUpperCase() + ' ' + Math.max(0, Math.round(th.d)) + ' m' : '');
+      const th = this.threat, hull = Math.max(0, Math.round(this.hull)), L = this.lock;
+      this.hud.textContent = P.name.toUpperCase() + ' · ' + Math.round(this.speed * KMH) + ' km/h · ' + Math.max(0, Math.round(this.pos.y)) + ' m · ' + (P.hero ? 'health ' : 'hull ') + hull + '%' + (this.P.gun ? ' · gun ' + (this.reload > 0 ? 'reloading' : this.ammo) : '') +
+        (this.duel ? '\nFIGHTING ' + this.duel.v.name.toUpperCase() : L ? '\nLOCKED ON ' + L.name.toUpperCase() + ' ' + Math.round(Math.hypot(L.x - this.pos.x, L.z - this.pos.z)) + ' m' : th && th.d < 600 ? '\n' + th.name.toUpperCase() + ' ' + Math.max(0, Math.round(th.d)) + ' m' : '');
       this.hud.style.color = hull < 35 ? '#ff8a7a' : th && th.d < 60 ? '#ffd27a' : '#fff';
       if (this.state === 'fly' && this.hull < 60) g.fire.spray(this.pos.x - _f.x * 3, this.pos.z - _f.z * 3, this.pos.y, this.hull < 30 ? 4 : 2, 1, 2.2); // smoke off a hurt plane
       if (g.audio) g.audio.engine(this.state === 'fly' ? this.P.sound : null, k);
-      this.dropBtn.textContent = this.seedT > 0 ? 'Seeding' : 'Drop'; this.dropBtn.classList.toggle('wait', this.coolT > 0 || this.seedT > 0 || this.state !== 'fly');
+      if (this.dropBtn) { this.dropBtn.textContent = this.seedT > 0 ? 'Seeding' : 'Drop'; this.dropBtn.classList.toggle('wait', this.coolT > 0 || this.seedT > 0 || this.state !== 'fly'); }
+      if (this.lockBtn) { this.lockBtn.textContent = this.lock ? 'Let go of the lock' : '\uD83C\uDFAF Lock on'; this.lockBtn.classList.toggle('on', !!this.lock); this.bar.style.visibility = this.duel ? 'hidden' : ''; }
     }
     if (this.view === 'cockpit') this.hz.style.transform = 'translate(-50%,' + (this.pitch * 260).toFixed(0) + 'px) rotate(' + (-this.roll).toFixed(3) + 'rad)';
   }
@@ -331,6 +363,7 @@ export class Flight {
       g.shake = Math.max(g.shake || 0, 0.8); if (C.t > 2.4) this.crash(-1, 'The tornado tore your plane apart!');
       return;
     }
+    if (this.lock && this.homeIn(dt)) return;
     let ix = this.ix, iy = this.iy;
     if (K.has('arrowleft') || K.has('a')) ix = -1; if (K.has('arrowright') || K.has('d')) ix = 1;
     const up = K.has('arrowup') || K.has('w'), dn = K.has('arrowdown') || K.has('s');
@@ -350,7 +383,7 @@ export class Flight {
       if (!this.saidFar) { this.saidFar = true; this.tip('Turning back toward town'); }
     } else if (far < 300) this.saidFar = false;
     // speed: toward the throttle, faster in a dive, slower climbing
-    this.speed += (this.thr - this.speed) * Math.min(1, dt * 0.8) - Math.sin(this.pitch) * 9.8 * 0.6 * dt;
+    this.speed += (this.thr - this.speed) * Math.min(1, dt * 0.8) - (P.hero ? 0 : Math.sin(this.pitch) * 9.8 * 0.6 * dt); // a hero climbs as fast as they dive
     this.speed = Math.max(P.min * 0.7, Math.min(P.max * 1.25, this.speed));
     _e.set(this.roll, this.yaw, this.pitch); _q.setFromEuler(_e); _f.set(1, 0, 0).applyQuaternion(_q);
     this.pos.addScaledVector(_f, this.speed * dt);
@@ -359,6 +392,12 @@ export class Flight {
     if (this.pos.y < 35 && (this.scareT = (this.scareT || 0) - dt) <= 0) { this.scareT = 0.5; g.people.scare(this.pos.x, this.pos.z, 30, 0.4); }
     // into the ground, or a building
     const x = this.pos.x, y = this.pos.y, z = this.pos.z;
+    if (P.hero) { // skims the ground; flies into a wall and bounces off it, nose up
+      if (y < 2.4) { this.pos.y = 2.4; if (this.pitch < 0) this.pitch *= 0.3; }
+      let wall = false; g.city.buildingsNear(x, z, 2, (k, d, b) => { if (y < b.roofY + 1.5) wall = true; });
+      if (wall) { _f.set(1, 0, 0).applyQuaternion(_q); this.pos.addScaledVector(_f, -this.speed * dt * 1.5); this.speed *= 0.5; this.pitch = Math.max(this.pitch, 0.7); if ((this.bumpT || 0) < this.t2) { this.bumpT = this.t2 + 1; this.damage(3, 'You bumped into a building!'); } }
+      return;
+    }
     if (y < 1.2) { this.crash(-1); return; }
     let hit = -1; g.city.buildingsNear(x, z, 2.5, (k, d, b) => { if (hit < 0 && y < b.roofY + 0.4) hit = k; });
     if (hit >= 0) this.crash(hit);
@@ -366,18 +405,20 @@ export class Flight {
   crash(k, why) {
     if (this.state !== 'fly') return;
     const g = this.g, f = g.fire, x = this.pos.x, y = Math.max(1, this.pos.y), z = this.pos.z;
-    this.state = 'down'; this.t = 0; this.obj.visible = false; this.at.set(x, y, z); this.caught = null; this.hull = 0;
+    this.state = 'down'; this.t = 0; this.obj.visible = false; this.at.set(x, y, z); this.caught = null; this.hull = 0; this.lock = null;
+    if (this.duel) this.duel.end('', false);
+    if (this.g.audio) this.g.audio.engine(null);
+    if (this.P.hero) { f.dustCloud(x, z, 6, Math.min(20, y + 4)); sfx('thud', x, y, z, { gain: 1 }); this.tip((why || 'You were knocked out of the sky!') + ' Back up in a moment'); return; } // knocked down, no fireball
     f.burst(x, y, z, 16, 2.4); f.burst(x, y + 2, z, 10, 1.6);
     if (k >= 0) f.igniteBuilding(k);
     sfx('boom', x, y, z, { gain: 0.8 }); g.shake = Math.max(g.shake || 0, 0.25);
-    if (g.audio) g.audio.engine(null);
     this.tip((why || (k >= 0 ? 'You flew into a building!' : 'You crashed!')) + ' Back in the air in a moment');
   }
   // hurt: the hull down by n (at nothing it goes down, why the reason), told once in a while
   damage(n, why) {
     if (this.state !== 'fly') return;
     this.hull -= n; if (this.hull <= 0) { this.crash(-1, why); return; }
-    if ((this.hurtT || 0) < this.t2) { this.hurtT = this.t2 + 1.5; this.tip(why + ' Hull ' + Math.round(this.hull) + '%'); sfx('crash', this.pos.x, this.pos.y, this.pos.z, { gain: 0.4, rate: 1.3 }); }
+    if ((this.hurtT || 0) < this.t2) { this.hurtT = this.t2 + 1.5; this.tip(why + (this.P.hero ? ' Health ' : ' Hull ') + Math.round(this.hull) + '%'); sfx('crash', this.pos.x, this.pos.y, this.pos.z, { gain: 0.4, rate: 1.3 }); }
   }
   // the gun (the fighters): whatever is ahead and in range - the kaiju, a saucer, a walker, a dust devil - it fires at by
   // itself, a magazine at a time, then reloads
@@ -425,6 +466,7 @@ export class Flight {
       if (e.type === 'tornado' && e.tw) this.twister(e.tw, h);
       else if (e.type === 'kaiju') this.kaijuStep(e, h);
       else if (e.type === 'haboob' && e.devils) this.devilStep(e, h);
+      else if (e.type === 'villains') this.villainStep(e, h);
     }
     // cars the kaiju threw, on their way: one that reaches the plane hits it
     for (const th of this.thrown) { th.t += h; const o = th.o.position; if (this.state === 'fly' && o.distanceTo(this.pos) < 7) { th.done = true; this.g.fire.burst(o.x, o.y, o.z, 10, 2); this.damage(60, 'A car the kaiju threw hit you!'); } else if (th.t > 6 || o.y < 3) th.done = true; }
@@ -483,6 +525,67 @@ export class Flight {
       if (this.seedT > 0 && d < r + 45) { this.killDevil(e, v, 'Seeded it out!'); continue; }
       if (p.y < v.h && d < r && (v.hitT || 0) < this.t2) { v.hitT = this.t2 + 2; this.roll += (Math.random() < 0.5 ? -1 : 1) * 1.6; this.pitch += 0.35; this.g.shake = Math.max(this.g.shake || 0, 0.7); this.damage(30, 'A dust devil tossed you about!'); }
     }
+  }
+  // the villains: the nearest named on the HUD; one close to a hero (not in a fight with them) lands a blow now and then
+  villainStep(e, h) {
+    for (const v of e.who) {
+      if (v.gone || v.beaten) continue;
+      const d = Math.hypot(v.x - this.pos.x, (v.y || 0) + HIP - this.pos.y, v.z - this.pos.z); this.note(v.name, d);
+      if (this.P.hero && !v.tossed && !v.gripped && d < 12 && (v.hitT || 0) < this.t2) { v.hitT = this.t2 + 2.5; this.g.shake = Math.max(this.g.shake || 0, 0.3); this.damage(6, v.name + ' hit you!'); }
+    }
+  }
+  // Lock on (a hero): the nearest villain still up, and the hero flies straight at them (homeIn); pressed again, the lock let go
+  lockOn(v, again = false) {
+    if (this.state !== 'fly' || this.duel) return;
+    if (this.lock && !again) { this.lock = null; this.tip('Lock let go: flying free'); return; }
+    if (!v) { let bd = 1e9; for (const e of this.g.disasters.list) if (e.alive && e.type === 'villains') for (const w of e.who) { if (w.gone || w.beaten) continue; const d = Math.hypot(w.x - this.pos.x, w.z - this.pos.z); if (d < bd) { bd = d; v = w; } } }
+    if (!v || v.gone || v.beaten) { this.lock = null; this.tip('No villains left to fight. Spawn Super villains from Disasters'); return; }
+    this.lock = v; this.tip('Locked on ' + v.name + '! Flying straight at them'); sfx('whoosh', this.pos.x, this.pos.y, this.pos.z, { gain: 0.9 });
+  }
+  // locked on: straight at the villain, faster the further, up over a roof in the way; close enough and the fight is on (heroduel.js)
+  homeIn(dt) {
+    const v = this.lock, P = this.P;
+    if (!v || v.gone || v.beaten) { this.lock = null; return false; }
+    const ty = Math.max(2.4, (v.y || 0) + HIP), dx = v.x - this.pos.x, dy = ty - this.pos.y, dz = v.z - this.pos.z, d = Math.hypot(dx, dy, dz) || 0.01;
+    if (d < 6.5) { this.speed = 0; this.duel = new Duel(this, v); this.obj.visible = true; SEE.on = this.saved.see; return true; }
+    let a = Math.atan2(-dz, dx) - this.yaw; a = Math.atan2(Math.sin(a), Math.cos(a));
+    this.yaw += a * Math.min(1, dt * 5); this.roll += (Math.max(-1, Math.min(1, -a * 2)) - this.roll) * Math.min(1, dt * 3);
+    this.pitch += (Math.atan2(dy, Math.hypot(dx, dz)) * 0.8 - this.pitch) * Math.min(1, dt * 4);
+    this.speed += (Math.min(P.max * 1.6, d * 1.6 + 14) - this.speed) * Math.min(1, dt * 2.5);
+    const s = Math.min(d - 6, this.speed * dt); this.pos.x += dx / d * s; this.pos.y += dy / d * s; this.pos.z += dz / d * s;
+    let top = -1; this.g.city.buildingsNear(this.pos.x, this.pos.z, 2, (k, dd, b) => { if (this.pos.y < b.roofY + 2.4 && b.roofY > top) top = b.roofY; });
+    if (top >= 0 && d > 14) this.pos.y = top + 2.4; // over it, not through it
+    if (this.pos.y < 2.4) this.pos.y = 2.4;
+    return true;
+  }
+  // in a fight: hanging in the air a step from the villain, at their height, facing them (they are held there); while
+  // spinning them, still, turning with them; once they are thrown, watching them go
+  hover(dt) {
+    const D = this.duel, v = D.v, k = Math.min(1, dt * 3);
+    if (D.phase === 'spots' || D.phase === 'dazed') {
+      const dx = this.pos.x - v.x, dz = this.pos.z - v.z, d = Math.hypot(dx, dz) || 1;
+      this.pos.x += (v.x + dx / d * 5.5 - this.pos.x) * k; this.pos.z += (v.z + dz / d * 5.5 - this.pos.z) * k; this.pos.y += (Math.max(2.4, (v.y || 0) + HIP) - this.pos.y) * k;
+    }
+    if (D.phase === 'spin') this.pos.y += (Math.max(this.pos.y, 14) - this.pos.y) * Math.min(1, dt * 1.2); // rising as they whirl round
+    let a = Math.atan2(-(v.z - this.pos.z), v.x - this.pos.x) - this.yaw; a = Math.atan2(Math.sin(a), Math.cos(a));
+    this.yaw += a * Math.min(1, dt * (D.phase === 'spin' ? 25 : 5)); this.pitch -= this.pitch * Math.min(1, dt * 4); this.roll -= this.roll * Math.min(1, dt * 4); this.speed = 0;
+  }
+  // the fight over (heroduel.js): back to flying
+  duelOver(won) { this.duel = null; if (won) this.lock = null; this.obj.visible = this.view === 'chase' && this.state === 'fly'; SEE.on = this.view === 'cockpit' ? false : this.saved.see; this.speed = this.thr = Math.max(this.thr, this.P.start * 0.6); this.pitch = 0.5; } // nose up, clear of the street
+  // a hero's pose: flat out along the way at speed, one fist ahead; upright and treading air slow or in a fight; a punch;
+  // arms out holding on while spinning a villain round. The rig set so the hips are where the hero is
+  heroPose(r, dt) {
+    const A = r.arms, D = this.duel, fast = D ? 0 : Math.max(0, Math.min(1, (this.speed - 10) / 14));
+    relax(r); this.lean = (this.lean || 0) + (1.35 * fast - (this.lean || 0)) * Math.min(1, dt * 3);
+    if (D && D.phase === 'spin') for (const a of A) { a.sh.rotation.set(-1.5, 0, a.sx * 0.15); a.el.rotation.set(0, 0, 0); }
+    else if (this.punch > 0) { A[1].sh.rotation.set(-1.6, 0, 0.1); A[0].sh.rotation.set(0.4, 0, -0.2); A[0].el.rotation.set(-1.4, 0, 0); r.torso.rotation.x = 0.3; }
+    else if (fast > 0.5) { A[1].sh.rotation.set(-3.0, 0, 0.1); A[0].sh.rotation.set(0.25, 0, -0.1); }
+    else { for (const a of A) a.sh.rotation.set(0.1, 0, a.sx * 0.3); for (const L of r.legs) { L.hip.rotation.x = 0.1; L.knee.rotation.x = 0.25; } }
+    r.body.rotation.x = this.lean; r.head.rotation.x = -this.lean * 0.6;
+    r.root.position.set(-Math.sin(this.lean) * HIP, -Math.cos(this.lean) * HIP + (fast < 0.5 ? Math.sin((this.wingT || 0) * 2) * 0.15 : 0), 0);
+    r.cape.update(dt, this.lean > 0.5 ? 0.12 : Math.min(0.6, this.speed / 30), 0.3 + Math.min(0.7, this.speed / 20));
+    this.wingT = (this.wingT || 0) + dt; r.wings.forEach((w, i) => { w.rotation.z = Math.sin(this.wingT * 55 + i * 1.3) * 0.45 + 0.15; });
+    if (this.obj.visible) detail(r, null, true);
   }
   killDevil(e, v, why) {
     v.dead = true; if (e.dust) e.dust.emit(v.x, 6, v.z, 30, { up: [6, 20], spread: 14, life: 2.2, size: 7 });

@@ -330,16 +330,17 @@ export class Audio {
       const g = c.createGain(), f = c.createBiquadFilter(), src = []; g.gain.value = 0; f.connect(g); g.connect(this.bus);
       const osc = (type, fr, gain) => { const o = c.createOscillator(), og = c.createGain(); o.type = type; o.frequency.value = fr; og.gain.value = gain; o.connect(og); og.connect(f); o.start(); src.push(o); return o; };
       const e = this.eng = { kind, g, f, src };
-      if (kind === 'jet') {
+      if (kind === 'jet' || kind === 'wind') { // wind: a hero flying, the air rushing past and nothing else
         const n = c.createBuffer(1, SR * 2, SR), d = n.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
         const s = c.createBufferSource(); s.buffer = n; s.loop = true; s.connect(f); s.start(); src.push(s);
-        f.type = 'bandpass'; f.Q.value = 0.6; e.o1 = osc('sawtooth', 42, 0.25);
+        f.type = 'bandpass'; f.Q.value = 0.6; if (kind === 'jet') e.o1 = osc('sawtooth', 42, 0.25);
       } else { f.type = 'lowpass'; f.Q.value = 2; e.o1 = osc('sawtooth', 80, 0.5); e.o2 = osc('sawtooth', 80.9, 0.5); }
     }
     const e = this.eng;
     if (kind === 'jet') { e.f.frequency.setTargetAtTime(380 + 1500 * k, t, 0.3); e.o1.frequency.setTargetAtTime(38 + 20 * k, t, 0.3); }
+    else if (kind === 'wind') e.f.frequency.setTargetAtTime(260 + 1100 * k, t, 0.3);
     else { const [f0, fk, l0, lk] = kind === 'tank' ? [30, 26, 240, 320] : kind === 'car' ? [40, 55, 320, 700] : [62, 75, 520, 900]; e.o1.frequency.setTargetAtTime(f0 + fk * k, t, 0.2); e.o2.frequency.setTargetAtTime(f0 + 0.8 + fk * k, t, 0.2); e.f.frequency.setTargetAtTime(l0 + lk * k, t, 0.2); }
-    e.g.gain.setTargetAtTime(kind === 'jet' ? 0.09 + 0.07 * k : kind === 'tank' ? 0.06 + 0.04 * k : kind === 'car' ? 0.04 + 0.04 * k : 0.05 + 0.05 * k, t, 0.3);
+    e.g.gain.setTargetAtTime(kind === 'wind' ? 0.015 + 0.06 * k : kind === 'jet' ? 0.09 + 0.07 * k : kind === 'tank' ? 0.06 + 0.04 * k : kind === 'car' ? 0.04 + 0.04 * k : 0.05 + 0.05 * k, t, 0.3);
   }
   toBuf(x) { const b = this.ctx.createBuffer(1, x.length, SR); b.copyToChannel ? b.copyToChannel(x, 0) : b.getChannelData(0).set(x); return b; }
   startLoop(name, buf) {

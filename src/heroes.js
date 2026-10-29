@@ -448,7 +448,9 @@ class Hero {
 }
 
 // a hero on their own for the roster
-export function heroModel(name) {
+export function heroModel(name) { return heroRig(name).root; }
+// the same, the rig itself to pose (flight.js: a hero the player flies); r.wings: Dragonfly's, to beat
+export function heroRig(name) {
   const K = kit(), r = rig({ mats: { ...K, ...K.look[name], hair: K.hair[name] }, slim: name === 'Nova', longHair: name === 'Nova', capeLen: 1.1 }); relax(r); handsOnHips(r);
   const wings = [];
   if (name === 'Dragonfly') for (const [sx, y, sweep] of [[1, 0.46, 0.25], [-1, 0.46, 0.25], [1, 0.38, 0.7], [-1, 0.38, 0.7]]) {
@@ -457,7 +459,7 @@ export function heroModel(name) {
   }
   if (name === 'Tempo') for (const a of r.arms) { const g = new THREE.Mesh(K.sphere, K.glow); g.scale.setScalar(0.07); g.position.y = -0.3; a.el.add(g); }
   let t = 0; r.root.userData.tick = (dt) => { t += dt; r.cape.update(dt, 0.12, 0.35); wings.forEach((w, i) => { w.rotation.z = Math.sin(t * 40 + i * 1.3) * 0.4 + 0.15; }); }; r.cape.update(0.1, 0.12, 0.35); detail(r, null, true);
-  return r.root;
+  r.wings = wings; return r;
 }
 
 export class Heroes {

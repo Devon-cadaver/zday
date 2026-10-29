@@ -134,7 +134,7 @@ export class Traffic {
     const node = this.nodes[car.b]; if (node) this.release(node, car); if (car.clearing >= 0) { this.release(this.nodes[car.clearing], car); car.clearing = -1; }
     this.takeParked(pc);
     this.startSeg(car, sa, sb); car.s = Math.max(0, Math.min(car.len - 1, st * Math.hypot(B.x - A.x, B.z - A.z) - this.nodes[sa].inset));
-    car.v = 6; car.resume = -1; car.blocked = 0; car.panic = 0; // away at once, but still braking for people in the road (a panicked driver does not) car.zx = fx; car.zz = fz; car.colHex = pc.hex; car.burning = false;
+    car.v = 6; car.resume = -1; car.blocked = 0; car.panic = 0; car.zx = fx; car.zz = fz; car.colHex = pc.hex; car.burning = false; // away at once, but still braking for people in the road (a panicked driver does not)
     this.tint(car, pc.hex); this.pose(car);
     return car;
   }

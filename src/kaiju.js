@@ -239,7 +239,7 @@ function pose(r, ph, o = {}, t = 0) {
     const ly = 0.28 * Math.sin(t * 0.33 + hi * 2.1) + 0.16 * Math.sin(t * 0.87 + hi * 4.3), lp = 0.12 * Math.sin(t * 0.41 + hi * 1.3) + 0.06 * Math.sin(t * 1.13 + hi);
     const n0 = 0.42 + rr * 0.35 + lp + sn * 0.3 + 0.05 * Math.sin(P * 2 + hi) * sw, n1 = -0.12 + rr * 0.15 - sn * 0.25, n2 = -0.18 - lp * 0.6 + 0.04 * Math.sin(P * 2 + 1 + hi) * sw;
     H.neck[0].rotation.z = Math.PI + n0; H.neck[0].rotation.x = H.s * 0.32 + ly * 0.5; H.neck[1].rotation.z = n1; H.neck[1].rotation.x = ly * 0.4; H.neck[2].rotation.z = n2;
-    H.head.rotation.z = 1.42 + rr * 0.6 - br * 0.3 + sn * 0.2 - (-LEAN + Math.PI + n0 + n1 + n2); // br: lowered to pour fire on the street H.head.rotation.x = -(H.s * 0.32 + ly * 0.9) * 0.5;
+    H.head.rotation.z = 1.42 + rr * 0.6 - br * 0.3 + sn * 0.2 - (-LEAN + Math.PI + n0 + n1 + n2); H.head.rotation.x = -(H.s * 0.32 + ly * 0.9) * 0.5; // br: lowered to pour fire on the street
     H.jaw.rotation.z = -(0.08 + rr * 0.85 + br * 0.8 + sn * 0.7 + 0.07 * Math.max(0, Math.sin(t * 0.7 + hi * 2.6))); // the jaw drops to roar or snap, and hangs a little open now and then
   });
   r.tail.forEach((tl, i) => { tl.rotation.y = Math.sin(t * 1.4 - i * 0.55 + P * 0.5) * (0.06 + i * 0.022) + 0.03; tl.rotation.z = i ? (i < 5 ? 0.07 : -0.11) + 0.04 * Math.sin(t * 0.9 - i * 0.5) : -1.5; }); // a wave running down the tail, which sags, lifts again at the tip and hangs a little to one side
