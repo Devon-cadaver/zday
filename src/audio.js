@@ -315,7 +315,7 @@ export class Audio {
       lfo(0.42, 150, f.frequency); lfo(5.5, 7, whine.frequency); lfo(0.23, 40, whine.frequency); // the whirl
       this.hum = g;
     }
-    if (this.hum) this.hum.gain.setTargetAtTime(on ? 0.12 : 0, c.currentTime, on ? 1.2 : 0.4);
+    if (this.hum) this.hum.gain.setTargetAtTime(on ? 0.09 : 0, c.currentTime, on ? 1.2 : 0.4);
   }
   // the plane being flown (flight.js): the stunt plane's buzz (two saws a hair apart through a lowpass, both rising with
   // the throttle k) or the jet's roar (noise through a band that rises with it, over a low rumble); kind null: off.

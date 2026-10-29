@@ -264,7 +264,7 @@ export class Kaiju {
     const ex = x - cx, ez = z - cz, side = Math.abs(ex) > Math.abs(ez) ? [Math.sign(ex || 1), 0] : [0, Math.sign(ez || 1)];
     this.x = side[0] ? (side[0] > 0 ? B.x1 + 40 : B.x0 - 40) : clamp(x, B.x0 + 40, B.x1 - 40); this.z = side[1] ? (side[1] > 0 ? B.z1 + 40 : B.z0 - 40) : clamp(z, B.z0 + 40, B.z1 - 40);
     this.goal = [clamp(x, B.x0 + 40, B.x1 - 40), clamp(z, B.z0 + 40, B.z1 - 40)]; this.yaw = Math.atan2(this.goal[1] - this.z, this.goal[0] - this.x);
-    this.ph = 0; this.state = 'walk'; this.act = null; this.actT = 6; this.roarT = 10; this.fireT = 9 + Math.random() * 8; this.goT = 20; this._m = new THREE.Vector3(); this._f = new THREE.Vector3(); // fireT: till it breathes fire this.cars = 0; this.grabbed = 0; this.tentT = 3;
+    this.ph = 0; this.state = 'walk'; this.act = null; this.actT = 6; this.roarT = 10; this.fireT = 9 + Math.random() * 8; this.goT = 20; this._m = new THREE.Vector3(); this._f = new THREE.Vector3(); this.cars = 0; this.grabbed = 0; this.tentT = 3; // fireT: till it breathes fire
     this.rig = kaijuRig(); D.ctx.scene.add(this.rig.root); this.cur = []; this.hy = null; this.swept = false;
     this._v = new THREE.Vector3();
     if (!o.quiet) D.emit({ type: 'warn', hazard: 'kaiju', x: this.goal[0], z: this.goal[1], r: 60, exact: true, text: 'A giant monster is coming into the city from the ' + (side[0] ? (side[0] > 0 ? 'east' : 'west') : (side[1] > 0 ? 'south' : 'north')) + '!' });

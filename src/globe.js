@@ -149,7 +149,19 @@ export class Globe {
     this.buildRoad();
     this.decorate();
     this.labels();
-    this.controls = new OrbitControls(cam, this.renderer.domElement); this.controls.addEventListener('start', () => { this.easing = false; }); // a finger on it: no easing back this.controls.enablePan = false; this.controls.enableDamping = true; this.controls.dampingFactor = 0.08;
+    this.controls = new OrbitControls(cam, this.renderer.domElement); this.controls.enablePan = false; this.controls.enableDamping = true; this.controls.dampingFactor = 0.08;
+    this.controls.addEventListener('start', () => { this.easing = false; }); // a finger on it: no easing back
+    // the menu: a finger (or the mouse) dragged up or down zooms, up for in, while the sideways part turns it (the tilt is held: backdrop)
+    const el = this.renderer.domElement, drag = new Map();
+    el.addEventListener('pointerdown', (e) => { drag.set(e.pointerId, e.clientY); });
+    el.addEventListener('pointermove', (e) => {
+      if (!drag.has(e.pointerId)) return;
+      const y0 = drag.get(e.pointerId); drag.set(e.pointerId, e.clientY);
+      if (this.state !== 'menu' || drag.size !== 1 || !this.controls.enabled || this.rise) return;
+      const C = this.controls, L = this.cam.position.length();
+      this.cam.position.setLength(Math.max(C.minDistance, Math.min(C.maxDistance, L * Math.exp((e.clientY - y0) * 0.005)))); this.easing = false;
+    });
+    for (const ev of ['pointerup', 'pointercancel']) el.addEventListener(ev, (e) => drag.delete(e.pointerId));
     this.controls.minDistance = R * 1.25; this.controls.maxDistance = Math.max(R * 5, this.fit() * 1.15); this.controls.rotateSpeed = 0.5; this.controls.enabled = false;
     this.ui();
   }
@@ -337,7 +349,7 @@ export class Globe {
   open(opts = {}) {
     if (this.active) return;
     if (!this.built) this.build();
-    this.active = true; this.fly = null; this.state = 'game'; this.arrive = null; this.shiftTo = 0;
+    this.active = true; this.fly = null; this.state = 'game'; this.arrive = null; this.shiftTo = 0; this.controls.minPolarAngle = 0; this.controls.maxPolarAngle = Math.PI;
     this.status = this.statusFor ? this.statusFor() : null; this.showRoad(!!this.status, this.mode ? this.mode() : null); this.here.visible = true; this.relabel();
     this.uiEl.firstChild.textContent = 'THE WORLD'; this.say('Spin it, tap a town to go there'); this.backBtn.textContent = 'Back to ' + PLACES[placeKey()].name;
     const [lat, lon] = this.spots[placeKey()], p = toVec(lat, lon, 1).normalize();
@@ -371,6 +383,7 @@ export class Globe {
     }
     this.controls.maxDistance = Math.max(R * 5, this.fit() * 1.15, mf.d * 1.3);
     this.controls.enabled = true; this.controls.autoRotate = true; this.controls.autoRotateSpeed = 0.45; this.controls.update();
+    const ph = Math.acos(Math.max(-1, Math.min(1, this.cam.position.y / this.cam.position.length()))); this.controls.minPolarAngle = this.controls.maxPolarAngle = ph; // a swipe only turns it (Sean): the tilt held where it is
     document.body.classList.add('zd-globe-on');
   }
   // on the menu: how far back, and how far up the view, for the whole planet to sit in the gap between the title and the
@@ -396,6 +409,7 @@ export class Globe {
   choose(opts) {
     if (!this.built) this.build();
     this.active = true; this.state = opts.key ? 'path' : 'pick'; this.status = opts.status || null; this.arrive = opts.arrive; this.onBack = opts.back;
+    this.controls.minPolarAngle = 0; this.controls.maxPolarAngle = Math.PI; // picking a town: free to tilt to any of them
     this.controls.autoRotate = false; this.controls.enabled = !opts.key; this.shiftTo = 0; this.showRoad(!!opts.road, opts.mode || null); this.relabel();
     this.uiEl.firstChild.textContent = opts.title || ''; this.say(opts.sub || ''); this.uiEl.style.display = '';
     this.metBtn.style.display = 'none'; this.backBtn.textContent = 'Back'; this.backBtn.style.display = opts.back ? '' : 'none';
