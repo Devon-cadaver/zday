@@ -205,9 +205,9 @@ export class TvCam {
       if (style === 'throw') { car = this.carNear(who.pos()); if (!car) style = 'beam'; }
     }
     this.tv.attacks = (this.tv.attacks || 0) + 1;
-    const what = c.kind === 'heli' ? c.name : 'a viewer filming', by = who ? who.name : WHO[kind];
-    this.tv.hits.say(by + (style === 'grab' ? ' is coming for ' : ' spotted ') + what + '!', 'small');
-    this.tv.say(by + (style === 'grab' ? ' is heading straight for our ' : ' has spotted our ') + (c.kind === 'heli' ? 'helicopter' : 'viewer filming from a rooftop') + '!');
+    const what = c.kind === 'heli' ? c.name : 'a viewer filming', by = who ? who.name : WHO[kind], pl = !who && /s$/.test(by); // the villains, the aliens, the rioters: they are, they have
+    this.tv.hits.say(by + (style === 'grab' ? (pl ? ' are coming for ' : ' is coming for ') : ' spotted ') + what + '!', 'small');
+    this.tv.say(by + (style === 'grab' ? (pl ? ' are heading straight for our ' : ' is heading straight for our ') : (pl ? ' have spotted our ' : ' has spotted our ')) + (c.kind === 'heli' ? 'helicopter' : 'viewer filming from a rooftop') + '!');
     this.attack = { style, t: 0, cam: c, hit: false, who, car };
     if (who && style === 'grab' && who.kaiju) { who.obj.goal = [c.x, c.z]; who.obj.goT = 99; } // it walks over to the building
   }

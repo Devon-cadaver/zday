@@ -175,6 +175,8 @@ const CSS = `
 #zd-menuflash{position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:8}
 #zd-menu .ufo .rim{position:absolute;top:83%;padding:4px 10px;min-width:0;font-size:9.5px;letter-spacing:.08em;border-radius:10px;background:rgba(10,14,26,.9);border:1px solid rgba(95,220,255,.55);color:#bff4ff;box-shadow:0 0 8px rgba(95,220,255,.35)}
 #zd-menu .ufo .rim.l{left:27%}#zd-menu .ufo .rim.r{right:27%}
+#zd-menu .ufo .rim::after{content:'';position:absolute;left:-10px;right:-10px;top:-12px;bottom:-12px} /* a bigger place to tap than the little label */
+@media (orientation:landscape) and (max-height:480px){#zd-menu .box.saucer{max-width:330px}#zd-menu .box.saucer .xp,#zd-menu .box.saucer .foot{display:none}} /* a phone on its side: the saucer smaller, the XP and the footer left off so it fits */
 #zd-menu .box.saucer .xp{margin:6px 10px 0;padding:8px 14px 9px;background:linear-gradient(180deg,rgba(14,20,36,.92),rgba(6,9,18,.94));border:1px solid rgba(95,220,255,.6);box-shadow:0 0 12px rgba(60,180,255,.3),inset 0 0 10px rgba(60,180,255,.12);
   clip-path:polygon(10px 0,calc(100% - 10px) 0,100% 10px,100% calc(100% - 10px),calc(100% - 10px) 100%,10px 100%,0 calc(100% - 10px),0 10px)} /* notched corners */
 #zd-menu .box.saucer .xp .rank{margin:0 0 6px;color:#e8f6ff}#zd-menu .box.saucer .xp .rank b{color:#5fe0ff}#zd-menu .box.saucer .xp .bar{margin:0;background:rgba(95,220,255,.15)}
@@ -664,7 +666,7 @@ export class Game {
     this.top = document.createElement('div'); this.top.id = 'zd-top';
     this.bar = document.createElement('div'); this.bar.id = 'zd-bar';
     const toast = document.createElement('div'); toast.id = 'zd-toast';
-    const fps = document.createElement('div'); fps.id = 'zd-fps';
+    const fps = document.createElement('div'); fps.id = 'zd-fps'; if (!/[?&]fps\b/.test(location.search)) fps.style.display = 'none'; // the frame rate, only with ?fps
     document.body.append(this.top, this.bar, toast, fps);
     const old = document.getElementById('hud'); if (old) old.remove();
     this.el = { toast, fps };
@@ -734,6 +736,8 @@ export class Game {
     f.style.top = (this.top.getBoundingClientRect().bottom + 10) + 'px';
     const b = f.querySelector('b'); b.textContent = name; b.style.animation = 'none'; void b.offsetWidth; b.style.animation = '';
     f.querySelector('span').textContent = hint || ''; f.classList.add('on'); this.placeToast();
+    const again = () => { if (f.classList.contains('on')) { f.style.top = (this.top.getBoundingClientRect().bottom + 10) + 'px'; this.placeToast(); } }; // the alert pill may grow and wrap the top bar a moment later
+    for (const ms of [60, 400, 1200]) setTimeout(again, ms);
     clearTimeout(this._ft); this._ft = setTimeout(() => { f.classList.remove('on'); this.placeToast(); }, 3200);
     let c = this.el.chip; if (!c || !this.bar.contains(c)) { c = this.el.chip = document.createElement('div'); c.id = 'zd-alertchip'; c.innerHTML = '<i></i><b></b><button type="button" class="zd-btn">Show</button>'; this.extraRow().appendChild(c); }
     c.querySelector('b').textContent = name; c.querySelector('button').onclick = show; c.hidden = false;
