@@ -435,11 +435,12 @@ export class Game {
   // the menu saucer's orb (Sean's Easter egg): a tap fires a laser blast from the front of the ship onto the planet; held a
   // second (it glows, then pulses red) and let go, it drops a nuke there. Only light and sound: nothing on the map
   orbFire(btn) {
-    let t0 = 0, rdy = 0, mega = 0;
-    const calm = () => { t0 = 0; clearTimeout(rdy); clearTimeout(mega); btn.classList.remove('charge', 'ready', 'mega'); };
-    btn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); calm(); t0 = performance.now(); btn.classList.add('charge'); try { btn.setPointerCapture(e.pointerId); } catch (er) { /* fine */ } rdy = setTimeout(() => btn.classList.add('ready'), 1000); mega = setTimeout(() => { btn.classList.remove('ready'); btn.classList.add('mega'); }, 15000); });
-    const go = (e) => { if (!t0) return; e.stopPropagation(); const held = performance.now() - t0; calm(); if (held >= 15000) this.planetBuster(btn); else this.menuShot(held >= 1000 ? 'nuke' : 'laser', btn); }; // held 15 s: the whole planet
-    btn.addEventListener('pointerup', go); btn.addEventListener('pointercancel', calm);
+    let t0 = 0, rdy = 0, mega = 0, tape = 0;
+    const M = () => this.audio && this.audio.music, untape = () => { const m = M(); if (m && !this.busting) m.rec(false); }; // the song taped from 12 s held, for the planet-buster to run backwards
+    const calm = () => { t0 = 0; clearTimeout(rdy); clearTimeout(mega); clearTimeout(tape); btn.classList.remove('charge', 'ready', 'mega'); };
+    btn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); calm(); t0 = performance.now(); btn.classList.add('charge'); try { btn.setPointerCapture(e.pointerId); } catch (er) { /* fine */ } rdy = setTimeout(() => btn.classList.add('ready'), 1000); mega = setTimeout(() => { btn.classList.remove('ready'); btn.classList.add('mega'); }, 15000); tape = setTimeout(() => { const m = M(); if (m) m.rec(true); }, 12000); });
+    const go = (e) => { if (!t0) return; e.stopPropagation(); const held = performance.now() - t0; calm(); if (held >= 15000) this.planetBuster(btn); else { untape(); this.menuShot(held >= 1000 ? 'nuke' : 'laser', btn); } }; // held 15 s: the whole planet
+    btn.addEventListener('pointerup', go); btn.addEventListener('pointercancel', () => { calm(); untape(); });
     btn.addEventListener('click', (e) => e.stopPropagation());
   }
   menuShot(kind, btn) {
@@ -487,6 +488,7 @@ export class Game {
   planetBuster(btn) {
     const G = this.globe; if (!G || !G.planetScale || this.busting) return;
     this.busting = true;
+    const music = this.audio && this.audio.music; let cut = false; // the song: stopped at the blast, run backwards as the hole opens (music.js)
     const NS = 'http://www.w3.org/2000/svg', el = (tag, at) => { const n = document.createElementNS(NS, tag); for (const k in at) n.setAttribute(k, at[k]); return n; };
     const layer = (id) => { let l = document.getElementById(id); if (!l) { l = el('svg', { id }); document.body.appendChild(l); } return l; };
     const fx = layer('zd-menufx'), top = layer('zd-menuflash');
@@ -508,7 +510,7 @@ export class Game {
       glow.setAttribute('opacity', (t < 800 ? 0.6 : Math.max(0, 0.6 - (t - 800) / 300)).toFixed(2)); glow.setAttribute('stroke-width', (30 * (1 + Math.sin(t * 0.06) * 0.3)).toFixed(1)); core.setAttribute('opacity', (t < 800 ? 1 : Math.max(0, 1 - (t - 800) / 200)).toFixed(2));
       // it bursts: gone at the flash
       if (t >= 800) {
-        if (once('boom')) { snd('nuke', { gain: 1, rate: 0.8 }); G.planetScale(0); }
+        if (once('boom')) { snd('nuke', { gain: 1, rate: 0.8 }); G.planetScale(0); cut = !!music && music.blast(); }
         const b = t - 800;
         white.setAttribute('opacity', Math.max(0, 1 - b / 1300).toFixed(2));
         ball.setAttribute('r', (pr * (0.7 + 1.1 * ease(b / 600))).toFixed(1)); ball.setAttribute('opacity', Math.max(0, 1 - b / 2200).toFixed(2));
@@ -517,7 +519,7 @@ export class Game {
       }
       // two seconds after: a black hole opens, draws the pieces back, and the planet gathers out of it as it closes
       if (t >= 2800) {
-        if (once('hole')) snd('thunder', { gain: 0.9, rate: 0.55 });
+        if (once('hole')) { snd('thunder', { gain: 0.9, rate: 0.55 }); if (cut) music.rewind(2); }
         const h = t - 2800, open = ease(h / 700) * (t > 5200 ? Math.max(0, 1 - (t - 5200) / 900) : 1), r = pr * 0.34 * open;
         hole.setAttribute('r', (r * 2.1).toFixed(1)); disk.setAttribute('rx', (r * 2.3).toFixed(1)); disk.setAttribute('ry', (r * 0.62).toFixed(1)); disk.setAttribute('opacity', (0.95 * open).toFixed(2));
         disk.setAttribute('transform', 'rotate(' + (-12 + Math.sin(h * 0.004) * 4).toFixed(1) + ' ' + cx.toFixed(1) + ' ' + cy.toFixed(1) + ')'); disk.setAttribute('stroke-dasharray', (8 + Math.sin(h * 0.01) * 4).toFixed(1) + ' 6'); disk.setAttribute('stroke-dashoffset', (-h * 0.08).toFixed(1));
@@ -525,7 +527,7 @@ export class Game {
         for (const q of bits) { const a = q.a + h * 0.004 * q.s, d = pr * (0.4 + q.s * 2.2) * (1 - k); q.n.setAttribute('cx', (cx + Math.cos(a) * d).toFixed(1)); q.n.setAttribute('cy', (cy + Math.sin(a) * d * 0.7).toFixed(1)); q.n.setAttribute('opacity', (k < 1 ? 0.9 : 0).toFixed(2)); }
         if (t >= 3600) { if (once('back')) snd('collapse', { gain: 0.8, rate: 0.5 }); G.planetScale(ease((t - 3600) / 2000)); }
       }
-      if (t > 6300) { G.planetScale(1); for (const p of parts) p.remove(); this.busting = false; return; }
+      if (t > 6300) { G.planetScale(1); for (const p of parts) p.remove(); this.busting = false; if (music && music.bustP) music.resume(); else if (music) music.rec(false); return; }
       requestAnimationFrame(step);
     };
     requestAnimationFrame(step);
