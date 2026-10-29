@@ -160,12 +160,14 @@ const setPR = (k) => { prK = k; renderer.setPixelRatio(k); renderer.setSize(inne
 let loadingEl = document.getElementById('zd-loading'); // index.html's Loading, gone with the first frame
 const M = 10;
 
-function frame() {
+let frameErrs = 0;
+function frame() { requestAnimationFrame(frame); try { frameBody(); } catch (e) { if (frameErrs++ < 5) console.error(e); } } // the next frame comes whatever happens in this one
+function frameBody() {
   if (loadingEl) { loadingEl.remove(); loadingEl = null; }
   const dt = Math.min(0.05, clock.getDelta());
   time += dt;
   sky.update(dt);
-  if (globe.active || !W) { controls.enabled = false; if (globe.active) globe.frame(dt); frames++; fpsT += dt; requestAnimationFrame(frame); globeWas = true; return; } // up on the globe (or nothing built yet): the city waits
+  if (globe.active || !W) { controls.enabled = false; if (globe.active) globe.frame(dt); frames++; fpsT += dt; globeWas = true; return; } // up on the globe (or nothing built yet): the city waits
   if (globeWas) { globeWas = false; controls.enabled = !sky.busy(); }
   const { city, outskirts, daylight, disasters, sirens } = W, B = city.bounds, pilot = [game.flight, game.drive, game.takeover, game.bandGame].find(c => c && c.active) || null, fl = !!pilot; // flying a plane, on the ground (drive.js), driving a disaster (takeover.js) or playing the band (rhythm.js): it has the camera
   if (!fl) controls.update();
@@ -207,7 +209,6 @@ function frame() {
   if (fpsT > 0.5) {
     fps = Math.round(frames / fpsT); frames = 0; fpsT = 0;
   }
-  requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 

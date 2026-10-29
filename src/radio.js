@@ -41,6 +41,7 @@ const IDENT = 1, CLEAR = [22, 23, 24];
 const LEVELS = [0, 0.18, 0.33, 0.55]; // off, quiet, medium, loud (its own button; starts at quiet. Sean: much quieter - loud is the old quiet)
 
 const CSS = `
+body.zd-flying #zd-radio{bottom:calc(150px + env(safe-area-inset-bottom))} /* above a plane's, a take-over's or the band's own buttons (the town's bar is away) */
 #zd-radio{position:fixed;left:0;right:0;margin:0 auto;width:max-content;bottom:calc(var(--zd-bar-h, 64px) + 8px);z-index:4;max-width:min(calc(100vw - 24px),460px);box-sizing:border-box;
   display:flex;gap:8px;align-items:flex-start;padding:6px 11px;border-radius:10px;background:rgba(18,14,10,.74);border:1px solid rgba(255,236,200,.12);
   color:#efe3cb;font:italic 500 12px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif;pointer-events:none;opacity:0;transition:opacity .4s}

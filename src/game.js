@@ -409,6 +409,9 @@ export class Game {
   }
   // a mode stops for good: its touch handlers go quiet (dead), what it put on the screen goes
   endMode() {
+    for (const p of [this.flight, this.drive, this.takeover]) if (p && p.active) p.stop(true); // whatever the player was driving, put away
+    if (this.bandGame) { if (this.bandGame.active) this.bandGame.stop(); if (this.bandGame.offerEl) { this.bandGame.offerEl.remove(); this.bandGame.offerEl = null; } }
+    if (this.takeover && this.takeover.picking) this.takeover.endPick();
     if (this.folk) this.folk.hide();
     if (this.profile) this.profile.mode = null;
     SEE.on = true; SEE.far = 430; // back to the usual see-through (Be The Disaster sets its own)

@@ -44,6 +44,7 @@ const CSS = `
 @keyframes zdMiss{to{transform:scale(.3);opacity:0;filter:hue-rotate(-60deg)}}
 #zd-duel .acts{position:absolute;left:50%;bottom:calc(130px + env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;gap:8px;width:max-content;max-width:calc(100vw - 16px)}
 #zd-duel .acts button{appearance:none;border:2px solid rgba(255,255,255,.4);border-radius:14px;padding:14px 12px;font:900 13px system-ui,-apple-system,sans-serif;letter-spacing:.05em;color:#fff;background:linear-gradient(#ff5ad5,#a0168a);box-shadow:0 0 16px rgba(255,90,213,.6);cursor:pointer;white-space:nowrap}
+#zd-duel .land{position:absolute;left:12px;bottom:calc(14px + env(safe-area-inset-bottom));appearance:none;border:2px solid rgba(255,255,255,.35);border-radius:12px;padding:10px 14px;font:800 12px system-ui,-apple-system,sans-serif;color:#fff;background:linear-gradient(#ff5a8a,#c2165a);cursor:pointer}
 #zd-duel .acts button.rnd{background:linear-gradient(#ffc04a,#d0700a);box-shadow:0 0 16px rgba(255,180,60,.6)}
 #zd-duel .ring{position:absolute;left:50%;top:50%;width:200px;height:200px;margin:-100px 0 0 -100px;border-radius:50%;border:3px dashed rgba(255,255,255,.55);pointer-events:none;animation:zdTurn 1.2s linear infinite}
 @keyframes zdTurn{to{transform:rotate(360deg)}}
@@ -61,8 +62,9 @@ export class Duel {
     v.gripped = true; v.pinned = 'reel'; v.flinch = 0; v.downT = 0; if (v.dropHeld) v.dropHeld(); // held where it is, reeling
     if (!document.getElementById('zd-duel-css')) { const s = document.createElement('style'); s.id = 'zd-duel-css'; s.textContent = CSS; document.head.appendChild(s); }
     const el = this.el = document.createElement('div'); el.id = 'zd-duel';
-    el.innerHTML = '<div class="pan"><div class="ttl"></div><div class="bar"><i></i></div><div class="vhp"></div></div><div class="acts"></div>';
+    el.innerHTML = '<div class="pan"><div class="ttl"></div><div class="bar"><i></i></div><div class="vhp"></div></div><div class="acts"></div><button type="button" class="land">Land</button>';
     document.body.appendChild(el);
+    el.querySelector('.land').onclick = (e) => { e.stopPropagation(); this.F.stop(); }; // Land, in the middle of it
     this.ttl = el.querySelector('.ttl'); this.barI = el.querySelector('.bar i'); this.vhp = el.querySelector('.vhp'); this.acts = el.querySelector('.acts');
     this.title('🎯 WEAK SPOTS! TAP THEM!'); sfx('thud', v.x, v.y + 2, v.z, { gain: 0.8 });
     // the spin: a finger going round the middle of the screen

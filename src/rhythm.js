@@ -37,7 +37,7 @@ const CSS = `
 #zd-band .acts{position:absolute;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;gap:8px}
 #zd-band .acts button{appearance:none;border:2px solid rgba(255,255,255,.35);border-radius:12px;padding:12px 18px;font:800 13px system-ui,-apple-system,sans-serif;color:#fff;background:linear-gradient(#ff5a8a,#c2165a);cursor:pointer}
 #zd-band .acts button.go{background:linear-gradient(#ff4fa3,#a0168a)}
-#zd-band .res{position:absolute;left:50%;top:50%;transform:translate(-50%,-55%);width:min(84vw,320px);padding:18px 16px;border-radius:16px;background:rgba(20,10,30,.88);border:1px solid rgba(255,255,255,.2);color:#fff;text-align:center}
+#zd-band .res{position:absolute;left:calc(50% - 22px);top:50%;transform:translate(-50%,-55%);width:min(calc(100vw - 110px),320px);padding:18px 16px;border-radius:16px;background:rgba(20,10,30,.88);border:1px solid rgba(255,255,255,.2);color:#fff;text-align:center}
 #zd-band .res .gr{font:900 64px/1 system-ui,-apple-system,sans-serif;color:#ffd27a;text-shadow:0 0 18px rgba(255,200,90,.6)}
 #zd-band .res .pts{font:900 22px/1.3 system-ui,-apple-system,sans-serif;margin-top:4px}
 #zd-band .res .ln{font:700 13px/1.6 system-ui,-apple-system,sans-serif;opacity:.9}
@@ -93,13 +93,14 @@ export class BandGame {
     document.body.appendChild(el);
     this.ptsEl = el.querySelector('.pts'); this.cbEl = el.querySelector('.cb'); this.barI = el.querySelector('.bar i'); this.hintEl = el.querySelector('.hint');
     el.querySelector('[data-b="stop"]').onclick = (e) => { e.stopPropagation(); this.stop(); };
+    this.onKey = (e) => { if (e.key === 'Escape') this.stop(); }; addEventListener('keydown', this.onKey); // Esc, as in the planes
   }
   // a new set
   reset() {
     for (const n of this.notes || []) n.el.remove(); if (this.res) { this.res.remove(); this.res = null; } if (this.bigEl) { this.bigEl.remove(); this.bigEl = null; }
     this.notes = []; this.score = 0; this.combo = 0; this.bestCombo = 0; this.hits = { perfect: 0, good: 0, miss: 0 }; this.over = false; this.last = -1; this.same = 0;
     const M = this.g.audio && this.g.audio.music, el = M && M.bandEl;
-    if (el && !el.paused && el.duration && el.duration - el.currentTime < SET + 15) { try { el.currentTime = 0; } catch (e) { /* not seekable */ } } // too near the end for a whole set: from the top
+    if (el && !el.paused && el.duration && el.duration - el.currentTime < SET + 15) { try { el.currentTime = 0; M.songAt = performance.now(); } catch (e) { /* not seekable */ } } // too near the end for a whole set: from the top (the song's own clock with it)
     this.clock = null; this.tick(0); // where the song is now
     const k0 = Math.ceil((this.clock - this.song.first) / this.period) + 1; this.k0 = k0; this.nextK = k0 + COUNT; this.endK = k0 + COUNT + Math.round(SET / this.period); // a count-in, then a minute of beats
     this.counted = k0 - 1; this.show();
@@ -115,7 +116,7 @@ export class BandGame {
     if (!on) { this.clock = (this.clock ?? 0) + dt; return false; }
     const a = el.currentTime; if (this.clock == null) { this.clock = a; return false; }
     const want = this.clock + dt;
-    if (a < this.clock - 1 || a > want + 2) { this.clock = a; return true; } // looped back to the start, or skipped on: a new set
+    if (a < this.clock - 1 || a > want + 2) { this.jumpFrom = this.clock; this.clock = a; return true; } // looped back to the start, or skipped on
     this.clock = Math.abs(a - want) > 0.12 ? a : want + (a - want) * 0.1; // drifted (a slow frame): straight to it; otherwise eased
     return false;
   }
@@ -136,9 +137,16 @@ export class BandGame {
     const n = { k, lane, at, el, ring: el.querySelector('i'), done: false }; this.el.appendChild(el); this.notes.push(n);
     el.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); this.judge(n); });
   }
+  // the song jumped: the balls in the air dropped (no misses), the beats laid again from where it is now; the score, the
+  // combo and the time left kept
+  resync() {
+    for (const n of this.notes) if (!n.done) { n.done = true; n.el.remove(); }
+    const P = this.period, F = this.song.first, left = Math.max(0, F + this.endK * P - (this.jumpFrom ?? this.clock)), k = Math.ceil((this.clock - F) / P) + 1;
+    this.nextK = k; this.endK = k + Math.round(left / P); this.k0 = k - COUNT - Math.round(Math.max(0, SET - left) / P); this.counted = Math.max(k, this.k0 + COUNT); this.big('');
+  }
   // a tap on a ball: how near the beat
   judge(n) {
-    if (n.done || this.over) return; const d = this.now() - n.at, ad = Math.abs(d);
+    if (n.done || this.over || this.g.paused) return; const d = this.now() - n.at, ad = Math.abs(d);
     if (d < -GOOD) return; // far too early: not yet
     const perfect = ad <= PERFECT; n.done = true; n.el.classList.add('hit'); setTimeout(() => n.el.remove(), 230);
     this.combo++; this.bestCombo = Math.max(this.bestCombo, this.combo); this.hits[perfect ? 'perfect' : 'good']++;
@@ -166,7 +174,10 @@ export class BandGame {
     this.place(); cam.position.copy(this.camAt); cam.up.set(0, 1, 0); cam.lookAt(this.lookAt); this.focus = cam.position.distanceTo(this.lookAt);
     tg.set(this.lookAt.x, 0, this.lookAt.z); this.g.focusAt = this.lookAt;
     if (this.over) return;
-    if (this.tick(dt)) { for (const n of this.notes) if (!n.done) { n.done = true; n.el.remove(); } this.reset(); return; } // the song jumped: start the set again
+    const paused = !!this.g.paused, M = this.g.audio && this.g.audio.music; // the pause button: the song held where it is, the balls frozen
+    if (paused !== !!this.held) { this.held = paused; if (M && M.holdBand) M.holdBand(paused); }
+    if (paused) return;
+    if (this.tick(dt)) { this.resync(); return; } // the song jumped (it looped, the music button): the set carries on from there
     const t = this.clock, P = this.period, F = this.song.first;
     // the count-in: 4, 3, 2, 1 on the beats before the first ball lands
     const kb = Math.floor((t - F) / P + 0.0001);
@@ -208,7 +219,7 @@ export class BandGame {
   stop(why) {
     if (!this.active) return;
     const g = this.g, { camera, controls, post } = this.ctx;
-    this.active = false; document.body.classList.remove('zd-flying'); if (this.el) this.el.remove(); this.el = null; this.notes = []; this.bigEl = null; this.res = null;
+    this.active = false; document.body.classList.remove('zd-flying'); removeEventListener('keydown', this.onKey); if (this.held) { this.held = false; const Mh = g.audio && g.audio.music; if (Mh && Mh.holdBand) Mh.holdBand(false); } if (this.el) this.el.remove(); this.el = null; this.notes = []; this.bigEl = null; this.res = null;
     const M = g.audio && g.audio.music; if (M) M.bandLoud = false;
     if (this.B) { this.B.beatClock = null; for (const mb of this.B.members) mb.hop = 0; } this.B = null;
     camera.position.copy(this.saved.pos); controls.target.copy(this.saved.tg); camera.fov = this.saved.fov; camera.updateProjectionMatrix(); camera.up.set(0, 1, 0); post.opts.dof = this.saved.dof;

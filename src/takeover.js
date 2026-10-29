@@ -108,13 +108,15 @@ export class TakeOver {
     this.css(); const g = this.g, list = this.candidates();
     if (!list.length) { g.toast('Start a disaster first: an alien invasion (saucers and walkers), the giant worm, the kaiju or a tornado. Then take it over', 5000); return; }
     this.picking = true; this.sel = null; document.body.classList.add('zd-picking');
+    this.onPickKey = (e) => { if (e.key === 'Escape') this.endPick(); }; addEventListener('keydown', this.onPickKey);
+    const only = list.length === 1 && list[0].kind === 'band' ? list[0].b.venue : null; if (only) g.lookAt(only.x, only.z, 260); // no disaster on: the band, in view
     this.marks = list.map((u) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'zd-pickmark'; b.textContent = KINDS[u.kind].name; b.onclick = (e) => { e.stopPropagation(); this.select(u, b); }; document.body.appendChild(b); return { u, b }; });
     const bar = this.pbar = document.createElement('div'); bar.id = 'zd-takebar';
     bar.innerHTML = '<button type="button" class="zd-btn act" data-t="go">Take over</button><button type="button" class="zd-btn exit" data-t="no">Cancel</button>';
     document.body.appendChild(bar); this.goBtn = bar.querySelector('[data-t="go"]'); this.goBtn.style.opacity = '0.45';
     this.goBtn.onclick = () => { if (this.sel) { const u = this.sel; this.endPick(); if (u.kind === 'band') g.bandGame.start(); else this.start(u); } else g.toast('Tap one of the labels first'); };
     bar.querySelector('[data-t="no"]').onclick = () => this.endPick();
-    g.toast('Tap the one you want, then Take over', 3500);
+    g.toast(list.every(u => u.kind === 'band') ? 'No disaster to take over yet: start one from Disasters. Or tap Band and play the band' : 'Tap the one you want, then Take over', 4000);
     const loop = () => { if (!this.picking) return; this.placeMarks(); requestAnimationFrame(loop); }; loop();
   }
   select(u, b) { this.sel = u; for (const m of this.marks) m.b.classList.toggle('sel', m.b === b); this.goBtn.textContent = u.kind === 'band' ? 'Control the band' : 'Take over the ' + KINDS[u.kind].name.toLowerCase(); this.goBtn.style.opacity = '1'; }
@@ -127,7 +129,7 @@ export class TakeOver {
       m.b.style.display = ''; m.b.style.left = ((v.x + 1) / 2 * innerWidth) + 'px'; m.b.style.top = ((1 - v.y) / 2 * innerHeight) + 'px';
     }
   }
-  endPick() { this.picking = false; document.body.classList.remove('zd-picking'); for (const m of this.marks || []) m.b.remove(); this.marks = []; if (this.pbar) this.pbar.remove(); this.pbar = null; }
+  endPick() { removeEventListener('keydown', this.onPickKey); this.picking = false; document.body.classList.remove('zd-picking'); for (const m of this.marks || []) m.b.remove(); this.marks = []; if (this.pbar) this.pbar.remove(); this.pbar = null; }
 
   // yours: the camera behind it, the thumbs and its buttons
   start(u) {
