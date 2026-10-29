@@ -165,6 +165,11 @@ const CSS = `
 #zd-menu .ufo .mode[data-go="be"]{--c:#ff4a78;--c1:#d6164a;--c2:#5a061f;--g:rgba(255,74,120,.45)}
 #zd-menu .ufo .mode[data-play="sandbox"]{--c:#45ef75;--c1:#14a847;--c2:#05461c;--g:rgba(69,239,117,.4)}
 #zd-menu .ufo .mode[data-play="tv"]{--c:#ff9a2e;--c1:#ec600c;--c2:#6a2300;--g:rgba(255,154,46,.45)}
+#zd-menu .ufo .orbfire{position:absolute;left:50%;top:88.7%;width:9%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;border:0;padding:0;background:none;cursor:pointer;touch-action:none;-webkit-tap-highlight-color:transparent;transition:box-shadow .2s}
+#zd-menu .ufo .orbfire.charge{box-shadow:0 0 14px 4px rgba(120,220,255,.85),inset 0 0 10px rgba(255,255,255,.8)}
+#zd-menu .ufo .orbfire.ready{animation:zdOrb .35s ease-in-out infinite alternate}
+@keyframes zdOrb{from{box-shadow:0 0 14px 5px rgba(255,80,60,.9),inset 0 0 12px rgba(255,220,200,.9)}to{box-shadow:0 0 26px 10px rgba(255,140,40,.95),inset 0 0 14px #fff}}
+#zd-menufx{position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:8}
 #zd-menu .ufo .rim{position:absolute;top:83%;padding:4px 10px;min-width:0;font-size:9.5px;letter-spacing:.08em;border-radius:10px;background:rgba(10,14,26,.9);border:1px solid rgba(95,220,255,.55);color:#bff4ff;box-shadow:0 0 8px rgba(95,220,255,.35)}
 #zd-menu .ufo .rim.l{left:27%}#zd-menu .ufo .rim.r{right:27%}
 #zd-menu .box.saucer .xp{margin:6px 10px 0;padding:8px 14px 9px;background:linear-gradient(180deg,rgba(14,20,36,.92),rgba(6,9,18,.94));border:1px solid rgba(95,220,255,.6);box-shadow:0 0 12px rgba(60,180,255,.3),inset 0 0 10px rgba(60,180,255,.12);
@@ -422,6 +427,52 @@ export class Game {
     if (this.radio) this.radio.begin(which === 'be' ? this.mode.kind : null);
   }
 
+  // the menu saucer's orb (Sean's Easter egg): a tap fires a laser blast from the front of the ship onto the planet; held a
+  // second (it glows, then pulses red) and let go, it drops a nuke there. Only light and sound: nothing on the map
+  orbFire(btn) {
+    let t0 = 0, rdy = 0;
+    btn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); t0 = performance.now(); btn.classList.add('charge'); try { btn.setPointerCapture(e.pointerId); } catch (er) { /* fine */ } clearTimeout(rdy); rdy = setTimeout(() => btn.classList.add('ready'), 1000); });
+    const go = (e) => { if (!t0) return; e.stopPropagation(); const held = performance.now() - t0; t0 = 0; clearTimeout(rdy); btn.classList.remove('charge', 'ready'); this.menuShot(held >= 1000 ? 'nuke' : 'laser', btn); };
+    btn.addEventListener('pointerup', go); btn.addEventListener('pointercancel', () => { t0 = 0; clearTimeout(rdy); btn.classList.remove('charge', 'ready'); });
+    btn.addEventListener('click', (e) => e.stopPropagation());
+  }
+  menuShot(kind, btn) {
+    const G = this.globe; if (!G || !G.screenPoint) return;
+    const NS = 'http://www.w3.org/2000/svg', el = (tag, at) => { const n = document.createElementNS(NS, tag); for (const k in at) n.setAttribute(k, at[k]); return n; };
+    let fx = document.getElementById('zd-menufx');
+    if (!fx) { fx = el('svg', { id: 'zd-menufx' }); fx.innerHTML = '<defs><radialGradient id="zfxB"><stop offset="0" stop-color="#fff"/><stop offset=".35" stop-color="#b8f6ff"/><stop offset="1" stop-color="#36c8ff" stop-opacity="0"/></radialGradient><radialGradient id="zfxN"><stop offset="0" stop-color="#fff"/><stop offset=".3" stop-color="#ffe9a0"/><stop offset=".65" stop-color="#ff7a2e"/><stop offset="1" stop-color="#c22a10" stop-opacity="0"/></radialGradient></defs>'; document.body.appendChild(fx); }
+    const r = btn.getBoundingClientRect(), x0 = r.left + r.width / 2, y0 = r.top + r.height * 0.35, [x1, y1] = G.screenPoint(kind === 'nuke' ? 0.35 : 0.55), pr = G.screenRadius(), nuke = kind === 'nuke';
+    const glow = el('line', { x1: x0, y1: y0, x2: x1, y2: y1, stroke: nuke ? '#ff6ad5' : '#36c8ff', 'stroke-width': nuke ? 14 : 8, 'stroke-linecap': 'round', opacity: 0.55 });
+    const core = el('line', { x1: x0, y1: y0, x2: x1, y2: y1, stroke: '#fff', 'stroke-width': nuke ? 4.5 : 2.5, 'stroke-linecap': 'round' });
+    fx.append(glow, core);
+    const cam = this.camera.position, A = this.audio; if (A) A.play(nuke ? 'laser' : 'zap', cam.x, cam.y, cam.z, { gain: 0.8, rate: nuke ? 0.7 : 1.2 });
+    const parts = [glow, core], beam = nuke ? 520 : 240, start = performance.now();
+    const hit = (n) => { const c = el('circle', { cx: x1, cy: y1, r: 0, fill: 'url(#' + (nuke ? 'zfxN' : 'zfxB') + ')' }); fx.appendChild(c); parts.push(c); return c; };
+    let flash = null, ball = null, ring = null, white = null, cloud = null;
+    if (!nuke) flash = hit(); else { flash = hit(); ball = hit(); ring = el('circle', { cx: x1, cy: y1, r: 0, fill: 'none', stroke: '#ffe2b0', 'stroke-width': 4 }); cloud = hit(); white = el('rect', { x: 0, y: 0, width: '100%', height: '100%', fill: '#fff', opacity: 0 }); fx.append(ring, white); parts.push(ring, white); }
+    let boomed = false;
+    const step = () => {
+      const t = performance.now() - start, b = Math.min(1, t / beam);
+      glow.setAttribute('opacity', (t < beam ? 0.55 : Math.max(0, 0.55 - (t - beam) / 300)).toFixed(2)); core.setAttribute('opacity', (t < beam ? 1 : Math.max(0, 1 - (t - beam) / 200)).toFixed(2));
+      const w = 1 + Math.sin(t * 0.08) * 0.25; glow.setAttribute('stroke-width', ((nuke ? 14 : 8) * w).toFixed(1));
+      if (!nuke) { const k = Math.min(1, t / 450); flash.setAttribute('r', (6 + 26 * k).toFixed(1)); flash.setAttribute('opacity', (1 - k).toFixed(2)); if (t > 700) return done(); }
+      else {
+        const u = (t - beam) / 1000; // the bomb goes off as the beam lands
+        if (u > 0) {
+          if (!boomed) { boomed = true; if (A) A.play('nuke', cam.x, cam.y, cam.z, { gain: 0.7 }); }
+          white.setAttribute('opacity', Math.max(0, 0.7 - u * 1.4).toFixed(2));
+          flash.setAttribute('r', (pr * 0.55 * Math.min(1, u * 4)).toFixed(1)); flash.setAttribute('opacity', Math.max(0, 1 - u * 2.2).toFixed(2));
+          ball.setAttribute('r', (pr * (0.12 + 0.24 * Math.min(1, u * 2))).toFixed(1)); ball.setAttribute('opacity', Math.max(0, 1 - u / 2.6).toFixed(2));
+          ring.setAttribute('r', (pr * 1.1 * Math.min(1, u / 1.2)).toFixed(1)); ring.setAttribute('opacity', Math.max(0, 1 - u / 1.2).toFixed(2)); ring.setAttribute('stroke-width', (5 * Math.max(0.2, 1 - u)).toFixed(1));
+          cloud.setAttribute('cy', (y1 - pr * 0.25 * Math.min(1, u)).toFixed(1)); cloud.setAttribute('r', (pr * 0.16 * Math.min(1, u * 1.5)).toFixed(1)); cloud.setAttribute('opacity', Math.max(0, 0.9 - u / 3).toFixed(2));
+          if (u > 3) return done();
+        }
+      }
+      requestAnimationFrame(step);
+    };
+    const done = () => { for (const p of parts) p.remove(); };
+    requestAnimationFrame(step);
+  }
   // ---------- main menu and unlocks
   showMenu(panel = 'main') {
     if (this.audio && this.audio.music) this.audio.music.setMenu(true); // the theme on the menus
@@ -440,7 +491,7 @@ export class Game {
         wedgeBtn(1, 'data-go="be"', MICON.be + '<b>Be the<br>Disaster</b>') +
         wedgeBtn(2, 'data-play="sandbox"', MICON.sandbox + '<b>Sandbox</b>') +
         wedgeBtn(3, 'data-play="tv"', MICON.tv + '<b>Disaster<br>TV</b>') + '</div>' + // just the names (Sean: the level shows below)
-        '<button class="zd-btn rim l" type="button" data-go="unlocks">Units' + (pr.bank >= 3000 && UPGRADES.some(u => pr.canBuy(u.id)) ? ' \u2022' : '') + '</button><button class="zd-btn rim r" type="button" data-go="roster">Roster</button></div>' +
+        '<button class="zd-btn rim l" type="button" data-go="unlocks">Units' + (pr.bank >= 3000 && UPGRADES.some(u => pr.canBuy(u.id)) ? ' \u2022' : '') + '</button><button class="zd-btn rim r" type="button" data-go="roster">Roster</button><button class="orbfire" type="button" aria-label="Fire"></button></div>' +
         '<div class="xp"><div class="rank sm"><span>Commander level <b>' + lvl + '</b></span><span>' + pr.xp.toLocaleString() + (next ? ' / ' + next.toLocaleString() : '') + ' XP</span></div>' +
         '<div class="bar sm"><i style="width:' + Math.round(pr.progress * 100) + '%"></i></div></div>' +
         '<div class="foot">' + pr.data.rounds + ' rounds played · best score ' + pr.data.best.toLocaleString() + ' · ' + pr.data.stars + ' stars' + (pr.ok ? '' : ' · progress is not being saved on this device') + '</div>';
@@ -485,6 +536,7 @@ export class Game {
     dragScroll(this.menu.querySelector('.mbody'), 'y');
     this.menu.querySelectorAll('[data-go]').forEach(b => { b.onclick = () => this.showMenu(b.dataset.go); });
     this.menu.querySelectorAll('[data-play]').forEach(b => { b.onclick = () => this.playMode(b.dataset.play); });
+    const orb = this.menu.querySelector('.orbfire'); if (orb) this.orbFire(orb); // the saucer's laser (an Easter egg)
     this.menu.querySelectorAll('[data-place]').forEach(b => { b.onclick = () => travel(b.dataset.place); });
     this.menu.querySelectorAll('[data-be]').forEach(b => { b.onclick = () => this.playMode('be', b.dataset.be); });
     this.menu.querySelectorAll('[data-buy]').forEach(b => { b.onclick = () => { if (pr.buy(b.dataset.buy)) { this.toast('Upgrade bought'); this.showMenu('unlocks'); } }; });

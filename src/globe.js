@@ -386,6 +386,13 @@ export class Globe {
     const ph = Math.acos(Math.max(-1, Math.min(1, this.cam.position.y / this.cam.position.length()))); this.controls.minPolarAngle = this.controls.maxPolarAngle = ph; this.tiltTo = null; // a swipe only turns it (Sean): the tilt held where it is
     document.body.classList.add('zd-globe-on');
   }
+  // the menu saucer's laser (game.js orbFire): a point on the side of the planet facing the camera, on the screen, and how
+  // big the planet is there
+  screenPoint(spread = 0.5) {
+    const c = this.cam.position.clone().normalize(), t = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).cross(c).normalize().multiplyScalar(Math.random() * spread);
+    const v = c.add(t).normalize().multiplyScalar(R).project(this.cam); return [(v.x + 1) / 2 * innerWidth, (1 - v.y) / 2 * innerHeight];
+  }
+  screenRadius() { const o = new THREE.Vector3().project(this.cam), e = new THREE.Vector3(1, 0, 0).applyQuaternion(this.cam.quaternion).multiplyScalar(R).project(this.cam); return Math.abs(e.x - o.x) / 2 * innerWidth; }
   // on the menu: how far back, and how far up the view, for the whole planet to sit in the gap between the title and the
   // menu card (Sean: all of it in view above the menu); a long panel leaving no gap: the planet behind it all
   menuFit() {
