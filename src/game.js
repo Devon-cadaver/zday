@@ -154,15 +154,19 @@ const CSS = `
 #zd-menu .ufo .mode:nth-child(2){animation-duration:4.2s;animation-delay:-1.3s}#zd-menu .ufo .mode:nth-child(3){animation-duration:3.9s;animation-delay:-2.5s}#zd-menu .ufo .mode:nth-child(4){animation-duration:4.5s;animation-delay:-.7s}
 @keyframes zdBob{0%,100%{translate:0 0;rotate:0deg}30%{translate:1px -5px;rotate:.8deg}65%{translate:-1px 2px;rotate:-.6deg}}
 @media (prefers-reduced-motion:reduce){#zd-menu .ufo .mode,#zd-menu .ufo .hull .spin{animation:none}}
-#zd-menu .ufo .modes{position:absolute;left:5%;right:5%;top:38%;height:39%;margin:0;display:grid;grid-template-columns:repeat(4,1fr);gap:1.6%;perspective:420px}
-#zd-menu .ufo .zd-btn.mode{height:100%;box-sizing:border-box;justify-content:center;gap:3px;padding:8px 3px 7px;border-radius:15px;border:2.5px solid var(--c);color:#fff;text-transform:uppercase;letter-spacing:.01em;
-  background:linear-gradient(180deg,var(--c1),var(--c2));box-shadow:0 0 12px var(--c),0 0 26px var(--g),inset 0 0 14px rgba(255,255,255,.2),inset 0 10px 18px rgba(255,255,255,.12);text-shadow:0 1px 3px rgba(0,0,0,.6)}
+#zd-menu .ufo .modes{position:absolute;inset:0;margin:0;display:block} /* the panels sit on the deck where WEDGE puts them */
+#zd-menu .ufo .zd-btn.mode{position:absolute;display:block;padding:0;margin:0;border:0;border-radius:0;min-width:0;background:none;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;overflow:visible;pointer-events:none;color:#fff;text-transform:uppercase;letter-spacing:.01em;text-shadow:0 1px 3px rgba(0,0,0,.6)}
+#zd-menu .ufo .mode > svg{position:absolute;left:0;top:0;width:100%;height:100%;overflow:visible;filter:drop-shadow(0 0 4px var(--c)) drop-shadow(0 0 10px var(--g))}
+#zd-menu .ufo .mode .pan{pointer-events:visiblePainted;cursor:pointer;stroke:var(--c);stroke-width:2.6px;stroke-linejoin:round;vector-effect:non-scaling-stroke} /* only the wedge itself takes the tap */
+#zd-menu .ufo .mode .hi{fill:none;stroke:rgba(255,255,255,.35);stroke-width:1px;vector-effect:non-scaling-stroke;pointer-events:none}
+#zd-menu .ufo .mode:active > svg{filter:brightness(1.35) drop-shadow(0 0 6px var(--c)) drop-shadow(0 0 14px var(--g))}
+#zd-menu .ufo .mode .lab{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:2px;width:max-content;text-align:center;pointer-events:none;text-transform:uppercase;opacity:1;font-size:8.5px} /* the title in capitals, the line under it as it is (.mode span) */
 #zd-menu .ufo .mode b{font-size:11.5px;font-weight:900;line-height:1.05}#zd-menu .ufo .mode span{font-size:8.5px;font-weight:600;text-transform:none;opacity:.92}
-#zd-menu .ufo .mode svg{width:24px;height:24px;filter:drop-shadow(0 0 4px rgba(255,255,255,.7))}
-#zd-menu .ufo .mode[data-play="commander"]{--c:#4fc3ff;--c1:#1f6fe6;--c2:#0a2a72;--g:rgba(79,195,255,.45);transform:rotateY(24deg) rotateZ(-8deg) translateY(4%)}
-#zd-menu .ufo .mode[data-go="be"]{--c:#ff4a78;--c1:#d6164a;--c2:#5a061f;--g:rgba(255,74,120,.45);transform:rotateX(16deg) rotateZ(-2.5deg) translateY(9%)}
-#zd-menu .ufo .mode[data-play="sandbox"]{--c:#45ef75;--c1:#14a847;--c2:#05461c;--g:rgba(69,239,117,.4);transform:rotateX(16deg) rotateZ(2.5deg) translateY(9%)}
-#zd-menu .ufo .mode[data-play="tv"]{--c:#ff9a2e;--c1:#ec600c;--c2:#6a2300;--g:rgba(255,154,46,.45);transform:rotateY(-24deg) rotateZ(8deg) translateY(4%)}
+#zd-menu .ufo .mode .lab svg{width:22px;height:22px;filter:drop-shadow(0 0 4px rgba(255,255,255,.7))}
+#zd-menu .ufo .mode[data-play="commander"]{--c:#4fc3ff;--c1:#1f6fe6;--c2:#0a2a72;--g:rgba(79,195,255,.45)}
+#zd-menu .ufo .mode[data-go="be"]{--c:#ff4a78;--c1:#d6164a;--c2:#5a061f;--g:rgba(255,74,120,.45)}
+#zd-menu .ufo .mode[data-play="sandbox"]{--c:#45ef75;--c1:#14a847;--c2:#05461c;--g:rgba(69,239,117,.4)}
+#zd-menu .ufo .mode[data-play="tv"]{--c:#ff9a2e;--c1:#ec600c;--c2:#6a2300;--g:rgba(255,154,46,.45)}
 #zd-menu .ufo .rim{position:absolute;top:83%;padding:4px 10px;min-width:0;font-size:9.5px;letter-spacing:.08em;border-radius:10px;background:rgba(10,14,26,.9);border:1px solid rgba(95,220,255,.55);color:#bff4ff;box-shadow:0 0 8px rgba(95,220,255,.35)}
 #zd-menu .ufo .rim.l{left:27%}#zd-menu .ufo .rim.r{right:27%}
 #zd-menu .box.saucer .xp{margin:6px 10px 0;padding:8px 14px 9px;background:linear-gradient(180deg,rgba(14,20,36,.92),rgba(6,9,18,.94));border:1px solid rgba(95,220,255,.6);box-shadow:0 0 12px rgba(60,180,255,.3),inset 0 0 10px rgba(60,180,255,.12);
@@ -273,6 +277,30 @@ ICON['zd-restart'] = ICON['zd-reset'];
 // the main menu's flying saucer, seen from a little above: the domed top with its glowing ring, the hull and the deck
 // the four modes stand on, the rim under it with its lights and the beam orb (the buttons go over it: .ufo .modes). It
 // spins: its lights and hull panels (.spin, dashed rings) run round it, the far side the other way
+// the four ways to play as panels on its deck (Sean's photo): curved wedges side by side round the front, between an inner
+// ellipse (along the dome's ring) and an outer one (along the rim), the sides running out from the middle; cut so each is
+// about as wide on the screen, wider at the bottom. In the hull's own 400 x 230: each a path, its box and where its label goes
+const WEDGE = (() => {
+  const IN = [200, 86, 124, 21], OUT = [200, 120, 186, 60], at = (E, a) => [E[0] + E[2] * Math.cos(a), E[1] + E[3] * Math.sin(a)];
+  const cut = [161.2, 117.9, 90, 62.1, 18.8].map(d => d * Math.PI / 180), gap = 1.3 * Math.PI / 180;
+  return [0, 1, 2, 3].map(i => {
+    const a0 = cut[i] - gap, a1 = cut[i + 1] + gap, pts = [];
+    for (let k = 0; k <= 10; k++) pts.push(at(OUT, a0 + (a1 - a0) * k / 10));
+    for (let k = 10; k >= 0; k--) pts.push(at(IN, a0 + (a1 - a0) * k / 10));
+    const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]), x0 = Math.min(...xs) - 3, y0 = Math.min(...ys) - 3, x1 = Math.max(...xs) + 3, y1 = Math.max(...ys) + 3;
+    const c = [at(OUT, a0), at(OUT, a1), at(IN, a0), at(IN, a1)], cx = c.reduce((s, p) => s + p[0], 0) / 4, cy = c.reduce((s, p) => s + p[1], 0) / 4 + 2;
+    const mid = (Math.abs(at(IN, a1)[0] - at(IN, a0)[0]) + Math.abs(at(OUT, a1)[0] - at(OUT, a0)[0])) / 2; // its width half way up: the label fits in that
+    return { d: 'M' + pts.map(p => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join('L') + 'Z', box: [x0, y0, x1 - x0, y1 - y0].map(v => +v.toFixed(1)), lab: [(cx - x0) / (x1 - x0) * 100, (cy - y0) / (y1 - y0) * 100, mid * 0.86 / (x1 - x0) * 100] };
+  });
+})();
+// a panel: the button covers its box (placed over the hull in the same 400 x 230), the wedge drawn in it takes the tap
+const wedgeBtn = (i, attr, inner) => {
+  const W = WEDGE[i], [x, y, w, h] = W.box;
+  return '<button class="zd-btn mode' + (i === 0 ? ' main' : '') + '" type="button" ' + attr + ' style="left:' + (x / 4).toFixed(2) + '%;top:' + (y / 2.3).toFixed(2) + '%;width:' + (w / 4).toFixed(2) + '%;height:' + (h / 2.3).toFixed(2) + '%">' +
+    '<svg viewBox="' + W.box.join(' ') + '" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="zw' + i + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--c1)"/><stop offset="1" style="stop-color:var(--c2)"/></linearGradient></defs>' +
+    '<path class="pan" d="' + W.d + '" fill="url(#zw' + i + ')"/><path class="hi" d="' + W.d + '" transform="translate(0 1.2)"/></svg>' +
+    '<span class="lab" style="left:' + W.lab[0].toFixed(1) + '%;top:' + W.lab[1].toFixed(1) + '%;max-width:' + W.lab[2].toFixed(1) + '%">' + inner + '</span></button>';
+};
 const SAUCER = '<svg class="hull" viewBox="0 0 400 230" preserveAspectRatio="none" aria-hidden="true"><defs>' +
   '<radialGradient id="ufH" cx="50%" cy="22%" r="78%"><stop offset="0" stop-color="#8f9bbd"/><stop offset=".42" stop-color="#434b63"/><stop offset="1" stop-color="#151925"/></radialGradient>' +
   '<linearGradient id="ufR" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6a7492"/><stop offset=".5" stop-color="#262b3b"/><stop offset="1" stop-color="#06070b"/></linearGradient>' +
@@ -388,10 +416,10 @@ export class Game {
       body = top('Travel') + '<div class="btns">' + Object.keys(PLACES).map(k => '<button class="zd-btn' + (k === here ? ' main' : '') + '" type="button" data-place="' + k + '">' + PLACES[k].name + (k === here ? ' · you are here' : '') + '<div style="font-size:11px;opacity:0.7;margin-top:2px">' + PLACES[k].blurb + '</div></button>').join('') + '</div>';
     } else if (panel === 'main') { // over the globe: the four ways to play on the deck of a flying saucer (Sean), each saying where it goes; the level under it
       const town = (m) => { const k = pr.town(m); return 'Level ' + (PATH.indexOf(k) + 1) + ' · ' + PLACES[k].name; };
-      body = '<div class="ufo">' + SAUCER + '<div class="modes"><button class="zd-btn mode main" type="button" data-play="commander">' + MICON.commander + '<b>Commander</b><span>' + town('commander') + '</span></button>' +
-        '<button class="zd-btn mode" type="button" data-go="be">' + MICON.be + '<b>Be the Disaster</b><span>' + town('be') + '</span></button>' +
-        '<button class="zd-btn mode" type="button" data-play="sandbox">' + MICON.sandbox + '<b>Sandbox</b><span>Pick any city</span></button>' +
-        '<button class="zd-btn mode" type="button" data-play="tv">' + MICON.tv + '<b>Disaster TV</b><span>Sit back and watch</span></button></div>' +
+      body = '<div class="ufo">' + SAUCER + '<div class="modes">' + wedgeBtn(0, 'data-play="commander"', MICON.commander + '<b>Commander</b><span>' + town('commander') + '</span>') +
+        wedgeBtn(1, 'data-go="be"', MICON.be + '<b>Be the Disaster</b><span>' + town('be') + '</span>') +
+        wedgeBtn(2, 'data-play="sandbox"', MICON.sandbox + '<b>Sandbox</b><span>Pick any city</span>') +
+        wedgeBtn(3, 'data-play="tv"', MICON.tv + '<b>Disaster TV</b><span>Sit back and watch</span>') + '</div>' +
         '<button class="zd-btn rim l" type="button" data-go="unlocks">Units' + (pr.bank >= 3000 && UPGRADES.some(u => pr.canBuy(u.id)) ? ' \u2022' : '') + '</button><button class="zd-btn rim r" type="button" data-go="roster">Roster</button></div>' +
         '<div class="xp"><div class="rank sm"><span>Commander level <b>' + lvl + '</b></span><span>' + pr.xp.toLocaleString() + (next ? ' / ' + next.toLocaleString() : '') + ' XP</span></div>' +
         '<div class="bar sm"><i style="width:' + Math.round(pr.progress * 100) + '%"></i></div></div>' +
