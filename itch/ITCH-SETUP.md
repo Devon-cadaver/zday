@@ -1,4 +1,4 @@
-# itch.io upload checklist — My Little Disaster
+# itch.io upload checklist: My Little Disaster
 
 Everything for the page is in this `itch` folder.
 
