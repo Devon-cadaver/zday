@@ -16,6 +16,7 @@ import { rig, relax, handsOnHips, tumble, detail } from './villains.js';
 import { tossStep, toss } from './brawl.js';
 import { fightPose } from './melee.js';
 import { alienStep } from './herofight.js';
+import { riftStep } from './rift.js';
 const up = (v) => v && !v.gone && !v.beaten;
 import { roofTop } from './tripod.js';
 import { ST } from './people.js';
@@ -171,6 +172,7 @@ class Hero {
     else if (J.kind === 'swim') this.doSwim(h, J);
     else if (J.kind === 'wave') this.doWave(h, J);
     else if (J.kind === 'alien') alienStep(this, h, J);
+    else if (J.kind === 'rift') riftStep(this, h, J);
   }
   // nothing to do: hover by the signal, then land on its roof
   idle(h) {
@@ -525,6 +527,9 @@ export class Heroes {
     // the alien invasion: whoever is free goes at the tripods and saucers
     const I = D.list.find(e => e.type === 'aliens' && e.alive && !e.leaving);
     if (I) { work++; for (const hr of live) if (!hr.job) hr.job = { kind: 'alien', I }; }
+    // a dimensional rift: whoever is free goes at its orbs and pours power into it
+    const RF = D.list.find(e => e.type === 'rift' && e.alive && e.phase !== 'closing');
+    if (RF) { work++; for (const hr of live) if (!hr.job) hr.job = { kind: 'rift', R: RF }; }
     // the giant monsters: whoever is free goes at it
     const M = D.list.find(e => e.alive && !e.heroLost && ((e.type === 'kaiju' && e.state !== 'leave') || (e.type === 'worm' && e.phase !== 'leave' && e.phase !== 'gone')));
     if (M) {

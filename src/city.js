@@ -1295,6 +1295,17 @@ export function buildCity(tex, opts = {}) {
     for (const [im, i] of bInst[k]) { im.instanceMatrix.array.set(im.userData.orig.subarray(i * 16, i * 16 + 16), i * 16); im.instanceMatrix.needsUpdate = true; }
     clearRubble(k); dead[k] = 0;
   };
+  // building k bent out of true: each corner moved by fn(x, y, z, out) from where it was built (the dimensional rift);
+  // restoreBuilding and restoreAll put it back
+  const warpBuilding = (k, fn) => {
+    if (dead[k]) return; const o = [0, 0, 0];
+    for (const rg of buildings[k].ranges) {
+      const m = meshes[rg.key]; if (!m || rg.v1 <= rg.v0) continue;
+      const pos = m.geometry.attributes.position, a = pos.array, op = m.userData.origPos;
+      for (let v = rg.v0; v < rg.v1; v++) { fn(op[v * 3], op[v * 3 + 1], op[v * 3 + 2], o); a[v * 3] = o[0]; a[v * 3 + 1] = o[1]; a[v * 3 + 2] = o[2]; }
+      pos.addUpdateRange(rg.v0 * 3, (rg.v1 - rg.v0) * 3); pos.needsUpdate = true;
+    }
+  };
   const hidden = [];
   // street trees and lamps within R are ripped out; returns what was taken
   const hooks = {}; // hooks.street(x, z, R): the street torn up there (the railway breaks)
@@ -1337,7 +1348,7 @@ export function buildCity(tex, opts = {}) {
 
   return {
     buildings, char, uncharAll, lamps, mats,
-    dead, buildingsNear, hideBuilding, extractBuilding, addRubble, clearRubble, restoreBuilding, takeStreetNear, restoreAll,
+    dead, buildingsNear, hideBuilding, extractBuilding, warpBuilding, addRubble, clearRubble, restoreBuilding, takeStreetNear, restoreAll,
     group, sx, sz, NB, parked, crowds, walkBlocks, open, layout, nid, roofPoint, rail, scramble, hooks,
     bounds: { x0: sx[0], x1: sx[NB], z0: sz[0], z1: sz[NB] },
     stats: { crowns: crowns.length, tanks: tanks.length, parked: parked.length, verts: Object.values(B).flat().reduce((a, b) => a + b.v, 0) },

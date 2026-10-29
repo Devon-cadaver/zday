@@ -26,6 +26,7 @@ import { Worm } from './worm.js';
 import { Kaiju } from './kaiju.js';
 import { Spill } from './spill.js';
 import { Plant, FlameTeam } from './plant.js';
+import { Rift } from './rift.js';
 
 export const threatName = (h) => (h === 'zombies' ? 'Zombie outbreak' : HAZARDS[h].name);
 
@@ -49,6 +50,7 @@ export const HAZARDS = {
   worm: { name: 'Giant worm', tap: true },
   kaiju: { name: 'Kaiju', tap: true },
   plant: { name: 'Killer plant', tap: true },
+  rift: { name: 'Dimensional rift', tap: true },
 };
 // called by the hero signal rather than picked as a disaster
 export const HELPERS = { heroes: { name: 'Hero signal' } };
@@ -177,6 +179,7 @@ export class Disasters {
     else if (type === 'worm') ev = new Worm(this, x, z, opts);
     else if (type === 'kaiju') ev = new Kaiju(this, x, z, opts);
     else if (type === 'plant') ev = new Plant(this, x, z, opts);
+    else if (type === 'rift') ev = new Rift(this, x, z, opts);
     else if (type === 'heroes') { const on = this.list.find(e => e.type === 'heroes' && e.alive && !e.leaving); if (on) { on.signal(x, z); return on; } ev = new Heroes(this, x, z, opts); }
     if (!ev) return null;
     this.list.push(ev); this.stats.hazards++;

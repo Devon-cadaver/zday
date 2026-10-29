@@ -29,9 +29,9 @@ const CSS = `
 
 // how each disaster goes for a camera: beam, a thing hurled at it, the signal drowned, or the building brought down
 const STYLE = { kaiju: 'beam', villains: 'beam', aliens: 'beam', worm: 'hurl', tornado: 'hurl', volcano: 'hurl', meteor: 'hurl', riot: 'hurl', blackhole: 'pull',
-  solar: 'static', haboob: 'static', coldwave: 'static', quake: 'fell', sinkhole: 'fell', flood: 'fell', tsunami: 'fell', plant: 'fell' };
+  solar: 'static', haboob: 'static', coldwave: 'static', quake: 'fell', sinkhole: 'fell', flood: 'fell', tsunami: 'fell', plant: 'fell', rift: 'pull' };
 const WHO = { kaiju: 'The kaiju', villains: 'The villains', aliens: 'The aliens', worm: 'The worm', tornado: 'The tornado', volcano: 'The volcano', meteor: 'A meteor', riot: 'The rioters', blackhole: 'The black hole',
-  solar: 'The solar flare', haboob: 'The dust storm', coldwave: 'The cold wave', quake: 'The quake', sinkhole: 'The sinkhole', flood: 'The flood', tsunami: 'The wave', plant: 'The plant' };
+  solar: 'The solar flare', haboob: 'The dust storm', coldwave: 'The cold wave', quake: 'The quake', sinkhole: 'The sinkhole', flood: 'The flood', tsunami: 'The wave', plant: 'The plant', rift: 'The rift' };
 const SKY_OK = new Set(['beam', 'hurl', 'pull', 'static']); // what can reach a helicopter
 
 export class TvCam {

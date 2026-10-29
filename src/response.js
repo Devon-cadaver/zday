@@ -162,6 +162,11 @@ export class Responders {
         if (e.t > 25 && this.ready('flamer', 20)) { const tr = e.traps.find(q => !q.dead && q.state !== 'burn'), at = tr ? [tr.x, tr.z] : [e.x, e.z]; this.send('apc', at[0], at[1], (ax, az) => D.flameTeam(ax, az)); }
         if (helis && e.t > 50 && this.ready('napalm', 45)) helis.napalm(e.x, e.z, { onBurn: (bx, bz, R) => D.burnPlants(bx, bz, R, 2) });
       }
+      // a dimensional rift: an armoured squad to it (they shoot the orbs down) and airstrikes on it
+      if (e.type === 'rift' && e.phase !== 'closing') {
+        if (e.t > 15 && this.out('apc') < 2 && this.ready('riftapc', 30)) this.send('apc', e.x + e.n[0] * 50, e.z + e.n[1] * 50, (ax, az) => p.spawnOfficers(ax, az, 8, 3));
+        if (helis && e.t > 25 && this.ready('riftstrike', 18)) helis.strike(e.x, e.z, { radius: 25 });
+      }
       // the kaiju: airstrikes until it turns back
       if (e.type === 'kaiju' && e.state !== 'leave' && helis && this.ready('kaiju', 9)) helis.strike(e.x, e.z, { radius: 25 });
       // aliens: airstrikes on walking tripods and low saucers
@@ -173,7 +178,7 @@ export class Responders {
     // super villains, the giant worm and the kaiju, incoming meteors and missiles: the hero signal (the kaiju has the
     // city to itself for a quarter of a minute first)
     if (this.autoHeroes && !D.list.some(e => e.type === 'heroes' && e.alive && !e.leaving)) {
-      const th = D.list.find(e => e.alive && (e.type === 'villains' || (e.type === 'kaiju' && e.state !== 'leave' && e.t > 15) || (e.type === 'tsunami' && e.phase !== 'recede') || (e.type === 'flood' && p.stats.afloat > 20) || (e.type === 'worm' && e.phase !== 'leave' && e.phase !== 'gone') || ((e.type === 'meteor' || e.type === 'nuclear') && (e.phase === 'warn' || e.phase === 'fall'))));
+      const th = D.list.find(e => e.alive && (e.type === 'villains' || (e.type === 'rift' && e.phase !== 'closing' && e.t > 20) || (e.type === 'kaiju' && e.state !== 'leave' && e.t > 15) || (e.type === 'tsunami' && e.phase !== 'recede') || (e.type === 'flood' && p.stats.afloat > 20) || (e.type === 'worm' && e.phase !== 'leave' && e.phase !== 'gone') || ((e.type === 'meteor' || e.type === 'nuclear') && (e.phase === 'warn' || e.phase === 'fall'))));
       if (th && this.ready('heroes', 20)) { const v = th.who ? th.who.find(w => !w.gone) : null; D.start('heroes', v ? v.x : th.x, v ? v.z : th.z); }
     }
     // radiation: a hazmat team to each zone (two out at once)

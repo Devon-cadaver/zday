@@ -7,6 +7,7 @@ import { tripodModel } from './tripod.js';
 import { wormModel } from './worm.js';
 import { kaijuModel } from './kaiju.js';
 import { flytrapModel } from './plant.js';
+import { riftModel } from './rift.js';
 
 const std = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.8, ...o });
 const glow = (r, g, b, o = {}) => new THREE.MeshBasicMaterial({ color: new THREE.Color(r, g, b), ...o });
@@ -188,6 +189,6 @@ export function disasterExamples() {
     ['Tornado', tornado(), 17], ['Earthquake', quake(), 10], ['Flood', flood(), 10], ['Tsunami', tsunami(), 15], ['Sinkhole', sinkhole(), 12],
     ['Meteor', meteor(), 17], ['Volcano', volcano(), 16], ['Lava', lava(), 10], ['Dust storm', haboob(), 16], ['Cold wave', blizzard(), 10],
     ['Solar flare', solar(), 11], ['Alien saucer', saucer(), 13], ['Alien tripod', tripod(), 27], ['Black hole', blackhole(), 12],
-    ['Nuclear attack', nuke(), 19], ['Plant meltdown', meltdown(), 20], ['Giant worm', worm(), 42], ['Kaiju', kaiju(), 62], ['Killer plant', flytrap(), 5],
+    ['Nuclear attack', nuke(), 19], ['Plant meltdown', meltdown(), 20], ['Giant worm', worm(), 42], ['Kaiju', kaiju(), 62], ['Killer plant', flytrap(), 5], ['Dimensional rift', riftModel(), 6],
   ];
 }

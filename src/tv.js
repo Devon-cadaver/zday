@@ -58,13 +58,13 @@ body.zd-tv #zd-radio{bottom:calc(var(--zd-bar-h, 64px) + 42px)}
 #zd-mkt button:active{transform:scale(.96)}
 `;
 
-const POOL = ['tornado', 'quake', 'flood', 'tsunami', 'riot', 'aliens', 'meteor', 'sinkhole', 'volcano', 'haboob', 'coldwave', 'solar', 'blackhole', 'villains', 'worm', 'kaiju', 'plant'];
+const POOL = ['tornado', 'quake', 'flood', 'tsunami', 'riot', 'aliens', 'meteor', 'sinkhole', 'volcano', 'haboob', 'coldwave', 'solar', 'blackhole', 'villains', 'worm', 'kaiju', 'plant', 'rift'];
 const LIFE = { villains: 80, kaiju: 80, worm: 70, aliens: 80 }; // the ones that would stay for minutes
 const TOWN_T = 170, PICK_T = 10, MAX = 60, TICK_SPEED = 60; // s in a town before moving on; s to make a call; s before the next comes anyway; ticker px a second
-const HERO_KINDS = new Set(['villains', 'kaiju', 'worm', 'aliens', 'meteor']); // called right: the heroes come at once
+const HERO_KINDS = new Set(['villains', 'kaiju', 'worm', 'aliens', 'meteor', 'rift']); // called right: the heroes come at once
 const VERB = { tornado: 'touches down in', quake: 'shakes', flood: 'floods', tsunami: 'heads for', riot: 'breaks out in', aliens: 'land in', meteor: 'rains down on', sinkhole: 'opens up in',
-  volcano: 'erupts in', haboob: 'rolls into', coldwave: 'freezes', solar: 'strikes', blackhole: 'opens in', villains: 'attack', worm: 'surfaces in', kaiju: 'stomps into', plant: 'takes root in' };
-const NAME = { aliens: 'Aliens', meteor: 'Meteors', villains: 'Super villains', haboob: 'A dust storm', coldwave: 'A cold wave', solar: 'A solar flare', blackhole: 'A black hole', worm: 'A giant worm', kaiju: 'A kaiju', plant: 'A killer plant' };
+  volcano: 'erupts in', haboob: 'rolls into', coldwave: 'freezes', solar: 'strikes', blackhole: 'opens in', villains: 'attack', worm: 'surfaces in', kaiju: 'stomps into', plant: 'takes root in', rift: 'tears open over' };
+const NAME = { aliens: 'Aliens', meteor: 'Meteors', villains: 'Super villains', haboob: 'A dust storm', coldwave: 'A cold wave', solar: 'A solar flare', blackhole: 'A black hole', worm: 'A giant worm', kaiju: 'A kaiju', plant: 'A killer plant', rift: 'A dimensional rift' };
 const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 let FIRST = true; // the very first town of a broadcast gets the opening title
 let CLOCK = 0.16; // the broadcast's time of day: one day and night every 12 minutes, carried on from town to town

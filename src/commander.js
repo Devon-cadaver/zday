@@ -37,7 +37,7 @@ const FLOOD_CD = { boat: 5, rescue: 8, water: 15 }; // once the streets flood th
 const GROUND = new Set(['police', 'bus', 'fire', 'apc', 'chaser', 'build', 'camp', 'hazmat']); // nothing on wheels gets through flooded streets
 const ROUND = 600;
 // the long ones are shorter in a round (playtests: villains, the kaiju and the worm outlasted the round, so it could never end secured)
-const LIFE = { villains: 240, kaiju: 200, worm: 160, aliens: 140, plant: 220 };
+const LIFE = { villains: 240, kaiju: 200, worm: 160, aliens: 140, plant: 220, rift: 200 };
 // the nuclear strike in a round: a smaller warhead and a longer warning, so people can be got clear (it killed 44% of the town before anything could be done)
 const OPTS = { nuclear: { size: 170, warn: 30 } };
 const START_RP = 250; // enough for a first cordon (playtests: 100 bought two cruisers and the outbreak got away)
