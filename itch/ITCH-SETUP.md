@@ -10,10 +10,11 @@ Everything for the page is in this `itch` folder.
 | `logo.png` | **Edit theme → Title image** (replaces the plain title text; transparent) | 960 × 400 |
 | `banner.png` | **Edit theme → Banner image** (the thin strip across the top) | 960 × 200 |
 | `background.png` | **Edit theme → Background image**: *don't repeat*, *centered*, *fixed* | 1920 × 1080 |
+| `embed-bg.png` | **Edit theme → Embed BG**: the picture behind the Run game button. It is exactly the game's 1280 × 720, so itch shows it once instead of repeating the cover; on a phone itch shows its middle (the city and the tornado) | 1280 × 720 |
 | `description.html` | **Description**: switch the editor to HTML and paste it in (or copy the text from `DESCRIPTION.md`) | |
 
 The screenshots, in order: main menu · Sandbox tornado · kaiju · hero sky slam · play the band · Defend mode · Disaster TV · Destroy (giant worm) · phone menu · phone hero fight · phone band.
-`source/` holds the raw pictures the cover was made from (not for upload).
+`source/` holds the raw pictures the cover and `embed-bg.png` were made from (not for upload).
 
 ## Create new project
 - **Kind of project:** HTML
@@ -22,7 +23,7 @@ The screenshots, in order: main menu · Sandbox tornado · kaiju · hero sky sla
   - Viewport dimensions: **1280 × 720** (the game fits any size)
   - Tick **Mobile friendly**, orientation **Default**
   - Tick **Fullscreen button**
-  - Leave **Automatically start on page load** unticked (players tap to start, which also turns the sound on)
+  - Tick **Automatically start on page load**: on a computer the game's own title screen (the planet and PLAY) shows straight away instead of a picture, and its PLAY tap turns the sound on. Phones always get itch's Run game button over `embed-bg.png` and open the game full screen, whatever this is set to.
   - No scrollbars
 - **Classification:** Games · **Genre:** Simulation (or Action) · Release status: your call
 - **Tags (up to 10):** disaster, sandbox, city, 3d, casual, destruction, zombies, kaiju, superheroes, rhythm
@@ -34,6 +35,7 @@ The screenshots, in order: main menu · Sandbox tornado · kaiju · hero sky sla
 - Background **#0b0712**, page **#160a26**, text **#f4eee4**, links **#ff4fa3**, buttons **#ff4fa3**
 - Banner image `banner.png`; title image `logo.png` (hide the plain title)
 - Background image `background.png`, not repeated, centred, fixed
+- Embed BG image `embed-bg.png` (not the cover: the 630 × 500 cover repeats across the 1280 × 720 game area)
 
 ## Before you publish
 - Put your name in the last line of the description ("Made by [your name]").
