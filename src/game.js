@@ -169,7 +169,7 @@ const CSS = `
 #zd-menu .ufo .orbfire.charge{box-shadow:0 0 14px 4px rgba(120,220,255,.85),inset 0 0 10px rgba(255,255,255,.8)}
 #zd-menu .ufo .orbfire.ready{animation:zdOrb .35s ease-in-out infinite alternate}
 #zd-menu .ufo .orbfire.mega{animation:zdOrbM .16s ease-in-out infinite alternate} /* held 15 s: the planet-buster */
-@keyframes zdOrbM{from{box-shadow:0 0 20px 8px rgba(190,90,255,.95),inset 0 0 14px #fff}to{box-shadow:0 0 38px 16px rgba(255,255,255,.95),inset 0 0 16px #e8c8ff}}
+@keyframes zdOrbM{from{box-shadow:0 0 20px 8px rgba(60,255,110,.95),inset 0 0 14px #eaffef}to{box-shadow:0 0 38px 16px rgba(140,255,120,.95),inset 0 0 16px #b8ffc8}} /* green: the planet-buster is ready (Sean) */
 @keyframes zdOrb{from{box-shadow:0 0 14px 5px rgba(255,80,60,.9),inset 0 0 12px rgba(255,220,200,.9)}to{box-shadow:0 0 26px 10px rgba(255,140,40,.95),inset 0 0 14px #fff}}
 #zd-menufx{position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:5} /* under the menu (6): the beam passes behind the ship */
 #zd-menuflash{position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:8}
