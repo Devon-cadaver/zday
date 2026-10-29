@@ -1,6 +1,7 @@
 // The killer plant (Sean): a seed takes root in a street and the plant grows out of control. Thick veined vines run
-// out along the streets and branch at the crossings, climb the walls of the buildings beside them (a building wrapped
-// by three is crushed and comes down), flowers pop open along them, and car-sized flytraps rise out of the vines and
+// out along the streets and branch at the crossings, thinner tendrils creep off them and out of the heart in every
+// direction, forking smaller and smaller like veins, climb the walls of the buildings beside them (a building wrapped
+// by four is crushed and comes down), flowers pop open along them, and car-sized flytraps rise out of the vines and
 // snap up the people and cars that come near. Fire kills it: the vines on a burning building burn with it, fire runs
 // along the vines, and so does whatever an airstrike's blast, a flame team (FlameTeam below: soldiers with
 // flamethrowers torching everything in reach) or a napalm run (aircraft.js) reaches. Burn out its heart, the bulb where
@@ -12,7 +13,7 @@ import { ST, KIND } from './people.js';
 import { RW, HALF } from './city.js';
 import { sfx } from './audio.js';
 
-const MAXSEG = 900, MAXFLOWER = 240, MAXTRAP = 14, MAXTIP = 18, STEP = 3.6, GROW = 3.3; // vine pieces, flowers, flytraps, tips; metres a piece; metres a second a tip grows
+const MAXSEG = 3200, MAXFLOWER = 420, MAXTRAP = 20, MAXTIP = 26, MAXVEIN = 40, MAXCLIMB = 12, STEP = 3.6, GROW = 4.4; // vine pieces, flowers, flytraps, street tips, tendrils, vines up walls; metres a piece; metres a second a tip grows
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const UP = new THREE.Vector3(0, 1, 0);
 const paint = (g, hex) => { const c = new THREE.Color(hex), n = g.attributes.position.count, a = new Float32Array(n * 3); for (let i = 0; i < n; i++) a.set([c.r, c.g, c.b], i * 3); g.setAttribute('color', new THREE.BufferAttribute(a, 3)); return g; };
@@ -82,6 +83,7 @@ export class Plant {
     // out from the root both ways along its street, and along the cross street if it is at a crossing
     const onX = city.sz.includes(z);
     for (const d of [-1, 1]) this.tips.push(onX ? { axis: 'x', line: z, x, z, dx: d, dz: 0, off: 0, acc: 0, len: 0, r: 1.35 } : { axis: 'z', line: x, x, z, dx: 0, dz: d, off: 0, acc: 0, len: 0, r: 1.35 });
+    for (let k = 0; k < 8; k++) this.vein(x, z, (k + Math.random() * 0.6) / 8 * Math.PI * 2, 0.95, 0); // and tendrils out of it every way
     D.emit({ type: 'plant', text: 'A strange plant has taken root in the ' + D.district(x, z) + ' district. It is spreading fast!' });
     sfx('collapse', x, 2, z, { gain: 0.5, rate: 0.7 });
   }
@@ -99,6 +101,11 @@ export class Plant {
     this.c.set(['#ff4fa3', '#e83ccf', '#b14dff', '#ff6f6f', '#ff9ad5'][Math.floor(Math.random() * 5)]); this.blooms.setColorAt(f.i, this.c); this.blooms.instanceColor.needsUpdate = true;
     this.anim.add(f);
   }
+  // a tendril off in any direction (gen 0: out of the heart; each fork thinner and shorter), wandering like a vein
+  vein(x, z, a, r, gen) {
+    if (gen > 3 || this.withering >= 0 || this.tips.filter(q => !q.dead && q.axis === 'v').length >= MAXVEIN) return;
+    this.tips.push({ axis: 'v', x, z, a, r, gen, acc: 0, len: 0, max: [32, 13, 7, 4][gen] * (1 + Math.random()) });
+  }
   // a car-sized flytrap rising out of the vines at (x, z)
   trap(x, z, yaw) {
     const m = flytrapModel(); m.position.set(x, 0, z); m.scale.setScalar(0.01); m.userData.size = 1.25; this.g.add(m);
@@ -113,14 +120,19 @@ export class Plant {
     if (this.withering < 0 && this.t > this.life) this.wither('dormant');
     if (this.withering >= 0) { this.withering += h; if (this.withering > 6) this.alive = false; for (const tr of this.traps) this.trapStep(tr, h); this.burnStep(h); return; }
     // the tips grow
-    for (const T of this.tips) { if (T.dead) continue; T.acc += GROW * h * (T.axis === 'y' ? 0.55 : 1); while (T.acc >= STEP && !T.dead) { T.acc -= STEP; this.grow(T); } }
-    if (this.tips.length > 40) this.tips = this.tips.filter(T => !T.dead);
+    for (const T of this.tips) { if (T.dead) continue; T.acc += GROW * h * (T.axis === 'y' ? 0.55 : T.axis === 'v' ? 0.62 : 1); while (T.acc >= STEP && !T.dead) { T.acc -= STEP; this.grow(T); } }
+    if (this.tips.length > 90) this.tips = this.tips.filter(T => !T.dead);
+    // and it keeps creeping: a new tendril now and then out of the heart, or off a vine already grown
+    if ((this.veinT = (this.veinT ?? 2) - h) <= 0) {
+      this.veinT = 0.9 + Math.random() * 0.8; const s = Math.random() < 0.3 ? null : this.segs[Math.floor(Math.random() * this.segs.length)];
+      if (!s) this.vein(this.x, this.z, Math.random() * 6.283, 0.95, 0); else if (!s.dead && s.burn === 0 && s.k < 0) this.vein(s.bx, s.bz, Math.random() * 6.283, Math.max(0.4, s.r * 0.6), 1);
+    }
     // a flytrap now and then, out of the vines, away from the others
     if ((this.trapT -= h) <= 0 && this.traps.filter(tr => !tr.dead).length < MAXTRAP) {
-      this.trapT = 6 + Math.random() * 4;
+      this.trapT = 4 + Math.random() * 3;
       for (let n = 0; n < 12; n++) {
         const s = this.segs[this.segs.length - 1 - Math.floor(Math.random() * Math.min(80, this.segs.length))]; if (!s || s.dead || s.k >= 0) continue;
-        if (Math.hypot(s.bx - this.x, s.bz - this.z) < 18 || this.traps.some(tr => !tr.dead && Math.hypot(tr.x - s.bx, tr.z - s.bz) < 24)) continue;
+        if (Math.hypot(s.bx - this.x, s.bz - this.z) < 18 || this.traps.some(tr => !tr.dead && Math.hypot(tr.x - s.bx, tr.z - s.bz) < 20)) continue;
         this.trap(s.bx, s.bz, Math.atan2(s.bx - s.ax, s.bz - s.az) + (Math.random() < 0.5 ? 1.57 : -1.57)); break;
       }
     }
@@ -135,10 +147,30 @@ export class Plant {
       if (this.traps.length) people.scare(this.x, this.z, 40, 0.6);
     }
   }
-  // a tip grows one piece: along its street (wandering across the road, branching at the crossings, now and then up a
-  // wall beside it) or up its wall
+  // a tip grows one piece: along its street (wandering across the road, branching at the crossings, tendrils off it, now
+  // and then up a wall beside it), a tendril its own way, or up its wall
   grow(T) {
     const D = this.D, city = D.ctx.city, B = city.bounds;
+    if (T.axis === 'v') { // a tendril: wandering off over the pavements, lots and roads, thinning, forking smaller ones
+      const st = STEP * 0.75; T.a += (Math.random() - 0.5) * 0.7;
+      const x2 = T.x + Math.sin(T.a) * st, z2 = T.z + Math.cos(T.a) * st;
+      if (x2 < B.x0 || x2 > B.x1 || z2 < B.z0 || z2 > B.z1) { T.dead = true; return; }
+      let k = -1; city.buildingsNear(x2, z2, 0.4, (kk) => { if (k < 0) k = kk; });
+      if (k >= 0) { // a wall: up it (one too tall, or too many climbing already: along it)
+        const b = city.buildings[k];
+        if (b.landmark || b.roofY >= 70 || this.tips.filter(q => !q.dead && q.axis === 'y').length >= MAXCLIMB) { T.a += Math.random() < 0.5 ? 1.6 : -1.6; T.len += st; if (T.len > T.max) T.dead = true; return; }
+        const inx = T.x < b.x0 ? 1 : T.x > b.x1 ? -1 : 0, inz = inx ? 0 : T.z < b.z0 ? 1 : -1, wx = clamp(T.x, b.x0, b.x1) - inx * 0.3, wz = clamp(T.z, b.z0, b.z1) - inz * 0.3;
+        T.dead = true; if (!this.seg(T.x, 0.15, T.z, wx, 0.4, wz, T.r, -1)) return;
+        this.tips.push({ axis: 'y', k, x: wx, y: 0.4, z: wz, wx: inz, wz: inx, nx: -inx, nz: -inz, acc: 0, r: Math.max(0.4, T.r * 0.8) });
+        return;
+      }
+      if (!this.seg(T.x, 0.15, T.z, x2, 0.15, z2, T.r, -1)) { T.dead = true; return; }
+      T.x = x2; T.z = z2; T.len += st; T.r = Math.max(0.25, T.r * 0.97);
+      if (Math.random() < 0.07) this.flower(x2, 0.25, z2, false);
+      if (Math.random() < (T.gen < 2 ? 0.22 : 0.12)) this.vein(x2, z2, T.a + (Math.random() < 0.5 ? 1 : -1) * (0.45 + Math.random() * 0.7), T.r * 0.7, T.gen + 1);
+      if (T.len > T.max) T.dead = true;
+      return;
+    }
     if (T.axis === 'y') {
       const b = city.buildings[T.k]; if (!b || city.dead[T.k]) { T.dead = true; return; }
       const y2 = Math.min(b.roofY + 0.2, T.y + STEP * 0.9), w = (Math.random() - 0.5) * 1.6, x2 = T.x + T.wx * w, z2 = T.z + T.wz * w;
@@ -155,32 +187,33 @@ export class Plant {
     if (!this.seg(T.x, 0.2, T.z, px, 0.2, pz, T.r, -1)) { T.dead = true; return; }
     T.x = px; T.z = pz; T.len += STEP;
     if (Math.random() < 0.16) this.flower(px + (Math.random() - 0.5) * 1.6, 0.3, pz + (Math.random() - 0.5) * 1.6, false);
+    if (Math.random() < 0.3) this.vein(px, pz, Math.atan2(T.dx, T.dz) + (Math.random() < 0.5 ? 1 : -1) * (0.6 + Math.random() * 0.9), T.r * 0.5, 1); // a tendril off to one side
     // a crossing: a branch off along the cross street
     const a = T.axis === 'x' ? px : pz, live = this.tips.filter(q => !q.dead).length;
     for (const L of T.axis === 'x' ? city.sx : city.sz) {
       if (Math.abs(a - L) > STEP / 2 || T.cross === L) continue;
       T.cross = L;
-      if (live < MAXTIP && Math.random() < 0.72) { const d = Math.random() < 0.5 ? 1 : -1, r = Math.max(0.7, T.r * 0.85); this.tips.push(T.axis === 'x' ? { axis: 'z', line: L, x: px, z: pz, dx: 0, dz: d, off: 0, acc: 0, len: 0, r } : { axis: 'x', line: L, x: px, z: pz, dx: d, dz: 0, off: 0, acc: 0, len: 0, r }); }
+      if (live < MAXTIP && Math.random() < 0.85) { const r = Math.max(0.7, T.r * 0.85), d0 = Math.random() < 0.5 ? 1 : -1; for (const d of Math.random() < 0.4 ? [d0, -d0] : [d0]) this.tips.push(T.axis === 'x' ? { axis: 'z', line: L, x: px, z: pz, dx: 0, dz: d, off: 0, acc: 0, len: 0, r } : { axis: 'x', line: L, x: px, z: pz, dx: d, dz: 0, off: 0, acc: 0, len: 0, r }); }
     }
-    if (Math.random() < 0.1) this.climb(T, px, pz);
+    if (Math.random() < 0.14) this.climb(T, px, pz);
     if (T.len > 60 && Math.random() < 0.006 * T.len / 40) T.dead = true; // some peter out
   }
   // off the street and up the wall of the building beside it
   climb(T, px, pz) {
     const city = this.D.ctx.city, sd = Math.random() < 0.5 ? 1 : -1, nx = T.axis === 'x' ? 0 : sd, nz = T.axis === 'x' ? sd : 0;
-    if (this.tips.filter(q => !q.dead && q.axis === 'y').length >= 6) return;
+    if (this.tips.filter(q => !q.dead && q.axis === 'y').length >= MAXCLIMB) return;
     let k = -1; city.buildingsNear(px + nx * (HALF + 2), pz + nz * (HALF + 2), 4, (kk, d, b) => { if (k < 0 && !b.landmark && b.roofY < 70) k = kk; });
     if (k < 0) return;
     const b = city.buildings[k], wx = clamp(px, b.x0, b.x1) - nx * 0.3, wz = clamp(pz, b.z0, b.z1) - nz * 0.3;
     if (!this.seg(px, 0.2, pz, wx, 0.4, wz, T.r * 0.6, -1)) return;
     this.tips.push({ axis: 'y', k, x: wx, y: 0.4, z: wz, wx: nz, wz: nx, nx: -nx, nz: -nz, acc: 0, r: Math.max(0.5, T.r * 0.55) });
   }
-  // a building with three vines up it is crushed (a small one; a tall one only gets its windows burst)
+  // a building with four vines up it is crushed (a small one; a tall one only gets its windows burst)
   wrapped(k) {
     const D = this.D, city = D.ctx.city, b = city.buildings[k];
     this.wraps[k] = (this.wraps[k] || 0) + 1;
-    if (this.wraps[k] < 3 || city.dead[k]) return;
-    if (b.roofY < 40) { D.destroyBuilding(k, 'collapse'); if (!this.saidCrush) { this.saidCrush = true; D.emit({ type: 'plantcrush', text: 'The vines have crushed a building!' }); } }
+    if (this.wraps[k] < 4 || city.dead[k]) return;
+    if (b.roofY < 50) { D.destroyBuilding(k, 'collapse'); if (!this.saidCrush) { this.saidCrush = true; D.emit({ type: 'plantcrush', text: 'The vines have crushed a building!' }); } }
     else D.blowWindows(k, 1, 0, 0.8);
   }
 
@@ -193,9 +226,9 @@ export class Plant {
     if (tr.state === 'rise') { if (tr.t > 1.6) { tr.state = 'open'; tr.t = 0; } return; }
     if (tr.state === 'open' && (tr.look -= h) <= 0) {
       tr.look = 0.3; let vic = null;
-      people.around(tr.x, tr.z, 6.5, (j) => { if (!vic && people.hittable(j) && people.kind[j] !== KIND.SOLDIER && people.st[j] !== ST.ZOMBIE) vic = { j, x: people.x[j], z: people.z[j] }; });
-      if (!vic) traffic.near(tr.x, tr.z, 8, (c) => { if (!vic && !c.gone && !c.mission && (c.mode === 0 || c.mode === 4) && Math.hypot(c.x - tr.x, c.z - tr.z) < 7) vic = { car: c, x: c.x, z: c.z }; });
-      if (!vic) { const pc = traffic.parkedNear(tr.x, tr.z, 6.5)[0]; if (pc) vic = { pc, x: pc.x, z: pc.z }; }
+      people.around(tr.x, tr.z, 7.5, (j) => { if (!vic && people.hittable(j) && people.kind[j] !== KIND.SOLDIER && people.st[j] !== ST.ZOMBIE) vic = { j, x: people.x[j], z: people.z[j] }; });
+      if (!vic) traffic.near(tr.x, tr.z, 9, (c) => { if (!vic && !c.gone && !c.mission && (c.mode === 0 || c.mode === 4) && Math.hypot(c.x - tr.x, c.z - tr.z) < 8) vic = { car: c, x: c.x, z: c.z }; });
+      if (!vic) { const pc = traffic.parkedNear(tr.x, tr.z, 7.5)[0]; if (pc) vic = { pc, x: pc.x, z: pc.z }; }
       if (vic) { tr.state = 'snap'; tr.t = 0; tr.vic = vic; tr.yaw = Math.atan2(vic.x - tr.x, vic.z - tr.z); }
     }
     if (tr.state === 'snap' && tr.t > 0.15 && tr.vic) { // gone
@@ -254,7 +287,7 @@ export class Plant {
   poi() { if (this.withering >= 0) return null; const tr = this.traps.find(q => !q.dead && q.state === 'chew'); return tr ? { x: tr.x, z: tr.z, danger: 12, range: 260 } : { x: this.x, z: this.z, danger: 22, range: 300 }; }
 
   sync(dt, t) {
-    const { m4, q, v, s, c } = this;
+    const { m4, q, v, s, c } = this, moved = this.anim.size > 0; // nothing growing or burning: nothing to send to the screen
     for (const o of this.anim) {
       if (o.ax !== undefined) { // a piece of vine growing in, burning away
         o.g = Math.min(1, o.g + dt * 2.2);
@@ -272,7 +305,7 @@ export class Plant {
         if (o.g >= 1 && (o.burn === 0 || o.dead)) this.anim.delete(o);
       }
     }
-    this.vines.instanceMatrix.needsUpdate = true; if (this.vines.instanceColor) this.vines.instanceColor.needsUpdate = true; this.blooms.instanceMatrix.needsUpdate = true;
+    if (moved) { this.vines.instanceMatrix.needsUpdate = true; if (this.vines.instanceColor) this.vines.instanceColor.needsUpdate = true; this.blooms.instanceMatrix.needsUpdate = true; }
     // the heart throbs (faster when burnt); withering, it blackens and sinks
     const w = this.withering >= 0 ? Math.min(1, this.withering / 5) : 0, beat = 1 + Math.sin(t * (this.hurt > 0 ? 9 : 3)) * 0.04;
     this.hurt = Math.max(0, (this.hurt || 0) - dt);
