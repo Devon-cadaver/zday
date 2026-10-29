@@ -19,6 +19,7 @@ import { CURVE, curveFrame } from './curve.js';
 import { seeFrame, SEE, seeButton } from './see.js';
 import { Band } from './band.js';
 import { Rail } from './rail.js';
+import { Flight } from './flight.js';
 import { PLACES, placeKey, settle } from './places.js';
 import { Globe } from './globe.js';
 import { Sky } from './sky.js';
@@ -157,25 +158,27 @@ function frame() {
   sky.update(dt);
   if (globe.active || !W) { controls.enabled = false; if (globe.active) globe.frame(dt); frames++; fpsT += dt; requestAnimationFrame(frame); globeWas = true; return; } // up on the globe (or nothing built yet): the city waits
   if (globeWas) { globeWas = false; controls.enabled = !sky.busy(); }
-  const { city, outskirts, daylight, disasters, sirens } = W, B = city.bounds;
-  controls.update();
+  const { city, outskirts, daylight, disasters, sirens } = W, B = city.bounds, fl = game.flight && game.flight.active; // fl: flying a plane, which has the camera
+  if (!fl) controls.update();
   // keep the view over the city
   const tg = controls.target;
   const cx = THREE.MathUtils.clamp(tg.x, B.x0 + M, B.x1 - M), cz = THREE.MathUtils.clamp(tg.z, B.z0 + M, B.z1 - M);
-  if (cx !== tg.x || cz !== tg.z) { camera.position.x += cx - tg.x; camera.position.z += cz - tg.z; tg.x = cx; tg.z = cz; }
+  if (!fl && (cx !== tg.x || cz !== tg.z)) { camera.position.x += cx - tg.x; camera.position.z += cz - tg.z; tg.x = cx; tg.z = cz; }
   tg.y = 0;
 
   game.update(dt, fps);
   sky.step(dt); // up off the city, or down to it
   game.compassStep(dt);
+  if (fl) game.flight.frame(dt, tg); // the plane, and the camera behind it or in its seat
   outskirts.update(time, scene, sun, disasters.lightK, disasters.sunK);
   sun.position.copy(tg).addScaledVector(daylight.sunDir, 700); // the sun (or the moon) where the day and night cycle has it
   sun.target.position.copy(tg);
   { const e = Math.max(300, Math.min(950, camera.position.distanceTo(tg) * 0.45)); if (e !== sc.right) { sc.left = sc.bottom = -e; sc.right = sc.top = e; sc.far = 1600 + e; sc.updateProjectionMatrix(); } } // shadows cover what is in view
   // the shadow map only needs redrawing when the world has moved (a simulation step) or the view has
   if (game.simT !== shadowAt || !camAt.equals(camera.position)) { renderer.shadowMap.needsUpdate = true; shadowAt = game.simT; camAt.copy(camera.position); }
-  const focus = camera.position.distanceTo(game.focusAt || tg); // whatever Follow is on stays in focus
-  const nearZ = Math.max(10, focus * 0.2); // the near plane follows the zoom: far more depth precision, so flat rooftop details don't flicker on phones
+  const focus = fl ? game.flight.focus : camera.position.distanceTo(game.focusAt || tg); // whatever Follow is on stays in focus
+  const far = fl || focus > 300; if (city.far !== far) { city.far = far; city.lod(far); W.people.lod(far); W.traffic.lod(far); } // zoomed out (or flying, the whole town in view): tree crowns, people and cars in fewer pieces
+  const nearZ = fl ? game.flight.near : Math.max(10, focus * 0.2); // the near plane follows the zoom: far more depth precision, so flat rooftop details don't flicker on phones
   if (Math.abs(camera.near - nearZ) > 0.5) { camera.near = nearZ; camera.updateProjectionMatrix(); }
   // camera shake (quakes, blasts, the tsunami): a jolt for this frame only
   let jx = 0, jy = 0, jz = 0;
@@ -198,6 +201,7 @@ requestAnimationFrame(frame);
 
 game = new Game({ camera, controls, renderer, mode, post, world: W });
 game.buildWorld = buildWorld; // the menu builds the place it picks, here
+game.flight = new Flight(game, { camera, controls, post, renderer }); // the Sandbox's planes
 game.moveWorld = moveWorld;
 game.audio = new Audio(camera, controls); // sound: switched on by the first tap
 game.radio = new Radio(game.audio); // the announcer

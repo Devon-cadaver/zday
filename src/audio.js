@@ -317,6 +317,29 @@ export class Audio {
     }
     if (this.hum) this.hum.gain.setTargetAtTime(on ? 0.12 : 0, c.currentTime, on ? 1.2 : 0.4);
   }
+  // the plane being flown (flight.js): the stunt plane's buzz (two saws a hair apart through a lowpass, both rising with
+  // the throttle k) or the jet's roar (noise through a band that rises with it, over a low rumble); kind null: off.
+  // On the effects' volume, kept low
+  engine(kind, k = 0.5) {
+    const c = this.ctx; if (!c) return;
+    const t = c.currentTime;
+    if (this.eng && this.eng.kind !== kind) { const e = this.eng; this.eng = null; e.g.gain.setTargetAtTime(0, t, 0.12); setTimeout(() => { for (const s of e.src) try { s.stop(); } catch (er) { /* done */ } e.g.disconnect(); }, 700); }
+    if (!kind) return;
+    if (!this.eng) {
+      const g = c.createGain(), f = c.createBiquadFilter(), src = []; g.gain.value = 0; f.connect(g); g.connect(this.bus);
+      const osc = (type, fr, gain) => { const o = c.createOscillator(), og = c.createGain(); o.type = type; o.frequency.value = fr; og.gain.value = gain; o.connect(og); og.connect(f); o.start(); src.push(o); return o; };
+      const e = this.eng = { kind, g, f, src };
+      if (kind === 'jet') {
+        const n = c.createBuffer(1, SR * 2, SR), d = n.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+        const s = c.createBufferSource(); s.buffer = n; s.loop = true; s.connect(f); s.start(); src.push(s);
+        f.type = 'bandpass'; f.Q.value = 0.6; e.o1 = osc('sawtooth', 42, 0.25);
+      } else { f.type = 'lowpass'; f.Q.value = 2; e.o1 = osc('sawtooth', 80, 0.5); e.o2 = osc('sawtooth', 80.9, 0.5); }
+    }
+    const e = this.eng;
+    if (kind === 'jet') { e.f.frequency.setTargetAtTime(380 + 1500 * k, t, 0.3); e.o1.frequency.setTargetAtTime(38 + 20 * k, t, 0.3); }
+    else { e.o1.frequency.setTargetAtTime(62 + 75 * k, t, 0.2); e.o2.frequency.setTargetAtTime(62.8 + 75 * k, t, 0.2); e.f.frequency.setTargetAtTime(520 + 900 * k, t, 0.2); }
+    e.g.gain.setTargetAtTime(kind === 'jet' ? 0.09 + 0.07 * k : 0.05 + 0.05 * k, t, 0.3);
+  }
   toBuf(x) { const b = this.ctx.createBuffer(1, x.length, SR); b.copyToChannel ? b.copyToChannel(x, 0) : b.getChannelData(0).set(x); return b; }
   startLoop(name, buf) {
     const c = this.ctx, src = c.createBufferSource(), g = c.createGain(), p = c.createStereoPanner ? c.createStereoPanner() : null;

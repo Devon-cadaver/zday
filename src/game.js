@@ -211,6 +211,7 @@ body.zd-menu-on.zd-main #zd-side .zd-side-btn{background:rgba(12,18,34,.75);bord
 #zd-dis .zd-btn .th{display:block;position:relative;padding-top:56.25%;border-radius:7px;overflow:hidden;background:#111}
 #zd-dis .zd-btn .th svg{position:absolute;left:0;top:0;width:100%;height:100%;display:block}
 #zd-dis .zd-btn.sel .th{box-shadow:0 0 0 2px #a6ff4d}
+#zd-dis .zd-btn.fly{color:#ff9ad5;border-color:rgba(255,154,213,.45)}
 #zd-dis .zd-btn.zb{color:#a6ff4d;border-color:rgba(166,255,77,.35)}
 #zd-dis .zd-btn.zb.empty{opacity:.5}
 #zd-dis .zd-btn.hero{color:#ffe08a;border-color:rgba(255,224,138,.45)}
@@ -954,7 +955,7 @@ class Sandbox {
     g.addButton('zd-menu-btn', 'Menu', () => g.toMenu());
     this.buildPanel(); this.bindHold();
     this.dropsLeft = START_DROPS; this.clock = -1; this.milestone = 0;
-    g.toast('Open Disasters to drop zombies or unleash a disaster', 4500);
+    g.toast('Open Disasters to drop zombies, unleash a disaster or fly a plane', 4500);
   }
   buildPanel() {
     const g = this.g, d = document.createElement('div'); d.id = 'zd-dis'; d.hidden = true;
@@ -962,7 +963,8 @@ class Sandbox {
       '<div data-pane="dis"><div class="g cards">' + [{ k: 'zombies', name: 'Toxic spill', attr: 'class="zd-btn zb" data-zb' }].concat(Object.keys(HAZARDS).map(h => ({ k: h, name: HAZARDS[h].name, attr: 'class="zd-btn" data-hz="' + h + '"' })))
         .sort((a, b) => a.name.localeCompare(b.name)) // A to Z, each with its picture
         .map(o => '<button type="button" ' + o.attr + '><span class="th">' + (THUMB[o.k] || '') + '</span><span class="nm">' + (o.k === 'zombies' ? o.name + ' · ' + START_DROPS : o.name) + '</span></button>').join('') + '</div>' +
-      '<div class="h">Help</div><div class="g two"><button class="zd-btn auto" type="button" data-auto>Auto responders: On</button><button class="zd-btn hero" type="button" data-hero>Hero signal \u262E</button></div></div>' +
+      '<div class="h">Help</div><div class="g two"><button class="zd-btn auto" type="button" data-auto>Auto responders: On</button><button class="zd-btn hero" type="button" data-hero>Hero signal \u262E</button></div>' +
+      '<div class="h">Fly a plane</div><div class="g two cards">' + [['stunt', 'Stunt plane'], ['jet', 'Fighter jet']].map(([k, n]) => '<button class="zd-btn fly" type="button" data-fly="' + k + '"><span class="th">' + THUMB[k] + '</span><span class="nm">' + n + '</span></button>').join('') + '</div></div>' +
       '<div data-pane="wx" hidden><div class="g">' + Object.keys(WEATHER).map(w => '<button class="zd-btn" type="button" data-wx="' + w + '">' + WEATHER[w].name.replace('Thunderstorm', 'Storm') + '</button>').join('') + '</div></div>' +
       '<div data-pane="go" hidden><div class="g">' + Object.keys(PLACES).map(k => '<button class="zd-btn' + (k === placeKey() ? ' sel' : '') + '" type="button" data-place="' + k + '">' + PLACES[k].name + '</button>').join('') + '</div></div></div>';
     document.body.appendChild(d); this.panel = d; this.zbBtn = d.querySelector('[data-zb]');
@@ -974,6 +976,7 @@ class Sandbox {
     addEventListener('resize', () => { if (!d.hidden) this.fitPanel(); });
     const autoBtn = d.querySelector('[data-auto]');
     autoBtn.onclick = () => { this.auto.setOn(!this.auto.on); autoBtn.textContent = 'Auto responders: ' + (this.auto.on ? 'On' : 'Off'); autoBtn.classList.toggle('off', !this.auto.on); g.toast(this.auto.on ? 'Responders will answer every disaster and rebuild afterwards' : 'Responders off: nobody comes to help', 3500); };
+    d.querySelectorAll('[data-fly]').forEach(b => { b.onclick = () => { this.pending = null; this.close(); if (g.flight) g.flight.start(b.dataset.fly); }; }); // up in a plane (flight.js)
     d.querySelector('[data-hero]').onclick = () => { const tg = g.controls.target; g.disasters.start('heroes', tg.x, tg.z); this.pending = null; this.close(); if (this.clock < 0) this.clock = 0; }; // the peace sign goes up over the middle of the view
     this.zbBtn.onclick = () => { // armed until the Shamblers run out or you tap Done: every tap on a street drops one
       if (this.dropsLeft <= 0) { g.toast('No Shamblers left. Tap Reset to start over'); return; }

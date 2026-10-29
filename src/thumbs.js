@@ -14,6 +14,14 @@ const STARS = '<g fill="#fff" opacity=".7"><circle cx="8" cy="6" r=".6"/><circle
 const svg = (s) => '<svg viewBox="0 0 96 54" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' + s + '</svg>';
 
 export const THUMB = {
+  stunt: svg(sky('stunt', '#4aa8f0', '#cfeaff') + '<g fill="#fff" opacity=".9"><ellipse cx="18" cy="10" rx="10" ry="3.5"/><ellipse cx="80" cy="7" rx="12" ry="3.5"/></g>' + town('#5a6f8a', '#fff2b0') + ground('#7a8a6a') +
+    '<path d="M2 36 Q18 16 32 26 T52 22" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".85"/>' + // its smoke trail
+    '<g transform="rotate(-12 64 20)"><path d="M50 20 L48 13 L53 13.5 L55 18 Z" fill="#d8282e"/><path d="M50 20 Q52 16.5 62 16.8 L72 17.5 Q75 19 72 20.8 L62 21.6 Q53 22 50 20 Z" fill="#d8282e"/>' +
+    '<path d="M70 17.4 Q75 17.8 75.5 19.2 Q75 20.6 70 21 Z" fill="#f4f1ea"/><path d="M60 16.9 Q63 13.6 67 17.2 Z" fill="#2b4a66"/><path d="M49 19 L56 19.4 L55.6 20.4 L49 20.6 Z" fill="#f4f1ea"/>' +
+    '<rect x="57" y="19.6" width="10" height="1.6" rx=".8" fill="#f4f1ea"/><ellipse cx="75.8" cy="19.2" rx="1" ry="4.6" fill="#dfe6ee" opacity=".6"/><circle cx="75.8" cy="19.2" r=".8" fill="#f4f1ea"/></g>'),
+  jet: svg(sky('jet', '#ff8a5a', '#ffd0a0') + town('#3a2a3a', '#ffd77a') + ground('#4a3040') + '<path d="M6 14h16M10 26h14M4 32h12" stroke="#fff" stroke-width="1" opacity=".6" stroke-linecap="round"/>' +
+    '<g transform="rotate(-8 50 20)"><path d="M28 20 L40 18.5 L40 21.5 Z" fill="#ffb02e"/><path d="M33 20 L40 19.3 L40 20.7 Z" fill="#fff4b0"/><path d="M41 18.4 L39 11 L44 11 L49 18.2 Z" fill="#7a8088"/>' +
+    '<path d="M40 18.4 L66 18 Q74 19 77 20 Q74 21 66 22 L40 21.6 Z" fill="#8d939a"/><path d="M60 18.2 Q64 15.6 69 18.6 Z" fill="#2b4a66"/><path d="M48 20.5 L60 20.4 L52 25.5 L47 25.5 Z" fill="#6b7178"/><rect x="54" y="21.3" width="6" height="1.6" fill="#5a6066"/></g>'),
   aliens: svg(sky('aliens', '#1a0b3d', '#4a1f6e') + STARS + town('#1a1430') + ground('#1c1530') +
     '<path d="M39 22 L57 22 L72 46 L24 46 Z" fill="#7dff9a" opacity=".3"/><circle cx="48" cy="33" r="1.3" fill="#fff"/><rect x="47.2" y="34.2" width="1.6" height="3" fill="#fff"/>' +
     '<ellipse cx="48" cy="19" rx="20" ry="5" fill="#b9c3d6"/><ellipse cx="48" cy="20.5" rx="20" ry="3" fill="#6b7590"/><path d="M38 17 Q48 5 58 17 Z" fill="#8ff0ff"/>' +
