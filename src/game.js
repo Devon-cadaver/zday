@@ -15,6 +15,7 @@ import { dragScroll, sideAdd } from './ui.js';
 import { Folk } from './folk.js';
 import { SEE } from './see.js';
 import { DisasterTV } from './tv.js';
+import { THUMB } from './thumbs.js';
 
 const CSS = `
 #zd-top{position:fixed;left:0;right:0;top:0;display:flex;gap:6px;align-items:center;justify-content:center;flex-wrap:wrap;
@@ -206,6 +207,10 @@ body.zd-menu-on.zd-main #zd-side .zd-side-btn{background:rgba(12,18,34,.75);bord
 #zd-dis .g.two > .zd-btn{flex:0 0 calc((100% - 6px) / 2)}
 #zd-dis .zd-btn{padding:11px 4px;min-width:0;font-size:11px;letter-spacing:.03em;text-transform:none}
 #zd-dis .zd-btn.sel{border-color:#a6ff4d;color:#a6ff4d}
+#zd-dis .g.cards > .zd-btn{display:flex;flex-direction:column;align-items:stretch;gap:5px;padding:4px 4px 7px;line-height:1.15} /* the disasters: a picture over the name */
+#zd-dis .zd-btn .th{display:block;position:relative;padding-top:56.25%;border-radius:7px;overflow:hidden;background:#111}
+#zd-dis .zd-btn .th svg{position:absolute;left:0;top:0;width:100%;height:100%;display:block}
+#zd-dis .zd-btn.sel .th{box-shadow:0 0 0 2px #a6ff4d}
 #zd-dis .zd-btn.zb{color:#a6ff4d;border-color:rgba(166,255,77,.35)}
 #zd-dis .zd-btn.zb.empty{opacity:.5}
 #zd-dis .zd-btn.hero{color:#ffe08a;border-color:rgba(255,224,138,.45)}
@@ -954,7 +959,9 @@ class Sandbox {
   buildPanel() {
     const g = this.g, d = document.createElement('div'); d.id = 'zd-dis'; d.hidden = true;
     d.innerHTML = '<div class="tabs"><button type="button" class="on" data-tab="dis">Disasters</button><button type="button" data-tab="wx">Weather</button><button type="button" data-tab="go">Travel</button></div><div class="pbody">' +
-      '<div data-pane="dis"><div class="g"><button class="zd-btn zb" type="button" data-zb>Toxic spill · ' + START_DROPS + '</button>' + Object.keys(HAZARDS).map(h => '<button class="zd-btn" type="button" data-hz="' + h + '">' + HAZARDS[h].name + '</button>').join('') + '</div>' +
+      '<div data-pane="dis"><div class="g cards">' + [{ k: 'zombies', name: 'Toxic spill', attr: 'class="zd-btn zb" data-zb' }].concat(Object.keys(HAZARDS).map(h => ({ k: h, name: HAZARDS[h].name, attr: 'class="zd-btn" data-hz="' + h + '"' })))
+        .sort((a, b) => a.name.localeCompare(b.name)) // A to Z, each with its picture
+        .map(o => '<button type="button" ' + o.attr + '><span class="th">' + (THUMB[o.k] || '') + '</span><span class="nm">' + (o.k === 'zombies' ? o.name + ' · ' + START_DROPS : o.name) + '</span></button>').join('') + '</div>' +
       '<div class="h">Help</div><div class="g two"><button class="zd-btn auto" type="button" data-auto>Auto responders: On</button><button class="zd-btn hero" type="button" data-hero>Hero signal \u262E</button></div></div>' +
       '<div data-pane="wx" hidden><div class="g">' + Object.keys(WEATHER).map(w => '<button class="zd-btn" type="button" data-wx="' + w + '">' + WEATHER[w].name.replace('Thunderstorm', 'Storm') + '</button>').join('') + '</div></div>' +
       '<div data-pane="go" hidden><div class="g">' + Object.keys(PLACES).map(k => '<button class="zd-btn' + (k === placeKey() ? ' sel' : '') + '" type="button" data-place="' + k + '">' + PLACES[k].name + '</button>').join('') + '</div></div></div>';
@@ -989,7 +996,7 @@ class Sandbox {
     d.querySelectorAll('[data-wx]').forEach(b => { b.onclick = () => { g.disasters.weather.set(b.dataset.wx); g.toast('Weather: ' + WEATHER[b.dataset.wx].name); this.close(); }; });
   }
   zombieLabel() {
-    if (this.zbBtn) { this.zbBtn.textContent = 'Toxic spill · ' + this.dropsLeft; this.zbBtn.classList.toggle('empty', this.dropsLeft <= 0); }
+    if (this.zbBtn) { this.zbBtn.querySelector('.nm').textContent = 'Toxic spill · ' + this.dropsLeft; this.zbBtn.classList.toggle('empty', this.dropsLeft <= 0); }
     if (this.pending === 'zombies') this.g.setLabel(this.disBtn, 'Done (' + this.dropsLeft + ' left)');
   }
   // the panel sits between the bar and the numbers at the top, and scrolls if the screen is too short for it
