@@ -30,7 +30,7 @@ function holder(F) {
 }
 
 const CSS = `
-#zd-duel{position:fixed;left:0;top:0;right:0;bottom:0;z-index:32;touch-action:none}
+#zd-duel{position:fixed;left:0;top:0;right:0;bottom:0;z-index:29;touch-action:none}
 #zd-duel .pan{position:absolute;left:50%;top:calc(66px + env(safe-area-inset-top));transform:translateX(-50%);width:min(86vw,360px);text-align:center;color:#fff;font:800 13px/1.2 system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:.04em;text-shadow:0 1px 3px #000;pointer-events:none}
 #zd-duel .bar{height:8px;margin-top:6px;border-radius:4px;background:rgba(0,0,0,.45);overflow:hidden}
 #zd-duel .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#ff5ad5,#ffd27a)}
@@ -39,7 +39,7 @@ const CSS = `
 #zd-duel .spot.pop{animation:zdPop .2s ease-out forwards}
 #zd-duel .spot.miss{animation:zdMiss .25s ease-out forwards}
 @keyframes zdSpot{from{transform:scale(1.25)}to{transform:scale(.55);opacity:.55}}
-#zd-duel .spot.slow{animation-duration:1.52s}
+#zd-duel .spot.slow:not(.pop):not(.miss){animation-duration:1.52s}
 @keyframes zdPop{to{transform:scale(1.7);opacity:0}}
 @keyframes zdMiss{to{transform:scale(.3);opacity:0;filter:hue-rotate(-60deg)}}
 #zd-duel .acts{position:absolute;left:50%;bottom:calc(130px + env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;gap:8px;width:max-content;max-width:calc(100vw - 16px)}
@@ -47,7 +47,7 @@ const CSS = `
 #zd-duel .acts button.rnd{background:linear-gradient(#ffc04a,#d0700a);box-shadow:0 0 16px rgba(255,180,60,.6)}
 #zd-duel .ring{position:absolute;left:50%;top:50%;width:200px;height:200px;margin:-100px 0 0 -100px;border-radius:50%;border:3px dashed rgba(255,255,255,.55);pointer-events:none;animation:zdTurn 1.2s linear infinite}
 @keyframes zdTurn{to{transform:rotate(360deg)}}
-#zd-duel .hold{position:absolute;width:88px;height:88px;margin:-44px 0 0 -44px;border-radius:50%;border:3px solid #fff;display:flex;align-items:center;justify-content:center;color:#fff;font:900 13px system-ui,-apple-system,sans-serif;letter-spacing:.06em;text-shadow:0 1px 2px #000;background:rgba(0,0,0,.35);background:radial-gradient(circle,rgba(40,20,60,.55) 55%,transparent 57%),conic-gradient(#ffd27a calc(var(--k,0) * 360deg),rgba(0,0,0,.35) 0);box-shadow:0 0 18px 4px rgba(255,210,122,.7);animation:zdPulse .6s ease-in-out infinite alternate;touch-action:none}
+#zd-duel .hold{position:absolute;width:88px;height:88px;margin:-44px 0 0 -44px;border-radius:50%;border:3px solid #fff;display:flex;align-items:center;justify-content:center;color:#fff;font:900 13px system-ui,-apple-system,sans-serif;letter-spacing:.06em;text-shadow:0 1px 2px #000;background:rgba(0,0,0,.35);background:radial-gradient(circle,rgba(40,20,60,.55) 55%,transparent 57%),conic-gradient(#ffd27a calc(var(--k,0) * 360deg),rgba(0,0,0,.35) 0deg);box-shadow:0 0 18px 4px rgba(255,210,122,.7);animation:zdPulse .6s ease-in-out infinite alternate;touch-action:none}
 #zd-duel .hold.tap{background:radial-gradient(circle,rgba(150,230,255,.9),rgba(40,120,255,.55) 62%,rgba(40,120,255,0) 74%);box-shadow:0 0 18px 5px rgba(120,220,255,.85)}
 @keyframes zdPulse{to{transform:scale(1.08)}}
 `;
@@ -67,7 +67,7 @@ export class Duel {
     this.title('🎯 WEAK SPOTS! TAP THEM!'); sfx('thud', v.x, v.y + 2, v.z, { gain: 0.8 });
     // the spin: a finger going round the middle of the screen
     el.addEventListener('pointerdown', (e) => { if (this.phase === 'spin') { this.last = Math.atan2(e.clientY - innerHeight / 2, e.clientX - innerWidth / 2); e.preventDefault(); } });
-    el.addEventListener('pointermove', (e) => { if (this.phase !== 'spin' || this.last == null) return; const a = Math.atan2(e.clientY - innerHeight / 2, e.clientX - innerWidth / 2); let d = a - this.last; d = Math.atan2(Math.sin(d), Math.cos(d)); this.ang += Math.abs(d); this.spinA += d; this.last = a; });
+    el.addEventListener('pointermove', (e) => { if (this.phase !== 'spin' || this.last == null) return; const a = Math.atan2(e.clientY - innerHeight / 2, e.clientX - innerWidth / 2); let d = a - this.last; d = Math.atan2(Math.sin(d), Math.cos(d)); this.ang += Math.abs(d); this.spinA -= d; this.last = a; });
     el.addEventListener('pointerup', () => { this.last = null; });
   }
   title(s) { this.ttl.textContent = s; }
@@ -77,7 +77,7 @@ export class Duel {
   // the street under (x, z), or a roof standing there
   groundAt(x, z) { const city = this.g.city; let y = this.g.people.groundY(x, z); city.buildingsNear(x, z, 0.1, (k, d, b) => { if (d === 0 && !city.dead[k] && b.roofY > y) y = b.roofY; }); return y; }
   spot() {
-    const [sx, sy] = this.screen(), x = Math.max(40, Math.min(innerWidth - 40, sx + (Math.random() - 0.5) * 150)), y = Math.max(140, Math.min(innerHeight - 230, sy + (Math.random() - 0.5) * 170));
+    const [sx, sy] = this.screen(), x = Math.max(40, Math.min(innerWidth - 84, sx + (Math.random() - 0.5) * 150)), y = Math.max(140, Math.min(innerHeight - 230, sy + (Math.random() - 0.5) * 170));
     const b = document.createElement('div'); b.className = 'spot' + (this.life > 1.2 ? ' slow' : ''); b.style.left = x + 'px'; b.style.top = y + 'px'; this.el.appendChild(b);
     const s = { b, life: this.life, dead: false }; this.live.push(s);
     b.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); if (s.dead) return; s.dead = true; b.classList.add('pop'); setTimeout(() => b.remove(), 200); this.hit(26); sfx('crash', this.v.x, 2, this.v.z, { gain: 0.5, rate: 1.4 }); });
@@ -104,11 +104,13 @@ export class Duel {
     if ((this.next -= h) <= 0 && this.spawned < this.total) { this.next = 0.45; this.spawned++; this.spot(); }
     for (const s of this.live) { if (s.dead) continue; s.life -= h; if (s.life <= 0) { s.dead = true; s.b.classList.add('miss'); setTimeout(() => s.b.remove(), 250); this.F.damage(7, v.name + ' hit you!'); this.g.shake = Math.max(this.g.shake || 0, 0.25); } }
     this.barI.style.width = (this.spawned / this.total * 100) + '%';
+    if (this.over) return false; // knocked out by that last miss
     if (this.spawned >= this.total && this.live.every(s => s.dead)) this.daze();
     return true;
   }
   // dazed: the spin, or a move picked at random
   daze() {
+    if (this.over) return;
     this.phase = 'dazed'; this.t = 0; this.v.pinned = 'dazed';
     this.title('💫 ' + this.v.name.toUpperCase() + ' IS DAZED!');
     this.button(['🌀 SPIN & TOSS', () => this.startSpin()], ['🎲 RANDOM MOVE', () => this.random(), 'rnd']);
@@ -211,7 +213,7 @@ export class Duel {
     c.addEventListener('pointerup', up); c.addEventListener('pointercancel', up);
     this.place(c); return c;
   }
-  place(c) { const [x, y] = this.screen(); c.style.left = Math.max(50, Math.min(innerWidth - 50, x)) + 'px'; c.style.top = Math.max(150, Math.min(innerHeight - 240, y)) + 'px'; }
+  place(c) { const [x, y] = this.screen(); c.style.left = Math.max(50, Math.min(innerWidth - 100, x)) + 'px'; c.style.top = Math.max(150, Math.min(innerHeight - 240, y)) + 'px'; } // clear of the side buttons
   dropCircle() { if (this.ring2) { this.ring2.remove(); this.ring2 = null; } }
   _slam(h) {
     const v = this.v, F = this.F, s = this.sub;

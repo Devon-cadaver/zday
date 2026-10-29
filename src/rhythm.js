@@ -16,7 +16,7 @@ const hash = (k, s) => { const x = Math.sin(k * 12.9898 + s * 78.233) * 43758.54
 const _v = new THREE.Vector3(), _w = new THREE.Vector3();
 
 const CSS = `
-#zd-band{position:fixed;left:0;top:0;right:0;bottom:0;z-index:32;touch-action:none;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+#zd-band{position:fixed;left:0;top:0;right:0;bottom:0;z-index:29;touch-action:none;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
 #zd-band .hud{position:absolute;left:50%;top:calc(10px + env(safe-area-inset-top));transform:translateX(-50%);width:min(90vw,380px);text-align:center;color:#fff;text-shadow:0 1px 3px #000;pointer-events:none}
 #zd-band .ttl{font:900 13px/1.2 system-ui,-apple-system,sans-serif;letter-spacing:.08em}
 #zd-band .sc{display:flex;justify-content:space-between;margin-top:6px;font:800 14px/1 system-ui,-apple-system,sans-serif;font-variant-numeric:tabular-nums}
@@ -41,6 +41,7 @@ const CSS = `
 #zd-band .res .gr{font:900 64px/1 system-ui,-apple-system,sans-serif;color:#ffd27a;text-shadow:0 0 18px rgba(255,200,90,.6)}
 #zd-band .res .pts{font:900 22px/1.3 system-ui,-apple-system,sans-serif;margin-top:4px}
 #zd-band .res .ln{font:700 13px/1.6 system-ui,-apple-system,sans-serif;opacity:.9}
+body.zd-flying #zd-bar,body.zd-flying #zd-dis,body.zd-flying #zd-followchip,body.zd-flying #zd-globe,body.zd-flying #zd-top{display:none!important} /* the town's bars put away while playing (flight.js has the same; it may not have run yet) */
 .zd-bandoffer{position:fixed;z-index:30;transform:translate(-50%,-130%);padding:10px 14px;border-radius:14px;border:2px solid #ffd27a;background:linear-gradient(#ff4fa3,#a0168a);color:#fff;font:800 13px system-ui,-apple-system,sans-serif;white-space:nowrap;cursor:pointer;box-shadow:0 0 16px rgba(255,90,200,.6)}
 `;
 
@@ -53,6 +54,7 @@ export class BandGame {
   // a tap on the town (game.js): on the stage, the offer to play them. true: it was on the stage
   tapStage(cx, cy) {
     const B = this.band(), cam = this.ctx.camera; if (!B || this.active || this.g.modeName !== 'sandbox') return false;
+    if (this.g.mode && this.g.mode.busy && this.g.mode.busy()) return false; // a disaster picked and waiting to be dropped: the tap is its
     const V = B.venue; _v.set(V.x, V.y + V.H + 2, V.z); const d = cam.position.distanceTo(_v), p = _v.clone().project(cam); if (p.z > 1) return false;
     const sx = (p.x + 1) / 2 * innerWidth, sy = (1 - p.y) / 2 * innerHeight, f = innerHeight / (2 * Math.tan(cam.fov * Math.PI / 360)), R = Math.max(36, V.W * 0.6 / d * f);
     if (Math.hypot(cx - sx, cy - sy) > R) return false;
@@ -96,6 +98,8 @@ export class BandGame {
   reset() {
     for (const n of this.notes || []) n.el.remove(); if (this.res) { this.res.remove(); this.res = null; } if (this.bigEl) { this.bigEl.remove(); this.bigEl = null; }
     this.notes = []; this.score = 0; this.combo = 0; this.bestCombo = 0; this.hits = { perfect: 0, good: 0, miss: 0 }; this.over = false; this.last = -1; this.same = 0;
+    const M = this.g.audio && this.g.audio.music, el = M && M.bandEl;
+    if (el && !el.paused && el.duration && el.duration - el.currentTime < SET + 15) { try { el.currentTime = 0; } catch (e) { /* not seekable */ } } // too near the end for a whole set: from the top
     this.clock = null; this.tick(0); // where the song is now
     const k0 = Math.ceil((this.clock - this.song.first) / this.period) + 1; this.k0 = k0; this.nextK = k0 + COUNT; this.endK = k0 + COUNT + Math.round(SET / this.period); // a count-in, then a minute of beats
     this.counted = k0 - 1; this.show();
@@ -177,14 +181,14 @@ export class BandGame {
       if (n.done) continue;
       if (t - n.at > GOOD) { this.miss(n); continue; }
       const [x, y] = this.spotOf(n.lane), s = 1 + 1.8 * Math.max(0, (n.at - t) / AP); // the ring closing in
-      n.el.style.left = x + 'px'; n.el.style.top = y + 'px'; n.ring.style.transform = 'scale(' + s.toFixed(3) + ')'; n.ring.style.opacity = s > 2.6 ? '0.4' : '1';
+      n.el.style.left = Math.max(36, Math.min(innerWidth - 90, x)) + 'px'; n.el.style.top = y + 'px'; n.ring.style.transform = 'scale(' + s.toFixed(3) + ')'; n.ring.style.opacity = s > 2.6 ? '0.4' : '1';
     }
     if (this.notes.length > 40) this.notes = this.notes.filter(n => !n.done);
     const end = F + this.endK * P; this.barI.style.width = Math.max(0, Math.min(100, (end - t) / SET * 100)) + '%';
     this.hintEl.textContent = this.audible ? '' : 'Turn the music on (🎵) to hear the song';
     if (t > end + GOOD + 0.1 && this.notes.every(n => n.done)) this.results();
   }
-  big(s) { if (!this.bigEl) { this.bigEl = document.createElement('div'); this.bigEl.className = 'big'; this.el.appendChild(this.bigEl); } this.bigEl.textContent = s; }
+  big(s) { if (!this.el) return; if (!this.bigEl) { this.bigEl = document.createElement('div'); this.bigEl.className = 'big'; this.el.appendChild(this.bigEl); } this.bigEl.textContent = s; }
   // the set over: the grade, the score, the best kept
   results() {
     this.over = true; this.big('');

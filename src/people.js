@@ -665,7 +665,7 @@ export class People {
   becomeZombie(i, type = -1) {
     this.zt[i] = type >= 0 ? type : this.zrad[i] ? RADIOACTIVE : (this.runnerBoost && this.r() < 0.3 ? 1 : rollZombieType(this.r));
     const Z = ZTYPES[this.zt[i]];
-    this.hp[i] = Z.rad && this.zrad[i] === 1 ? 1 : Z.hp; // the tanker's gas: they glow, but drop to one shot (the nuclear kind takes two) this.inc[i] = Z.scream ? 4 + this.r() * 4 : 0;
+    this.hp[i] = Z.rad && this.zrad[i] === 1 ? 1 : Z.hp; this.inc[i] = Z.scream ? 4 + this.r() * 4 : 0; // the tanker's gas: they glow, but drop to one shot (the nuclear kind takes two); inc: a screamer's first scream
     this.zombieLook(i);
   }
 
