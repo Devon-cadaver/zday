@@ -315,7 +315,7 @@ export class Audio {
       lfo(0.42, 150, f.frequency); lfo(5.5, 7, whine.frequency); lfo(0.23, 40, whine.frequency); // the whirl
       this.hum = g;
     }
-    if (this.hum) this.hum.gain.setTargetAtTime(on ? 0.45 : 0, c.currentTime, on ? 1.2 : 0.4);
+    if (this.hum) this.hum.gain.setTargetAtTime(on ? 0.12 : 0, c.currentTime, on ? 1.2 : 0.4);
   }
   toBuf(x) { const b = this.ctx.createBuffer(1, x.length, SR); b.copyToChannel ? b.copyToChannel(x, 0) : b.getChannelData(0).set(x); return b; }
   startLoop(name, buf) {
