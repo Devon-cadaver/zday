@@ -159,8 +159,8 @@ const CSS = `
 #zd-menu .ufo .mode .hi{fill:none;stroke:rgba(255,255,255,.35);stroke-width:1px;vector-effect:non-scaling-stroke;pointer-events:none}
 #zd-menu .ufo .mode:active > svg{filter:brightness(1.35) drop-shadow(0 0 6px var(--c)) drop-shadow(0 0 14px var(--g))}
 #zd-menu .ufo .mode .lab{position:absolute;z-index:2;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:2px;width:max-content;white-space:nowrap;text-align:center;pointer-events:none;text-transform:uppercase;opacity:1;font-size:8.5px} /* the title in capitals, the line under it as it is (.mode span) */
-#zd-menu .ufo .mode b{font-size:12.5px;letter-spacing:.02em;font-weight:900;line-height:1.05}#zd-menu .ufo .mode span{font-size:8.5px;font-weight:600;text-transform:none;opacity:.92}
-#zd-menu .ufo .mode .lab svg{width:22px;height:22px;filter:drop-shadow(0 0 4px rgba(255,255,255,.7))}
+#zd-menu .ufo .mode b{font-size:10.5px;letter-spacing:.03em;font-weight:900;line-height:1.05}#zd-menu .ufo .mode span{font-size:8.5px;font-weight:600;text-transform:none;opacity:.92}
+#zd-menu .ufo .mode .lab svg{width:19px;height:19px;filter:drop-shadow(0 0 4px rgba(255,255,255,.7))}
 #zd-menu .ufo .mode[data-play="commander"]{--c:#4fc3ff;--c1:#1f6fe6;--c2:#0a2a72;--g:rgba(79,195,255,.45)}
 #zd-menu .ufo .mode[data-go="be"]{--c:#ff4a78;--c1:#d6164a;--c2:#5a061f;--g:rgba(255,74,120,.45)}
 #zd-menu .ufo .mode[data-play="sandbox"]{--c:#45ef75;--c1:#14a847;--c2:#05461c;--g:rgba(69,239,117,.4)}
