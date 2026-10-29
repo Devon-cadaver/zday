@@ -56,7 +56,7 @@ const CSS = `
 #zd-drive{position:fixed;left:0;top:0;right:0;bottom:0;touch-action:none}
 #zd-drive .stick{position:absolute;width:90px;height:90px;margin:-45px 0 0 -45px;border-radius:50%;border:2px solid rgba(255,255,255,.35);display:none;pointer-events:none}
 #zd-drive .knob{position:absolute;left:50%;top:50%;width:36px;height:36px;margin:-18px 0 0 -18px;border-radius:50%;background:rgba(255,255,255,.45)}
-#zd-drive .hud{position:absolute;left:50%;top:calc(10px + env(safe-area-inset-top));transform:translateX(-50%);background:rgba(20,14,30,.6);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:9px;padding:6px 11px;font:700 12px/1 system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:.04em;white-space:nowrap;pointer-events:none;font-variant-numeric:tabular-nums}
+#zd-drive .hud{position:absolute;left:50%;top:calc(10px + env(safe-area-inset-top));transform:translateX(-50%);background:rgba(20,14,30,.6);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:9px;padding:6px 11px;font:700 12px/1 system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:.04em;white-space:pre;text-align:center;line-height:1.35;pointer-events:none;font-variant-numeric:tabular-nums}
 #zd-drive .ret{position:absolute;left:50%;top:46%;width:24px;height:24px;margin:-12px 0 0 -12px;border:2px solid rgba(255,255,255,.75);border-radius:50%;pointer-events:none;display:none}
 #zd-drive.first .ret{display:block}
 #zd-drive .tip{position:absolute;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%);color:#fff;font:600 12px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif;text-align:center;text-shadow:0 1px 3px #000;pointer-events:none;transition:opacity .6s;width:80vw}
@@ -67,7 +67,7 @@ const CSS = `
 #zd-drivebar .zd-btn.fire.wait{opacity:.5}
 #zd-drivebar .zd-btn.exit{background:linear-gradient(#ff5a8a,#c2165a)}
 #zd-drivebar .zd-btn.off{opacity:.4}
-body.zd-flying #zd-bar,body.zd-flying #zd-dis,body.zd-flying #zd-followchip,body.zd-flying #zd-globe{display:none!important}
+body.zd-flying #zd-bar,body.zd-flying #zd-dis,body.zd-flying #zd-followchip,body.zd-flying #zd-globe,body.zd-flying #zd-top{display:none!important} /* the numbers at the top too: the readout sits there */
 `;
 
 export class Drive {
@@ -242,6 +242,7 @@ export class Drive {
       if (hit < 0 && s.y > top && s.t < 3.5) continue;
       s.done = true;
       g.fire.blast(s.x, s.z, 9); g.people.blast(s.x, s.z, 6); // the airstrike's burst, smaller (the kaiju and the tripods feel it)
+      for (const e of D.list) if (e.alive && e.type === 'kaiju' && e.state !== 'leave' && Math.hypot(e.x - s.x, e.z - s.z) < 40) { e.damage(30); this.tip('Hit! The kaiju is down to ' + Math.max(0, Math.round(e.hp)) + ' of 1200'); }
       if (hit >= 0) { const b = city.buildings[hit]; if (!b.landmark && b.roofY < 22 && Math.random() < 0.4) D.destroyBuilding(hit, 'collapse'); else D.blowWindows(hit, s.vx / 150, s.vz / 150, 0.8); }
       for (const c of g.traffic.parkedNear(s.x, s.z, 4)) { g.traffic.takeParked(c); g.fire.burst(c.x, 1, c.z, 8, 2); }
       g.traffic.near(s.x, s.z, 6, (c) => { if (!c.gone && !c.mission) g.traffic.fling(c, (c.x - s.x) * 2, 6, (c.z - s.z) * 2); });

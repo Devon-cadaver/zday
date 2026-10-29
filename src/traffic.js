@@ -139,7 +139,7 @@ export class Traffic {
     return car;
   }
   burnParked(pc) { pc.im.setColorAt(pc.k, this._c.set('#1a1714')); pc.im.instanceColor.needsUpdate = true; pc.burnt = true; }
-  geometryOf(type) { return this.typeMeshes[type].geometry; }
+  geometryOf(type) { const im = this.typeMeshes[type]; return im.userData.geoNear || im.geometry; } // the whole car (not the far-off block)
 
   // ---------- disasters: cars can be taken over (tornado, wave), thrown, and stalled by flood water
   grab(car) {

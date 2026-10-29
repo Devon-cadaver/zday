@@ -5,7 +5,9 @@
 // on the stunt plane, a small bomb, a big bomb, napalm, a nuke) and Drop lets one go. Keys work too (arrows or WASD to
 // steer, Shift faster, Ctrl slower, Q the payload, Space to drop, I to invert, V the view, Esc to land). Fly into a building or the ground
 // and it goes up in flames there; a moment later you are back in the air at the edge of town. The disasters carry on
-// round you. main.js hands the camera over while it is up (frame()), and game.js's Sandbox has the buttons.
+// round you, and fight back (hazards: the tornado pulls the plane in, the kaiju throws cars at it, grabs it and burns it,
+// the dust storm's devils toss it about) - the hull takes the damage, and at nothing it goes down. main.js hands the
+// camera over while it is up (frame()), and game.js's Sandbox has the buttons.
 import * as THREE from 'three';
 import { buildVehicle } from './vehicles.js';
 import { sfx } from './audio.js';
@@ -20,7 +22,8 @@ const PLANES = {
 const CEIL = 650, KMH = 3.6, FOV_CHASE = 62, FOV_COCKPIT = 72, INVERT = 'zday_fly_invert';
 // what each plane carries, in the order the payload button goes round; wait: seconds before the next; R: the blast's reach; s: the bomb's size
 const LOADS = { stunt: ['seed', 'small', 'big', 'napalm', 'nuke'], jet: ['small', 'big', 'napalm', 'nuke'] };
-const LOAD = { seed: { name: 'Storm seeding', wait: 8 }, small: { name: 'Small bomb', wait: 0.35, R: 12, s: 0.7 }, big: { name: 'Big bomb', wait: 1.2, R: 26, s: 1.3 }, napalm: { name: 'Napalm', wait: 2.5, s: 1.1 }, nuke: { name: 'Nuke', wait: 10, R: 200, s: 2.4 } };
+const LOAD = { seed: { name: 'Storm seeding', wait: 8 }, small: { name: 'Small bomb', wait: 0.35, R: 12, s: 0.7, kaiju: 40 }, big: { name: 'Big bomb', wait: 1.2, R: 26, s: 1.3, kaiju: 120 }, napalm: { name: 'Napalm', wait: 2.5, s: 1.1, kaiju: 70 }, nuke: { name: 'Nuke', wait: 10, R: 200, s: 2.4 } }; // kaiju: what a hit does to it, on top of the blast
+const SEED_REACH = 160; // a seeding run passing this close to a tornado weakens it (closer, more)
 const _f = new THREE.Vector3(), _u = new THREE.Vector3(), _v = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler(0, 0, 0, 'YZX');
 const SEAT_TURN = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2); // a camera looks down -z; the planes point along +x
 
@@ -57,7 +60,7 @@ const CSS = `
 #zd-fly{position:fixed;left:0;top:0;right:0;bottom:0;touch-action:none}
 #zd-fly .stick{position:absolute;width:84px;height:84px;margin:-42px 0 0 -42px;border-radius:50%;border:2px solid rgba(255,255,255,.35);display:none;pointer-events:none}
 #zd-fly .knob{position:absolute;left:50%;top:50%;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;background:rgba(255,255,255,.45)}
-#zd-fly .hud{position:absolute;left:50%;top:calc(10px + env(safe-area-inset-top));transform:translateX(-50%);background:rgba(20,14,30,.6);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:9px;padding:6px 11px;font:700 12px/1 system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:.04em;white-space:nowrap;pointer-events:none;font-variant-numeric:tabular-nums}
+#zd-fly .hud{position:absolute;left:50%;top:calc(10px + env(safe-area-inset-top));transform:translateX(-50%);background:rgba(20,14,30,.6);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:9px;padding:6px 11px;font:700 12px/1 system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:.04em;white-space:pre;text-align:center;line-height:1.35;pointer-events:none;font-variant-numeric:tabular-nums}
 #zd-fly .hz,#zd-fly .ret{position:absolute;left:50%;top:50%;pointer-events:none;display:none}
 #zd-fly .hz{width:56vw;height:0;border-top:2px solid rgba(160,255,190,.55)}
 #zd-fly .ret{width:22px;height:22px;margin:-11px 0 0 -11px;border:2px solid rgba(160,255,190,.8);border-radius:50%}
@@ -70,7 +73,7 @@ const CSS = `
 #zd-flybar .zd-btn.load{flex:2 1 0;background:linear-gradient(#3a2a6a,#241848)}
 #zd-flybar .zd-btn.drop{background:linear-gradient(#ffb02e,#e05a10);font-size:13px;letter-spacing:.1em}
 #zd-flybar .zd-btn.drop.wait{opacity:.45}
-body.zd-flying #zd-bar,body.zd-flying #zd-dis,body.zd-flying #zd-followchip,body.zd-flying #zd-globe{display:none!important}
+body.zd-flying #zd-bar,body.zd-flying #zd-dis,body.zd-flying #zd-followchip,body.zd-flying #zd-globe,body.zd-flying #zd-top{display:none!important} /* the numbers at the top too: the readout sits there */
 `;
 
 export class Flight {
@@ -98,6 +101,7 @@ export class Flight {
     this.pos.set(cx + Math.cos(a) * R, 95, cz + Math.sin(a) * R);
     this.yaw = Math.atan2(-(cz - this.pos.z), cx - this.pos.x); this.pitch = 0; this.roll = 0;
     this.speed = this.thr = this.P.start; this.ix = this.iy = 0; this.state = 'fly'; this.t = 0; this.obj.visible = this.view === 'chase'; this.snap = true;
+    this.hull = 100; this.caught = null; this.thrown = []; this.seedTw = null;
   }
   ui() {
     if (!document.getElementById('zd-fly-css')) { const s = document.createElement('style'); s.id = 'zd-fly-css'; s.textContent = CSS; document.head.appendChild(s); }
@@ -153,7 +157,7 @@ export class Flight {
   drop() {
     if (this.state !== 'fly' || this.coolT > 0 || this.seedT > 0) return;
     const id = this.loads[this.load], L = LOAD[id]; this.coolT = L.wait;
-    if (id === 'seed') { this.seedT = 5; this.trailT = 0; this.tip('Seeding the clouds...'); return; }
+    if (id === 'seed') { this.seedT = 5; this.trailT = 0; this.seedHigh = 0; this.tip('Seeding the clouds...'); return; }
     const H = this.g.helis, m = new THREE.Mesh(H.bombGeo, H.bombMat); m.scale.setScalar(L.s); m.castShadow = true; this.g.disasters.ctx.scene.add(m);
     _f.set(1, 0, 0).applyQuaternion(this.q);
     this.bombs.push({ m, id, x: this.pos.x, y: this.pos.y - 1.5, z: this.pos.z, vx: _f.x * this.speed, vy: _f.y * this.speed - 2, vz: _f.z * this.speed });
@@ -177,7 +181,7 @@ export class Flight {
       const H = g.helis;
       if (H.nukeBlast) { H.nukeBlast(x, z, L.R); H.events.push({ type: 'nuke', x, z }); } else { F.nuke(x, z, L.R); g.people.nuke(x, z, L.R); }
       g.flash = 1.6; g.shake = 2.5;
-      if (this.state === 'fly' && Math.hypot(this.pos.x - x, this.pos.z - z) < L.R * 0.6 && this.pos.y < 300) this.crash(-1);
+      if (this.state === 'fly' && Math.hypot(this.pos.x - x, this.pos.z - z) < L.R * 0.6 && this.pos.y < 300) this.crash(-1, 'Caught in your own nuke!');
     } else if (b.id === 'napalm') {
       const d = Math.hypot(b.vx, b.vz) || 1, hx = b.vx / d, hz = b.vz / d;
       for (let k = 0; k < 6; k++) {
@@ -191,11 +195,29 @@ export class Flight {
       if (b.id === 'big') g.city.buildingsNear(x, z, L.R * 0.45, (k, d, bb) => { if (!bb.landmark && bb.roofY < 30) D.destroyBuilding(k, 'collapse'); });
       g.shake = Math.max(g.shake || 0, b.id === 'big' ? 0.8 : 0.35);
     }
+    // on a disaster: the kaiju hurt (more than the blast alone), a dust devil taken out
+    for (const e of D.list) {
+      if (!e.alive) continue;
+      if (e.type === 'kaiju' && L.kaiju && e.state !== 'leave' && Math.hypot(e.x - x, e.z - z) < 45) { e.damage(L.kaiju); this.tip('Direct hit! The kaiju is down to ' + Math.max(0, Math.round(e.hp)) + ' of 1200'); }
+      if (e.type === 'haboob' && e.devils) for (const v of e.devils.list) if (!v.dead && Math.hypot(v.x - x, v.z - z) < (L.R || 20) + v.r * 0.8) this.killDevil(e, v, 'Bombed it out!'); // a column of dust: a blast near enough breaks it up
+    }
   }
   // the seeding run over: the weather a step wilder (clear to rain to a thunderstorm); seeded in a thunderstorm over the
   // town, a tornado comes down under it
   seeded() {
     const D = this.g.disasters, w = D.weather.type, x = this.pos.x, z = this.pos.z, B = this.g.city.bounds;
+    // a tornado about: the run weakens it, more the closer it passed (the cloud seeder's way); a tornado too weak to stand ropes out
+    const tws = D.list.filter(e => e.alive && e.type === 'tornado' && e.tw).map(e => e.tw), runs = this.seedTw; this.seedTw = null;
+    if (tws.length) {
+      let best = null; for (const tw of tws) if (runs && runs.has(tw) && (!best || tw._seedMin < best._seedMin)) best = tw;
+      for (const tw of tws) { const m = tw._seedMin; tw._seedMin = undefined; if (tw !== best || m == null || m > SEED_REACH) continue;
+        tw.size = Math.max(0.6, tw.size - (0.12 + 0.28 * (1 - Math.max(0, m) / SEED_REACH))); // two or three close runs bring it down tw.applySize(); tw.life = Math.min(tw.life, tw.t + 25);
+        if (tw.size < 1.05 && tw.phase === 'ground') { tw.phase = 'rope'; tw.ropeT = 0; this.tip('The tornado is roping out and dying!'); }
+        else this.tip('Seeded ' + Math.max(0, Math.round(m)) + ' m from the tornado: it is weakening (strength ' + tw.size.toFixed(1) + ')');
+        return; }
+      const high = this.seedHigh; this.seedHigh = 0;
+      this.tip(high && !(runs && runs.size) ? 'Seed under the cloud base (below ' + Math.round(high) + ' m) to weaken it' : 'Fly the seeding run closer to the tornado, within ' + SEED_REACH + ' m'); return;
+    }
     if (w === 'storm') {
       if (x > B.x0 && x < B.x1 && z > B.z0 && z < B.z1) { D.start('tornado', x, z); this.tip('The storm you seeded spins up a tornado!'); } else this.tip('Seed over the town to spin the storm up into a tornado');
     } else { const to = w === 'rain' ? 'storm' : 'rain'; D.weather.set(to); this.tip(to === 'storm' ? 'The clouds boil up into a thunderstorm' : 'The seeded clouds start to rain'); }
@@ -263,7 +285,10 @@ export class Flight {
     // what the pilot reads
     if ((this.hudT = (this.hudT || 0) - dt) <= 0) {
       this.hudT = 0.15;
-      this.hud.textContent = P.name.toUpperCase() + ' · ' + Math.round(this.speed * KMH) + ' km/h · ' + Math.max(0, Math.round(this.pos.y)) + ' m';
+      const th = this.threat, hull = Math.max(0, Math.round(this.hull));
+      this.hud.textContent = P.name.toUpperCase() + ' · ' + Math.round(this.speed * KMH) + ' km/h · ' + Math.max(0, Math.round(this.pos.y)) + ' m · hull ' + hull + '%' + (th && th.d < 600 ? '\n' + th.name.toUpperCase() + ' ' + Math.max(0, Math.round(th.d)) + ' m' : '');
+      this.hud.style.color = hull < 35 ? '#ff8a7a' : th && th.d < 60 ? '#ffd27a' : '#fff';
+      if (this.state === 'fly' && this.hull < 60) g.fire.spray(this.pos.x - _f.x * 3, this.pos.z - _f.z * 3, this.pos.y, this.hull < 30 ? 4 : 2, 1, 2.2); // smoke off a hurt plane
       if (g.audio) g.audio.engine(this.state === 'fly' ? this.kind : null, k);
       this.dropBtn.textContent = this.seedT > 0 ? 'Seeding' : 'Drop'; this.dropBtn.classList.toggle('wait', this.coolT > 0 || this.seedT > 0 || this.state !== 'fly');
     }
@@ -271,6 +296,12 @@ export class Flight {
   }
   fly(dt) {
     const g = this.g, P = this.P, K = this.keys;
+    if (this.caught) { // in the tornado's grip: spun round it and up, then spat out in pieces
+      const C = this.caught, tw = C.tw; C.t += dt; C.a += dt * (3 + C.t); C.r = Math.max(4, C.r * (1 - dt * 0.3));
+      this.pos.set(tw.x + Math.cos(C.a) * C.r, this.pos.y + 16 * dt, tw.z + Math.sin(C.a) * C.r); this.yaw = -C.a - Math.PI / 2; this.roll += dt * 9; this.pitch = Math.sin(C.t * 5) * 0.6;
+      g.shake = Math.max(g.shake || 0, 0.8); if (C.t > 2.4) this.crash(-1, 'The tornado tore your plane apart!');
+      return;
+    }
     let ix = this.ix, iy = this.iy;
     if (K.has('arrowleft') || K.has('a')) ix = -1; if (K.has('arrowright') || K.has('d')) ix = 1;
     const up = K.has('arrowup') || K.has('w'), dn = K.has('arrowdown') || K.has('s');
@@ -294,6 +325,7 @@ export class Flight {
     this.speed = Math.max(P.min * 0.7, Math.min(P.max * 1.25, this.speed));
     _e.set(this.roll, this.yaw, this.pitch); _q.setFromEuler(_e); _f.set(1, 0, 0).applyQuaternion(_q);
     this.pos.addScaledVector(_f, this.speed * dt);
+    this.hazards(dt); if (this.state !== 'fly' || this.caught) return;
     // low over the streets, people duck
     if (this.pos.y < 35 && (this.scareT = (this.scareT || 0) - dt) <= 0) { this.scareT = 0.5; g.people.scare(this.pos.x, this.pos.z, 30, 0.4); }
     // into the ground, or a building
@@ -302,13 +334,94 @@ export class Flight {
     let hit = -1; g.city.buildingsNear(x, z, 2.5, (k, d, b) => { if (hit < 0 && y < b.roofY + 0.4) hit = k; });
     if (hit >= 0) this.crash(hit);
   }
-  crash(k) {
+  crash(k, why) {
+    if (this.state !== 'fly') return;
     const g = this.g, f = g.fire, x = this.pos.x, y = Math.max(1, this.pos.y), z = this.pos.z;
-    this.state = 'down'; this.t = 0; this.obj.visible = false; this.at.set(x, y, z);
+    this.state = 'down'; this.t = 0; this.obj.visible = false; this.at.set(x, y, z); this.caught = null; this.hull = 0;
     f.burst(x, y, z, 16, 2.4); f.burst(x, y + 2, z, 10, 1.6);
     if (k >= 0) f.igniteBuilding(k);
     sfx('boom', x, y, z, { gain: 0.8 }); g.shake = Math.max(g.shake || 0, 0.25);
     if (g.audio) g.audio.engine(null);
-    this.tip(k >= 0 ? 'You flew into a building! Back in the air in a moment' : 'You crashed! Back in the air in a moment');
+    this.tip((why || (k >= 0 ? 'You flew into a building!' : 'You crashed!')) + ' Back in the air in a moment');
+  }
+  // hurt: the hull down by n (at nothing it goes down, why the reason), told once in a while
+  damage(n, why) {
+    if (this.state !== 'fly') return;
+    this.hull -= n; if (this.hull <= 0) { this.crash(-1, why); return; }
+    if ((this.hurtT || 0) < this.t2) { this.hurtT = this.t2 + 1.5; this.tip(why + ' Hull ' + Math.round(this.hull) + '%'); sfx('crash', this.pos.x, this.pos.y, this.pos.z, { gain: 0.4, rate: 1.3 }); }
+  }
+  // the nearest danger, for the HUD
+  note(name, d) { if (!this.threat || d < this.threat.d) this.threat = { name, d }; }
+  // the disasters fight back: each one near enough has its go at the plane
+  hazards(h) {
+    this.t2 = (this.t2 || 0) + h; this.threat = null;
+    for (const e of this.g.disasters.list) {
+      if (!e.alive || this.state !== 'fly' || this.caught) continue;
+      if (e.type === 'tornado' && e.tw) this.twister(e.tw, h);
+      else if (e.type === 'kaiju') this.kaijuStep(e, h);
+      else if (e.type === 'haboob' && e.devils) this.devilStep(e, h);
+    }
+    // cars the kaiju threw, on their way: one that reaches the plane hits it
+    for (const th of this.thrown) { th.t += h; const o = th.o.position; if (this.state === 'fly' && o.distanceTo(this.pos) < 7) { th.done = true; this.g.fire.burst(o.x, o.y, o.z, 10, 2); this.damage(60, 'A car the kaiju threw hit you!'); } else if (th.t > 6 || o.y < 3) th.done = true; }
+    if (this.thrown.some(th => th.done)) this.thrown = this.thrown.filter(th => !th.done);
+  }
+  // a tornado: within reach of its funnel (wider the higher up, and leaning with it) the plane is drawn in and round and
+  // shaken; into the funnel itself and it is caught. Over the top of it, nothing. A seeding run notes how close it came
+  twister(tw, h) {
+    if (tw.descend < 0.5 || tw.fade < 0.5) return; // still coming down out of the cloud, or gone
+    const p = this.pos, k = Math.pow(Math.max(0, Math.min(1, p.y / tw.H)), 1.5), ax = tw.x + (tw.vort.lx || 0) * k, az = tw.z + (tw.vort.lz || 0) * k;
+    const dx = p.x - ax, dz = p.z - az, d = Math.hypot(dx, dz) || 0.01, r = tw.radiusAt(Math.min(p.y, tw.H)), reach = r * 4 + 70;
+    this.note('tornado', d - r);
+    if (this.seedT > 0) { if (p.y < tw.H) { tw._seedMin = Math.min(tw._seedMin ?? 1e9, d - r); (this.seedTw || (this.seedTw = new Set())).add(tw); } else this.seedHigh = tw.H; } // only under the cloud base
+    if (p.y > tw.H && d < reach) { this.g.shake = Math.max(this.g.shake || 0, 0.3); this.roll += (Math.random() - 0.5) * 0.08; } // the wall cloud over it: rough air
+    if (p.y > tw.H * 1.15 || d > reach) { if (d > reach + 40) this.saidPull = false; return; }
+    const s = Math.pow(1 - d / reach, 2), tx = -dz / d, tz = dx / d; // how hard it has hold, and the way it turns round
+    p.x += (-dx / d * 50 + tx * 30) * s * h; p.z += (-dz / d * 50 + tz * 30) * s * h; p.y += 8 * s * h;
+    this.roll += (Math.random() - 0.5) * s * 0.5; this.pitch += (Math.random() - 0.5) * s * 0.12; this.g.shake = Math.max(this.g.shake || 0, s * 0.7);
+    if (s > 0.12 && !this.saidPull) { this.saidPull = true; this.tip('The tornado is pulling you in! Turn away, speed up, or climb over it'); }
+    if (d < r * 1.5 + 4) { this.caught = { tw, a: Math.atan2(dz, dx), r: Math.max(6, d), t: 0 }; this.tip('Sucked into the tornado!'); }
+  }
+  // the kaiju: flies too close under it and a tentacle snatches the plane; through the jet of its fire and it burns; in
+  // range it throws a car at where the plane will be
+  kaijuStep(e, h) {
+    if (e.state === 'leave') return;
+    const p = this.pos, dx = p.x - e.x, dz = p.z - e.z, d = Math.hypot(dx, dz) || 0.01;
+    this.note('kaiju ' + Math.max(0, Math.round(e.hp)) + ' hp', d);
+    if (d < 48 && p.y < 80) {
+      if (!this.saidTent) { this.saidTent = true; this.tip('Too close! Its tentacles are reaching for you'); }
+      if (d < 30 && p.y < 65 && Math.random() < h * 2.5) { this.crash(-1, 'A tentacle snatched your plane out of the air!'); return; }
+    } else if (d > 90) this.saidTent = false;
+    if (e.act && e.act.kind === 'fire' && d < 95 && p.y < 75 && (dx * Math.cos(e.yaw) + dz * Math.sin(e.yaw)) / d > 0.7) this.damage(32 * h, 'You flew through its fire!');
+    if (d < 260 && p.y < 190 && (e._throwT = (e._throwT ?? 2.5) - h) <= 0) { e._throwT = 4.5 + Math.random() * 3; this.throwAt(e); }
+  }
+  // a parked car near the kaiju, hurled from up at its shoulders to where the plane will be when it gets there
+  throwAt(e) {
+    const g = this.g, T = g.traffic, D = g.disasters; let pc = null, bd = 1e9;
+    for (const c of T.parkedNear(e.x, e.z, 80)) { const d = Math.hypot(c.x - e.x, c.z - e.z); if (d < bd) { bd = d; pc = c; } }
+    if (!pc) return;
+    T.takeParked(pc);
+    const m = new THREE.Mesh(T.geometryOf(pc.type), D.carMat(pc.hex)); m.castShadow = true;
+    const sx = e.x, sy = 40, sz = e.z; m.position.set(sx, sy, sz);
+    _f.set(1, 0, 0).applyQuaternion(this.q);
+    const t = Math.max(0.9, Math.hypot(this.pos.x - sx, this.pos.y - sy, this.pos.z - sz) / 75), tx = this.pos.x + _f.x * this.speed * t, ty = this.pos.y + _f.y * this.speed * t, tz = this.pos.z + _f.z * this.speed * t;
+    D.debris.addObject(m, 'fly', { v: [(tx - sx) / t, (ty - sy) / t + 4.9 * t, (tz - sz) / t] });
+    this.thrown.push({ o: m, t: 0 });
+    sfx('roar', e.x, 45, e.z, { gain: 0.6 }); this.tip('The kaiju threw a car at you! Turn!');
+  }
+  // the dust storm's devils: flying into one tosses the plane about; a seeding run close by takes it out (so does a bomb: boom)
+  devilStep(e, h) {
+    const p = this.pos;
+    for (const v of e.devils.list) {
+      if (v.dead || !e.sw.inCity(v.x, v.z, 40)) continue;
+      const d = Math.hypot(p.x - v.x, p.z - v.z), r = v.r * (0.22 + 0.78 * Math.min(1, Math.max(0, p.y) / v.h)); // its width at the plane's height
+      this.note('dust devil', d - r);
+      if (this.seedT > 0 && d < r + 45) { this.killDevil(e, v, 'Seeded it out!'); continue; }
+      if (p.y < v.h && d < r && (v.hitT || 0) < this.t2) { v.hitT = this.t2 + 2; this.roll += (Math.random() < 0.5 ? -1 : 1) * 1.6; this.pitch += 0.35; this.g.shake = Math.max(this.g.shake || 0, 0.7); this.damage(30, 'A dust devil tossed you about!'); }
+    }
+  }
+  killDevil(e, v, why) {
+    v.dead = true; if (e.dust) e.dust.emit(v.x, 6, v.z, 30, { up: [6, 20], spread: 14, life: 2.2, size: 7 });
+    const left = e.devils.list.filter(q => !q.dead && e.sw.inCity(q.x, q.z, 40)).length;
+    this.tip(left ? why + ' ' + left + ' dust devil' + (left > 1 ? 's' : '') + ' left' : 'Every dust devil is down!');
   }
 }

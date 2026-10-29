@@ -181,6 +181,7 @@ export class DustDevils {
   update(h, dust) {
     const D = this.D, sw = this.sw, { people, city } = D.ctx; this.t += h;
     for (const v of this.list) {
+      if (v.dead) continue; // taken out (flight.js: a bomb or a seeding run)
       const t = v.t0 + Math.sin(this.t * 0.11 + v.ph) * 60, s = sw.frontAt(t) - v.back - Math.sin(this.t * 0.07 + v.ph * 2) * 25; // wandering along behind the front
       v.x = sw.origin.x + sw.tan.x * t + sw.dir.x * s; v.z = sw.origin.y + sw.tan.y * t + sw.dir.y * s;
       if (!sw.inCity(v.x, v.z, 40) || (v.kickT -= h) > 0) continue;
@@ -192,6 +193,7 @@ export class DustDevils {
   }
   sync(realT, fade = 1) {
     for (const v of this.list) {
+      v.m.visible = !v.dead; if (v.dead) continue;
       v.m.position.set(v.x, 0, v.z); v.m.scale.set(v.r, v.h, v.r); v.m.rotation.y = -realT * 3;
       const u = v.m.material.uniforms; u.uTime.value = realT; u.uLight.value = this.D.lightK; u.uFade.value = fade * (this.sw.inCity(v.x, v.z, 120) ? 1 : 0);
     }
