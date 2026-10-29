@@ -16,13 +16,17 @@ import { SEE } from './see.js';
 // speeds in metres a second; turn: how hard it turns at full bank; chase: the camera's distance behind and height above;
 // seat: the cockpit's place (forward, up) in the model
 const PLANES = {
-  stunt: { name: 'Stunt plane', min: 22, max: 72, start: 42, turn: 1.15, climb: 1.0, chase: [17, 5], seat: [0.6, 1.25] },
-  jet: { name: 'Fighter jet', min: 45, max: 150, start: 85, turn: 0.95, climb: 0.85, chase: [28, 7.5], seat: [2.4, 1.85] },
+  stunt: { name: 'Stunt plane', min: 22, max: 72, start: 42, turn: 1.15, climb: 1.0, chase: [17, 5], seat: [0.6, 1.25], sound: 'stunt' },
+  jet: { name: 'Fighter jet', min: 45, max: 150, start: 85, turn: 0.95, climb: 0.85, chase: [28, 7.5], seat: [2.4, 1.85], sound: 'jet', gun: { mag: 40, rate: 12, dmg: 4, range: 350 } },
+  a10: { name: 'A-10 Warthog', model: 'a10', scale: 1.7, min: 35, max: 95, start: 60, turn: 1.05, climb: 0.9, chase: [24, 7], seat: [3.2, 3.0], sound: 'jet', gun: { mag: 60, rate: 14, dmg: 6, range: 380 } },
+  seeder: { name: 'Cloud seeder', model: 'seeder_plane', scale: 1.8, min: 25, max: 75, start: 45, turn: 1.1, climb: 1.0, chase: [20, 6], seat: [2.8, 3.0], sound: 'stunt' },
+  b2: { name: 'B-2 Spirit', model: 'b2', scale: 3, min: 50, max: 120, start: 75, turn: 0.7, climb: 0.6, chase: [40, 12], seat: [3.6, 5.2], sound: 'jet' },
+  b52: { name: 'B-52', model: 'b52', scale: 2.4, min: 45, max: 110, start: 70, turn: 0.6, climb: 0.55, chase: [44, 13], seat: [9.0, 5.0], sound: 'jet' },
 };
 const CEIL = 650, KMH = 3.6, FOV_CHASE = 62, FOV_COCKPIT = 72, INVERT = 'zday_fly_invert';
 // what each plane carries, in the order the payload button goes round; wait: seconds before the next; R: the blast's reach; s: the bomb's size
-const LOADS = { stunt: ['seed', 'small', 'big', 'napalm', 'nuke'], jet: ['small', 'big', 'napalm', 'nuke'] };
-const LOAD = { seed: { name: 'Storm seeding', wait: 8 }, small: { name: 'Small bomb', wait: 0.35, R: 12, s: 0.7, kaiju: 40 }, big: { name: 'Big bomb', wait: 1.2, R: 26, s: 1.3, kaiju: 120 }, napalm: { name: 'Napalm', wait: 2.5, s: 1.1, kaiju: 70 }, nuke: { name: 'Nuke', wait: 10, R: 200, s: 2.4 } }; // kaiju: what a hit does to it, on top of the blast
+const LOADS = { stunt: ['seed', 'small', 'big', 'napalm', 'nuke'], jet: ['small', 'big', 'napalm', 'nuke'], a10: ['small', 'big', 'napalm'], seeder: ['seed', 'small'], b2: ['big', 'nuke'], b52: ['carpet', 'big', 'napalm', 'nuke'] };
+const LOAD = { seed: { name: 'Storm seeding', wait: 8 }, small: { name: 'Small bomb', wait: 0.35, R: 12, s: 0.7, kaiju: 40 }, big: { name: 'Big bomb', wait: 1.2, R: 26, s: 1.3, kaiju: 120 }, napalm: { name: 'Napalm', wait: 2.5, s: 1.1, kaiju: 70 }, carpet: { name: 'Carpet bombs', wait: 3, R: 12, s: 0.7, kaiju: 40, stick: 8 }, nuke: { name: 'Nuke', wait: 10, R: 200, s: 2.4 } }; // kaiju: what a hit does to it, on top of the blast
 const SEED_REACH = 160; // a seeding run passing this close to a tornado weakens it (closer, more)
 const _f = new THREE.Vector3(), _u = new THREE.Vector3(), _v = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler(0, 0, 0, 'YZX');
 const SEAT_TURN = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2); // a camera looks down -z; the planes point along +x
@@ -47,6 +51,12 @@ function stuntModel() {
   const blur = new THREE.Mesh(new THREE.CircleGeometry(1.35, 24).rotateY(Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#cfd4da', transparent: true, opacity: 0.18, depthWrite: false, side: THREE.DoubleSide })); prop.add(blur); // the blur of it spinning
   g.userData.prop = prop;
   return g;
+}
+// any of the others: the airstrikes' own models, sized up
+function planeModel(kind, P) {
+  if (kind === 'stunt') return stuntModel();
+  if (kind === 'jet') return jetModel();
+  const g = new THREE.Group(), m = buildVehicle(P.model); m.scale.setScalar(P.scale); g.add(m); return g;
 }
 // the fighter: the F-16 of the airstrikes with an afterburner glow at its tail (userData.burner), its throttle
 function jetModel() {
@@ -87,7 +97,10 @@ export class Flight {
     const g = this.g, { camera, controls, post } = this.ctx;
     this.kind = PLANES[kind] ? kind : 'stunt'; this.P = PLANES[this.kind];
     this.saved = { far: camera.far, fov: camera.fov, dof: post.opts.dof, see: SEE.on, pos: camera.position.clone(), tg: controls.target.clone() };
-    this.obj = this.kind === 'jet' ? jetModel() : stuntModel(); this.obj.rotation.order = 'YZX'; g.disasters.ctx.scene.add(this.obj);
+    this.obj = planeModel(this.kind, this.P); this.obj.rotation.order = 'YZX'; g.disasters.ctx.scene.add(this.obj);
+    this.zoom = this.zoom || 1; this.ammo = this.P.gun ? this.P.gun.mag : 0; this.reload = 0; this.stickN = 0; this.shots = [];
+    const tg = new THREE.BufferGeometry(); tg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(32 * 6), 3)); tg.setDrawRange(0, 0); // the gun's tracers
+    this.tracer = new THREE.LineSegments(tg, new THREE.LineBasicMaterial({ color: new THREE.Color(2.2, 1.8, 0.7), transparent: true, opacity: 0.9 })); this.tracer.frustumCulled = false; g.disasters.ctx.scene.add(this.tracer);
     camera.far = 4000; // past the fog anyway; a nearer far plane keeps the depth sharp with the near one so close
     this.loads = LOADS[this.kind]; this.load = 0; this.bombs = []; this.coolT = 0; this.seedT = 0;
     try { this.invert = localStorage.getItem(INVERT) === '1'; } catch (e) { this.invert = false; }
@@ -129,6 +142,12 @@ export class Flight {
     });
     const up = (e) => { if (e.pointerId !== id) return; id = null; this.ix = this.iy = 0; this.stick.style.display = 'none'; };
     ov.addEventListener('pointerup', up); ov.addEventListener('pointercancel', up);
+    // two fingers: a pinch zooms (the stick let go meanwhile); the mouse wheel too
+    const pts = new Map(); let pinch = null;
+    ov.addEventListener('pointerdown', (e) => { pts.set(e.pointerId, [e.clientX, e.clientY]); if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]) || 1, z: this.zoom }; } });
+    ov.addEventListener('pointermove', (e) => { if (!pts.has(e.pointerId)) return; pts.set(e.pointerId, [e.clientX, e.clientY]); if (pinch && pts.size === 2) { const [a, b] = [...pts.values()]; this.setZoom(pinch.z * pinch.d / (Math.hypot(a[0] - b[0], a[1] - b[1]) || 1)); this.ix = this.iy = 0; this.stick.style.display = 'none'; } });
+    for (const ev of ['pointerup', 'pointercancel']) ov.addEventListener(ev, (e) => { pts.delete(e.pointerId); if (pts.size < 2) pinch = null; });
+    ov.addEventListener('wheel', (e) => { e.preventDefault(); this.setZoom(this.zoom * Math.exp(e.deltaY * 0.0012)); }, { passive: false });
     this.keys = new Set();
     this.onKey = (e) => {
       const down = e.type === 'keydown', k = e.key.toLowerCase();
@@ -139,12 +158,15 @@ export class Flight {
       if (down && !e.repeat && k === ' ') this.drop();
       if (down && !e.repeat && k === 'q') this.cycle();
       if (down && !e.repeat && k === 'i') this.setInvert(!this.invert);
+      if (down && k === 'z') this.setZoom(this.zoom * 0.88); if (down && k === 'x') this.setZoom(this.zoom / 0.88);
       if (down) this.keys.add(k); else this.keys.delete(k);
       if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) e.preventDefault();
     };
     addEventListener('keydown', this.onKey); addEventListener('keyup', this.onKey);
   }
   tip(text) { if (!this.tipEl) return; this.tipEl.textContent = text; this.tipEl.style.opacity = '1'; clearTimeout(this.tipT); this.tipT = setTimeout(() => { if (this.tipEl) this.tipEl.style.opacity = '0'; }, 5000); }
+  // nearer or further: the chase camera's distance, or in the cockpit how wide it sees
+  setZoom(z) { this.zoom = Math.max(0.45, Math.min(3, z)); if (this.view === 'cockpit') { const c = this.ctx.camera; c.fov = FOV_COCKPIT * Math.max(0.35, Math.min(1.25, this.zoom)); c.updateProjectionMatrix(); } }
   // the payload button: on round what this plane carries (d 0: just show it)
   cycle(d = 1) { this.load = (this.load + d) % this.loads.length; this.loadBtn.textContent = LOAD[this.loads[this.load]].name + ' \u25B8'; this.coolT = Math.min(this.coolT, 0.3); }
   // up and down: down climbs and up dives (a pilot's stick), or the other way round; remembered
@@ -158,7 +180,11 @@ export class Flight {
     if (this.state !== 'fly' || this.coolT > 0 || this.seedT > 0) return;
     const id = this.loads[this.load], L = LOAD[id]; this.coolT = L.wait;
     if (id === 'seed') { this.seedT = 5; this.trailT = 0; this.seedHigh = 0; this.tip('Seeding the clouds...'); return; }
-    const H = this.g.helis, m = new THREE.Mesh(H.bombGeo, H.bombMat); m.scale.setScalar(L.s); m.castShadow = true; this.g.disasters.ctx.scene.add(m);
+    if (L.stick) { this.stickN = L.stick; this.stickT = 0; this.stickId = id; return; } // a stick of them, one after another (frame)
+    this.release(id);
+  }
+  release(id) {
+    const L = LOAD[id], H = this.g.helis, m = new THREE.Mesh(H.bombGeo, H.bombMat); m.scale.setScalar(L.s); m.castShadow = true; this.g.disasters.ctx.scene.add(m);
     _f.set(1, 0, 0).applyQuaternion(this.q);
     this.bombs.push({ m, id, x: this.pos.x, y: this.pos.y - 1.5, z: this.pos.z, vx: _f.x * this.speed, vy: _f.y * this.speed - 2, vz: _f.z * this.speed });
     sfx('thud', this.pos.x, this.pos.y, this.pos.z, { gain: 0.3, rate: 1.6 });
@@ -225,7 +251,7 @@ export class Flight {
   throttle(d) { const P = this.P; this.thr = Math.max(P.min, Math.min(P.max, this.thr + d * (P.max - P.min) / 5)); }
   setView(v) {
     this.view = v; const cam = this.ctx.camera;
-    cam.fov = v === 'cockpit' ? FOV_COCKPIT : FOV_CHASE; cam.updateProjectionMatrix();
+    cam.fov = v === 'cockpit' ? FOV_COCKPIT * Math.max(0.35, Math.min(1.25, this.zoom || 1)) : FOV_CHASE; cam.updateProjectionMatrix();
     this.near = v === 'cockpit' ? 0.5 : 1.5; this.obj.visible = v === 'chase' && this.state === 'fly'; this.snap = true;
     SEE.on = v === 'cockpit' ? false : this.saved.see; // walls see-through only between the chase camera and the plane
     this.ov.classList.toggle('cockpit', v === 'cockpit'); this.viewBtn.textContent = v === 'cockpit' ? 'Chase view' : 'Cockpit';
@@ -237,6 +263,7 @@ export class Flight {
     this.active = false; document.body.classList.remove('zd-flying');
     g.disasters.ctx.scene.remove(this.obj); this.obj.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); // its own shapes and paint
     for (const b of this.bombs) g.disasters.ctx.scene.remove(b.m); this.bombs = [];
+    g.disasters.ctx.scene.remove(this.tracer); this.tracer.geometry.dispose(); this.tracer.material.dispose();
     this.ov.remove(); this.bar.remove(); removeEventListener('keydown', this.onKey); removeEventListener('keyup', this.onKey); clearTimeout(this.tipT); this.tipEl = null;
     if (g.audio) g.audio.engine(null);
     camera.fov = this.saved.fov; camera.far = this.saved.far; camera.up.set(0, 1, 0); camera.updateProjectionMatrix(); post.opts.dof = this.saved.dof; SEE.on = this.saved.see;
@@ -252,6 +279,8 @@ export class Flight {
     const run = !g.paused && dt > 0;
     if (run) {
       this.coolT = Math.max(0, this.coolT - dt); if (this.bombs.length) this.bombStep(dt);
+      if (this.stickN > 0 && this.state === 'fly' && (this.stickT -= dt) <= 0) { this.stickT = 0.16; this.stickN--; this.release(this.stickId); }
+      if (this.state === 'fly') this.gunStep(dt); this.tracerStep(dt);
       if (this.seedT > 0) { // a long white trail of seeding flares behind it
         this.seedT -= dt; _f.set(1, 0, 0).applyQuaternion(this.q);
         if ((this.trailT -= dt) <= 0) { this.trailT = 0.12; g.fire.spray(this.pos.x - _f.x * 6, this.pos.z - _f.z * 6, this.pos.y - 1, 5, 3, 3.2); }
@@ -272,7 +301,7 @@ export class Flight {
       _v.set(P.seat[0], P.seat[1], 0).applyQuaternion(this.q); cam.position.copy(this.pos).add(_v);
       cam.quaternion.copy(this.q).multiply(SEAT_TURN); cam.up.set(0, 1, 0).applyQuaternion(this.q);
     } else {
-      const fl = Math.hypot(_f.x, _f.z) || 1, back = P.chase[0], hi = P.chase[1];
+      const fl = Math.hypot(_f.x, _f.z) || 1, back = P.chase[0] * this.zoom, hi = P.chase[1] * Math.pow(this.zoom, 0.8);
       _v.set(this.pos.x - _f.x / fl * back, this.pos.y + hi - _f.y * back * 0.5, this.pos.z - _f.z / fl * back);
       if (this.state === 'down') _v.copy(this.at).add(_u.set(-30, 22, -30)); // watching the wreck burn
       if (this.snap) cam.position.copy(_v); else cam.position.lerp(_v, 1 - Math.exp(-dt * 6));
@@ -286,10 +315,10 @@ export class Flight {
     if ((this.hudT = (this.hudT || 0) - dt) <= 0) {
       this.hudT = 0.15;
       const th = this.threat, hull = Math.max(0, Math.round(this.hull));
-      this.hud.textContent = P.name.toUpperCase() + ' · ' + Math.round(this.speed * KMH) + ' km/h · ' + Math.max(0, Math.round(this.pos.y)) + ' m · hull ' + hull + '%' + (th && th.d < 600 ? '\n' + th.name.toUpperCase() + ' ' + Math.max(0, Math.round(th.d)) + ' m' : '');
+      this.hud.textContent = P.name.toUpperCase() + ' · ' + Math.round(this.speed * KMH) + ' km/h · ' + Math.max(0, Math.round(this.pos.y)) + ' m · hull ' + hull + '%' + (this.P.gun ? ' · gun ' + (this.reload > 0 ? 'reloading' : this.ammo) : '') + (th && th.d < 600 ? '\n' + th.name.toUpperCase() + ' ' + Math.max(0, Math.round(th.d)) + ' m' : '');
       this.hud.style.color = hull < 35 ? '#ff8a7a' : th && th.d < 60 ? '#ffd27a' : '#fff';
       if (this.state === 'fly' && this.hull < 60) g.fire.spray(this.pos.x - _f.x * 3, this.pos.z - _f.z * 3, this.pos.y, this.hull < 30 ? 4 : 2, 1, 2.2); // smoke off a hurt plane
-      if (g.audio) g.audio.engine(this.state === 'fly' ? this.kind : null, k);
+      if (g.audio) g.audio.engine(this.state === 'fly' ? this.P.sound : null, k);
       this.dropBtn.textContent = this.seedT > 0 ? 'Seeding' : 'Drop'; this.dropBtn.classList.toggle('wait', this.coolT > 0 || this.seedT > 0 || this.state !== 'fly');
     }
     if (this.view === 'cockpit') this.hz.style.transform = 'translate(-50%,' + (this.pitch * 260).toFixed(0) + 'px) rotate(' + (-this.roll).toFixed(3) + 'rad)';
@@ -349,6 +378,42 @@ export class Flight {
     if (this.state !== 'fly') return;
     this.hull -= n; if (this.hull <= 0) { this.crash(-1, why); return; }
     if ((this.hurtT || 0) < this.t2) { this.hurtT = this.t2 + 1.5; this.tip(why + ' Hull ' + Math.round(this.hull) + '%'); sfx('crash', this.pos.x, this.pos.y, this.pos.z, { gain: 0.4, rate: 1.3 }); }
+  }
+  // the gun (the fighters): whatever is ahead and in range - the kaiju, a saucer, a walker, a dust devil - it fires at by
+  // itself, a magazine at a time, then reloads
+  gunStep(h) {
+    const G = this.P.gun; if (!G) return;
+    if (this.reload > 0) { this.reload -= h; if (this.reload <= 0) this.ammo = G.mag; return; }
+    if ((this.gunT = (this.gunT || 0) - h) > 0) return;
+    const t = this.sight(G.range); if (!t) return;
+    this.gunT = 1 / G.rate; this.ammo--;
+    _f.set(1, 0, 0).applyQuaternion(this.q); const j = t.r * 0.6, ax = t.x + (Math.random() - 0.5) * j, ay = t.y + (Math.random() - 0.5) * j, az = t.z + (Math.random() - 0.5) * j;
+    this.shots.push({ a: [this.pos.x + _f.x * 4, this.pos.y + _f.y * 4 - 0.5, this.pos.z + _f.z * 4], b: [ax, ay, az], t: 0.07 });
+    if (Math.random() < 0.75) t.hit(G.dmg);
+    if (this.ammo % 3 === 0) sfx('shot', this.pos.x, this.pos.y, this.pos.z, { gain: 0.3, rate: 1.5 });
+    if (this.ammo <= 0) { this.reload = 2.5; this.tip('Out of rounds: reloading'); }
+  }
+  // the target ahead: within range and about 9 degrees of the nose, the nearest
+  sight(range) {
+    const p = this.pos, out = [], D = this.g.disasters; _f.set(1, 0, 0).applyQuaternion(this.q);
+    for (const e of D.list) {
+      if (!e.alive) continue;
+      if (e.type === 'kaiju' && e.state !== 'leave') out.push({ x: e.x, y: 35, z: e.z, r: 12, hit: (n) => { if (e.state === 'leave') return; e.hp -= n; if (Math.random() < 0.15) this.g.fire.burst(e.x, 30 + Math.random() * 15, e.z, 3, 1); if (e.hp <= 0) e.retreat('The monster is hurt and retreating out of the city!'); } }); // a round at a time: no big burst each
+      if (e.type === 'aliens') {
+        for (const s of e.saucers) if (s.state === 'cruise' || s.state === 'act') out.push({ x: s.x, y: s.y, z: s.z, r: 6, hit: (n) => { s.hp -= n; this.g.fire.burst(s.x, s.y, s.z, 2, 0.6); if (s.hp <= 0) { e.shootDown(s); this.tip('Saucer down!'); } } });
+        for (const tr of e.tripods) if (!tr.gone && tr.state !== 'fall' && tr.state !== 'wreck') out.push({ x: tr.x, y: Math.max(12, (tr.y || 30) - 4), z: tr.z, r: 8, hit: (n) => tr.damage(n) });
+      }
+      if (e.type === 'haboob' && e.devils) for (const v of e.devils.list) if (!v.dead && e.sw.inCity(v.x, v.z, 40)) out.push({ x: v.x, y: v.h * 0.4, z: v.z, r: v.r * 0.5, hit: (n) => { v.hp = (v.hp ?? 30) - n; if (v.hp <= 0 && !v.dead) this.killDevil(e, v, 'Shot it to pieces!'); } });
+    }
+    let best = null, bd = range;
+    for (const t of out) { const dx = t.x - p.x, dy = t.y - p.y, dz = t.z - p.z, d = Math.hypot(dx, dy, dz) || 1; if (d < bd && (dx * _f.x + dy * _f.y + dz * _f.z) / d > 0.988) { bd = d; best = t; } }
+    return best;
+  }
+  tracerStep(h) {
+    if (!this.tracer) return;
+    for (const s of this.shots) s.t -= h; if (this.shots.length) this.shots = this.shots.filter(s => s.t > 0).slice(-32);
+    const a = this.tracer.geometry.attributes.position; this.shots.forEach((s, i) => { a.setXYZ(i * 2, s.a[0], s.a[1], s.a[2]); a.setXYZ(i * 2 + 1, s.b[0], s.b[1], s.b[2]); });
+    a.needsUpdate = true; this.tracer.geometry.setDrawRange(0, this.shots.length * 2);
   }
   // the nearest danger, for the HUD
   note(name, d) { if (!this.threat || d < this.threat.d) this.threat = { name, d }; }

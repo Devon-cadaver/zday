@@ -14,6 +14,18 @@ const STARS = '<g fill="#fff" opacity=".7"><circle cx="8" cy="6" r=".6"/><circle
 const svg = (s) => '<svg viewBox="0 0 96 54" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' + s + '</svg>';
 
 export const THUMB = {
+  a10: svg(sky('a10', '#7fb4e0', '#d6ebf7') + town('#5a6a7a', '#fff2b0') + ground('#7a8a6a') + '<path d="M10 30h14M8 36h12" stroke="#fff" stroke-width="1" opacity=".7"/>' +
+    '<g fill="#7a8468"><rect x="30" y="17" width="38" height="5" rx="2.5"/><rect x="44" y="8" width="6" height="24" rx="1"/><rect x="28" y="13" width="3" height="13" rx="1"/></g><g fill="#5e665a"><circle cx="36" cy="14" r="2.6"/><circle cx="36" cy="25" r="2.6"/></g>' +
+    '<path d="M68 19.5 L74 19.5" stroke="#3a3a3a" stroke-width="1.4"/><rect x="60" y="18.2" width="4" height="2.6" rx="1.2" fill="#2b4a66"/><path d="M74 19.5 L92 17 M74 19.5 L92 21" stroke="#ffd36b" stroke-width=".8"/>'),
+  seeder: svg(sky('seeder', '#9cc8ec', '#e4f1fb') + town('#5a6f8a', '#fff2b0') + ground('#7a8a6a') + '<g stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".85"><path d="M4 9 L40 9"/><path d="M4 31 L40 31"/></g>' +
+    '<rect x="36" y="18" width="32" height="4" rx="2" fill="#f4f4f0"/><rect x="46" y="6" width="5" height="28" rx="1" fill="#f4f4f0"/><g fill="#e0b030"><rect x="46" y="5" width="5" height="2.5"/><rect x="46" y="32.5" width="5" height="2.5"/></g>' +
+    '<g fill="#d8d8d4"><rect x="50" y="10.5" width="7" height="3" rx="1.5"/><rect x="50" y="26.5" width="7" height="3" rx="1.5"/></g><g fill="#cfd4da" opacity=".7"><ellipse cx="58" cy="12" rx=".8" ry="4"/><ellipse cx="58" cy="28" rx=".8" ry="4"/></g><rect x="35" y="15" width="3" height="10" rx="1" fill="#f4f4f0"/>'),
+  b2: svg(sky('b2', '#3a2a5a', '#c47a5a') + town('#2a1f30', '#ffd77a') + ground('#3a2a30') +
+    '<path d="M48 10 L84 30 L76 32 L68 28 L62 32 L55 28 L48 32 L41 28 L34 32 L28 28 L20 32 L12 30 Z" fill="#3a3e44"/><path d="M48 10 L56 15 L48 18 L40 15 Z" fill="#2d3136"/><g fill="#2a2a2a"><ellipse cx="48" cy="38" rx="1.4" ry="2.6"/></g>'),
+  b52: svg(sky('b52', '#8aa8c4', '#e8dcc4') + town('#5a5a62', '#ffe9a0') + ground('#7a7466') +
+    '<path d="M48 16 L86 32 L86 35 L48 25 L10 35 L10 32 Z" fill="#7a8088"/><rect x="45" y="4" width="6" height="34" rx="3" fill="#8d939a"/><path d="M48 33 L58 38 L58 39.5 L48 37 L38 39.5 L38 38 Z" fill="#7a8088"/>' +
+    '<g fill="#5e666c"><rect x="26" y="25" width="2.4" height="5" rx="1"/><rect x="18" y="28.5" width="2.4" height="5" rx="1"/><rect x="67.6" y="25" width="2.4" height="5" rx="1"/><rect x="75.6" y="28.5" width="2.4" height="5" rx="1"/></g>' +
+    '<g fill="#2a2c30"><ellipse cx="40" cy="42" rx="1" ry="1.8"/><ellipse cx="46" cy="44" rx="1" ry="1.8"/><ellipse cx="52" cy="42" rx="1" ry="1.8"/><ellipse cx="58" cy="44" rx="1" ry="1.8"/></g>'),
   tank: svg(sky('tank', '#8fb0c8', '#e3d8bc') + town('#6a6458', '#ffe9a0', [3, 4, 5]) + ground('#7a7466') + '<g fill="#e8e0c8" opacity=".8"><circle cx="66" cy="18" r="5"/><circle cx="72" cy="15" r="4"/></g><path d="M58 21 L66 18" stroke="#ffd36b" stroke-width="1.4"/>' +
     '<rect x="24" y="40" width="34" height="6" rx="3" fill="#2a2c24"/><g fill="#4a4f3a"><circle cx="28" cy="43" r="2"/><circle cx="35" cy="43" r="2"/><circle cx="42" cy="43" r="2"/><circle cx="49" cy="43" r="2"/><circle cx="55" cy="43" r="2"/></g>' +
     '<path d="M22 40 L26 34 L58 34 L61 40 Z" fill="#5f6b45"/><path d="M32 34 L35 28 L48 28 L50 34 Z" fill="#6d7a50"/><rect x="47" y="29.5" width="16" height="1.8" fill="#3f4630" transform="rotate(-8 47 30)"/><circle cx="39" cy="27.5" r="1.6" fill="#3f4630"/>'),
