@@ -85,7 +85,7 @@ export class Drive {
     this.kind = kind === 'tank' ? 'tank' : 'cop';
     this.saved = { far: camera.far, fov: camera.fov, dof: post.opts.dof, see: SEE.on };
     camera.far = 3000; post.opts.dof = false; controls.enabled = false; g.setFollow(-1);
-    this.cop = copModel(); scene.add(this.cop); this.parked = []; this.shells = []; this.tracers = []; this.coolT = 0; this.spillT = 0;
+    this.cop = copModel(); scene.add(this.cop); this.parked = []; this.shells = []; this.tracers = []; this.coolT = 0; this.spillT = 0; this.rounds = 6; this.reloadT = 0;
     // a crossing near the middle of town
     const mx = city.sx[Math.floor(city.sx.length / 2)], mz = city.sz[Math.floor(city.sz.length / 2)];
     this.yaw = 0; this.camYaw = 0; this.aim = 0; this.v = 0; this.ix = this.iy = 0; this.walkT = 0;
@@ -96,30 +96,28 @@ export class Drive {
     }
     if (this.ride) this.pos.set(this.ride.x, 0, this.ride.z);
     this.ui(); this.active = true; document.body.classList.add('zd-flying'); this.setView(this.view); this.snap = true;
-    this.tip(this.kind === 'tank' ? 'Left thumb drives, a drag on the right turns the gun. Fire!' : 'Left thumb walks, a drag on the right looks round. Get in a car nearby, or shoot zombies');
+    this.tip(this.kind === 'tank' ? 'Press anywhere to drive; a second finger turns the gun. Fire!' : 'Press anywhere and walk; he shoots any zombie he points at. Get in a car nearby');
   }
   makeRide(type, x, z, yaw) { const R = RIDES[type], obj = R.model(); obj.traverse(o => { if (o.isMesh) o.castShadow = true; }); this.g.disasters.ctx.scene.add(obj); const r = { type, R, obj, x, z, yaw }; obj.position.set(x, this.groundY(x, z), z); obj.rotation.y = yaw; return r; }
   groundY(x, z) { return this.g.people ? this.g.people.groundY(x, z) : 0; }
   ui() {
     if (!document.getElementById('zd-drive-css')) { const s = document.createElement('style'); s.id = 'zd-drive-css'; s.textContent = CSS; document.head.appendChild(s); }
     const R = this.ctx.renderer.domElement, ov = this.ov = document.createElement('div'); ov.id = 'zd-drive';
-    ov.innerHTML = '<div class="ret"></div><div class="stick"><div class="knob"></div></div><div class="hud"></div><div class="tip"></div><div class="half" style="left:18%">MOVE</div><div class="half" style="right:18%">' + (this.kind === 'tank' ? 'AIM' : 'LOOK') + '</div>';
+    ov.innerHTML = '<div class="ret"></div><div class="stick"><div class="knob"></div></div><div class="hud"></div><div class="tip"></div>';
     R.parentNode.insertBefore(ov, R.nextSibling);
     this.hud = ov.querySelector('.hud'); this.stickEl = ov.querySelector('.stick'); this.knob = ov.querySelector('.knob'); this.tipEl = ov.querySelector('.tip');
-    setTimeout(() => ov.querySelectorAll('.half').forEach(h => { h.style.opacity = '0'; }), 4000);
     const bar = this.bar = document.createElement('div'); bar.id = 'zd-drivebar';
-    bar.innerHTML = '<button type="button" class="zd-btn fire" data-d="fire">Fire</button>' + (this.kind === 'cop' ? '<button type="button" class="zd-btn" data-d="door">Get in</button><button type="button" class="zd-btn" data-d="spill">Zombies</button>' : '') +
+    bar.innerHTML = (this.kind === 'tank' ? '<button type="button" class="zd-btn fire" data-d="fire">Fire</button>' : '') + (this.kind === 'cop' ? '<button type="button" class="zd-btn" data-d="door">Get in</button><button type="button" class="zd-btn" data-d="spill">Zombies</button>' : '') +
       '<button type="button" class="zd-btn" data-d="view"></button><button type="button" class="zd-btn exit" data-d="exit">Stop</button>';
     document.body.appendChild(bar);
     this.fireBtn = bar.querySelector('[data-d="fire"]'); this.doorBtn = bar.querySelector('[data-d="door"]'); this.viewBtn = bar.querySelector('[data-d="view"]');
-    this.fireBtn.onclick = () => this.fire(); if (this.doorBtn) this.doorBtn.onclick = () => this.door();
+    if (this.fireBtn) this.fireBtn.onclick = () => this.fire(); if (this.doorBtn) this.doorBtn.onclick = () => this.door();
     const sp = bar.querySelector('[data-d="spill"]'); if (sp) sp.onclick = () => this.spill();
     this.viewBtn.onclick = () => this.setView(this.view === 'third' ? 'first' : 'third'); bar.querySelector('[data-d="exit"]').onclick = () => this.stop();
-    // two thumbs: the left half a stick from where it lands, the right half drags the aim
+    // a stick wherever the first finger comes down (Sean); a second finger drags the aim (the tank's gun) or the view
     const touches = new Map();
     ov.addEventListener('pointerdown', (e) => {
-      const left = e.clientX < innerWidth / 2;
-      if (left && [...touches.values()].some(t => t.left)) return;
+      const left = ![...touches.values()].some(t => t.left); // the first finger down is the stick
       touches.set(e.pointerId, { left, x: e.clientX, y: e.clientY, lx: e.clientX });
       if (left) { this.stickEl.style.display = 'block'; this.stickEl.style.left = e.clientX + 'px'; this.stickEl.style.top = e.clientY + 'px'; this.knob.style.transform = ''; }
       try { ov.setPointerCapture(e.pointerId); } catch (er) { /* fine */ } e.preventDefault();
@@ -219,15 +217,23 @@ export class Drive {
       g.fire.burst(mz.x, mz.y, mz.z, 6, 1.2); sfx('boom', mz.x, mz.y, mz.z, { gain: 0.7 }); g.shake = Math.max(g.shake || 0, 0.25); this.kick = 1;
       return;
     }
-    if (this.mode !== 'foot') { this.tip('Get out of the car to shoot'); return; }
-    // the pistol: the nearest zombie within reach in front of the officer; nobody else is ever hit
-    this.coolT = 0.35; this.yaw = this.camYaw; this.aimT = 0.6;
-    const P = g.people, [fx, fz] = fwd(this.camYaw), x = this.pos.x, z = this.pos.z; let best = -1, bd = 45;
-    P.around(x, z, 45, (j) => {
+    if (this.mode !== 'foot') this.tip('Get out of the car to shoot'); // on foot the revolver fires by itself (revolver)
+  }
+  // the officer's six-shooter (Sean: walk and point, it fires by itself): a zombie in his sights (about 10 degrees either
+  // side of the way he faces, within 40 m) gets a round every half second; after six it reloads itself, 3 s, the zombies
+  // coming on meanwhile. Nobody else is ever hit
+  revolver(h) {
+    if (this.reloadT > 0) { this.reloadT -= h; if (this.reloadT <= 0) { this.rounds = 6; sfx('thud', this.pos.x, 1, this.pos.z, { gain: 0.3, rate: 2 }); } return; }
+    if (this.coolT > 0) return;
+    const g = this.g, scene = g.disasters.ctx.scene, P = g.people, yaw = this.view === 'first' ? this.camYaw : this.yaw, [fx, fz] = fwd(yaw), x = this.pos.x, z = this.pos.z; let best = -1, bd = 40;
+    P.around(x, z, 40, (j) => {
       if (P.st[j] !== ST.ZOMBIE) return;
-      const dx = P.x[j] - x, dz = P.z[j] - z, d = Math.hypot(dx, dz) || 1; if ((dx * fx + dz * fz) / d < 0.95 || d >= bd) return; // within about 18 degrees
+      const dx = P.x[j] - x, dz = P.z[j] - z, d = Math.hypot(dx, dz) || 1; if ((dx * fx + dz * fz) / d < 0.985 || d >= bd) return;
       bd = d; best = j;
     });
+    if (best < 0) return;
+    this.coolT = 0.5; this.aimT = 0.6; this.rounds--;
+    if (this.rounds <= 0) { this.reloadT = 3; this.tip('Reloading...'); }
     const tx = best >= 0 ? P.x[best] : x + fx * 30, tz = best >= 0 ? P.z[best] : z + fz * 30, ty = best >= 0 ? P.y[best] + 1.2 : 1.3;
     P.events.push({ type: 'shot', x, z, tx, tz }); // the bang, and the zombies near hear it
     if (best >= 0 && P.r() < 0.9) P.kill(best, (tx - x) * 0.5, (tz - z) * 0.5, 'shot');
@@ -262,7 +268,7 @@ export class Drive {
       if (this.shells.length) this.shellStep(dt);
       for (const t of this.tracers) t.t -= dt;
       if (this.tracers.some(t => t.t <= 0)) this.tracers = this.tracers.filter(t => { if (t.t <= 0) { g.disasters.ctx.scene.remove(t.m); t.m.geometry.dispose(); t.m.material.dispose(); } return t.t > 0; });
-      if (this.mode === 'foot') this.walk(dt, ix, iy); else this.drive(dt, ix, iy);
+      if (this.mode === 'foot') { this.walk(dt, ix, iy); if (this.kind === 'cop') this.revolver(dt); } else this.drive(dt, ix, iy);
     }
     // where things are drawn
     const y = this.groundY(this.pos.x, this.pos.z);
@@ -296,9 +302,9 @@ export class Drive {
     if ((this.hudT = (this.hudT || 0) - dt) <= 0) {
       this.hudT = 0.2;
       const near = this.mode === 'foot' && this.kind === 'cop' ? this.nearRide() : null;
-      this.hud.textContent = this.mode === 'foot' ? 'POLICE OFFICER · ON FOOT · ' + g.people.stats.zombies + ' zombies' : ride.R.name.toUpperCase() + ' · ' + Math.round(Math.abs(this.v) * KMH) + ' km/h';
+      this.hud.textContent = this.mode === 'foot' ? 'OFFICER \u00B7 ' + (this.reloadT > 0 ? 'reloading' : '\u25CF'.repeat(this.rounds) + '\u25CB'.repeat(6 - this.rounds)) + ' \u00B7 ' + g.people.stats.zombies + ' zombies' : ride.R.name.toUpperCase() + ' · ' + Math.round(Math.abs(this.v) * KMH) + ' km/h';
       if (this.doorBtn) { this.doorBtn.textContent = this.mode === 'ride' ? 'Get out' : near ? 'Get in' : 'Get in'; this.doorBtn.classList.toggle('off', this.mode === 'foot' && !near); }
-      this.fireBtn.classList.toggle('wait', this.coolT > 0 || (this.mode === 'ride' && !tank)); this.fireBtn.classList.toggle('off', this.mode === 'ride' && !tank);
+      if (this.fireBtn) this.fireBtn.classList.toggle('wait', this.coolT > 0);
       if (g.audio) g.audio.engine(ride ? (tank ? 'tank' : 'car') : null, Math.min(1, Math.abs(this.v) / (ride ? ride.R.max : 1)));
     }
   }
@@ -308,7 +314,8 @@ export class Drive {
     if (m < 0.1) return;
     const [fx, fz] = fwd(this.camYaw), sx = -fz, sz = fx; // the camera's forward and its right
     const wx = fx * iy + sx * ix, wz = fz * iy + sz * ix, wl = Math.hypot(wx, wz) || 1;
-    if (this.view === 'first') this.yaw = this.camYaw; else if ((this.aimT || 0) <= 0) { const want = Math.atan2(-wz, wx); let d = want - this.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); this.yaw += d * Math.min(1, h * 10); }
+    if (this.view === 'first') this.yaw = this.camYaw; else { const want = Math.atan2(-wz, wx); let d = want - this.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); this.yaw += d * Math.min(1, h * 10); // he faces the way he walks (and shoots that way)
+      if (iy > -0.3) { let c = this.yaw - this.camYaw; c = Math.atan2(Math.sin(c), Math.cos(c)); this.camYaw += c * Math.min(1, h * 1.8); } } // the camera swings round behind him
     this.walkT += h; this.step(this.pos.x + wx / wl * WALK * m * h, this.pos.z + wz / wl * WALK * m * h, 0.35);
   }
   // in a car or the tank: the stick's up and down the throttle (and reverse), its sides the steering (the tank turns on the spot)

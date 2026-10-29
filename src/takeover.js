@@ -135,9 +135,10 @@ export class TakeOver {
     camera.fov = 60; camera.far = 4000; camera.updateProjectionMatrix(); post.opts.dof = false; controls.enabled = false; g.setFollow(-1);
     const [x, , z] = K.at(u); this.camYaw = K.face ? K.face(u) : Math.atan2(-(z - camera.position.z), x - camera.position.x); this.zoom = 1; this.ix = this.iy = 0; this.snap = true; this.pos = new THREE.Vector3(x, 0, z); // the camera behind it, the way it faces
     this.ui(); this.active = true; document.body.classList.add('zd-flying');
-    this.tip('You are the ' + K.name.toLowerCase() + '. Left thumb moves, drag on the right to look round');
+    this.tip('You are the ' + K.name.toLowerCase() + '. Press anywhere to move; a second finger turns the view and zooms');
   }
   ui() {
+    this.css(); // (also when started straight away, without the pick)
     const R = this.ctx.renderer.domElement, ov = this.ov = document.createElement('div'); ov.id = 'zd-take';
     ov.innerHTML = '<div class="stick"><div class="knob"></div></div><div class="hud"></div><div class="tip"></div>';
     R.parentNode.insertBefore(ov, R.nextSibling);
@@ -147,20 +148,18 @@ export class TakeOver {
     document.body.appendChild(bar);
     bar.querySelectorAll('[data-a]').forEach(b => { b.onclick = () => { const [fx, fz] = fwd(this.camYaw); this.K.acts[+b.dataset.a][1](this.u, fx, fz); }; });
     bar.querySelector('[data-t="stop"]').onclick = () => this.stop();
-    const touches = new Map(); let pinch = null;
+    const touches = new Map(); // a stick wherever the first finger comes down (Sean); a second finger turns the view (sideways) and zooms (up and down)
     ov.addEventListener('pointerdown', (e) => {
-      const left = e.clientX < innerWidth / 2; touches.set(e.pointerId, { left, x: e.clientX, y: e.clientY, lx: e.clientX });
-      if (touches.size === 2) { const [a, b] = [...touches.values()]; pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, z: this.zoom }; }
-      else if (left) { this.stickEl.style.display = 'block'; this.stickEl.style.left = e.clientX + 'px'; this.stickEl.style.top = e.clientY + 'px'; this.knob.style.transform = ''; }
+      const left = ![...touches.values()].some(t => t.left); touches.set(e.pointerId, { left, x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY });
+      if (left) { this.stickEl.style.display = 'block'; this.stickEl.style.left = e.clientX + 'px'; this.stickEl.style.top = e.clientY + 'px'; this.knob.style.transform = ''; }
       try { ov.setPointerCapture(e.pointerId); } catch (er) { /* fine */ } e.preventDefault();
     });
     ov.addEventListener('pointermove', (e) => {
       const t = touches.get(e.pointerId); if (!t) return;
-      if (pinch && touches.size === 2) { t.x = e.clientX; t.y = e.clientY; const [a, b] = [...touches.values()]; this.zoom = Math.max(0.4, Math.min(3, pinch.z * pinch.d / (Math.hypot(a.x - b.x, a.y - b.y) || 1))); this.ix = this.iy = 0; this.stickEl.style.display = 'none'; return; }
       if (t.left) { const dx = Math.max(-1, Math.min(1, (e.clientX - t.x) / 60)), dy = Math.max(-1, Math.min(1, (e.clientY - t.y) / 60)); this.ix = dx; this.iy = -dy; this.knob.style.transform = 'translate(' + dx * 27 + 'px,' + dy * 27 + 'px)'; }
-      else { this.camYaw -= (e.clientX - t.lx) * 0.006; t.lx = e.clientX; }
+      else { this.camYaw -= (e.clientX - t.lx) * 0.006; this.zoom = Math.max(0.4, Math.min(3, this.zoom * Math.exp((e.clientY - t.ly) * 0.004))); t.lx = e.clientX; t.ly = e.clientY; }
     });
-    const up = (e) => { const t = touches.get(e.pointerId); if (!t) return; touches.delete(e.pointerId); if (touches.size < 2) pinch = null; if (t.left) { this.ix = this.iy = 0; this.stickEl.style.display = 'none'; } };
+    const up = (e) => { const t = touches.get(e.pointerId); if (!t) return; touches.delete(e.pointerId); if (t.left) { this.ix = this.iy = 0; this.stickEl.style.display = 'none'; } };
     ov.addEventListener('pointerup', up); ov.addEventListener('pointercancel', up);
     ov.addEventListener('wheel', (e) => { e.preventDefault(); this.zoom = Math.max(0.4, Math.min(3, this.zoom * Math.exp(e.deltaY * 0.0012))); }, { passive: false });
     this.keys = new Set();

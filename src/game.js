@@ -159,7 +159,7 @@ const CSS = `
 #zd-menu .ufo .mode .hi{fill:none;stroke:rgba(255,255,255,.35);stroke-width:1px;vector-effect:non-scaling-stroke;pointer-events:none}
 #zd-menu .ufo .mode:active > svg{filter:brightness(1.35) drop-shadow(0 0 6px var(--c)) drop-shadow(0 0 14px var(--g))}
 #zd-menu .ufo .mode .lab{position:absolute;z-index:2;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:2px;width:max-content;white-space:nowrap;text-align:center;pointer-events:none;text-transform:uppercase;opacity:1;font-size:8.5px} /* the title in capitals, the line under it as it is (.mode span) */
-#zd-menu .ufo .mode b{font-size:11px;letter-spacing:0;font-weight:900;line-height:1.05}#zd-menu .ufo .mode span{font-size:8.5px;font-weight:600;text-transform:none;opacity:.92}
+#zd-menu .ufo .mode b{font-size:12.5px;letter-spacing:.02em;font-weight:900;line-height:1.05}#zd-menu .ufo .mode span{font-size:8.5px;font-weight:600;text-transform:none;opacity:.92}
 #zd-menu .ufo .mode .lab svg{width:22px;height:22px;filter:drop-shadow(0 0 4px rgba(255,255,255,.7))}
 #zd-menu .ufo .mode[data-play="commander"]{--c:#4fc3ff;--c1:#1f6fe6;--c2:#0a2a72;--g:rgba(79,195,255,.45)}
 #zd-menu .ufo .mode[data-go="be"]{--c:#ff4a78;--c1:#d6164a;--c2:#5a061f;--g:rgba(255,74,120,.45)}
@@ -168,8 +168,11 @@ const CSS = `
 #zd-menu .ufo .orbfire{position:absolute;left:50%;top:88.7%;width:9%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;border:0;padding:0;background:none;cursor:pointer;touch-action:none;-webkit-tap-highlight-color:transparent;transition:box-shadow .2s}
 #zd-menu .ufo .orbfire.charge{box-shadow:0 0 14px 4px rgba(120,220,255,.85),inset 0 0 10px rgba(255,255,255,.8)}
 #zd-menu .ufo .orbfire.ready{animation:zdOrb .35s ease-in-out infinite alternate}
+#zd-menu .ufo .orbfire.mega{animation:zdOrbM .16s ease-in-out infinite alternate} /* held 15 s: the planet-buster */
+@keyframes zdOrbM{from{box-shadow:0 0 20px 8px rgba(190,90,255,.95),inset 0 0 14px #fff}to{box-shadow:0 0 38px 16px rgba(255,255,255,.95),inset 0 0 16px #e8c8ff}}
 @keyframes zdOrb{from{box-shadow:0 0 14px 5px rgba(255,80,60,.9),inset 0 0 12px rgba(255,220,200,.9)}to{box-shadow:0 0 26px 10px rgba(255,140,40,.95),inset 0 0 14px #fff}}
-#zd-menufx{position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:8}
+#zd-menufx{position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:5} /* under the menu (6): the beam passes behind the ship */
+#zd-menuflash{position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:8}
 #zd-menu .ufo .rim{position:absolute;top:83%;padding:4px 10px;min-width:0;font-size:9.5px;letter-spacing:.08em;border-radius:10px;background:rgba(10,14,26,.9);border:1px solid rgba(95,220,255,.55);color:#bff4ff;box-shadow:0 0 8px rgba(95,220,255,.35)}
 #zd-menu .ufo .rim.l{left:27%}#zd-menu .ufo .rim.r{right:27%}
 #zd-menu .box.saucer .xp{margin:6px 10px 0;padding:8px 14px 9px;background:linear-gradient(180deg,rgba(14,20,36,.92),rgba(6,9,18,.94));border:1px solid rgba(95,220,255,.6);box-shadow:0 0 12px rgba(60,180,255,.3),inset 0 0 10px rgba(60,180,255,.12);
@@ -293,7 +296,8 @@ const WEDGE = (() => {
     const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]), x0 = Math.min(...xs) - 3, y0 = Math.min(...ys) - 3, x1 = Math.max(...xs) + 3, y1 = Math.max(...ys) + 3;
     const c = [at(OUT, a0), at(OUT, a1), at(IN, a0), at(IN, a1)], cx = c.reduce((s, p) => s + p[0], 0) / 4, cy = c.reduce((s, p) => s + p[1], 0) / 4 + 2;
     const mid = (Math.abs(at(IN, a1)[0] - at(IN, a0)[0]) + Math.abs(at(OUT, a1)[0] - at(OUT, a0)[0])) / 2; // its width half way up: the label fits in that
-    return { d: 'M' + pts.map(p => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join('L') + 'Z', box: [x0, y0, x1 - x0, y1 - y0].map(v => +v.toFixed(1)), lab: [(cx - x0) / (x1 - x0) * 100, (cy - y0) / (y1 - y0) * 100, mid * 0.86 / (x1 - x0) * 100] };
+    const o0 = at(OUT, a0), o1 = at(OUT, a1), tilt = Math.atan2((o1[1] - o0[1]) * 248 / 230, o1[0] - o0[0]) * 180 / Math.PI; // its bottom edge's slope on the screen (the saucer is drawn 400 x 248)
+    return { d: 'M' + pts.map(p => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join('L') + 'Z', box: [x0, y0, x1 - x0, y1 - y0].map(v => +v.toFixed(1)), lab: [(cx - x0) / (x1 - x0) * 100, (cy - y0) / (y1 - y0) * 100, mid * 0.86 / (x1 - x0) * 100, tilt] };
   });
 })();
 // the band the panels are set in: dark metal round the front of the deck, a little wider than them every way, with a lit
@@ -322,7 +326,7 @@ const wedgeBtn = (i, attr, inner) => {
   return '<button class="zd-btn mode' + (i === 0 ? ' main' : '') + '" type="button" ' + attr + ' style="left:' + (x / 4).toFixed(2) + '%;top:' + (y / 2.3).toFixed(2) + '%;width:' + (w / 4).toFixed(2) + '%;height:' + (h / 2.3).toFixed(2) + '%">' +
     '<svg viewBox="' + W.box.join(' ') + '" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="zw' + i + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--c1)"/><stop offset="1" style="stop-color:var(--c2)"/></linearGradient></defs>' +
     '<path class="bez" d="' + W.d + '"/><path class="pan" d="' + W.d + '" fill="url(#zw' + i + ')"/><path class="hi" d="' + W.d + '" transform="translate(0 1.2)"/></svg>' +
-    '<span class="lab" style="left:' + W.lab[0].toFixed(1) + '%;top:' + W.lab[1].toFixed(1) + '%' + (i === 0 || i === 3 ? ';transform:translate(-50%,-50%) rotate(' + (i === 0 ? 8 : -8) + 'deg)' : '') + '">' + inner + '</span></button>';
+    '<span class="lab" style="left:' + W.lab[0].toFixed(1) + '%;top:' + W.lab[1].toFixed(1) + '%;transform:translate(-50%,-50%) rotate(' + W.lab[3].toFixed(1) + 'deg)">' + inner + '</span></button>';
 };
 const SAUCER = '<svg class="hull" viewBox="0 0 400 230" preserveAspectRatio="none" aria-hidden="true"><defs>' +
   '<radialGradient id="ufH" cx="50%" cy="22%" r="78%"><stop offset="0" stop-color="#8f9bbd"/><stop offset=".42" stop-color="#434b63"/><stop offset="1" stop-color="#151925"/></radialGradient>' +
@@ -347,6 +351,7 @@ const SAUCER = '<svg class="hull" viewBox="0 0 400 230" preserveAspectRatio="non
   '<path d="M126 55 Q128 10 200 7 Q272 10 274 55 Q200 70 126 55Z" fill="url(#ufD)" stroke="#6c7896" stroke-width="1.2"/>' + // the dome
   '<path d="M150 30 Q200 14 250 30" fill="none" stroke="rgba(255,255,255,.28)" stroke-width="2"/>' +
   '<path d="M136 49 A64 7 0 0 0 264 49" fill="none" stroke="#a8f2ff" stroke-width="3.2" stroke-linecap="round" stroke-dasharray="0.5 12.5" class="spin s4"/>' + // the dome's lights going round
+  '<path d="M189 210 L211 210 L207 220 L193 220 Z" fill="#151925" stroke="#3a4258" stroke-width="1.4"/><rect x="197.5" y="219" width="5" height="8" rx="1.2" fill="#2a3044" stroke="#4a5470" stroke-width="1"/><circle cx="200" cy="227" r="1.6" fill="#8ff0ff"/>' + // the gun under the belly (the orb fires it)
   '<circle cx="200" cy="204" r="22" fill="#1e8cff" opacity=".35" filter="url(#ufG)"/><circle cx="200" cy="204" r="14" fill="#141826" stroke="#3a4258" stroke-width="3"/><circle cx="200" cy="204" r="11" fill="url(#ufO)"/>' + // the beam orb
   '</svg>';
 const MICON = {
@@ -430,47 +435,99 @@ export class Game {
   // the menu saucer's orb (Sean's Easter egg): a tap fires a laser blast from the front of the ship onto the planet; held a
   // second (it glows, then pulses red) and let go, it drops a nuke there. Only light and sound: nothing on the map
   orbFire(btn) {
-    let t0 = 0, rdy = 0;
-    btn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); t0 = performance.now(); btn.classList.add('charge'); try { btn.setPointerCapture(e.pointerId); } catch (er) { /* fine */ } clearTimeout(rdy); rdy = setTimeout(() => btn.classList.add('ready'), 1000); });
-    const go = (e) => { if (!t0) return; e.stopPropagation(); const held = performance.now() - t0; t0 = 0; clearTimeout(rdy); btn.classList.remove('charge', 'ready'); this.menuShot(held >= 1000 ? 'nuke' : 'laser', btn); };
-    btn.addEventListener('pointerup', go); btn.addEventListener('pointercancel', () => { t0 = 0; clearTimeout(rdy); btn.classList.remove('charge', 'ready'); });
+    let t0 = 0, rdy = 0, mega = 0;
+    const calm = () => { t0 = 0; clearTimeout(rdy); clearTimeout(mega); btn.classList.remove('charge', 'ready', 'mega'); };
+    btn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); calm(); t0 = performance.now(); btn.classList.add('charge'); try { btn.setPointerCapture(e.pointerId); } catch (er) { /* fine */ } rdy = setTimeout(() => btn.classList.add('ready'), 1000); mega = setTimeout(() => { btn.classList.remove('ready'); btn.classList.add('mega'); }, 15000); });
+    const go = (e) => { if (!t0) return; e.stopPropagation(); const held = performance.now() - t0; calm(); if (held >= 15000) this.planetBuster(btn); else this.menuShot(held >= 1000 ? 'nuke' : 'laser', btn); }; // held 15 s: the whole planet
+    btn.addEventListener('pointerup', go); btn.addEventListener('pointercancel', calm);
     btn.addEventListener('click', (e) => e.stopPropagation());
   }
   menuShot(kind, btn) {
     const G = this.globe; if (!G || !G.screenPoint) return;
     const NS = 'http://www.w3.org/2000/svg', el = (tag, at) => { const n = document.createElementNS(NS, tag); for (const k in at) n.setAttribute(k, at[k]); return n; };
-    let fx = document.getElementById('zd-menufx');
-    if (!fx) { fx = el('svg', { id: 'zd-menufx' }); fx.innerHTML = '<defs><radialGradient id="zfxB"><stop offset="0" stop-color="#fff"/><stop offset=".35" stop-color="#b8f6ff"/><stop offset="1" stop-color="#36c8ff" stop-opacity="0"/></radialGradient><radialGradient id="zfxN"><stop offset="0" stop-color="#fff"/><stop offset=".3" stop-color="#ffe9a0"/><stop offset=".65" stop-color="#ff7a2e"/><stop offset="1" stop-color="#c22a10" stop-opacity="0"/></radialGradient></defs>'; document.body.appendChild(fx); }
-    const r = btn.getBoundingClientRect(), x0 = r.left + r.width / 2, y0 = r.top + r.height * 0.35, [x1, y1] = G.screenPoint(kind === 'nuke' ? 0.35 : 0.55), pr = G.screenRadius(), nuke = kind === 'nuke';
+    const layer = (id, defs) => { let l = document.getElementById(id); if (!l) { l = el('svg', { id }); l.innerHTML = '<defs>' + defs + '</defs>'; document.body.appendChild(l); } return l; };
+    const fx = layer('zd-menufx', '<radialGradient id="zfxB"><stop offset="0" stop-color="#fff"/><stop offset=".35" stop-color="#b8f6ff"/><stop offset="1" stop-color="#36c8ff" stop-opacity="0"/></radialGradient><radialGradient id="zfxN"><stop offset="0" stop-color="#fff"/><stop offset=".3" stop-color="#ffe9a0"/><stop offset=".65" stop-color="#ff7a2e"/><stop offset="1" stop-color="#c22a10" stop-opacity="0"/></radialGradient>'); // under the menu: the beam passes behind the ship
+    const top = layer('zd-menuflash', '<radialGradient id="zfxM"><stop offset="0" stop-color="#fff"/><stop offset=".4" stop-color="#9af0ff"/><stop offset="1" stop-color="#36c8ff" stop-opacity="0"/></radialGradient>'); // over everything: the muzzle flash, the nuke's white
+    const u = btn.closest('.ufo').getBoundingClientRect(), x0 = u.left + u.width * 0.5, y0 = u.top + u.height * 226 / 230; // the gun's muzzle under the belly (the hull's 400 x 230)
+    const nuke = kind === 'nuke', [x1, y1] = G.screenPoint(nuke ? 0.35 : 0.55), pr = G.screenRadius();
     const glow = el('line', { x1: x0, y1: y0, x2: x1, y2: y1, stroke: nuke ? '#ff6ad5' : '#36c8ff', 'stroke-width': nuke ? 14 : 8, 'stroke-linecap': 'round', opacity: 0.55 });
     const core = el('line', { x1: x0, y1: y0, x2: x1, y2: y1, stroke: '#fff', 'stroke-width': nuke ? 4.5 : 2.5, 'stroke-linecap': 'round' });
-    fx.append(glow, core);
+    const muzzle = el('circle', { cx: x0, cy: y0, r: nuke ? 16 : 10, fill: 'url(#zfxM)' });
+    fx.append(glow, core); top.appendChild(muzzle);
     const cam = this.camera.position, A = this.audio; if (A) A.play(nuke ? 'laser' : 'zap', cam.x, cam.y, cam.z, { gain: 0.8, rate: nuke ? 0.7 : 1.2 });
-    const parts = [glow, core], beam = nuke ? 520 : 240, start = performance.now();
-    const hit = (n) => { const c = el('circle', { cx: x1, cy: y1, r: 0, fill: 'url(#' + (nuke ? 'zfxN' : 'zfxB') + ')' }); fx.appendChild(c); parts.push(c); return c; };
-    let flash = null, ball = null, ring = null, white = null, cloud = null;
-    if (!nuke) flash = hit(); else { flash = hit(); ball = hit(); ring = el('circle', { cx: x1, cy: y1, r: 0, fill: 'none', stroke: '#ffe2b0', 'stroke-width': 4 }); cloud = hit(); white = el('rect', { x: 0, y: 0, width: '100%', height: '100%', fill: '#fff', opacity: 0 }); fx.append(ring, white); parts.push(ring, white); }
-    let boomed = false;
+    const parts = [glow, core, muzzle], beam = nuke ? 520 : 240, start = performance.now();
+    const hit = () => { const c = el('circle', { cx: x1, cy: y1, r: 0, fill: 'url(#' + (nuke ? 'zfxN' : 'zfxB') + ')' }); fx.appendChild(c); parts.push(c); return c; };
+    let flash = hit(), ball = null, ring = null, white = null, cloud = null, boomed = false;
+    if (nuke) { ball = hit(); ring = el('circle', { cx: x1, cy: y1, r: 0, fill: 'none', stroke: '#ffe2b0', 'stroke-width': 4 }); cloud = hit(); white = el('rect', { x: 0, y: 0, width: '100%', height: '100%', fill: '#fff', opacity: 0 }); fx.appendChild(ring); top.appendChild(white); parts.push(ring, white); }
+    const done = () => { for (const p of parts) p.remove(); };
     const step = () => {
-      const t = performance.now() - start, b = Math.min(1, t / beam);
+      const t = performance.now() - start;
       glow.setAttribute('opacity', (t < beam ? 0.55 : Math.max(0, 0.55 - (t - beam) / 300)).toFixed(2)); core.setAttribute('opacity', (t < beam ? 1 : Math.max(0, 1 - (t - beam) / 200)).toFixed(2));
-      const w = 1 + Math.sin(t * 0.08) * 0.25; glow.setAttribute('stroke-width', ((nuke ? 14 : 8) * w).toFixed(1));
+      glow.setAttribute('stroke-width', ((nuke ? 14 : 8) * (1 + Math.sin(t * 0.08) * 0.25)).toFixed(1)); muzzle.setAttribute('opacity', Math.max(0, 1 - t / (beam + 150)).toFixed(2));
       if (!nuke) { const k = Math.min(1, t / 450); flash.setAttribute('r', (6 + 26 * k).toFixed(1)); flash.setAttribute('opacity', (1 - k).toFixed(2)); if (t > 700) return done(); }
       else {
-        const u = (t - beam) / 1000; // the bomb goes off as the beam lands
-        if (u > 0) {
+        const v = (t - beam) / 1000; // it goes off as the beam lands
+        if (v > 0) {
           if (!boomed) { boomed = true; if (A) A.play('nuke', cam.x, cam.y, cam.z, { gain: 0.7 }); }
-          white.setAttribute('opacity', Math.max(0, 0.7 - u * 1.4).toFixed(2));
-          flash.setAttribute('r', (pr * 0.55 * Math.min(1, u * 4)).toFixed(1)); flash.setAttribute('opacity', Math.max(0, 1 - u * 2.2).toFixed(2));
-          ball.setAttribute('r', (pr * (0.12 + 0.24 * Math.min(1, u * 2))).toFixed(1)); ball.setAttribute('opacity', Math.max(0, 1 - u / 2.6).toFixed(2));
-          ring.setAttribute('r', (pr * 1.1 * Math.min(1, u / 1.2)).toFixed(1)); ring.setAttribute('opacity', Math.max(0, 1 - u / 1.2).toFixed(2)); ring.setAttribute('stroke-width', (5 * Math.max(0.2, 1 - u)).toFixed(1));
-          cloud.setAttribute('cy', (y1 - pr * 0.25 * Math.min(1, u)).toFixed(1)); cloud.setAttribute('r', (pr * 0.16 * Math.min(1, u * 1.5)).toFixed(1)); cloud.setAttribute('opacity', Math.max(0, 0.9 - u / 3).toFixed(2));
-          if (u > 3) return done();
+          white.setAttribute('opacity', Math.max(0, 0.7 - v * 1.4).toFixed(2));
+          flash.setAttribute('r', (pr * 0.55 * Math.min(1, v * 4)).toFixed(1)); flash.setAttribute('opacity', Math.max(0, 1 - v * 2.2).toFixed(2));
+          ball.setAttribute('r', (pr * (0.12 + 0.24 * Math.min(1, v * 2))).toFixed(1)); ball.setAttribute('opacity', Math.max(0, 1 - v / 2.6).toFixed(2));
+          ring.setAttribute('r', (pr * 1.1 * Math.min(1, v / 1.2)).toFixed(1)); ring.setAttribute('opacity', Math.max(0, 1 - v / 1.2).toFixed(2)); ring.setAttribute('stroke-width', (5 * Math.max(0.2, 1 - v)).toFixed(1));
+          cloud.setAttribute('cy', (y1 - pr * 0.25 * Math.min(1, v)).toFixed(1)); cloud.setAttribute('r', (pr * 0.16 * Math.min(1, v * 1.5)).toFixed(1)); cloud.setAttribute('opacity', Math.max(0, 0.9 - v / 3).toFixed(2));
+          if (v > 3) return done();
         }
       }
       requestAnimationFrame(step);
     };
-    const done = () => { for (const p of parts) p.remove(); };
+    requestAnimationFrame(step);
+  }
+  // held 15 s and let go (Sean): a beam like a pillar, the whole planet bursts - a white-out, a fireball, a shockwave, the
+  // pieces flying - and is gone; two seconds later a black hole opens where it was, draws the pieces back in, and the planet
+  // gathers back out of it as the hole closes. Light and sound only
+  planetBuster(btn) {
+    const G = this.globe; if (!G || !G.planetScale || this.busting) return;
+    this.busting = true;
+    const NS = 'http://www.w3.org/2000/svg', el = (tag, at) => { const n = document.createElementNS(NS, tag); for (const k in at) n.setAttribute(k, at[k]); return n; };
+    const layer = (id) => { let l = document.getElementById(id); if (!l) { l = el('svg', { id }); document.body.appendChild(l); } return l; };
+    const fx = layer('zd-menufx'), top = layer('zd-menuflash');
+    if (!document.getElementById('zfxP')) { const d = el('defs', {}); d.innerHTML = '<radialGradient id="zfxP"><stop offset="0" stop-color="#fff"/><stop offset=".25" stop-color="#fff3c0"/><stop offset=".55" stop-color="#ff8a2e"/><stop offset=".8" stop-color="#b02a18" stop-opacity=".6"/><stop offset="1" stop-color="#400" stop-opacity="0"/></radialGradient><radialGradient id="zfxH"><stop offset=".45" stop-color="#000"/><stop offset=".6" stop-color="#3a1060" stop-opacity=".8"/><stop offset="1" stop-color="#8a3bff" stop-opacity="0"/></radialGradient>'; fx.appendChild(d); }
+    const u = btn.closest('.ufo').getBoundingClientRect(), x0 = u.left + u.width * 0.5, y0 = u.top + u.height * 226 / 230, [cx, cy] = G.screenCenter(), pr = G.screenRadius();
+    const parts = [], add = (l, n) => { l.appendChild(n); parts.push(n); return n; };
+    const glow = add(fx, el('line', { x1: x0, y1: y0, x2: cx, y2: cy, stroke: '#c07bff', 'stroke-width': 30, 'stroke-linecap': 'round', opacity: 0.6 }));
+    const core = add(fx, el('line', { x1: x0, y1: y0, x2: cx, y2: cy, stroke: '#fff', 'stroke-width': 9, 'stroke-linecap': 'round' }));
+    const ball = add(fx, el('circle', { cx, cy, r: 0, fill: 'url(#zfxP)', opacity: 0 })), ring = add(fx, el('circle', { cx, cy, r: 0, fill: 'none', stroke: '#ffe2b0', 'stroke-width': 6, opacity: 0 }));
+    const hole = add(fx, el('circle', { cx, cy, r: 0, fill: 'url(#zfxH)' })), disk = add(fx, el('ellipse', { cx, cy, rx: 0, ry: 0, fill: 'none', stroke: '#ffb04a', 'stroke-width': 4, opacity: 0 }));
+    const white = add(top, el('rect', { x: 0, y: 0, width: '100%', height: '100%', fill: '#fff', opacity: 0 }));
+    const bits = []; for (let n = 0; n < 44; n++) { const a = Math.random() * Math.PI * 2, s = 0.6 + Math.random() * 1.8; bits.push({ a, s, n: add(fx, el('circle', { cx, cy, r: 1.5 + Math.random() * 3, fill: ['#ffb02e', '#8a7a6a', '#5a4a40', '#fff2c0', '#3a6a3a'][n % 5], opacity: 0 })) }); }
+    const cam = this.camera.position, A = this.audio, snd = (n, o) => { if (A) A.play(n, cam.x, cam.y, cam.z, o); };
+    snd('laser', { gain: 1, rate: 0.5 });
+    const said = {}, once = (k) => !said[k] && (said[k] = true), ease = (k) => 1 - Math.pow(1 - Math.max(0, Math.min(1, k)), 3), start = performance.now();
+    const step = () => {
+      const t = performance.now() - start;
+      // the beam, 0.8 s
+      glow.setAttribute('opacity', (t < 800 ? 0.6 : Math.max(0, 0.6 - (t - 800) / 300)).toFixed(2)); glow.setAttribute('stroke-width', (30 * (1 + Math.sin(t * 0.06) * 0.3)).toFixed(1)); core.setAttribute('opacity', (t < 800 ? 1 : Math.max(0, 1 - (t - 800) / 200)).toFixed(2));
+      // it bursts: gone at the flash
+      if (t >= 800) {
+        if (once('boom')) { snd('nuke', { gain: 1, rate: 0.8 }); G.planetScale(0); }
+        const b = t - 800;
+        white.setAttribute('opacity', Math.max(0, 1 - b / 1300).toFixed(2));
+        ball.setAttribute('r', (pr * (0.7 + 1.1 * ease(b / 600))).toFixed(1)); ball.setAttribute('opacity', Math.max(0, 1 - b / 2200).toFixed(2));
+        ring.setAttribute('r', (pr * 3.2 * ease(b / 1600)).toFixed(1)); ring.setAttribute('opacity', Math.max(0, 1 - b / 1600).toFixed(2));
+        if (t < 3000) for (const q of bits) { const d = pr * (0.4 + q.s * b / 900); q.n.setAttribute('cx', (cx + Math.cos(q.a) * d).toFixed(1)); q.n.setAttribute('cy', (cy + Math.sin(q.a) * d).toFixed(1)); q.n.setAttribute('opacity', Math.max(0, 1 - b / 2200).toFixed(2)); }
+      }
+      // two seconds after: a black hole opens, draws the pieces back, and the planet gathers out of it as it closes
+      if (t >= 2800) {
+        if (once('hole')) snd('thunder', { gain: 0.9, rate: 0.55 });
+        const h = t - 2800, open = ease(h / 700) * (t > 5200 ? Math.max(0, 1 - (t - 5200) / 900) : 1), r = pr * 0.34 * open;
+        hole.setAttribute('r', (r * 2.1).toFixed(1)); disk.setAttribute('rx', (r * 2.3).toFixed(1)); disk.setAttribute('ry', (r * 0.62).toFixed(1)); disk.setAttribute('opacity', (0.95 * open).toFixed(2));
+        disk.setAttribute('transform', 'rotate(' + (-12 + Math.sin(h * 0.004) * 4).toFixed(1) + ' ' + cx.toFixed(1) + ' ' + cy.toFixed(1) + ')'); disk.setAttribute('stroke-dasharray', (8 + Math.sin(h * 0.01) * 4).toFixed(1) + ' 6'); disk.setAttribute('stroke-dashoffset', (-h * 0.08).toFixed(1));
+        const k = Math.min(1, h / 1500); // the pieces spiral in
+        for (const q of bits) { const a = q.a + h * 0.004 * q.s, d = pr * (0.4 + q.s * 2.2) * (1 - k); q.n.setAttribute('cx', (cx + Math.cos(a) * d).toFixed(1)); q.n.setAttribute('cy', (cy + Math.sin(a) * d * 0.7).toFixed(1)); q.n.setAttribute('opacity', (k < 1 ? 0.9 : 0).toFixed(2)); }
+        if (t >= 3600) { if (once('back')) snd('collapse', { gain: 0.8, rate: 0.5 }); G.planetScale(ease((t - 3600) / 2000)); }
+      }
+      if (t > 6300) { G.planetScale(1); for (const p of parts) p.remove(); this.busting = false; return; }
+      requestAnimationFrame(step);
+    };
     requestAnimationFrame(step);
   }
   // ---------- main menu and unlocks
@@ -487,10 +544,10 @@ export class Game {
       const here = placeKey();
       body = top('Travel') + '<div class="btns">' + Object.keys(PLACES).map(k => '<button class="zd-btn' + (k === here ? ' main' : '') + '" type="button" data-place="' + k + '">' + PLACES[k].name + (k === here ? ' · you are here' : '') + '<div style="font-size:11px;opacity:0.7;margin-top:2px">' + PLACES[k].blurb + '</div></button>').join('') + '</div>';
     } else if (panel === 'main') { // over the globe: the four ways to play on the deck of a flying saucer (Sean), the level under it
-      body = '<div class="ufo">' + SAUCER + '<div class="modes">' + wedgeBtn(0, 'data-play="commander"', MICON.commander + '<b>Commander</b>') +
-        wedgeBtn(1, 'data-go="be"', MICON.be + '<b>Be the<br>Disaster</b>') +
+      body = '<div class="ufo">' + SAUCER + '<div class="modes">' + wedgeBtn(0, 'data-play="commander"', MICON.commander + '<b>Command</b>') +
+        wedgeBtn(1, 'data-go="be"', MICON.be + '<b>Control</b>') +
         wedgeBtn(2, 'data-play="sandbox"', MICON.sandbox + '<b>Sandbox</b>') +
-        wedgeBtn(3, 'data-play="tv"', MICON.tv + '<b>Disaster<br>TV</b>') + '</div>' + // just the names (Sean: the level shows below)
+        wedgeBtn(3, 'data-play="tv"', MICON.tv + '<b>Watch</b>') + '</div>' + // just the names (Sean: the level shows below)
         '<button class="zd-btn rim l" type="button" data-go="unlocks">Units' + (pr.bank >= 3000 && UPGRADES.some(u => pr.canBuy(u.id)) ? ' \u2022' : '') + '</button><button class="zd-btn rim r" type="button" data-go="roster">Roster</button><button class="orbfire" type="button" aria-label="Fire"></button></div>' +
         '<div class="xp"><div class="rank sm"><span>Commander level <b>' + lvl + '</b></span><span>' + pr.xp.toLocaleString() + (next ? ' / ' + next.toLocaleString() : '') + ' XP</span></div>' +
         '<div class="bar sm"><i style="width:' + Math.round(pr.progress * 100) + '%"></i></div></div>' +

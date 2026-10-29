@@ -392,6 +392,9 @@ export class Globe {
     const c = this.cam.position.clone().normalize(), t = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).cross(c).normalize().multiplyScalar(Math.random() * spread);
     const v = c.add(t).normalize().multiplyScalar(R).project(this.cam); return [(v.x + 1) / 2 * innerWidth, (1 - v.y) / 2 * innerHeight];
   }
+  screenCenter() { const v = new THREE.Vector3().project(this.cam); return [(v.x + 1) / 2 * innerWidth, (1 - v.y) / 2 * innerHeight]; }
+  // the planet-buster's: the planet and everything on it (not the stars, not the light) at k of its size (k 0: gone)
+  planetScale(k) { for (const o of this.scene.children) { if (o.isLight || o.isPoints) continue; if (o.userData.s0 == null) o.userData.s0 = o.scale.x; o.scale.setScalar(o.userData.s0 * Math.max(1e-4, k)); } }
   screenRadius() { const o = new THREE.Vector3().project(this.cam), e = new THREE.Vector3(1, 0, 0).applyQuaternion(this.cam.quaternion).multiplyScalar(R).project(this.cam); return Math.abs(e.x - o.x) / 2 * innerWidth; }
   // on the menu: how far back, and how far up the view, for the whole planet to sit in the gap between the title and the
   // menu card (Sean: all of it in view above the menu); a long panel leaving no gap: the planet behind it all
