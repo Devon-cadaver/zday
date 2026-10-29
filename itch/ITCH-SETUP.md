@@ -12,7 +12,7 @@ Everything for the page is in this `itch` folder.
 | `background.png` | **Edit theme → Background image**: *don't repeat*, *centered*, *fixed* | 1920 × 1080 |
 | `description.html` | **Description**: switch the editor to HTML and paste it in (or copy the text from `DESCRIPTION.md`) | |
 
-The screenshots, in order: main menu · Sandbox tornado · kaiju · hero sky slam · play the band · Command mode · Disaster TV · Control (giant worm) · phone menu · phone hero fight · phone band.
+The screenshots, in order: main menu · Sandbox tornado · kaiju · hero sky slam · play the band · Defend mode · Disaster TV · Destroy (giant worm) · phone menu · phone hero fight · phone band.
 `source/` holds the raw pictures the cover was made from (not for upload).
 
 ## Create new project

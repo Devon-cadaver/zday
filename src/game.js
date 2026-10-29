@@ -551,8 +551,8 @@ export class Game {
       const here = placeKey();
       body = top('Travel') + '<div class="btns">' + Object.keys(PLACES).map(k => '<button class="zd-btn' + (k === here ? ' main' : '') + '" type="button" data-place="' + k + '">' + PLACES[k].name + (k === here ? ' · you are here' : '') + '<div style="font-size:11px;opacity:0.7;margin-top:2px">' + PLACES[k].blurb + '</div></button>').join('') + '</div>';
     } else if (panel === 'main') { // over the globe: the four ways to play on the deck of a flying saucer (Sean), the level under it
-      body = '<div class="ufo">' + SAUCER + '<div class="modes">' + wedgeBtn(0, 'data-play="commander"', MICON.commander + '<b>Command</b>') +
-        wedgeBtn(1, 'data-go="be"', MICON.be + '<b>Control</b>') +
+      body = '<div class="ufo">' + SAUCER + '<div class="modes">' + wedgeBtn(0, 'data-play="commander"', MICON.commander + '<b>Defend</b>') +
+        wedgeBtn(1, 'data-go="be"', MICON.be + '<b>Destroy</b>') +
         wedgeBtn(2, 'data-play="sandbox"', MICON.sandbox + '<b>Sandbox</b>') +
         wedgeBtn(3, 'data-play="tv"', MICON.tv + '<b>Watch</b>') + '</div>' + // just the names (Sean: the level shows below)
         '<button class="zd-btn rim l" type="button" data-go="unlocks">Units' + (pr.bank >= 3000 && UPGRADES.some(u => pr.canBuy(u.id)) ? ' \u2022' : '') + '</button><button class="zd-btn rim r" type="button" data-go="roster">Roster</button><button class="orbfire" type="button" aria-label="Fire"></button></div>' +

@@ -10,13 +10,13 @@ Plays in your browser on phone, tablet or PC. No download, no account.
 
 ## Four ways to play
 
-### 🚨 Command — save the town
+### 🚨 Defend — save the town
 You're the emergency commander. Each 10-minute round throws two to five incidents at the town: zombie outbreaks, earthquakes, riots, floods, fires, alien landings, super villains and worse as you level up. Send in the police, evacuation buses, fire trucks, water bombers and rescue helicopters, the army, an airstrike... or, if it really comes to it, the nuke. Clear every incident and the town is safe.
 
 - 12 levels, new units and incidents unlocked as you go, upgrades to buy
 - A road of 17 towns, from a little mountain village to the big city and the neon towns of the Far Isles
 
-### 🌪️ Control — be the disaster
+### 🌪️ Destroy — be the disaster
 Pick a disaster and *drive* it for three minutes. Steer the tornado through downtown, guide the giant worm under the streets, stomp the kaiju through the harbour, beam people up from a flying saucer, start the riot, spread the outbreak. Every disaster has its own controls. Score, ranks and a best score for each one.
 
 ### 🧪 Sandbox — anything goes

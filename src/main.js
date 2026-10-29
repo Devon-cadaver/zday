@@ -28,12 +28,14 @@ import { Globe } from './globe.js';
 import { Sky } from './sky.js';
 import { Radio } from './radio.js';
 import { damageOf, rememberDamage, takeMeteor } from './world.js';
+import { noZoom } from './nozoom.js';
 
 const P = new URLSearchParams(location.search);
 CURVE.on = P.get('curve') !== '0'; // ?curve=0: the flat world, to compare
 const coarse = matchMedia('(pointer: coarse)').matches;
 const low = P.get('q') === 'low' || (coarse && P.get('q') !== 'high');
 const num = (k, d) => (P.has(k) ? parseFloat(P.get(k)) : d);
+noZoom(); // no double-tap zoom on phones (nozoom.js)
 const mode = P.get('mode') || 'menu'; // menu | commander | be | sandbox | tv
 
 const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', preserveDrawingBuffer: P.has('shot') });
