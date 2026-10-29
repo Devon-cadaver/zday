@@ -76,7 +76,7 @@ body.zd-flying #zd-bar,body.zd-flying #zd-dis,body.zd-flying #zd-followchip,body
 export class Flight {
   constructor(game, ctx) { // ctx: { camera, controls, post, renderer }
     this.g = game; this.ctx = ctx; this.active = false; this.view = 'chase'; this.pos = new THREE.Vector3(); this.q = new THREE.Quaternion();
-    this.near = 1; this.focus = 30; this.at = new THREE.Vector3();
+    this.near = 1; this.focus = 30; this.at = new THREE.Vector3(); this.lod = 3; // main.js: flying, the whole town in view, everything in fewer pieces
   }
   // up: the plane at the edge of town, heading in; the camera taken over
   start(kind = 'stunt') {

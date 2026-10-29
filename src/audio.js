@@ -317,8 +317,9 @@ export class Audio {
     }
     if (this.hum) this.hum.gain.setTargetAtTime(on ? 0.09 : 0, c.currentTime, on ? 1.2 : 0.4);
   }
-  // the plane being flown (flight.js): the stunt plane's buzz (two saws a hair apart through a lowpass, both rising with
-  // the throttle k) or the jet's roar (noise through a band that rises with it, over a low rumble); kind null: off.
+  // the plane being flown (flight.js) or what is driven (drive.js): the stunt plane's buzz, a car's or the tank's growl
+  // (two saws a hair apart through a lowpass, rising with the throttle k) or the jet's roar (noise through a band that
+  // rises with it, over a low rumble); kind null: off.
   // On the effects' volume, kept low
   engine(kind, k = 0.5) {
     const c = this.ctx; if (!c) return;
@@ -337,8 +338,8 @@ export class Audio {
     }
     const e = this.eng;
     if (kind === 'jet') { e.f.frequency.setTargetAtTime(380 + 1500 * k, t, 0.3); e.o1.frequency.setTargetAtTime(38 + 20 * k, t, 0.3); }
-    else { e.o1.frequency.setTargetAtTime(62 + 75 * k, t, 0.2); e.o2.frequency.setTargetAtTime(62.8 + 75 * k, t, 0.2); e.f.frequency.setTargetAtTime(520 + 900 * k, t, 0.2); }
-    e.g.gain.setTargetAtTime(kind === 'jet' ? 0.09 + 0.07 * k : 0.05 + 0.05 * k, t, 0.3);
+    else { const [f0, fk, l0, lk] = kind === 'tank' ? [30, 26, 240, 320] : kind === 'car' ? [40, 55, 320, 700] : [62, 75, 520, 900]; e.o1.frequency.setTargetAtTime(f0 + fk * k, t, 0.2); e.o2.frequency.setTargetAtTime(f0 + 0.8 + fk * k, t, 0.2); e.f.frequency.setTargetAtTime(l0 + lk * k, t, 0.2); }
+    e.g.gain.setTargetAtTime(kind === 'jet' ? 0.09 + 0.07 * k : kind === 'tank' ? 0.06 + 0.04 * k : kind === 'car' ? 0.04 + 0.04 * k : 0.05 + 0.05 * k, t, 0.3);
   }
   toBuf(x) { const b = this.ctx.createBuffer(1, x.length, SR); b.copyToChannel ? b.copyToChannel(x, 0) : b.getChannelData(0).set(x); return b; }
   startLoop(name, buf) {

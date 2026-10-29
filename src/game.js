@@ -955,7 +955,7 @@ class Sandbox {
     g.addButton('zd-menu-btn', 'Menu', () => g.toMenu());
     this.buildPanel(); this.bindHold();
     this.dropsLeft = START_DROPS; this.clock = -1; this.milestone = 0;
-    g.toast('Open Disasters to drop zombies, unleash a disaster or fly a plane', 4500);
+    g.toast('Open Disasters to unleash a disaster, then fly a plane, drive a tank or patrol as a police officer', 4500);
   }
   buildPanel() {
     const g = this.g, d = document.createElement('div'); d.id = 'zd-dis'; d.hidden = true;
@@ -964,7 +964,8 @@ class Sandbox {
         .sort((a, b) => a.name.localeCompare(b.name)) // A to Z, each with its picture
         .map(o => '<button type="button" ' + o.attr + '><span class="th">' + (THUMB[o.k] || '') + '</span><span class="nm">' + (o.k === 'zombies' ? o.name + ' · ' + START_DROPS : o.name) + '</span></button>').join('') + '</div>' +
       '<div class="h">Help</div><div class="g two"><button class="zd-btn auto" type="button" data-auto>Auto responders: On</button><button class="zd-btn hero" type="button" data-hero>Hero signal \u262E</button></div>' +
-      '<div class="h">Fly a plane</div><div class="g two cards">' + [['stunt', 'Stunt plane'], ['jet', 'Fighter jet']].map(([k, n]) => '<button class="zd-btn fly" type="button" data-fly="' + k + '"><span class="th">' + THUMB[k] + '</span><span class="nm">' + n + '</span></button>').join('') + '</div></div>' +
+      '<div class="h">Fly a plane</div><div class="g two cards">' + [['stunt', 'Stunt plane'], ['jet', 'Fighter jet']].map(([k, n]) => '<button class="zd-btn fly" type="button" data-fly="' + k + '"><span class="th">' + THUMB[k] + '</span><span class="nm">' + n + '</span></button>').join('') + '</div>' +
+      '<div class="h">On the ground</div><div class="g two cards">' + [['tank', 'Tank'], ['cop', 'Police officer']].map(([k, n]) => '<button class="zd-btn fly" type="button" data-drive="' + k + '"><span class="th">' + THUMB[k] + '</span><span class="nm">' + n + '</span></button>').join('') + '</div></div>' +
       '<div data-pane="wx" hidden><div class="g">' + Object.keys(WEATHER).map(w => '<button class="zd-btn" type="button" data-wx="' + w + '">' + WEATHER[w].name.replace('Thunderstorm', 'Storm') + '</button>').join('') + '</div></div>' +
       '<div data-pane="go" hidden><div class="g">' + Object.keys(PLACES).map(k => '<button class="zd-btn' + (k === placeKey() ? ' sel' : '') + '" type="button" data-place="' + k + '">' + PLACES[k].name + '</button>').join('') + '</div></div></div>';
     document.body.appendChild(d); this.panel = d; this.zbBtn = d.querySelector('[data-zb]');
@@ -977,6 +978,7 @@ class Sandbox {
     const autoBtn = d.querySelector('[data-auto]');
     autoBtn.onclick = () => { this.auto.setOn(!this.auto.on); autoBtn.textContent = 'Auto responders: ' + (this.auto.on ? 'On' : 'Off'); autoBtn.classList.toggle('off', !this.auto.on); g.toast(this.auto.on ? 'Responders will answer every disaster and rebuild afterwards' : 'Responders off: nobody comes to help', 3500); };
     d.querySelectorAll('[data-fly]').forEach(b => { b.onclick = () => { this.pending = null; this.close(); if (g.flight) g.flight.start(b.dataset.fly); }; }); // up in a plane (flight.js)
+    d.querySelectorAll('[data-drive]').forEach(b => { b.onclick = () => { this.pending = null; this.close(); if (g.drive) g.drive.start(b.dataset.drive); }; }); // on the ground (drive.js)
     d.querySelector('[data-hero]').onclick = () => { const tg = g.controls.target; g.disasters.start('heroes', tg.x, tg.z); this.pending = null; this.close(); if (this.clock < 0) this.clock = 0; }; // the peace sign goes up over the middle of the view
     this.zbBtn.onclick = () => { // armed until the Shamblers run out or you tap Done: every tap on a street drops one
       if (this.dropsLeft <= 0) { g.toast('No Shamblers left. Tap Reset to start over'); return; }
