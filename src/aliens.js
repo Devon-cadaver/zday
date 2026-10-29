@@ -167,7 +167,7 @@ export class Invasion {
       const dx = s.tx - s.x, dz = s.tz - s.z, d = Math.hypot(dx, dz) || 0.001, v = Math.min(18, 3 + d * 0.4);
       s.vx = dx / d * v; s.vz = dz / d * v;
       s.x += s.vx * h; s.z += s.vz * h; s.y += (s.alt - s.y) * Math.min(1, h * 0.8);
-      if (d < 2) {
+      if (d < 2 && !s.player) { // (taken over: its pilot says what it does - takeover.js)
         const r = Math.random();
         s.act = r < 0.45 ? 'abduct' : r < 0.75 ? 'zap' : 'drop';
         if (s.act === 'drop' && people.stats.aliens > 70) s.act = 'abduct';
