@@ -37,6 +37,12 @@ void main() {
   float cz = viewZ(vUv);
   float cs = cocN(cz) * maxBlur;
   vec3 col = clean(texture2D(tColor, vUv).rgb);
+  if (cs < 0.3) { // sharp here: and round it, at the blur's reach and part way, nothing blurred enough to spill over it
+    vec2 d = texel * maxBlur, e = d * 0.6;
+    float nb = max(max(cocN(viewZ(vUv + vec2(d.x, 0.0))), cocN(viewZ(vUv - vec2(d.x, 0.0)))), max(cocN(viewZ(vUv + vec2(0.0, d.y))), cocN(viewZ(vUv - vec2(0.0, d.y)))));
+    nb = max(nb, max(max(cocN(viewZ(vUv + e)), cocN(viewZ(vUv - e))), max(cocN(viewZ(vUv + vec2(e.x, -e.y))), cocN(viewZ(vUv + vec2(-e.x, e.y))))));
+    if (nb * maxBlur < 1.0) { gl_FragColor = vec4(col, cs / maxBlur); return; }
+  }
   float tot = 1.0;
   float rad = RAD_SCALE;
   float ang = 0.0;

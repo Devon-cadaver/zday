@@ -148,7 +148,7 @@ const CSS = `
 #zd-menu .box.saucer .mbody{overflow:visible;padding:0 0 4px}
 #zd-menu .ufo{position:relative;margin:0 -16px;aspect-ratio:400/248}
 #zd-menu .ufo .hull{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
-#zd-menu .ufo .hull .spin{animation:zdSpin 2.4s linear infinite}#zd-menu .ufo .hull .s2{animation-duration:7s}#zd-menu .ufo .hull .s3{animation-duration:4s}#zd-menu .ufo .hull .s4{animation-duration:2s}
+#zd-menu .ufo .hull .spin{animation:zdSpin 2.4s steps(24) infinite}#zd-menu .ufo .hull .s2{animation-duration:7s}#zd-menu .ufo .hull .s3{animation-duration:4s}#zd-menu .ufo .hull .s4{animation-duration:2s}
 @keyframes zdSpin{to{stroke-dashoffset:-104}} /* four or eight of each dash pattern: no jump as it loops */
 @media (prefers-reduced-motion:reduce){#zd-menu .ufo .hull .spin{animation:none}}
 #zd-menu .ufo .modes{position:absolute;inset:0;margin:0;display:block} /* the panels sit on the deck where WEDGE puts them */

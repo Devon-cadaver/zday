@@ -3,3 +3,5 @@ dist
 .playwright-mcp
 artifact/assets
 shots
+itch/_web
+itch/*.zip

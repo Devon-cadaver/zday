@@ -153,9 +153,15 @@ addEventListener('resize', () => {
 const clock = new THREE.Clock();
 renderer.shadowMap.autoUpdate = false; let shadowAt = -1; const camAt = new THREE.Vector3();
 let frames = 0, fpsT = 0, fps = 0, time = 0;
+// fewer pixels on a device that cannot keep up (Sean's older phones): under 26 fps for 3 s, a quarter step down to 0.8 at the
+// least; back up a step after 20 s over 45 fps (the blur's cost goes with the fourth power of it, the rest with the square)
+const PR_MAX = Math.min(devicePixelRatio, low ? 1.5 : 2); let prK = PR_MAX, slowT = 0, fastT = 0, prDownAt = -1e9, prN = 0, prT0 = performance.now(); // measured in real time (the frame step is capped, which flatters a slow phone)
+const setPR = (k) => { prK = k; renderer.setPixelRatio(k); renderer.setSize(innerWidth, innerHeight); post.setSize(); };
+let loadingEl = document.getElementById('zd-loading'); // index.html's Loading, gone with the first frame
 const M = 10;
 
 function frame() {
+  if (loadingEl) { loadingEl.remove(); loadingEl = null; }
   const dt = Math.min(0.05, clock.getDelta());
   time += dt;
   sky.update(dt);
@@ -197,7 +203,10 @@ function frame() {
   camera.position.x -= jx; camera.position.y -= jy; camera.position.z -= jz;
 
   frames++; fpsT += dt;
-  if (fpsT > 0.5) { fps = Math.round(frames / fpsT); frames = 0; fpsT = 0; }
+  prN++; { const now = performance.now(), w = (now - prT0) / 1000; if (w >= 0.5) { const rf = prN / w; prN = 0; prT0 = now; if (document.hidden) slowT = fastT = 0; else if (rf < 26) { slowT += w; fastT = 0; } else { slowT = 0; fastT = rf > 45 ? fastT + w : 0; } if (slowT >= 3 && prK > 0.8) { setPR(Math.max(0.8, prK - 0.25)); slowT = 0; prDownAt = now; } else if (fastT >= 20 && prK < PR_MAX && now - prDownAt > 20000) { setPR(Math.min(PR_MAX, prK + 0.25)); fastT = 0; } } } // the pixel ratio after the real frame rate
+  if (fpsT > 0.5) {
+    fps = Math.round(frames / fpsT); frames = 0; fpsT = 0;
+  }
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

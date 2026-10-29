@@ -545,5 +545,5 @@ export class Kaiju {
       if (!this.swept || (this.seen() && (!far || this.fN % 2 === 0))) { sweep(r, this.st); this.swept = true; }
     }
   }
-  dispose() { this.dropCar(); for (const q of this.rig.tents) this.tentIdle(q); this.D.ctx.scene.remove(this.rig.root); this.rig.body.geo.dispose(); for (const s of [this.flame, this.core]) if (s) { this.D.ctx.scene.remove(s.points); s.points.geometry.dispose(); s.mat.dispose(); } }
+  dispose() { this.dropCar(); for (const q of this.rig.tents) this.tentIdle(q); this.D.ctx.scene.remove(this.rig.root); this.rig.body.geo.dispose(); this.rig.root.traverse(o => { if (o.geometry) o.geometry.dispose(); }); for (const s of [this.flame, this.core]) if (s) { this.D.ctx.scene.remove(s.points); s.points.geometry.dispose(); s.mat.dispose(); } } // its own shapes, every one (the paints are shared)
 }
