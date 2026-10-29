@@ -151,13 +151,13 @@ export class Globe {
     this.labels();
     this.controls = new OrbitControls(cam, this.renderer.domElement); this.controls.enablePan = false; this.controls.enableDamping = true; this.controls.dampingFactor = 0.08;
     this.controls.addEventListener('start', () => { this.easing = false; }); // a finger on it: no easing back
-    // the menu: a finger (or the mouse) dragged up or down zooms, up for in, while the sideways part turns it (the tilt is held: backdrop)
+    // the menu and the town picker: a finger (or the mouse) dragged up or down zooms, up for in, while the sideways part turns it (the tilt is held: backdrop, choose)
     const el = this.renderer.domElement, drag = new Map();
     el.addEventListener('pointerdown', (e) => { drag.set(e.pointerId, e.clientY); });
     el.addEventListener('pointermove', (e) => {
       if (!drag.has(e.pointerId)) return;
       const y0 = drag.get(e.pointerId); drag.set(e.pointerId, e.clientY);
-      if (this.state !== 'menu' || drag.size !== 1 || !this.controls.enabled || this.rise) return;
+      if ((this.state !== 'menu' && this.state !== 'pick') || drag.size !== 1 || !this.controls.enabled || this.rise) return;
       const C = this.controls, L = this.cam.position.length();
       this.cam.position.setLength(Math.max(C.minDistance, Math.min(C.maxDistance, L * Math.exp((e.clientY - y0) * 0.005)))); this.easing = false;
     });
@@ -383,7 +383,7 @@ export class Globe {
     }
     this.controls.maxDistance = Math.max(R * 5, this.fit() * 1.15, mf.d * 1.3);
     this.controls.enabled = true; this.controls.autoRotate = true; this.controls.autoRotateSpeed = 0.45; this.controls.update();
-    const ph = Math.acos(Math.max(-1, Math.min(1, this.cam.position.y / this.cam.position.length()))); this.controls.minPolarAngle = this.controls.maxPolarAngle = ph; // a swipe only turns it (Sean): the tilt held where it is
+    const ph = Math.acos(Math.max(-1, Math.min(1, this.cam.position.y / this.cam.position.length()))); this.controls.minPolarAngle = this.controls.maxPolarAngle = ph; this.tiltTo = null; // a swipe only turns it (Sean): the tilt held where it is
     document.body.classList.add('zd-globe-on');
   }
   // on the menu: how far back, and how far up the view, for the whole planet to sit in the gap between the title and the
@@ -409,7 +409,13 @@ export class Globe {
   choose(opts) {
     if (!this.built) this.build();
     this.active = true; this.state = opts.key ? 'path' : 'pick'; this.status = opts.status || null; this.arrive = opts.arrive; this.onBack = opts.back;
-    this.controls.minPolarAngle = 0; this.controls.maxPolarAngle = Math.PI; // picking a town: free to tilt to any of them
+    const C = this.controls; this.tiltTo = null;
+    if (opts.key) { C.minPolarAngle = 0; C.maxPolarAngle = Math.PI; } // turning to a town of its own: free
+    else { // picking a town (Sean): a swipe only turns it, as on the menu; the tilt eased (frame) to the middle of the towns' latitudes, so every one can be turned into view
+      const lats = Object.values(this.spots).map(s => s[0]);
+      C.minPolarAngle = C.maxPolarAngle = Math.acos(Math.max(-1, Math.min(1, this.cam.position.y / this.cam.position.length())));
+      this.tiltTo = Math.PI / 2 - (Math.min(...lats) + Math.max(...lats)) / 2;
+    }
     this.controls.autoRotate = false; this.controls.enabled = !opts.key; this.shiftTo = 0; this.showRoad(!!opts.road, opts.mode || null); this.relabel();
     this.uiEl.firstChild.textContent = opts.title || ''; this.say(opts.sub || ''); this.uiEl.style.display = '';
     this.metBtn.style.display = 'none'; this.backBtn.textContent = 'Back'; this.backBtn.style.display = opts.back ? '' : 'none';
@@ -461,7 +467,10 @@ export class Globe {
       const T = this.turn; T.t += dt; const k = Math.min(1, T.t / 1.3), dir = this.cam.position.clone().normalize().lerp(T.to, Math.min(1, dt * 3.2)).normalize();
       this.cam.position.copy(dir.multiplyScalar(this.cam.position.length() + (T.r - this.cam.position.length()) * Math.min(1, dt * 3))); this.cam.lookAt(0, 0, 0);
       if (k >= 1) { this.turn = null; this.go(T.key); }
-    } else this.controls.update();
+    } else {
+      if (this.tiltTo != null) { const C = this.controls, a = C.minPolarAngle, b = a + (this.tiltTo - a) * Math.min(1, dt * 4); C.minPolarAngle = C.maxPolarAngle = b; if (Math.abs(b - this.tiltTo) < 0.002 || this.state !== 'pick') this.tiltTo = null; } // easing to the picker's tilt
+      this.controls.update();
+    }
     // labels over the places on the side facing you; where two would overlap, the one nearer the middle of the view
     // shows (your own place and the one you are heading for first)
     const v = new THREE.Vector3(), camDir = this.cam.position.clone().normalize(), cand = [], placed = [];
