@@ -205,6 +205,7 @@ if (!game.menu.hidden) { game.audio.music.setMenu(true); game.audio.ufo(game.men
 seeButton((on) => game.toast('See through buildings: ' + (on ? 'on' : 'off'))); // the eye: walls between you and the action fade, or not
 if (game.menu.hidden) game.radio.begin(game.modeName === 'be' && game.mode ? game.mode.kind : null);
 const globe = game.globe = new Globe(renderer); let globeWas = false; // the world from orbit: the big city and the towns
+globe.known = (key) => game.profile.beaten(key); // the towns won in show their names
 globe.statusFor = () => game.townStatus(game.modeName); // Commander and Be The Disaster: towns further down the road are locked
 globe.trail = (m) => game.profile.been(m === 'commander' || m === 'be' ? m : null); // the road only as far as the towns played (Sean: your trail, not where you are going)
 globe.mode = () => game.modeName;
@@ -215,7 +216,7 @@ globe.moveTo = (key) => { const m = game.modeName, kind = m === 'be' && game.mod
 globe.up = (after) => { game.setFollow(-1); sky.up(() => { globe.open({ clouds: true }); globe.after = after || null; }); }; // up through the clouds (then on to another town)
 if (viaSky) game.audio.askTap(); // the trip reloaded the page: sound needs a tap again
 if (viaSky) setTimeout(() => { if (globe.active) { sky.to(0, 0.8); return; } const r1 = game.zoomTo || 0; game.zoomTo = 0; sky.down(r1); }, 300); // out of the clouds over the streets
-if (!game.menu.hidden) { globe.backdrop(game.menuPanel === 'main'); game.dockSide(); if (viaSky) globe.pullBack(placeKey()); }
+if (!game.menu.hidden) { globe.backdrop(); game.dockSide(); if (viaSky) globe.pullBack(placeKey()); }
 // a fresh start on the menu: the title and a PLAY button over the turning planet first (Sean); the tap starts the music and the menu pops up
 if (!game.menu.hidden && !viaSky) {
   const st = document.createElement('style'); st.textContent = '#zd-play{position:fixed;inset:0;z-index:45;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:max(48px,9vh);box-sizing:border-box;gap:30px;cursor:pointer;-webkit-tap-highlight-color:transparent}' +

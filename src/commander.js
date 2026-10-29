@@ -741,6 +741,7 @@ export class Commander {
     ];
     const r = this.pr.addRound(score, stars);
     const here = placeKey(), at = PATH.indexOf(here), opened = stars >= 2 ? this.pr.clear('commander', here) : null, nextKey = PATH[at + 1], nextOpen = at >= 0 && nextKey && at + 1 <= this.pr.reach('commander');
+    if (stars >= 2) this.pr.beat(here); // its name shows on the globe from now on
     if (this.pr.level > r.level) { r.level = this.pr.level; r.levelUp = r.level > r.before; } // a new town: a level with it
     const done = at === PATH.length - 1 && stars >= 2; // the last town held: the road is done
     const road = at < 0 ? '' : done ? '<div class="lvl">That was the last town. Every town on the road came through: you beat My Little Disaster</div>' : opened ? '<div class="lvl">New town open: ' + PLACES[opened].name + '</div>' : nextKey && !nextOpen ? '<div class="xp">Win with two stars to open ' + PLACES[nextKey].name + '</div>' : '';

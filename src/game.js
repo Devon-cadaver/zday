@@ -427,7 +427,7 @@ export class Game {
     }
     clearTimeout(this._gone); this.menu.classList.remove('gone'); this.menu.hidden = false; document.body.classList.add('zd-menu-on'); document.body.classList.toggle('zd-main', panel === 'main'); if (this.audio) this.audio.ufo(panel === 'main'); // the main menu: the saucer, humming
     this.dockSide();
-    if (this.globe) this.globe.backdrop(panel === 'main'); // the town names only round the main menu
+    if (this.globe) this.globe.backdrop();
     dragScroll(this.menu.querySelector('.mbody'), 'y');
     this.menu.querySelectorAll('[data-go]').forEach(b => { b.onclick = () => this.showMenu(b.dataset.go); });
     this.menu.querySelectorAll('[data-play]').forEach(b => { b.onclick = () => this.playMode(b.dataset.play); });
@@ -459,15 +459,16 @@ export class Game {
       G.travelling(key); travel(key, which, kind ? { kind } : null);
     };
     if (which === 'tv') { const ks = Object.keys(PLACES), key = ks[Math.floor(Math.random() * ks.length)]; G.choose({ title: 'DISASTER TV · LIVE', sub: 'The end of the world, as it happens. First: ' + PLACES[key].name, key, arrive }); return; } // the whole world, then down into a town of its own choosing
-    if (which === 'sandbox') { G.choose({ title: 'SANDBOX', sub: 'Pick a city: tap it to play there', arrive, back: () => this.showMenu() }); return; }
+    if (which === 'sandbox') { G.choose({ title: 'SANDBOX', sub: 'Tap a city to play there \u00B7 win in one to learn its name', arrive, back: () => this.showMenu() }); return; }
     const key = this.profile.town(which);
     G.choose({ title: (which === 'be' ? 'BE THE DISASTER' : 'COMMANDER') + ' \u00B7 LEVEL ' + (PATH.indexOf(key) + 1), sub: PLACES[key].name, key, road: true, mode: which, status: this.townStatus(which), arrive });
   }
-  // how a place stands on the road for a mode (Commander, Be The Disaster): its number, won, open or locked
+  // how a place stands on the road for a mode (Commander, Be The Disaster): its number, won (a tick), open or locked (the
+  // globe puts the name between, if it is known)
   townStatus(mode) {
     if (mode !== 'commander' && mode !== 'be') return null;
-    const reach = this.profile.reach(mode), why = 'Win in ' + PLACES[PATH[reach]].name + ' to open the next town';
-    return (key) => { const i = PATH.indexOf(key); return { text: (i + 1) + ' \u00B7 ' + PLACES[key].name + (i < reach ? ' \u2713' : i > reach ? ' \uD83D\uDD12' : ''), locked: i > reach || i < 0, why }; };
+    const reach = this.profile.reach(mode), why = 'Win in town ' + (reach + 1) + ' to open the next one';
+    return (key) => { const i = PATH.indexOf(key); return { num: i + 1, mark: i < reach ? ' \u2713' : i > reach ? ' \uD83D\uDD12' : '', locked: i > reach || i < 0, why }; };
   }
   // back to the menu: straight up off the town into the clouds (the way in, backwards), then the menu page, which comes out of
   // them pulling back from this town to the whole planet (main.js: globe.pullBack)

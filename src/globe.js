@@ -300,15 +300,15 @@ export class Globe {
       document.body.appendChild(d); this.tags[key] = d;
     }
   }
-  // what each label says: the name (with the road's number, a tick for the towns won and a lock on those not open yet
-  // in Commander and Be The Disaster), dimmed when locked; behind the menu they are only names
+  // what each label says: the name, for the towns won in (this.known) and the one you are in, else ??? (Sean: the names
+  // come as you beat the towns); in Commander and Be The Disaster with the road's number, a tick for the towns won and a
+  // lock on those not open yet, dimmed. Behind the menu and on the way down from it there are none
   relabel() {
     for (const key in this.tags) {
-      const d = this.tags[key], s = this.status && this.state !== 'menu' ? this.status(key) : null;
-      d.textContent = (s ? s.text : PLACES[key].name) + (this.state === 'game' && key === placeKey() ? ' · here' : ''); d._w = 0; // measured again
-      d.style.opacity = s && s.locked ? '0.55' : this.state === 'menu' ? '0.85' : '1';
-      d.style.pointerEvents = this.state === 'menu' ? 'none' : '';
-      d.style.fontSize = this.state === 'menu' ? '11px' : '12px'; d.style.zIndex = this.state === 'menu' ? '5' : '41'; // under the menu card
+      const d = this.tags[key], s = this.status ? this.status(key) : null, here = this.state === 'game' && key === placeKey();
+      const name = here || !this.known || this.known(key) ? PLACES[key].name : '???';
+      d.textContent = (s ? s.num + ' \u00B7 ' : '') + name + (s ? s.mark : '') + (here ? ' · here' : ''); d._w = 0; // measured again
+      d.style.opacity = s && s.locked ? '0.55' : '1';
     }
   }
   ui() {
@@ -357,10 +357,9 @@ export class Globe {
     this.uiEl.style.display = 'none'; this.backBtn.style.display = 'none'; this.metBtn.style.display = 'none'; this.armed = false; for (const k in this.tags) this.tags[k].style.display = 'none';
     if (this.onArrive) this.onArrive();
   }
-  // behind the main menu: the planet turning slowly, the places on it and the road between them
-  backdrop(names = true) {
+  // behind the main menu: the planet turning slowly, the places on it and the road between them (no names: Sean)
+  backdrop() {
     if (!this.built) this.build();
-    this.quiet = !names;
     const was = this.active;
     this.active = true; this.state = 'menu'; this.status = null; this.arrive = null; this.fly = this.rise = this.turn = null; this.armed = false;
     this.uiEl.style.display = 'none'; this.backBtn.style.display = 'none'; this.metBtn.style.display = 'none';
@@ -454,7 +453,7 @@ export class Globe {
     const v = new THREE.Vector3(), camDir = this.cam.position.clone().normalize(), cand = [], placed = [];
     for (const key in this.tags) {
       const [lat, lon] = this.spots[key], p = toVec(lat, lon, R * 1.01), el = this.tags[key], dot = p.clone().normalize().dot(camDir);
-      if (!this.active || this.leaving || (this.quiet && this.state === 'menu') || dot < 0.25 || this.fly || this.rise) { el.style.display = 'none'; continue; }
+      if (!this.active || this.leaving || this.state === 'menu' || this.state === 'path' || dot < 0.25 || this.fly || this.rise) { el.style.display = 'none'; continue; }
       v.copy(p).project(this.cam);
       cand.push({ el, x: (v.x + 1) / 2 * innerWidth, y: (1 - v.y) / 2 * innerHeight, pri: dot + (key === placeKey() && this.state === 'game' ? 2 : 0) + (this.turn && this.turn.key === key ? 3 : 0) });
     }

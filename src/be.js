@@ -443,6 +443,7 @@ export class BeTheDisaster {
     if (H.best > 1) lines.unshift(['Best combo', '\u00D7' + H.best + ' (' + H.bestN + ' hits)'], ['Combo bonus', '+' + Math.round(H.bonus).toLocaleString()]);
     // the road: wreck enough of this town (a score of 30 a building) and the next one opens
     const here = placeKey(), at = PATH.indexOf(here), opened = this.score >= goal ? g.profile.clear('be', here) : null;
+    if (this.score >= goal) g.profile.beat(here); // its name shows on the globe from now on
     if (g.profile.level > r.level) { r.level = g.profile.level; r.levelUp = r.level > r.before; } // a new town: a level with it
     const done = at === PATH.length - 1 && this.score >= goal; // the last town wrecked: the road is done
     const nextKey = PATH[at + 1], nextOpen = at >= 0 && nextKey && at + 1 <= g.profile.reach('be');

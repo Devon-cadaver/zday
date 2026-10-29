@@ -63,6 +63,10 @@ export class Profile {
     const last = PATH.indexOf((this.data.last || {})[mode]);
     return Math.min(PATH.length - 1, Math.max((this.data.been || {})[mode] ?? -1, last, this.reach(mode) - 1));
   }
+  // the towns won in, either mode (Commander: two stars or more; Be The Disaster: its goal): the globe shows their names.
+  // Older saves: the towns the road has gone past
+  beat(key) { (this.data.beat || (this.data.beat = {}))[key] = 1; this.save(); }
+  beaten(key) { if ((this.data.beat || {})[key]) return true; const i = PATH.indexOf(key); return i >= 0 && (i < this.reach('commander') || i < this.reach('be')); }
   // won in the furthest open town: the next one opens; returns its key (null if nothing new opened)
   clear(mode, key) {
     const i = PATH.indexOf(key); if (i < 0 || i !== this.reach(mode) || i + 1 >= PATH.length) return null;
