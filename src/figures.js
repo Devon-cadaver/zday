@@ -52,6 +52,25 @@ export function figureGeometry() {
   return g;
 }
 
+// far off, a person a few pixels tall: the same figure in fewer pieces (whole arms and legs swinging from the shoulder and
+// hip, a block of a head; no hands, shoes, backpack or hand item), under half the triangles. The same tags, so it is
+// posed, dressed and coloured the same
+export function figureGeometryLow() {
+  const g = mergeGeometries([
+    tag(new THREE.BoxGeometry(0.22, 0.24, 0.22).translate(0, 1.47, 0), 2, 5),
+    tag(new THREE.BoxGeometry(0.22, 0.09, 0.26).translate(0.01, 1.58, 0), 3, 5, 5),
+    tag(new THREE.BoxGeometry(0.2, 0.52, 0.34).translate(0, 1.1, 0), 0, 0),
+    tag(new THREE.BoxGeometry(0.1, 0.53, 0.1).translate(0, 1.1, -0.22), 0, 3),
+    tag(new THREE.BoxGeometry(0.1, 0.53, 0.1).translate(0, 1.1, 0.22), 0, 4),
+    tag(new THREE.BoxGeometry(0.15, 0.84, 0.15).translate(0, 0.42, -0.09), 1, 1),
+    tag(new THREE.BoxGeometry(0.15, 0.84, 0.15).translate(0, 0.42, 0.09), 1, 2),
+    tag(new THREE.BoxGeometry(0.26, 0.08, 0.28).translate(0.01, 1.61, 0), 4, 5, 1),
+    tag(new THREE.BoxGeometry(0.25, 0.44, 0.39).translate(0, 1.1, 0), 5, 0, 2),
+  ]);
+  g.computeBoundingSphere();
+  return g;
+}
+
 // Hat types (aKit.x): 0 none, 1 cap, 2 hard hat or helmet, 3 beanie, 4 hood, 5 brimmed hat
 export const HAT = { NONE: 0, CAP: 1, HARD: 2, BEANIE: 3, HOOD: 4, BRIM: 5 };
 // Flags (aKit.y): 1 vest, 2 backpack, 4 hand item, 8 no hair, 16 radioactive glow

@@ -91,6 +91,27 @@ export class Traffic {
       parent.add(im);
     }
 
+    // their shadows: a block per car in the shadow map instead of the whole car (cars were a third of the shadow pass), on
+    // the shadow-only layer and moving with it (the same instance matrices; the count matched as the shadow is drawn)
+    const shMat = new THREE.MeshBasicMaterial(), blocks = new Map();
+    for (const im of [...Object.values(this.typeMeshes), ...Object.values(this.missionMeshes), ...this.parkedMeshes]) {
+      let bg = blocks.get(im.geometry);
+      if (!bg) { im.geometry.computeBoundingBox(); const bb = im.geometry.boundingBox, sz = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3()); bg = new THREE.BoxGeometry(sz.x, sz.y * 0.9, sz.z * 0.92).translate(c.x, c.y - sz.y * 0.05, c.z); blocks.set(im.geometry, bg); }
+      const sh = new THREE.InstancedMesh(bg, shMat, im.instanceMatrix.count); sh.instanceMatrix = im.instanceMatrix; sh.count = im.count;
+      sh.castShadow = true; sh.receiveShadow = false; sh.layers.set(1); sh.frustumCulled = im.frustumCulled; sh.boundingSphere = im.boundingSphere;
+      sh.onBeforeShadow = () => { sh.count = im.count; }; im.castShadow = false; parent.add(sh);
+    }
+    // zoomed out (lod): each car a body and a cabin block in its own colour with dark glass, 24 triangles instead of ~400
+    const low = new Map(), lowCar = (geo) => {
+      geo.computeBoundingBox(); const bb = geo.boundingBox, s = bb.getSize(new THREE.Vector3()), y0 = bb.min.y, cx = (bb.min.x + bb.max.x) / 2, cz = (bb.min.z + bb.max.z) / 2;
+      const tall = s.y > 2.4, paint = (g, v) => { const n = g.attributes.position.count, a = new Float32Array(n * 3).fill(v); g.setAttribute('color', new THREE.BufferAttribute(a, 3)); return g; };
+      const body = paint(new THREE.BoxGeometry(s.x, s.y * (tall ? 0.62 : 0.42), s.z).translate(cx, y0 + s.y * (tall ? 0.39 : 0.33), cz), 1);
+      const cab = paint(new THREE.BoxGeometry(s.x * (tall ? 0.96 : 0.5), s.y * (tall ? 0.3 : 0.36), s.z * 0.88).translate(cx - (tall ? 0 : s.x * 0.06), y0 + s.y * (tall ? 0.84 : 0.72), cz), 0.32);
+      cab.attributes.color.array.fill(1, 24, 36); // its roof in the car's colour, glass round the sides
+      const g = mergeGeometries([body, cab]); g.computeBoundingSphere(); return g;
+    };
+    this.lodMeshes = [...Object.values(this.typeMeshes), ...this.parkedMeshes];
+    for (const im of this.lodMeshes) { let g = low.get(im.geometry); if (!g) low.set(im.geometry, (g = lowCar(im.geometry))); im.userData.geoNear = im.geometry; im.userData.geoFar = g; }
     this._m4 = m4; this._q = q; this._e = e; this._p = p; this._one = one; this._c = col;
     this.reset();
   }
@@ -183,6 +204,7 @@ export class Traffic {
     im.setColorAt(car.slot, this._c.set(hex)); im.instanceColor.needsUpdate = true;
   }
 
+  lod(far) { for (const im of this.lodMeshes) im.geometry = far ? im.userData.geoFar : im.userData.geoNear; }
   reset() {
     this.head.fill(-1); // nobody in the hash until the next step builds it
     const r = this.r = rng(this.opts.seed ?? 99);

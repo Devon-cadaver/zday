@@ -36,19 +36,31 @@ function flowerGeometry() {
 const mat = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.55, ...o });
 // a flytrap the size of a car: a thick stalk in a ruff of leaves, two jaws hinged at the back (green outside, red
 // inside), spiked along their rims; userData.upper / lower are the jaws (rotate x to open), userData.head turns
+// the shapes, made once and shared by every flytrap (userData.shared: never disposed)
+let TRAP = null;
+function trapShapes() {
+  if (TRAP) return TRAP;
+  const leaves = [], teeth = (up) => { const t = []; for (let k = 0; k < 11; k++) { const a = -Math.PI * 0.9 + k / 10 * Math.PI * 1.8, c = new THREE.ConeGeometry(0.1, 0.55, 5); if (up) c.rotateX(Math.PI); t.push(c.translate(Math.sin(a) * 1.6, up ? -0.18 : 0.18, 1.25 + Math.cos(a) * 1.31)); } return mergeGeometries(t); };
+  for (let k = 0; k < 5; k++) leaves.push(new THREE.SphereGeometry(1, 8, 6).scale(1.4, 0.18, 0.55).translate(1.2, 0.25, 0).rotateZ(0.25).rotateY(k / 5 * Math.PI * 2 + 0.3));
+  const bowl = (up) => { const b = new THREE.SphereGeometry(1.6, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.5, 0.82).translate(0, 0, 1.25); if (!up) b.rotateX(Math.PI).translate(0, 0, 2.5); return b; };
+  TRAP = { stalk: new THREE.CylinderGeometry(0.35, 0.6, 2.3, 8).translate(0, 1.15, 0), leaves: mergeGeometries(leaves), bowlUp: bowl(true), bowlDown: bowl(false), teethUp: teeth(true), teethDown: teeth(false) };
+  for (const g of Object.values(TRAP)) g.userData.shared = true;
+  return TRAP;
+}
+// a flytrap's own materials and any shapes of its own, freed (the shared ones stay)
+export function freeModel(root) {
+  const seen = new Set();
+  root.traverse(o => { if (o.geometry && !o.geometry.userData.shared) o.geometry.dispose(); for (const m of [].concat(o.material || [])) if (!seen.has(m)) { seen.add(m); m.dispose(); } });
+}
 export function flytrapModel() {
-  const g = new THREE.Group(), green = mat('#4f8a34'), red = mat('#c42a44', { side: THREE.BackSide, roughness: 0.4 }), tooth = mat('#ece6c4'), stalk = mat('#365f27'), leaf = mat('#3f7a2c');
-  const st = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.6, 2.3, 8).translate(0, 1.15, 0), stalk); st.castShadow = true; g.add(st);
-  for (let k = 0; k < 5; k++) { const l = new THREE.Mesh(new THREE.SphereGeometry(1, 8, 6).scale(1.4, 0.18, 0.55).translate(1.2, 0.25, 0), leaf); l.rotation.y = k / 5 * Math.PI * 2 + 0.3; l.rotation.z = 0.25; l.castShadow = true; g.add(l); }
+  const S = trapShapes(), g = new THREE.Group(), green = mat('#4f8a34'), red = mat('#c42a44', { side: THREE.BackSide, roughness: 0.4 }), tooth = mat('#ece6c4'), stalk = mat('#365f27'), leaf = mat('#3f7a2c');
+  const st = new THREE.Mesh(S.stalk, stalk); st.castShadow = true; g.add(st);
+  const lv = new THREE.Mesh(S.leaves, leaf); lv.castShadow = true; g.add(lv); // a ruff of five leaves
   const head = new THREE.Group(); head.position.set(0, 2.35, 0); g.add(head);
   const jaw = (up) => {
     const pv = new THREE.Group(); pv.position.set(0, 0, -1.25); head.add(pv);
-    const bowl = new THREE.SphereGeometry(1.6, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.5, 0.82).translate(0, 0, 1.25); if (!up) bowl.rotateX(Math.PI).translate(0, 0, 2.5);
-    for (const m of [green, red]) { const o = new THREE.Mesh(bowl, m); o.castShadow = m === green; pv.add(o); }
-    for (let k = 0; k < 11; k++) { // teeth round the front of the rim
-      const a = -Math.PI * 0.9 + k / 10 * Math.PI * 1.8, t = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.55, 5), tooth);
-      t.position.set(Math.sin(a) * 1.6, up ? -0.18 : 0.18, 1.25 + Math.cos(a) * 1.31); t.rotation.x = up ? Math.PI : 0; pv.add(t);
-    }
+    for (const m of [green, red]) { const o = new THREE.Mesh(up ? S.bowlUp : S.bowlDown, m); o.castShadow = m === green; pv.add(o); }
+    pv.add(new THREE.Mesh(up ? S.teethUp : S.teethDown, tooth)); // teeth round the front of the rim
     return pv;
   };
   const upper = jaw(true), lower = jaw(false);
@@ -221,7 +233,7 @@ export class Plant {
   trapStep(tr, h) {
     if (tr.dead) return;
     const D = this.D, { people, traffic } = D.ctx; tr.t += h;
-    if (tr.state === 'burn') { if (tr.t > 1.8) { tr.dead = true; this.g.remove(tr.m); } return; }
+    if (tr.state === 'burn') { if (tr.t > 1.8) { tr.dead = true; this.g.remove(tr.m); freeModel(tr.m); } return; }
     if (this.withering >= 0 && tr.state !== 'burn') { tr.state = 'burn'; tr.t = 0; return; }
     if (tr.state === 'rise') { if (tr.t > 1.6) { tr.state = 'open'; tr.t = 0; } return; }
     if (tr.state === 'open' && (tr.look -= h) <= 0) {
@@ -325,7 +337,7 @@ export class Plant {
   }
   dispose() {
     this.D.ctx.scene.remove(this.g);
-    this.vines.geometry.dispose(); this.vines.material.dispose(); this.blooms.geometry.dispose(); this.blooms.material.dispose();
+    freeModel(this.g); // the vines, the flowers, the heart, the flytraps still standing
   }
 }
 

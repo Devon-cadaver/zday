@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { cutGround } from './holes.js';
 
-const G = 9.8;
+const G = 9.8, OBJ_CAP = 110, OBJ_SHADOWS = 60; // whole objects (each a draw call, two with its shadow): a busy storm threw hundreds of cars
 const M = { FREE: 0, ORBIT: 1, FLY: 2, REST: 3, FLOAT: 4, LIFT: 5, SINK: 6 };
 export { M as DEBRIS_MODE };
 
@@ -64,6 +64,11 @@ export class Debris {
 
   // a whole object (building shell, car). opts like add(); 'lift' = sucked up and shrunk away, 'sink' = collapses into the ground
   addObject(o, mode, opts = {}) {
+    if (this.objs.length >= OBJ_CAP) { // the oldest wreck lying still (else the oldest afloat) sinks away to make room
+      const old = this.objs.find(q => q.mode === M.REST && q.t < q.life) || this.objs.find(q => q.mode === M.FLOAT);
+      if (old) { if (old.mode === M.FLOAT) { old.mode = M.REST; old.t = 0; } old.life = Math.min(old.life, old.t); }
+    }
+    if (this.objs.length >= OBJ_SHADOWS) o.traverse(m => { m.castShadow = false; }); // past that, no shadows for the newcomers
     this.scene.add(o);
     const d = { o, mode: { orbit: M.ORBIT, fly: M.FLY, float: M.FLOAT, lift: M.LIFT, sink: M.SINK, rest: M.REST }[mode], t: 0, vort: opts.vort ?? -1,
       v: new THREE.Vector3(...(opts.v || [0, 0, 0])), w: new THREE.Vector3((Math.random() - 0.5) * 4, (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 4),

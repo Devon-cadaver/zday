@@ -12,7 +12,7 @@ import { cutGround } from './holes.js';
 import { HALF, RW, SW, CURB } from './city.js';
 import { rng } from './textures.js';
 import { Lives } from './lives.js';
-import { ARCHETYPES, figureGeometry, figureMaterial, figureAttributes, rollArchetype, OFFICER_LOOK, FIREFIGHTER_LOOK, SOLDIER_LOOK, ALIEN_LOOK, ZTYPES, rollZombieType, ZSKIN, FLAG, HAT, RADIOACTIVE } from './figures.js';
+import { ARCHETYPES, figureGeometry, figureGeometryLow, figureMaterial, figureAttributes, rollArchetype, OFFICER_LOOK, FIREFIGHTER_LOOK, SOLDIER_LOOK, ALIEN_LOOK, ZTYPES, rollZombieType, ZSKIN, FLAG, HAT, RADIOACTIVE } from './figures.js';
 
 export const ST = { WALK: 0, IDLE: 1, FLEE: 2, RETURN: 3, GRABBED: 4, TURNING: 5, ZOMBIE: 6, FALLING: 7, DEAD: 8, SEEK: 9, INSIDE: 10, ROOF: 11, PILE: 12, CLIMB: 13, JUMP: 14, COP: 15, FIREMAN: 16, EVAC: 17, BOARD: 18, EXT: 19, AIR: 20, RIOT: 21, ALIEN: 22, FROZEN: 23, FILM: 24, HELD: 25, PRAY: 26, FIGHT: 27, STEAL: 28, SWIM: 29, GO: 30 }; // GO: on the way somewhere in their day (lives.js)
 // how someone takes danger when it comes: most run or hide, some fight back, some go for a car, some kneel and pray
@@ -132,6 +132,8 @@ export class People {
     this.uTime = fm.uTime; this.uGlow = fm.uGlow;
     this.mesh = new THREE.InstancedMesh(geo, fm.mat, N);
     this.mesh.castShadow = false; this.mesh.receiveShadow = true; this.mesh.frustumCulled = false;
+    this.geoNear = geo; this.geoFar = figureGeometryLow(); // zoomed out (lod): the figure in fewer pieces, sharing every per-person attribute
+    for (const [k, a] of Object.entries(geo.attributes)) if (a.isInstancedBufferAttribute) this.geoFar.setAttribute(k, a);
     parent.add(this.mesh);
     // their shadows: a slim block per person in the same place, drawn only into the shadow map (the shadow pass never ran the figure's posing anyway)
     this.shadow = new THREE.InstancedMesh(new THREE.BoxGeometry(0.3, 1.7, 0.44).translate(0, 0.85, 0), fm.mat, N);
@@ -277,6 +279,7 @@ export class People {
   }
   walkable(x, z) { const c = this.cellOf(x, z); return c >= 0 && (this.grid[c] & 1) === 1; }
   onRoad(x, z) { const c = this.cellOf(x, z); return c >= 0 && (this.grid[c] & 2) === 2; }
+  lod(far) { this.mesh.geometry = far ? this.geoFar : this.geoNear; } // zoomed out: the figures in fewer pieces
   groundY(x, z) { const c = this.cellOf(x, z); return c >= 0 && (this.grid[c] & 2) ? 0 : CURB; }
 
   snapWalkable(x, z, maxR = 30) {

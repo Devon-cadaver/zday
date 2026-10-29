@@ -98,10 +98,10 @@ function top(bk, b, y, col, sc = 8) {
 }
 function box(bk, b, y0, y1, col, uv = PLAIN) { sides(bk, b, y0, y1, col, uv); top(bk, b, y1, toWhite(col, 0.06)); }
 
-function crownGeometry() {
+function crownGeometry(detail = 1) { // detail 0: the same crown in a quarter of the facets, for far off
   const parts = [];
   const offs = [[0, 0, 0, 1], [0.55, 0.2, 0.25, 0.72], [-0.5, 0.25, -0.3, 0.7], [0.1, 0.55, -0.35, 0.62], [-0.25, 0.15, 0.5, 0.66], [0.35, -0.1, -0.5, 0.6]];
-  for (const [x, y, z, s] of offs) { const g = new THREE.IcosahedronGeometry(s, 1); g.translate(x, y, z); parts.push(g); }
+  for (const [x, y, z, s] of offs) { const g = new THREE.IcosahedronGeometry(s, detail); g.translate(x, y, z); parts.push(g); }
   const m = mergeGeometries(parts);
   const pos = m.attributes.position; const col = new Float32Array(pos.count * 3);
   for (let i = 0; i < pos.count; i++) {
@@ -1139,7 +1139,8 @@ export function buildCity(tex, opts = {}) {
   const crownT = instTiled(crownGeometry(), std({ vertexColors: true, roughness: 1 }), crowns, (c) => {
     e.set(0, r() * Math.PI * 2, 0); q.setFromEuler(e);
     m4.compose(p.set(c.x, c.y, c.z), q, s.set(c.s, c.s * (0.8 + r() * 0.3), c.s));
-  }, true, new THREE.IcosahedronGeometry(1.05, 1).translate(0.05, 0.25, 0)); // its shadow: one lumpy ball instead of six
+  }, true, new THREE.IcosahedronGeometry(1.05, 0).translate(0.05, 0.25, 0)); // its shadow: one lumpy ball instead of six
+  const crownNear = crownT.meshes.length ? crownT.meshes[0].geometry : null, crownFar = crownGeometry(0);
   const trunkG = new THREE.CylinderGeometry(0.12, 0.2, 1, 5); trunkG.translate(0, 0.5, 0);
   const trunkT = instTiled(trunkG, std({ color: '#5a4430' }), trunks, (t) => { q.identity(); m4.compose(p.set(t.x, t.y, t.z), q, s.set(t.s, t.h + 0.6, t.s)); });
   const tankG = new THREE.CylinderGeometry(1, 1, 1, 10); tankG.translate(0, 0.5, 0);
@@ -1349,6 +1350,7 @@ export function buildCity(tex, opts = {}) {
   return {
     buildings, char, uncharAll, lamps, mats,
     dead, buildingsNear, hideBuilding, extractBuilding, warpBuilding, addRubble, clearRubble, restoreBuilding, takeStreetNear, restoreAll,
+    lod: (far) => { if (crownNear) for (const im of crownT.meshes) im.geometry = far ? crownFar : crownNear; }, // zoomed out: the tree crowns in fewer facets
     group, sx, sz, NB, parked, crowds, walkBlocks, open, layout, nid, roofPoint, rail, scramble, hooks,
     bounds: { x0: sx[0], x1: sx[NB], z0: sz[0], z1: sz[NB] },
     stats: { crowns: crowns.length, tanks: tanks.length, parked: parked.length, verts: Object.values(B).flat().reduce((a, b) => a + b.v, 0) },
