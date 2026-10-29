@@ -507,7 +507,7 @@ export class Kaiju {
       let roof = 0; city.buildingsNear(ix, iz, 0.5, (k, d, b) => { roof = Math.max(roof, b.top); });
       if (iy <= Math.max(0.5, roof)) break;
     }
-    fire.burst(ix, iy + 1, iz, 12, 2.4);
+    fire.burst(ix, iy + 1, iz, 12, 2.4); D.burnPlants(ix, iz, 9, 1.5);
     city.buildingsNear(ix, iz, 9, (k) => { if (Math.random() < 0.55) fire.igniteBuilding(k); });
     traffic.near(ix, iz, 9, (c) => { if (!c.gone && !c.burnt && c.mode !== 5) { c.burnt = true; fire.carFire(c.x, c.z); traffic.crash(c, null, 4); } });
     people.scare(ix, iz, 45, 0.95);

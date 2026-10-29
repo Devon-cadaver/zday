@@ -6,6 +6,7 @@ import { saucerMesh, beamMesh } from './aliens.js';
 import { tripodModel } from './tripod.js';
 import { wormModel } from './worm.js';
 import { kaijuModel } from './kaiju.js';
+import { flytrapModel } from './plant.js';
 
 const std = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.8, ...o });
 const glow = (r, g, b, o = {}) => new THREE.MeshBasicMaterial({ color: new THREE.Color(r, g, b), ...o });
@@ -176,11 +177,17 @@ function meltdown() {
 }
 
 // name, model, how much of it the camera should frame
+// the killer plant's flytrap, gaping and snapping shut
+function flytrap() {
+  const m = flytrapModel(), u = m.userData; let t = 0;
+  u.tick = (dt) => { t += dt; const k = (t % 4) / 4, o = k < 0.7 ? 0.9 + Math.sin(t * 1.5) * 0.06 : k < 0.74 ? 0.9 * (1 - (k - 0.7) / 0.04) : 0.05 + (k - 0.74) * 3.3; u.upper.rotation.x = -Math.min(0.9, o); u.lower.rotation.x = Math.min(0.9, o) * 0.22; };
+  return m;
+}
 export function disasterExamples() {
   return [
     ['Tornado', tornado(), 17], ['Earthquake', quake(), 10], ['Flood', flood(), 10], ['Tsunami', tsunami(), 15], ['Sinkhole', sinkhole(), 12],
     ['Meteor', meteor(), 17], ['Volcano', volcano(), 16], ['Lava', lava(), 10], ['Dust storm', haboob(), 16], ['Cold wave', blizzard(), 10],
     ['Solar flare', solar(), 11], ['Alien saucer', saucer(), 13], ['Alien tripod', tripod(), 27], ['Black hole', blackhole(), 12],
-    ['Nuclear attack', nuke(), 19], ['Plant meltdown', meltdown(), 20], ['Giant worm', worm(), 42], ['Kaiju', kaiju(), 62],
+    ['Nuclear attack', nuke(), 19], ['Plant meltdown', meltdown(), 20], ['Giant worm', worm(), 42], ['Kaiju', kaiju(), 62], ['Killer plant', flytrap(), 5],
   ];
 }

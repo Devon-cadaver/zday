@@ -237,12 +237,12 @@ body.zd-globe-on #zd-compass,body.zd-globe-on #zd-pause{display:none}
 `;
 
 // what each unit does, for the unlocks page
-const UNIT_DESC = { police: 'Officers who fight zombies and arrest rioters', bus: 'Takes people out of a dangerous street', build: 'Rebuilds a fallen building', camp: 'Shelters people nearby until the rebuilding is done',
+const UNIT_DESC = { flamer: 'Soldiers with flamethrowers who burn out a killer plant', napalm: 'A jet lays a carpet of fire along its run', police: 'Officers who fight zombies and arrest rioters', bus: 'Takes people out of a dangerous street', build: 'Rebuilds a fallen building', camp: 'Shelters people nearby until the rebuilding is done',
   chaser: 'Spots tornadoes and aliens and calls in help', boat: 'Pulls people out of flood water', coast: 'Boats and helicopters at once to the worst spots in a flood', barrier: 'An inflatable barrier that holds back a stretch of a tsunami', fire: 'Puts out burning buildings', hazmat: 'Clears radiation so rebuilding can start', seeder: 'Weakens tornadoes and breaks up storms',
   water: 'Drops water on a fire (life rafts over a flood)', rescue: 'Lifts survivors off a rooftop or out of flood water on a rope', heroes: 'Dragonfly, Nova and Tempo: they beat super villains and throw meteors and missiles into space',
   apc: 'A squad of soldiers to hold a crossing', strike: 'Bombs one spot', nuke: 'Wipes out a whole district' };
 const THREAT_HINT = { villains: 'Blur, Tyrant and Weaver. Only the super heroes can beat them' };
-const UNIT_NAMES = { heroes: 'Super heroes (hero signal)', build: 'Construction crew', camp: 'Medical camp', hazmat: 'Hazmat team', police: 'Police cruiser', bus: 'Evacuation bus', chaser: 'Storm chaser', seeder: 'Cloud seeder', boat: 'Rescue boat', coast: 'Coast Guard', barrier: 'Flood barrier', fire: 'Fire truck', water: 'Water helicopter', rescue: 'Rescue helicopter', apc: 'Army APC', strike: 'Airstrike', nuke: 'Nuke' };
+const UNIT_NAMES = { flamer: 'Flame team', napalm: 'Napalm jets', heroes: 'Super heroes (hero signal)', build: 'Construction crew', camp: 'Medical camp', hazmat: 'Hazmat team', police: 'Police cruiser', bus: 'Evacuation bus', chaser: 'Storm chaser', seeder: 'Cloud seeder', boat: 'Rescue boat', coast: 'Coast Guard', barrier: 'Flood barrier', fire: 'Fire truck', water: 'Water helicopter', rescue: 'Rescue helicopter', apc: 'Army APC', strike: 'Airstrike', nuke: 'Nuke' };
 
 // the buttons along the bottom: a line drawing over a short name
 const svg = (d) => '<svg viewBox="0 0 24 24" aria-hidden="true">' + d + '</svg>';

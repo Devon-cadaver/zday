@@ -25,6 +25,7 @@ import { Brawl } from './brawl.js';
 import { Worm } from './worm.js';
 import { Kaiju } from './kaiju.js';
 import { Spill } from './spill.js';
+import { Plant, FlameTeam } from './plant.js';
 
 export const threatName = (h) => (h === 'zombies' ? 'Zombie outbreak' : HAZARDS[h].name);
 
@@ -47,6 +48,7 @@ export const HAZARDS = {
   villains: { name: 'Super villains', tap: true },
   worm: { name: 'Giant worm', tap: true },
   kaiju: { name: 'Kaiju', tap: true },
+  plant: { name: 'Killer plant', tap: true },
 };
 // called by the hero signal rather than picked as a disaster
 export const HELPERS = { heroes: { name: 'Hero signal' } };
@@ -174,12 +176,19 @@ export class Disasters {
     else if (type === 'villains') ev = new Villains(this, x, z, opts);
     else if (type === 'worm') ev = new Worm(this, x, z, opts);
     else if (type === 'kaiju') ev = new Kaiju(this, x, z, opts);
+    else if (type === 'plant') ev = new Plant(this, x, z, opts);
     else if (type === 'heroes') { const on = this.list.find(e => e.type === 'heroes' && e.alive && !e.leaving); if (on) { on.signal(x, z); return on; } ev = new Heroes(this, x, z, opts); }
     if (!ev) return null;
     this.list.push(ev); this.stats.hazards++;
     return ev;
   }
 
+  // fire at (x, z) out to R burns whatever of a killer plant is there (napalm, a flame team, the kaiju's breath); how many pieces caught
+  burnPlants(x, z, R, power = 1) { let n = 0; for (const e of this.list) if (e.type === 'plant' && e.alive) n += e.burnAt(x, z, R, power); return n; }
+  // the nearest living part of a killer plant within R of (x, z): [x, z], or null
+  plantNear(x, z, R) { let best = null, bd = 1e9; for (const e of this.list) { if (e.type !== 'plant' || !e.alive) continue; const p = e.nearest(x, z, R); if (p && Math.hypot(p[0] - x, p[1] - z) < bd) { bd = Math.hypot(p[0] - x, p[1] - z); best = p; } } return best; }
+  // a flame team on foot at (x, z), torching the plant within reach (plant.js)
+  flameTeam(x, z, o) { const f = new FlameTeam(this, x, z, o); this.leftovers.push(f); return f; }
   // fire trucks parked at a fire: the roof cannon arcs a jet onto the building nearest them that is burning, and it helps put it out
   cannons(h) {
     const { traffic, fire, city } = this.ctx;

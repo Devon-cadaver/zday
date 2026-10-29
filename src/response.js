@@ -3,7 +3,7 @@
 // water drop on a big blaze, rescue helicopters to people stranded on roofs,
 // police to zombies and riots (and a police bus for the arrested), storm chasers
 // and cloud seeding for tornadoes, airstrikes on alien tripods and saucers,
-// hazmat for radiation, and the hero signal for super villains and incoming
+// flame teams and napalm runs for a killer plant, hazmat for radiation, and the hero signal for super villains and incoming
 // meteors and missiles. Once a disaster is over, construction crews rebuild
 // what fell, with a medical camp by the work to hold the people from round
 // there. Also the pieces Commander shares: cloud seeding, camp spots, police buses.
@@ -156,6 +156,11 @@ export class Responders {
       if (e.type === 'tornado' && e.tw && e.tw.onGround) {
         if (helis && this.ready('seed', 16)) { const x = e.tw.x, z = e.tw.z; helis.seed(x, z, { onSeed: (sx, sz) => { const r = seedEffect(D, sx, sz); if (r.hit) g.toast('Cloud seeding: the tornado is losing strength', 3000); } }); }
         if (this.out('chaser') < 1 && this.ready('chaser', 60)) this.send('chaser', e.tw.x, e.tw.z);
+      }
+      // the killer plant: flame teams to its flytraps (or its heart), napalm runs over it
+      if (e.type === 'plant' && e.withering < 0) {
+        if (e.t > 25 && this.ready('flamer', 20)) { const tr = e.traps.find(q => !q.dead && q.state !== 'burn'), at = tr ? [tr.x, tr.z] : [e.x, e.z]; this.send('apc', at[0], at[1], (ax, az) => D.flameTeam(ax, az)); }
+        if (helis && e.t > 50 && this.ready('napalm', 45)) helis.napalm(e.x, e.z, { onBurn: (bx, bz, R) => D.burnPlants(bx, bz, R, 2) });
       }
       // the kaiju: airstrikes until it turns back
       if (e.type === 'kaiju' && e.state !== 'leave' && helis && this.ready('kaiju', 9)) helis.strike(e.x, e.z, { radius: 25 });

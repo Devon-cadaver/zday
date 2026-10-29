@@ -31,6 +31,16 @@ export class Helicopters {
     return jet;
   }
 
+  // a napalm run: an A-10 low along a line through (tx, tz), canisters bursting into a carpet of fire behind it (what is
+  // there catches; opts.onBurn(x, z, R) at each, for the killer plant)
+  napalm(tx, tz, opts = {}) {
+    const obj = buildVehicle('a10'); obj.scale.setScalar(2.2);
+    const a = Math.random() * Math.PI * 2, R = 900, hx = Math.cos(a), hz = Math.sin(a);
+    const jet = { obj, x: tx - hx * R, y: 60, z: tz - hz * R, hx, hz, tx, tz, state: 'in', t: 0, napalm: true, speed: 75, alt: 60, onBurn: opts.onBurn, dropT: 0 };
+    obj.position.set(jet.x, jet.y, jet.z); this.scene.add(obj); this.jets.push(jet);
+    jet.eta = R / 75;
+    return jet;
+  }
   // a cloud seeding run: a light plane crosses (tx, tz) trailing silver iodide; onSeed when it is over the target
   seed(tx, tz, opts = {}) {
     const obj = buildVehicle('seeder_plane'); obj.scale.setScalar(2.4);
@@ -139,6 +149,16 @@ export class Helicopters {
       if (j.seed) { // no bomb: a long white trail of seeding flares over the target, and the clouds answer
         if (Math.abs(along) < 260 && (j.trailT -= h) <= 0) { j.trailT = 0.12; this.fire.spray(j.x - j.hx * 6, j.z - j.hz * 6, j.y - 2, 5, 4, 3.2); }
         if (j.state === 'in' && along <= 0) { j.state = 'done'; if (j.onSeed) j.onSeed(j.tx, j.tz); }
+        if (along < -1300) { this.scene.remove(j.obj); j.dead = true; }
+        continue;
+      }
+      if (j.napalm) { // canisters all along the run over the target, bursting into fire just behind it
+        if (Math.abs(along) < 85 && (j.dropT -= h) <= 0) {
+          j.dropT = 0.12; const bx = j.x - j.hx * 30, bz = j.z - j.hz * 30;
+          this.fire.burst(bx, 1.5, bz, 18, 3.2); this.fire.burst(bx + (Math.random() - 0.5) * 10, 1, bz + (Math.random() - 0.5) * 10, 10, 2.4);
+          this.city.buildingsNear(bx, bz, 7, (k) => { if (Math.random() < 0.25) this.fire.igniteBuilding(k); }); this.people.scare(bx, bz, 35, 0.9);
+          if (j.onBurn) j.onBurn(bx, bz, 11);
+        }
         if (along < -1300) { this.scene.remove(j.obj); j.dead = true; }
         continue;
       }

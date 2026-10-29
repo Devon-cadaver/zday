@@ -23,11 +23,13 @@ export const UNITS = [
   { id: 'build', name: 'Construction', cost: 100, cd: 20, alert: 0 }, // rebuilds a fallen building
   { id: 'camp', name: 'Medical camp', cost: 120, cd: 40, alert: 0 }, // shelters people nearby until the rebuilding is done
   { id: 'hazmat', name: 'Hazmat team', cost: 120, cd: 30, alert: 0 }, // clears radiation so building can start, decontaminates people
+  { id: 'flamer', name: 'Flame team', cost: 150, cd: 30, alert: 0 }, // soldiers with flamethrowers: burn out a killer plant
   { id: 'heroes', name: 'Hero signal', cost: 300, cd: 120, alert: 0 }, // Dragonfly, Nova and Tempo: catch meteors and missiles, slow what flies
   { id: 'water', name: 'Water heli', cost: 150, cd: 60, alert: 2 },
   { id: 'rescue', name: 'Rescue heli', cost: 120, cd: 45, alert: 2 },
   { id: 'apc', name: 'Army APC', cost: 250, cd: 60, alert: 3 },
   { id: 'strike', name: 'Airstrike', cost: 300, cd: 45, alert: 4 },
+  { id: 'napalm', name: 'Napalm jets', cost: 350, cd: 50, alert: 3 }, // a carpet of fire along a jet's run: the killer plant burns
   { id: 'nuke', name: 'Nuke', cost: 1000, cd: 9999, alert: 4, once: true },
 ];
 const ALERTS = ['Quiet', 'Incident', 'Spreading', 'Major incident', 'City emergency'];
@@ -35,7 +37,7 @@ const FLOOD_CD = { boat: 5, rescue: 8, water: 15 }; // once the streets flood th
 const GROUND = new Set(['police', 'bus', 'fire', 'apc', 'chaser', 'build', 'camp', 'hazmat']); // nothing on wheels gets through flooded streets
 const ROUND = 600;
 // the long ones are shorter in a round (playtests: villains, the kaiju and the worm outlasted the round, so it could never end secured)
-const LIFE = { villains: 240, kaiju: 200, worm: 160, aliens: 140 };
+const LIFE = { villains: 240, kaiju: 200, worm: 160, aliens: 140, plant: 220 };
 // the nuclear strike in a round: a smaller warhead and a longer warning, so people can be got clear (it killed 44% of the town before anything could be done)
 const OPTS = { nuclear: { size: 170, warn: 30 } };
 const START_RP = 250; // enough for a first cordon (playtests: 100 bought two cruisers and the outbreak got away)
@@ -245,6 +247,8 @@ export class Commander {
     else if (id === 'build') this.sendBuild(x, z);
     else if (id === 'camp') this.sendCamp(x, z);
     else if (id === 'hazmat') this.sendHazmat(x, z);
+    else if (id === 'flamer') this.sendFlamers(x, z);
+    else if (id === 'napalm') this.sendNapalm(x, z);
     else if (id === 'heroes') { this.g.disasters.start('heroes', x, z); this.spend('heroes'); this.heroCalls++; }
   }
 
@@ -507,6 +511,19 @@ export class Commander {
     g.toast('APC rolling, about ' + Math.ceil(car.eta) + ' s out');
   }
 
+  // a flame team: an armoured truck to (x, z), soldiers with flamethrowers out of it torching the plant in reach
+  sendFlamers(x, z) {
+    const g = this.g;
+    const car = g.traffic.dispatchTo(x, z, { kind: 'apc', onArrive: (ax, az) => { g.disasters.flameTeam(ax, az); g.toast('Flame team on the ground in the ' + this.district(ax, az) + '. Burning it out'); }, onLost: () => { this.lost++; g.toast('The flame team was lost on the way'); } });
+    if (!car) { g.toast('No flame team available'); return; }
+    this.spend('flamer'); g.toast('Flame team rolling, about ' + Math.ceil(car.eta) + ' s out');
+  }
+  // napalm: a jet low along a line through (x, z), a carpet of fire behind it (the plant burns, and what it lands on)
+  sendNapalm(x, z) {
+    const g = this.g, jet = g.helis.napalm(x, z, { onBurn: (bx, bz, R) => g.disasters.burnPlants(bx, bz, R, 2) });
+    this.spend('napalm');
+    this.report(x, z, 'Napalm run inbound. ' + Math.ceil(jet.eta) + ' s. Clear the area!', 40, true, 'Napalm', true);
+  }
   sendStrike(x, z) {
     const g = this.g;
     const jet = g.helis.strike(x, z, { radius: 25, onBlast: (bx, bz) => { if (g.camera.position.distanceTo(g.controls.target) < 500) g.shake = Math.max(g.shake, 1); } });
