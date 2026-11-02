@@ -117,7 +117,7 @@ export class HomeBase {
     g.toast('Home base. Tap the floor to walk; walk up to a station', 3500);
   }
   stop(quiet, keepRoom) { if (!this.active) return; const g = this.g, { camera, controls, post } = this.ctx, S = g.disasters.ctx.scene; this.active = false; if (!keepRoom) post.opts.dof = this.savedDof; this.close(); if (this.el) this.el.remove(); removeEventListener('keydown', this.onKey); if (this.h) S.remove(this.h.r.root); if (!keepRoom) { if (this.room) S.remove(this.room); this.room = null; this.ext.visible = true; } document.body.classList.remove('zd-flying'); g.focusAt = null;
-    if (!quiet) { const d = this.S.d / 2; controls.target.set(this.x, this.y + 7, this.z); camera.fov = 45; camera.updateProjectionMatrix(); camera.position.set(this.x + 22, this.y + 26, this.z + d + 30); camera.lookAt(controls.target); controls.enabled = true; controls.update(); g.toast('Outside the base. Open Disasters to unleash one; Home Base to go back in', 3500); } }
+    if (!quiet) { const d = this.S.d / 2; controls.target.set(this.x, this.y + 9, this.z); camera.fov = 45; camera.updateProjectionMatrix(); camera.position.set(this.x + 42, this.y + 40, this.z + d + 58); camera.lookAt(controls.target); controls.enabled = true; controls.update(); g.toast('Outside the base. Open Disasters to unleash one; Home Base to go back in', 3500); } }
   // each frame: walk to the tap, stand at a station, the steady camera over the room
   frame(dt, tg) {
     const g = this.g, h = this.h; if (!g.paused && dt > 0) {
