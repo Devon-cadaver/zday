@@ -17,6 +17,7 @@ import { SEE } from './see.js';
 import { DisasterTV } from './tv.js';
 import { THUMB } from './thumbs.js';
 import { LAB } from './lab.js';
+import { HeroGame, HS } from './herogame.js';
 
 const CSS = `
 #zd-top{position:fixed;left:0;right:0;top:0;display:flex;gap:6px;align-items:center;justify-content:center;flex-wrap:wrap;
@@ -162,8 +163,8 @@ const CSS = `
 #zd-menu .ufo .mode .lab{position:absolute;z-index:2;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:2px;width:max-content;white-space:nowrap;text-align:center;pointer-events:none;text-transform:uppercase;opacity:1;font-size:8.5px} /* the title in capitals, the line under it as it is (.mode span) */
 #zd-menu .ufo .mode b{font-size:10.5px;letter-spacing:.03em;font-weight:900;line-height:1.05}#zd-menu .ufo .mode span{font-size:8.5px;font-weight:600;text-transform:none;opacity:.92}
 #zd-menu .ufo .mode .lab svg{width:19px;height:19px;filter:drop-shadow(0 0 4px rgba(255,255,255,.7))}
-#zd-menu .ufo .mode[data-play="commander"]{--c:#45ef75;--c1:#14a847;--c2:#05461c;--g:rgba(69,239,117,.4)} /* Defend green, Sandbox blue (Sean) */
-#zd-menu .ufo .mode[data-go="be"]{--c:#ff4a78;--c1:#d6164a;--c2:#5a061f;--g:rgba(255,74,120,.45)}
+#zd-menu .ufo .mode[data-play="hero"]{--c:#45ef75;--c1:#14a847;--c2:#05461c;--g:rgba(69,239,117,.4)} /* Defend green, Sandbox blue (Sean) */
+#zd-menu .ufo .mode[data-play="villain"]{--c:#ff4a78;--c1:#d6164a;--c2:#5a061f;--g:rgba(255,74,120,.45)}
 #zd-menu .ufo .mode[data-play="sandbox"]{--c:#4fc3ff;--c1:#1f6fe6;--c2:#0a2a72;--g:rgba(79,195,255,.45)}
 #zd-menu .ufo .mode[data-play="tv"]{--c:#ff9a2e;--c1:#ec600c;--c2:#6a2300;--g:rgba(255,154,46,.45)}
 #zd-menu .ufo .orbfire{position:absolute;left:50%;top:88.7%;width:9%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;border:0;padding:0;background:none;cursor:pointer;touch-action:none;-webkit-tap-highlight-color:transparent;transition:box-shadow .2s}
@@ -391,7 +392,8 @@ export class Game {
     this.menu = document.createElement('div'); this.menu.id = 'zd-menu'; this.menu.hidden = true;
     document.body.appendChild(this.menu);
     this.modeName = mode;
-    if (mode === 'sandbox') this.mode = new Sandbox(this);
+    if (mode === 'hero' || mode === 'villain') this.mode = new HeroGame(this, mode);
+    else if (mode === 'sandbox') this.mode = new Sandbox(this);
     else if (mode === 'tv') this.mode = new DisasterTV(this);
     else if (mode === 'commander') this.mode = new Commander(this);
     else if (mode === 'be' || mode === 'storm') { // ?mode=be&kind=lava starts that disaster, ?mode=be alone opens the picker
@@ -435,7 +437,7 @@ export class Game {
   startMode(which, kind) {
     this.menu.hidden = true; this.menuOff(); this.modeName = which;
     this.top.innerHTML = ''; this.bar.innerHTML = ''; this.followChip = this.stopBtn = null; this.el.chip = null; this.setPaused(false);
-    this.mode = which === 'sandbox' ? new Sandbox(this) : which === 'be' ? new BeTheDisaster(this, kind) : which === 'tv' ? new DisasterTV(this) : new Commander(this);
+    this.mode = which === 'hero' || which === 'villain' ? new HeroGame(this, which) : which === 'sandbox' ? new Sandbox(this) : which === 'be' ? new BeTheDisaster(this, kind) : which === 'tv' ? new DisasterTV(this) : new Commander(this);
     if (this.radio) this.radio.begin(which === 'be' ? this.mode.kind : null);
   }
 
@@ -553,8 +555,8 @@ export class Game {
       const here = placeKey();
       body = top('Travel') + '<div class="btns">' + Object.keys(PLACES).map(k => '<button class="zd-btn' + (k === here ? ' main' : '') + '" type="button" data-place="' + k + '">' + PLACES[k].name + (k === here ? ' · you are here' : '') + '<div style="font-size:11px;opacity:0.7;margin-top:2px">' + PLACES[k].blurb + '</div></button>').join('') + '</div>';
     } else if (panel === 'main') { // over the globe: the four ways to play on the deck of a flying saucer (Sean), the level under it
-      body = '<div class="ufo">' + SAUCER + '<div class="modes">' + wedgeBtn(0, 'data-play="commander"', MICON.commander + '<b>Defend</b>') +
-        wedgeBtn(1, 'data-go="be"', MICON.be + '<b>Destroy</b>') +
+      body = '<div class="ufo">' + SAUCER + '<div class="modes">' + wedgeBtn(0, 'data-play="hero"', MICON.commander + '<b>Defend</b>') +
+        wedgeBtn(1, 'data-play="villain"', MICON.be + '<b>Destroy</b>') +
         wedgeBtn(2, 'data-play="sandbox"', MICON.sandbox + '<b>Sandbox</b>') +
         wedgeBtn(3, 'data-play="tv"', MICON.tv + '<b>Watch</b>') + '</div>' + // just the names (Sean: the level shows below)
         '<button class="zd-btn rim l" type="button" data-go="unlocks">Units' + (pr.bank >= 3000 && UPGRADES.some(u => pr.canBuy(u.id)) ? ' \u2022' : '') + '</button><button class="zd-btn rim r" type="button" data-go="roster">Roster</button><button class="orbfire" type="button" aria-label="Fire"></button></div>' +
@@ -632,6 +634,7 @@ export class Game {
     };
     if (which === 'tv') { const ks = Object.keys(PLACES), key = ks[Math.floor(Math.random() * ks.length)]; G.choose({ title: 'DISASTER TV · LIVE', sub: 'The end of the world, as it happens. First: ' + PLACES[key].name, key, arrive }); return; } // the whole world, then down into a town of its own choosing
     if (which === 'sandbox') { G.choose({ title: 'SANDBOX', sub: 'Tap a city to play there \u00B7 win in one to learn its name', arrive, back: () => this.showMenu() }); return; }
+    if (which === 'hero' || which === 'villain') { const s = HS.load()[which], k = PATH[s.idx % PATH.length]; G.choose({ title: (which === 'hero' ? 'DEFEND' : 'DESTROY') + ' \u00B7 TOWN ' + (s.idx + 1), sub: PLACES[k].name, key: k, arrive }); return; } // the hero game (herogame.js)
     const key = this.profile.town(which);
     G.choose({ title: (which === 'be' ? 'BE THE DISASTER' : 'COMMANDER') + ' \u00B7 LEVEL ' + (PATH.indexOf(key) + 1), sub: PLACES[key].name, key, road: true, mode: which, status: this.townStatus(which), arrive });
   }

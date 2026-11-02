@@ -27,10 +27,12 @@ Build order (one thing at a time, each tested in the Sandbox and pushed). The ch
     - [x] 3f.1 a second villain joins the fight, a breakable mask, the beaten carried off by a ship
     - [x] 3f.2 the rogue army: jets and helicopters firing on everyone, soldiers to save, saving them turns the army
 - [x] 4. Powers against disasters: Power and Use on the hero's bar, every disaster has a meter and what beats it
-- [ ] 5. The collateral meter: damage, fear, reputation, towns that remember you
-- [ ] 6. Outfits for the three
-- [ ] 7. Progression: XP, the skill tree, the campaign across the globe, the home tower
-- [ ] 8. Becoming the villain: hero fights against you
+- [x] 5. The collateral meter: damage, fear, reputation (Hero, Vigilante, Menace, Villain), towns that remember you
+- [x] 6. Outfits for the three: suit, cape, gloves and boots colours, no cape, hood, armour, long coat (unlocks with levels: not yet)
+- [x] 7. Progression: XP, the four-branch skill tree (one rank each, not three), the 17-town campaign, the tower as a menu that grows a floor a level (a tower you can walk round: not yet)
+- [x] 8. Becoming the villain: at Villain reputation the other heroes hunt you; Destroy starts you as a villain (the mirrored fight, where they tap your weak spots: not yet)
+- [ ] 9. Watch: scenarios to sit back and bet on, from the heroes and disasters involved
+- [ ] 10. Sean's test pass, then the adjustments
 
 Also done on the way: the stuck zoom on a phone fixed; the plan page at plan.html.
 

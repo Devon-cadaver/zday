@@ -50,7 +50,7 @@ function kit() {
 }
 
 // each villain's own dark colour, suit and cape (the heroes wear neon), so each can be told apart from above
-const LOOK = { Blur: ['#7a1229', '#560a1b'], Tyrant: ['#4d1672', '#340c4f'], Weaver: ['#155a33', '#0d3d22'] };
+const LOOK = { Blur: ['#7a1229', '#560a1b'], Tyrant: ['#4d1672', '#340c4f'], Weaver: ['#155a33', '#0d3d22'], Nova: ['#ff3fcf', '#c0229a'], Dragonfly: ['#3dff5c', '#23a83c'], Tempo: ['#29e3ff', '#1a9cb0'] }; // the heroes as rivals too (herogame.js)
 const VM = {};
 let MASK = null;
 function vmats(name) {
@@ -101,7 +101,7 @@ export function rig(o = {}) {
   const m = kit(), mt = o.mats || m, root = new THREE.Group(), body = new THREE.Group(); root.add(body); body.scale.setScalar(S);
   const parts = [], part = (g, mat, sx, sy, sz, x, y, z, parent) => { const me = new THREE.Mesh(g, mat); me.scale.set(sx, sy, sz); me.position.set(x, y, z); me.castShadow = true; parent.add(me); parts.push(me); return me; };
   const pivot = (parent, x, y, z) => { const p = new THREE.Group(); p.position.set(x, y, z); parent.add(p); return p; };
-  const hips = pivot(body, 0, 0.94, 0);
+  const hips = pivot(body, 0, 0.94, 0), xtra = o.extras || {};
   const sl = o.slim ? 0.88 : 1, fancy = !!mt.fancy, keep = (p) => { p.userData.keep = true; return p; }; // fancy (cloth.js looks): the extra parts, kept over the smooth body
   part(m.box, mt.suit, 0.3 * sl, 0.16, 0.18, 0, 0, 0, hips);
   const legs = [-1, 1].map(sx => {
@@ -138,7 +138,10 @@ export function rig(o = {}) {
       arms.push({ sh, el, wr, sx, row });
     }
   });
-  const cape = new Cape(torso, o.capeLen ?? 1.15, mt.cape);
+  if (xtra.hood) keep(part(m.ball, mt.cape || mt.suit, 0.135, 0.15, 0.135, 0, 0.02, -0.025, head));
+  if (xtra.plates) { keep(part(m.box, mt.badge || mt.glove || mt.suit, 0.3 * sl, 0.2, 0.05, 0, 0.1, 0.09, chest)); for (const L of legs) keep(part(m.box, mt.badge || mt.glove || mt.suit, 0.09, 0.2, 0.09, 0, -0.22, 0.03, L.hip)); }
+  if (xtra.coat) { keep(part(m.box, mt.cape || mt.suit, 0.38 * sl, 0.55, 0.22, 0, -0.32, 0, hips)); }
+  const cape = new Cape(torso, xtra.noCape ? 0.01 : o.capeLen ?? 1.15, mt.cape); if (xtra.noCape) cape.mesh.visible = false;
   return { root, body, hips, torso, chest, head, legs, arms, eyes, cape, parts, mt, o };
 }
 // the close-up body: smooth tubes swept through the same joints (flesh.js), each part in its own colour - a suit with
@@ -229,6 +232,10 @@ export function pinPose(r, f) {
     for (const a of A) { a.sh.rotation.set(dz ? -0.25 : -0.7 + 0.5 * k, 0, a.sx * (0.35 + 0.8 * k)); a.el.rotation.set(-0.9, 0, 0); }
     for (const l of L) { l.hip.rotation.x = 0.15; l.knee.rotation.x = 0.35; }
   }
+}
+export function villainRig(name, of) {
+  const base = vmats(name), mats = of ? { ...base, ...(of.suit ? { suit: clothMat(of.suit) } : null), ...(of.cape ? { cape: clothMat(of.cape, { side: THREE.DoubleSide, repeat: [5, 9] }) } : null), ...(of.dark ? { glove: clothMat(of.dark, { bumpScale: 0.15 }), boot: clothMat(of.dark, { bumpScale: 0.15 }) } : null) } : base;
+  const r = rig({ mats, arms: name === 'Weaver' ? 6 : 2, eyes: name === 'Tyrant', extras: of || {} }); relax(r); r.wings = []; return r;
 }
 export function handsOnHips(r) {
   r.legs[0].hip.rotation.z = -0.09; r.legs[1].hip.rotation.z = 0.09;
@@ -429,8 +436,8 @@ class Blur extends Villain {
 // ---------- Tyrant: flies, throws cars and buildings at each other, lasers from his eyes
 class Tyrant extends Villain {
   constructor(V, x, z) {
-    super(V, { x, z, y: 240, name: 'Tyrant', rig: { eyes: true } });
-    this.name = 'Tyrant'; this.hint = 'tap a car or a building to grab it, tap again to throw it there; hold to fire his laser eyes';
+    super(V, { x, z, y: 240, name: V.rivalName || 'Tyrant', rig: { eyes: !V.rivalName } }); if (V.rivalName) { this.mask.visible = false; this.maskBroken = true; }
+    this.name = V.rivalName || 'Tyrant'; this.hint = 'tap a car or a building to grab it, tap again to throw it there; hold to fire his laser eyes';
     this.state = 'arrive'; this.vx = this.vy = this.vz = 0; this.plan = null; this.held = null; this.ray = null; this.rayT = 2.5; this.wind = 0; this.after = 0; this.flying = []; this.pitch = 0; this.hs = 0;
     this.beams = [0, 1].map(() => { const b = strand(V.scene, kit().laser); b.renderOrder = 8; return b; });
   }
@@ -955,9 +962,12 @@ export class Villains {
     this.silk = new Splash(this.scene, 300); this.silk.mat.uniforms.uColor.value.setRGB(0.95, 0.94, 0.9); this.silk.mat.blending = THREE.NormalBlending;
     this.shots = []; this._c = new THREE.Color(); this._white = new THREE.Color('#f4f2ec');
     this.who = [];
+    if (o.rivals) { for (const n of o.rivals) { this.rivalName = n; const a = Math.random() * 6.28; this.who.push(new Tyrant(this, x + Math.cos(a) * 40, z + Math.sin(a) * 40)); } this.rivalName = null; } // the other heroes, come for you
+    else {
     if (!o.only || o.only === 'blur') this.who.push(new Blur(this, x, z));
     if (!o.only || o.only === 'tyrant') this.who.push(new Tyrant(this, x, z));
     if (!o.only || o.only === 'weaver') this.who.push(new Weaver(this, x, z));
+    }
     if (!o.quiet) D.emit({ type: 'warn', hazard: 'villains', x, z, r: 60, text: 'Super villains are attacking the ' + D.district(x, z) + ' district! Blur, Tyrant and Weaver' });
   }
   // a hero has beaten one of them: they give up and leave the city

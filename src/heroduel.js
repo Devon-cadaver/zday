@@ -13,14 +13,17 @@ import { toss } from './brawl.js';
 import { sfx } from './audio.js';
 import { LAB } from './lab.js';
 import { CLIPS, playClip } from './clips.js';
+import { heroRig } from './heroes.js';
+import { detail } from './villains.js';
+import { HS } from './herogame.js';
 
 const HIP = 0.94 * 2.2; // the hero is flown by the hips (flight.js)
 const HANDS = [1.24, 1.1]; // the hands held out ahead and together for the spin (flight.js heroPose): ahead of the hips, up from them
 const BEAM = { Nova: [3.2, 0.45, 2.4], Dragonfly: [0.7, 3.2, 0.9], Tempo: [0.5, 2.6, 3.4] }; // each hero's laser, lit past white so it glows
-const MOVES = ['kick', 'drag', 'laser', 'slam', 'jab', 'upper', 'pound', 'fling', 'hammer', 'elbow', 'freeze', 'fire', 'lightning', 'sonic', 'gravity', 'wind', 'shield', 'tk'];
+const MOVES = ['kick', 'drag', 'laser', 'slam', 'jab', 'upper', 'pound', 'fling', 'hammer', 'elbow', 'tag', 'freeze', 'fire', 'lightning', 'sonic', 'gravity', 'wind', 'shield', 'tk'];
 const POWERS = ['freeze', 'fire', 'lightning', 'sonic', 'gravity', 'wind', 'shield', 'tk']; // the ranged powers (3d): used from the dazed state like the laser
-const SAY = { kick: '🦵 FLYING KICK!', drag: '✊ BY THE NECK!', laser: '🔴 LASER BLAST!', slam: '🚀 SKY SLAM!', freeze: '❄ FREEZE!', fire: '🔥 FIRE BLAST!', lightning: '⚡ LIGHTNING!', sonic: '🔊 SONIC CLAP!', gravity: '🪐 GRAVITY PULSE!', wind: '🌬 WIND BLAST!', shield: '🛡 SHIELD!', tk: '🧠 TELEKINESIS! HOLD!', jab: '👊 JAB COMBO! TAP THE BEAT!', upper: '🥊 UPPERCUT!', pound: '💥 GROUND POUND! HOLD!', fling: '🏢 THROW THEM! DRAG TO AIM', hammer: '🔨 HAMMER THROW! CIRCLE YOUR FINGER', elbow: '⬇ ELBOW DROP! HOLD!' };
-const ICON = { freeze: '❄', fire: '🔥', lightning: '⚡', sonic: '🔊', gravity: '🪐', wind: '🌬', shield: '🛡', tk: '🧠', spin: '🌀', kick: '🦵', drag: '✊', laser: '🔴', slam: '🚀', jab: '👊', upper: '🥊', pound: '💥', fling: '🏢', hammer: '🔨', elbow: '⬇' };
+const SAY = { kick: '🦵 FLYING KICK!', drag: '✊ BY THE NECK!', laser: '🔴 LASER BLAST!', slam: '🚀 SKY SLAM!', tag: '🤝 TAG TEAM!', freeze: '❄ FREEZE!', fire: '🔥 FIRE BLAST!', lightning: '⚡ LIGHTNING!', sonic: '🔊 SONIC CLAP!', gravity: '🪐 GRAVITY PULSE!', wind: '🌬 WIND BLAST!', shield: '🛡 SHIELD!', tk: '🧠 TELEKINESIS! HOLD!', jab: '👊 JAB COMBO! TAP THE BEAT!', upper: '🥊 UPPERCUT!', pound: '💥 GROUND POUND! HOLD!', fling: '🏢 THROW THEM! DRAG TO AIM', hammer: '🔨 HAMMER THROW! CIRCLE YOUR FINGER', elbow: '⬇ ELBOW DROP! HOLD!' };
+const ICON = { tag: '🤝', freeze: '❄', fire: '🔥', lightning: '⚡', sonic: '🔊', gravity: '🪐', wind: '🌬', shield: '🛡', tk: '🧠', spin: '🌀', kick: '🦵', drag: '✊', laser: '🔴', slam: '🚀', jab: '👊', upper: '🥊', pound: '💥', fling: '🏢', hammer: '🔨', elbow: '⬇' };
 const ease = (u) => 1 - (1 - u) * (1 - u);
 const _r = new THREE.Vector3(), _w = new THREE.Vector3();
 const _a = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
@@ -424,6 +427,16 @@ export class Duel {
       return this.thrown(p > 0.6 ? '💥 CRUSHED! GO AFTER ' + v.name.toUpperCase() + '!' : '💥 ELBOW DROPPED! GO AFTER ' + v.name.toUpperCase() + '!'); }
     return true;
   }
+  // tag team: a teammate streaks in, hits them hard and is gone
+  go_tag() { const F = this.F, v = this.v, S = this.g.disasters.ctx.scene, names = ['Nova', 'Dragonfly', 'Tempo'].filter(n => n !== F.P.hero), n = names[Math.floor(Math.random() * names.length)]; this.phase = 'tag'; this.t = 0; this.tagged = false; v.pinned = 'reel'; F.act = null; this.play('guardL'); const r = this.mate = heroRig(n, HS.outfit(n)); r.root.position.set(v.x + 60, (v.y || 0) + 30, v.z + 40); S.add(r.root); r.body.rotation.x = 1.35; r.arms[1].sh.rotation.set(-3, 0, 0.1); this.title('🤝 ' + n.toUpperCase() + ' IS COMING IN!'); sfx('whoosh', v.x, v.y, v.z, { gain: 1 }); }
+  _tag(h) {
+    const v = this.v, F = this.F, r = this.mate, u = Math.min(1, this.t / 0.6), p = r.root.position;
+    if (!this.tagged) { p.x += (v.x - p.x) * u * h * 14; p.y += ((v.y || 0) + 1 - p.y) * u * h * 14; p.z += (v.z - p.z) * u * h * 14; r.root.lookAt(v.x, (v.y || 0) + 1, v.z); r.cape.update(h, 0.9, 0.9); detail(r, null, true); if (Math.random() < 0.6) this.g.fire.burst(p.x, p.y + 2, p.z, 1, 0.6); }
+    if (this.t >= 0.6 && !this.tagged) { this.tagged = true; const dx = v.x - F.pos.x, dz = v.z - F.pos.z, d = Math.hypot(dx, dz) || 1; this.play('cross'); this.hit(70); this.react('hitBody', 2); this.stop(0.09); this.g.fire.burst(v.x, (v.y || 0) + 2, v.z, 14, 2); sfx('crash', v.x, v.y + 2, v.z, { gain: 1 }); v.gripped = false; toss(v, dx / d * 34, 8, dz / d * 34); }
+    if (this.tagged) { p.y += h * 70; p.x -= h * 40; r.cape.update(h, 0.9, 0.9); detail(r, null, true); if (this.t > 1.5) { this.dropMate(); return this.thrown('🤝 DOUBLE TEAMED! GO AFTER ' + v.name.toUpperCase() + '!'); } }
+    return true;
+  }
+  dropMate() { if (!this.mate) return; const r = this.mate; this.g.disasters.ctx.scene.remove(r.root); r.cape.g.dispose(); if (r.smooth && r.smooth.mesh) r.smooth.mesh.geometry.dispose(); this.mate = null; }
   // ---------- the ranged powers (3d)
   beams(col) { if (!RAY) RAY = new THREE.CylinderGeometry(1, 1, 1, 10, 1, true).translate(0, 0.5, 0); const mat = (c, o) => new THREE.MeshBasicMaterial({ color: new THREE.Color(c[0], c[1], c[2]), transparent: true, opacity: o, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }); this.beam = [new THREE.Mesh(RAY, mat(col, 0.5)), new THREE.Mesh(RAY, mat([3.5, 3.8, 4], 0.9))]; for (const m of this.beam) { m.frustumCulled = false; m.renderOrder = 7; this.g.disasters.ctx.scene.add(m); } }
   hands() { const F = this.F, fx = Math.cos(F.yaw), fz = -Math.sin(F.yaw); return [F.pos.x + fx * 1.5, F.pos.y + 1.15, F.pos.z + fz * 1.5, fx, fz]; }
@@ -608,7 +621,7 @@ export class Duel {
     if (this.over) return false; this.over = true;
     const v = this.v, B = this.g.disasters.brawl;
     if (this.rush) { const p = this.rush.p; if (this.rush.el) this.rush.el.remove(); p.pinned = null; p.gripped = false; if (!p.tossed && !p.gone) toss(p, 0, 2, 0); this.rush = null; }
-    this.dropBeam(); this.dropIce(); this.dropBolt(); this.dropBubble(); if (this.cars) { for (const c of this.cars) { c.soft = true; this.g.disasters.ctx.traffic.fling(c, 0, 1, 0); } this.cars = null; } if (this.dodge) { this.dodge.el.remove(); this.dodge = null; } if (this.chipEl) { this.chipEl.remove(); this.chipEl = null; } if (this.aimEl) { this.aimEl.remove(); this.aimEl = null; }
+    this.dropMate(); this.dropBeam(); this.dropIce(); this.dropBolt(); this.dropBubble(); if (this.cars) { for (const c of this.cars) { c.soft = true; this.g.disasters.ctx.traffic.fling(c, 0, 1, 0); } this.cars = null; } if (this.dodge) { this.dodge.el.remove(); this.dodge = null; } if (this.chipEl) { this.chipEl.remove(); this.chipEl = null; } if (this.aimEl) { this.aimEl.remove(); this.aimEl = null; }
     if (this.S) { const i = B.drags.indexOf(this.S); if (i >= 0) { B.drags.splice(i, 1); v.gripped = false; if (!v.tossed && !v.gone) toss(v, this.S.dx * 10, 4, this.S.dz * 10); } this.S = null; }
     v.pinned = null; v.flinch = 0; v.react = null; this.F.clip = null;
     if (v.gripped) { v.gripped = false; if (!v.tossed && !v.gone) toss(v, 0, 2, 0); } // dropped, falls to the ground

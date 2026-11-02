@@ -31,7 +31,7 @@ export class HeroPower {
   get id() { const L = this.list(); return L[this.i % L.length]; }
   cycle() { this.i = (this.i + 1) % this.list().length; this.show(); }
   show() { const P = POWER[this.id]; if (this.F.powerBtn) this.F.powerBtn.textContent = P.icon + ' ' + P.name; }
-  target() { const F = this.F; let best = null, bd = 1e9; for (const e of F.g.disasters.list) { if (!e.alive || !WEAK[e.type]) continue; const w = where(e), d = w && w.x != null ? Math.hypot(w.x - F.pos.x, w.z - F.pos.z) : 9e8; if (d > REACH && !WHOLE[e.type]) continue; if (d < bd) { bd = d; best = e; } } return best; }
+  target() { const F = this.F; let best = null, bd = 1e9; for (const e of F.g.disasters.list) { if (!e.alive || !WEAK[e.type] || e.heroHp <= 0) continue; const w = where(e), d = w && w.x != null ? Math.hypot(w.x - F.pos.x, w.z - F.pos.z) : 9e8; if (d > REACH && !WHOLE[e.type]) continue; if (d < bd) { bd = d; best = e; } } return best; }
   use() {
     const F = this.F, g = F.g; if (this.cool > 0 || F.state !== 'fly' || F.duel) return false; this.cool = 1.3; const id = this.id, P = POWER[id], e = this.target();
     const fx = Math.cos(F.yaw), fz = -Math.sin(F.yaw), w = e && where(e), tx = w && w.x != null ? w.x : F.pos.x + fx * 40, tz = w && w.x != null ? w.z : F.pos.z + fz * 40, ty = w && w.x != null ? Math.max(2, Math.min(40, (w.y || 0) + 8)) : Math.max(2, F.pos.y - 10);

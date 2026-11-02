@@ -453,8 +453,10 @@ class Hero {
 // a hero on their own for the roster
 export function heroModel(name) { return heroRig(name).root; }
 // the same, the rig itself to pose (flight.js: a hero the player flies); r.wings: Dragonfly's, to beat
-export function heroRig(name) {
-  const K = kit(), r = rig({ mats: { ...K, ...K.look[name], hair: K.hair[name] }, slim: name === 'Nova', longHair: name === 'Nova', capeLen: 1.1 }); relax(r); handsOnHips(r);
+export function heroRig(name, of) { // of: an outfit (herogame.js): colours and extras
+  const K = kit(), base = { ...K, ...K.look[name], hair: K.hair[name] }, ec = new THREE.Color(of && of.suit ? of.suit : '#000000');
+  if (of) { if (of.suit) base.suit = clothMat(of.suit, { emissive: ec, emissiveIntensity: 0.22 }); if (of.cape) base.cape = clothMat(of.cape, { side: THREE.DoubleSide, repeat: [5, 9] }); if (of.dark) { base.boot = clothMat(of.dark, { bumpScale: 0.15 }); base.glove = clothMat(of.dark, { bumpScale: 0.15 }); } }
+  const r = rig({ mats: base, slim: name === 'Nova', longHair: name === 'Nova', capeLen: 1.1, extras: of || {} }); relax(r); handsOnHips(r);
   const wings = [];
   if (name === 'Dragonfly') for (const [sx, y, sweep] of [[1, 0.46, 0.25], [-1, 0.46, 0.25], [1, 0.38, 0.7], [-1, 0.38, 0.7]]) {
     const pv = new THREE.Group(); pv.position.set(sx * 0.06, y, -0.12); pv.scale.x = sx; pv.rotation.y = -sweep; r.torso.add(pv);

@@ -16,7 +16,7 @@ import { buildVehicle } from './vehicles.js';
 import { sfx } from './audio.js';
 import { SEE } from './see.js';
 import { heroRig } from './heroes.js';
-import { relax, detail } from './villains.js';
+import { relax, detail, villainRig } from './villains.js';
 import { Duel } from './heroduel.js';
 import { Interior } from './interior.js';
 import { LAB } from './lab.js';
@@ -25,6 +25,7 @@ import { Streak } from './streak.js';
 import { Getaway } from './getaway.js';
 import { Army } from './army.js';
 import { HeroPower } from './heropower.js';
+import { HS } from './herogame.js';
 
 // speeds in metres a second; turn: how hard it turns at full bank; chase: the camera's distance behind and height above;
 // seat: the cockpit's place (forward, up) in the model
@@ -38,6 +39,9 @@ const PLANES = {
   // the heroes: punch, how hard their blows land in a fight; slow, how much longer the weak spots last (Tempo slows time)
   nova: { name: 'Nova', hero: 'Nova', min: 6, max: 72, start: 30, turn: 1.8, climb: 1.4, chase: [10, 3.4], seat: [1.9, 0.7], sound: 'wind', punch: 1.4 },
   dragonfly: { name: 'Dragonfly', hero: 'Dragonfly', min: 6, max: 88, start: 34, turn: 2.1, climb: 1.5, chase: [10, 3.4], seat: [1.9, 0.7], sound: 'wind', punch: 1 },
+  tyrant: { name: 'Tyrant', hero: 'Tyrant', rigV: 1, min: 6, max: 70, start: 30, turn: 1.8, climb: 1.4, chase: [10, 3.4], seat: [1.9, 0.7], sound: 'wind', punch: 1.4 },
+  blur: { name: 'Blur', hero: 'Blur', rigV: 1, min: 6, max: 90, start: 36, turn: 2.2, climb: 1.5, chase: [10, 3.4], seat: [1.9, 0.7], sound: 'wind', punch: 0.9, slow: 1.3 },
+  weaver: { name: 'Weaver', hero: 'Weaver', rigV: 1, min: 6, max: 66, start: 28, turn: 1.9, climb: 1.4, chase: [10, 3.4], seat: [1.9, 0.7], sound: 'wind', punch: 1.1 },
   tempo: { name: 'Tempo', hero: 'Tempo', min: 6, max: 64, start: 28, turn: 1.8, climb: 1.4, chase: [10, 3.4], seat: [1.9, 0.7], sound: 'wind', punch: 0.9, slow: 1.45 },
 };
 const CEIL = 650, KMH = 3.6, FOV_CHASE = 62, FOV_COCKPIT = 72, INVERT = 'zday_fly_invert';
@@ -76,7 +80,7 @@ function stuntModel() {
 }
 // any of the others: the airstrikes' own models, sized up
 function planeModel(kind, P) {
-  if (P.hero) { const g = new THREE.Group(), r = heroRig(P.hero); r.root.rotation.y = Math.PI / 2; g.add(r.root); g.userData.hero = r; return g; } // a hero lying along +x, posed each frame (heroPose)
+  if (P.hero) { const g = new THREE.Group(), r = P.rigV ? villainRig(P.hero, HS.outfit(P.hero)) : heroRig(P.hero, HS.outfit(P.hero)); r.root.rotation.y = Math.PI / 2; g.add(r.root); g.userData.hero = r; return g; } // a hero lying along +x, posed each frame (heroPose)
   if (kind === 'stunt') return stuntModel();
   if (kind === 'jet') return jetModel();
   const g = new THREE.Group(), m = buildVehicle(P.model); m.scale.setScalar(P.scale); g.add(m); return g;
@@ -138,7 +142,7 @@ export class Flight {
     if (this.P.hero && LAB.army) this.army = new Army(this); // the rogue army, if the lab has it on (army.js)
     if (this.P.hero) { // villains to fight: three of them in the middle of town if there are none about
       const D = g.disasters, B = g.city.bounds;
-      if (!D.list.some(e => e.alive && e.type === 'villains' && e.who.some(v => !v.gone && !v.beaten))) D.start('villains', (B.x0 + B.x1) / 2, (B.z0 + B.z1) / 2);
+      if (!this.heroGame && !D.list.some(e => e.alive && e.type === 'villains' && e.who.some(v => !v.gone && !v.beaten))) D.start('villains', (B.x0 + B.x1) / 2, (B.z0 + B.z1) / 2);
       this.tip('Drag anywhere to fly. Fly into a building to smash right through it. Press Lock on and ' + this.P.name + ' flies straight at the nearest villain');
     } else this.tip('Drag anywhere to steer: left and right to turn, ' + (this.invert ? 'up to climb, down to dive' : 'down to climb, up to dive') + '. Let go and it levels out. Pick a payload, then Drop');
   }
@@ -363,6 +367,7 @@ export class Flight {
       _v.set(P.seat[0], P.seat[1], 0).applyQuaternion(this.q); cam.position.copy(this.pos).add(_v);
       cam.quaternion.copy(this.q).multiply(SEAT_TURN); cam.up.set(0, 1, 0).applyQuaternion(this.q);
     } else if (this.view === 'iso' && this.state !== 'down') { // the town's lens, behind and well above the hero's heading, aimed a little ahead of them
+      this.ctx.post.opts.dof = this.pos.y < 30; // high up, the whole town stays sharp to steer by
       const fl = Math.hypot(_f.x, _f.z) || 1, dist = ISO_DIST * 1.35 * this.zoom, ce = Math.cos(ISO_EL) * dist;
       _v.set(this.pos.x - _f.x / fl * ce, this.pos.y + Math.sin(ISO_EL) * dist, this.pos.z - _f.z / fl * ce);
       if (this.snap) cam.position.copy(_v); else cam.position.lerp(_v, 1 - Math.exp(-dt * 3)); cam.up.set(0, 1, 0);

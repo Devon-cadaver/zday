@@ -5,15 +5,15 @@
 // nothing outside the Sandbox changes. Kept in localStorage (zday_lab) so the bench is as you left it.
 const KEY = 'zday_lab';
 export const LAB = {
-  on: false, army: false, hero: 1, villain: 1, moves: { spin: true, kick: true, laser: true, drag: true, slam: true, jab: true, upper: true, pound: true, fling: true, hammer: true, elbow: true, freeze: true, fire: true, lightning: true, sonic: true, gravity: true, wind: true, shield: true, tk: true },
+  on: false, army: false, hero: 1, villain: 1, moves: { spin: true, kick: true, laser: true, drag: true, slam: true, tag: true, jab: true, upper: true, pound: true, fling: true, hammer: true, elbow: true, freeze: true, fire: true, lightning: true, sonic: true, gravity: true, wind: true, shield: true, tk: true },
   stats: { dealt: 0, taken: 0, fights: 0, won: 0, buildings: 0, scared: 0, hurt: 0, saved: 0 },
   // the hero's level: more health, harder hits
-  heroHealth() { return 100 + 10 * (this.hero - 1); },
+  heroHealth() { return (100 + 10 * (this.hero - 1)) * (this.toughK || 1); },
   heroPow() { return 1 + 0.06 * (this.hero - 1); },
   // the villains' level: more to wear down, harder hits, less time on each weak spot
   villainHp() { return 1 + 0.1 * (this.villain - 1); },
   villainHit(n) { return n * (1 + 0.05 * (this.villain - 1)); },
-  spotLife() { return 1 - 0.015 * (this.villain - 1); },
+  spotLife() { return (1 - 0.015 * (this.villain - 1)) * (this.spotK || 1); },
   // the readout, in two short lines (a phone's HUD is narrow)
   fear() { const s = this.stats; return Math.max(0, Math.round(s.scared + s.buildings * 20 + s.hurt * 50 - s.saved * 30)); },
   reset() { const s = this.stats; for (const k in s) s[k] = 0; },

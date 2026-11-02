@@ -143,7 +143,7 @@ function moveWorld(key, m, kind) {
   buildWorld();
   globe.setHere();
 }
-const needWorld = mode === 'commander' || mode === 'sandbox' || mode === 'tv' || ((mode === 'be' || mode === 'storm') && (P.has('kind') || mode === 'storm'));
+const needWorld = mode === 'hero' || mode === 'villain' || mode === 'commander' || mode === 'sandbox' || mode === 'tv' || ((mode === 'be' || mode === 'storm') && (P.has('kind') || mode === 'storm'));
 let game = null;
 if (needWorld) buildWorld();
 
