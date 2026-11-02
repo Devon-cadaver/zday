@@ -103,30 +103,34 @@ export function rig(o = {}) {
   part(m.box, mt.suit, 0.3 * sl, 0.16, 0.18, 0, 0, 0, hips);
   const legs = [-1, 1].map(sx => {
     const hip = pivot(hips, sx * 0.09, -0.04, 0); part(m.limb, mt.leg || mt.suit, 0.075 * sl, 0.46, 0.075 * sl, 0, 0, 0, hip); // leg: leggings in a colour of their own
-    const knee = pivot(hip, 0, -0.45, 0); part(m.limb, mt.leg || mt.suit, 0.06 * sl, 0.44, 0.06 * sl, 0, 0, 0, knee); part(m.box, mt.boot || mt.suit, 0.1, 0.07, 0.22, 0, -0.45, 0.05, knee);
-    return { hip, knee };
+    const knee = pivot(hip, 0, -0.45, 0); part(m.limb, mt.leg || mt.suit, 0.06 * sl, 0.44, 0.06 * sl, 0, 0, 0, knee);
+    const ank = pivot(knee, 0, -0.45, 0); part(m.box, mt.boot || mt.suit, 0.1, 0.07, 0.22, 0, 0, 0.05, ank); // the boot on its ankle
+    return { hip, knee, ank };
   });
-  const torso = pivot(hips, 0, 0.06, 0);
-  part(m.box, mt.suit, 0.36 * sl, 0.5, 0.2, 0, 0.28, 0, torso);
-  part(m.box, mt.suit, 0.44 * sl, 0.1, 0.22, 0, 0.5, 0, torso); // shoulders
+  const torso = pivot(hips, 0, 0.06, 0); // the waist
+  part(m.box, mt.suit, 0.36 * sl, 0.26, 0.2, 0, 0.16, 0, torso);
   if (mt.belt) part(m.box, mt.belt, 0.37 * sl, 0.05, 0.21, 0, 0.05, 0, torso);
-  if (mt.badge) part(m.box, mt.badge, 0.12, 0.12, 0.02, 0, 0.36, 0.105, torso); // the emblem on the chest
-  const head = pivot(torso, 0, 0.7, 0);
+  const chest = pivot(torso, 0, 0.3, 0); // the chest bends on its own above the waist (clips.js)
+  part(m.box, mt.suit, 0.36 * sl, 0.26, 0.2, 0, 0.11, 0, chest);
+  part(m.box, mt.suit, 0.44 * sl, 0.1, 0.22, 0, 0.2, 0, chest); // shoulders
+  if (mt.badge) part(m.box, mt.badge, 0.12, 0.12, 0.02, 0, 0.06, 0.105, chest); // the emblem on the chest
+  const head = pivot(chest, 0, 0.4, 0);
   part(m.ball, mt.skin, 0.11, 0.13, 0.115, 0, 0, 0, head);
   part(m.ball, mt.hair, 0.117, 0.085, 0.122, 0, 0.055, -0.014, head); // the hair
   if (o.longHair) part(m.box, mt.hair, 0.12, 0.26, 0.06, 0, -0.1, -0.1, head).userData.keep = true; // a long ponytail down the back
   part(m.box, mt.skin, 0.06, 0.08, 0.06, 0, -0.13, 0, head); // neck
   const eyes = o.eyes ? [-1, 1].map(sx => { const e = part(m.ball, mt.eye || m.eye, 0.024, 0.02, 0.016, sx * 0.042, 0.015, 0.108, head); e.userData.keep = true; return e; }) : null;
   const arms = [];
-  (o.arms === 6 ? [0.48, 0.34, 0.2] : [0.48]).forEach((y, row) => {
+  (o.arms === 6 ? [0.18, 0.04, -0.1] : [0.18]).forEach((y, row) => {
     for (const sx of [-1, 1]) {
-      const sh = pivot(torso, sx * 0.23 * sl, y, 0); part(m.limb, mt.suit, 0.055 * sl, 0.3, 0.055 * sl, 0, 0, 0, sh);
-      const el = pivot(sh, 0, -0.29, 0); part(m.limb, mt.suit, 0.045 * sl, 0.27, 0.045 * sl, 0, 0, 0, el); part(m.ball, mt.glove || mt.skin, 0.045, 0.05, 0.045, 0, -0.29, 0, el);
-      arms.push({ sh, el, sx, row });
+      const sh = pivot(chest, sx * 0.23 * sl, y, 0); part(m.limb, mt.suit, 0.055 * sl, 0.3, 0.055 * sl, 0, 0, 0, sh);
+      const el = pivot(sh, 0, -0.29, 0); part(m.limb, mt.suit, 0.045 * sl, 0.27, 0.045 * sl, 0, 0, 0, el);
+      const wr = pivot(el, 0, -0.29, 0); part(m.ball, mt.glove || mt.skin, 0.045, 0.05, 0.045, 0, 0, 0, wr); // the hand on its wrist
+      arms.push({ sh, el, wr, sx, row });
     }
   });
   const cape = new Cape(torso, o.capeLen ?? 1.15, mt.cape);
-  return { root, body, hips, torso, head, legs, arms, eyes, cape, parts, mt, o };
+  return { root, body, hips, torso, chest, head, legs, arms, eyes, cape, parts, mt, o };
 }
 // the close-up body: smooth tubes swept through the same joints (flesh.js), each part in its own colour - a suit with
 // a belt and an emblem, boots, gloves, a head with hair over the crown. Built the first time a figure comes near
@@ -136,21 +140,21 @@ function smoothBody(r) {
   const suit = col(mt.suit), skin = col(mt.skin), boot = col(mt.boot || mt.suit), glove = col(mt.glove || mt.skin), hair = col(mt.hair), belt = mt.belt ? col(mt.belt) : null, badge = mt.badge ? col(mt.badge) : null, leg = mt.leg ? col(mt.leg) : null;
   const body = new Body(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: mt.suit.roughness ?? 0.45, metalness: mt.suit.metalness ?? 0.05 }));
   const T = (q, pts, ref) => { const t = body.add({ lumps: 0, tile: 0.3, ...q }); t.src = pts; t.refSrc = ref; };
-  const H = r.hips, Tq = r.torso, Hd = r.head;
+  const H = r.hips, Tq = r.torso, Ch = r.chest, Hd = r.head;
   T({ rings: 16, cols: 14, len: 0.8, radii: [0.12, 0.15, 0.14, 0.17, 0.21, 0.1].map(v => v * sl), bulge: [0, 0, 0.012, 0.01, 0], capStart: true, capEnd: true, shape: (u, c, s) => 1 / Math.sqrt((c / 0.62) ** 2 + s * s),
     tint: (u, c, s) => (belt && u > 0.24 && u < 0.3 ? belt : badge && c > 0.75 && u > 0.6 && u < 0.72 && Math.abs(s) < 0.4 ? badge : suit) },
-    [[H, 0, -0.08, 0], [H, 0, 0.02, 0], [Tq, 0, 0.12, 0], [Tq, 0, 0.32, 0], [Tq, 0, 0.5, 0], [Tq, 0, 0.6, 0]], [Tq, 0, 0, 1]);
+    [[H, 0, -0.08, 0], [H, 0, 0.02, 0], [Tq, 0, 0.12, 0], [Ch, 0, 0.02, 0], [Ch, 0, 0.2, 0], [Ch, 0, 0.3, 0]], [Ch, 0, 0, 1]);
   T({ rings: 14, cols: 12, len: 0.4, radii: [0.05, 0.045, 0.085, 0.112, 0.06], capStart: true, capEnd: true, shape: (u, c, s) => 1 / Math.sqrt((c / 1.05) ** 2 + (s / 0.93) ** 2),
     tint: (u, c) => (u > 0.72 || (u > 0.5 && c < -0.2) ? hair : skin) }, // hair over the crown and down the back
-    [[Tq, 0, 0.58, 0], [Hd, 0, -0.12, 0], [Hd, 0, -0.06, 0.012], [Hd, 0, 0.03, 0], [Hd, 0, 0.14, -0.01]], [Hd, 0, 0, 1]);
+    [[Ch, 0, 0.28, 0], [Hd, 0, -0.12, 0], [Hd, 0, -0.06, 0.012], [Hd, 0, 0.03, 0], [Hd, 0, 0.14, -0.01]], [Hd, 0, 0, 1]);
   for (const L of r.legs) {
     const sx = Math.sign(L.hip.position.x) || 1;
     T({ rings: 16, cols: 10, len: 1.0, radii: [0.085 * sl, 0.08 * sl, 0.058 * sl, 0.045, 0.045, 0.035], bulge: [0, 0.014, 0.012, 0, 0], capStart: true, capEnd: true, tint: (u) => (u > 0.72 ? boot : leg && u > 0.12 ? leg : suit) },
-      [[H, sx * 0.06, 0.02, 0], [L.hip, 0, 0, 0], [L.knee, 0, 0, 0], [L.knee, 0, -0.4, 0], [L.knee, 0, -0.45, 0.06], [L.knee, 0, -0.46, 0.15]], [H, 0, 0, 1]);
+      [[H, sx * 0.06, 0.02, 0], [L.hip, 0, 0, 0], [L.knee, 0, 0, 0], [L.ank, 0, 0.05, 0], [L.ank, 0, 0, 0.06], [L.ank, 0, -0.01, 0.15]], [H, 0, 0, 1]);
   }
   for (const A of r.arms) {
     T({ rings: 14, cols: 9, len: 0.75, radii: [0.07 * sl, 0.058 * sl, 0.046 * sl, 0.04, 0.045, 0], bulge: [0, 0.01, 0.008, 0, 0], capStart: true, capEnd: true, tint: (u) => (u > 0.8 ? glove : suit) },
-      [[Tq, A.sx * 0.13 * sl, A.sh.position.y, 0], [A.sh, 0, 0, 0], [A.el, 0, 0, 0], [A.el, 0, -0.26, 0], [A.el, 0, -0.31, 0], [A.el, 0, -0.36, 0]], [Tq, 0, 0, 1]);
+      [[Ch, A.sx * 0.13 * sl, A.sh.position.y, 0], [A.sh, 0, 0, 0], [A.el, 0, 0, 0], [A.wr, 0, 0.03, 0], [A.wr, 0, -0.02, 0], [A.wr, 0, -0.07, 0]], [Ch, 0, 0, 1]);
   }
   const mesh = body.build([0, 1, 0], 2.2); mesh.visible = false; r.body.add(mesh);
   return { body, mesh };
@@ -168,9 +172,9 @@ export function detail(r, D, always = false) {
 export const handAt = (arm, out) => arm.el.localToWorld(out.set(0, -0.3, 0));
 
 export function relax(r) {
-  for (const L of r.legs) { L.hip.rotation.set(0, 0, 0); L.knee.rotation.set(0, 0, 0); }
-  for (const a of r.arms) { a.sh.rotation.set(0, 0, a.sx * 0.08); a.el.rotation.set(0, 0, 0); }
-  r.torso.rotation.set(0, 0, 0); r.head.rotation.set(0, 0, 0); r.body.rotation.set(0, 0, 0); r.body.position.y = 0; r.hips.position.y = 0.94;
+  for (const L of r.legs) { L.hip.rotation.set(0, 0, 0); L.knee.rotation.set(0, 0, 0); if (L.ank) L.ank.rotation.set(0, 0, 0); }
+  for (const a of r.arms) { a.sh.rotation.set(0, 0, a.sx * 0.08); a.el.rotation.set(0, 0, 0); if (a.wr) a.wr.rotation.set(0, 0, 0); }
+  r.torso.rotation.set(0, 0, 0); if (r.chest) r.chest.rotation.set(0, 0, 0); r.head.rotation.set(0, 0, 0); r.body.rotation.set(0, 0, 0); r.body.position.y = 0; r.hips.position.y = 0.94;
 }
 // a sprint at phase ph; k: how hard
 function run(r, ph, k) {
@@ -195,6 +199,7 @@ export function tumble(r, t, spinning) {
 export function pinPose(r, f) {
   const t = f.t || 0, A = r.arms, L = r.legs, P = f.pinned;
   relax(r);
+  if (f.react && f.react.play(r)) return; // hit: the reaction (clips.js), over the held pose
   if (P === 'swing') {
     r.body.rotation.x = 1.45 + Math.sin(t * 9) * 0.06;
     for (const a of A) { a.sh.rotation.set(-2.9 + Math.sin(t * 13 + a.sx) * 0.25, 0, a.sx * 0.5); a.el.rotation.set(-0.2, 0, 0); }

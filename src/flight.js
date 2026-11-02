@@ -20,6 +20,7 @@ import { relax, detail } from './villains.js';
 import { Duel } from './heroduel.js';
 import { Interior } from './interior.js';
 import { LAB } from './lab.js';
+import { playClip } from './clips.js';
 
 // speeds in metres a second; turn: how hard it turns at full bank; chase: the camera's distance behind and height above;
 // seat: the cockpit's place (forward, up) in the model
@@ -337,12 +338,12 @@ export class Flight {
     _f.set(1, 0, 0).applyQuaternion(this.q);
     if (this.duel && this.state === 'fly') { // a fight: the town's view, high and far over the two of them, the hero nearer the camera than the villain, following them up through a sky slam
       const D = this.duel, v = D.v, ph = D.phase;
-      if (!D.cam) { // the view's way, set once a fight: from the villain through the hero, then raised
+      if (!D.cam) { // the view's way, set once a fight: side on to the two of them (the hero's moves read in profile), from whichever side the camera is nearer, then raised
         let dx = this.pos.x - v.x, dz = this.pos.z - v.z; const l = Math.hypot(dx, dz); if (l < 0.5) { dx = -Math.cos(this.yaw); dz = Math.sin(this.yaw); } else { dx /= l; dz /= l; }
-        D.cam = { dx, dz }; cam.fov = FOV_ISO; cam.updateProjectionMatrix(); this.ctx.post.opts.dof = true;
+        const sx = -dz, sz = dx, side = (cam.position.x - this.pos.x) * sx + (cam.position.z - this.pos.z) * sz >= 0 ? 1 : -1; D.cam = { dx: sx * side, dz: sz * side }; cam.fov = FOV_ISO; cam.updateProjectionMatrix(); this.ctx.post.opts.dof = true;
       }
-      const mx = (this.pos.x + v.x) / 2, my = (this.pos.y + Math.max(2.4, (v.y || 0) + HIP)) / 2, mz = (this.pos.z + v.z) / 2, dist = ISO_DIST * this.zoom, ce = Math.cos(ISO_EL) * dist; // between them
-      _v.set(mx + D.cam.dx * ce, my + Math.sin(ISO_EL) * dist, mz + D.cam.dz * ce);
+      const mx = (this.pos.x + v.x) / 2, my = (this.pos.y + Math.max(2.4, (v.y || 0) + HIP)) / 2, mz = (this.pos.z + v.z) / 2, dist = ISO_DIST * this.zoom, el = ISO_EL - 0.18, ce = Math.cos(el) * dist; // between them, a little lower than the flying view
+      _v.set(mx + D.cam.dx * ce, my + Math.sin(el) * dist, mz + D.cam.dz * ce);
       cam.position.lerp(_v, 1 - Math.exp(-dt * (ph === 'slam' ? 12 : 4))); cam.up.set(0, 1, 0); cam.lookAt(_u.set(mx, my, mz));
     } else if (this.view === 'cockpit' && this.state === 'fly') {
       _v.set(P.seat[0], P.seat[1], 0).applyQuaternion(this.q); cam.position.copy(this.pos).add(_v);
@@ -686,14 +687,16 @@ export class Flight {
     this.pitch -= this.pitch * Math.min(1, dt * 4); this.roll -= this.roll * Math.min(1, dt * 4); this.speed = 0;
   }
   // the fight over (heroduel.js): the flying lens and no blur again (eased back to), nose up, clear of the street
-  duelOver(won) { this.duel = null; this.act = null; this.lock = null; this.obj.visible = this.view !== 'cockpit' && this.state === 'fly'; SEE.on = this.view === 'cockpit' ? false : this.saved.see; const cam = this.ctx.camera; cam.fov = this.view === 'cockpit' ? FOV_COCKPIT * Math.max(0.35, Math.min(1.25, this.zoom || 1)) : this.view === 'iso' ? FOV_ISO : FOV_CHASE; cam.updateProjectionMatrix(); this.ctx.post.opts.dof = this.view === 'iso'; this.speed = this.thr = Math.max(this.thr, this.P.start * 0.6); this.pitch = 0.5; } // nose up, clear of the street
+  duelOver(won) { this.duel = null; this.act = null; this.clip = null; this.lock = null; this.obj.visible = this.view !== 'cockpit' && this.state === 'fly'; SEE.on = this.view === 'cockpit' ? false : this.saved.see; const cam = this.ctx.camera; cam.fov = this.view === 'cockpit' ? FOV_COCKPIT * Math.max(0.35, Math.min(1.25, this.zoom || 1)) : this.view === 'iso' ? FOV_ISO : FOV_CHASE; cam.updateProjectionMatrix(); this.ctx.post.opts.dof = this.view === 'iso'; this.speed = this.thr = Math.max(this.thr, this.P.start * 0.6); this.pitch = 0.5; } // nose up, clear of the street
   // a hero's pose: flat out along the way at speed, one fist ahead; upright and treading air slow or in a fight; a punch;
   // arms out holding on while spinning a villain round. The rig set so the hips are where the hero is
   heroPose(r, dt) {
     const A = r.arms, L = r.legs, D = this.duel, fast = D ? 0 : Math.max(0, Math.min(1, (this.speed - 10) / 14)), act = this.act, kind = act && act.kind;
     const u = act ? Math.min(1, act.t / act.T) : 0, k = Math.sin(Math.PI * u); // a move: how far through it; out and back
     relax(r); this.lean = kind === 'dive' ? Math.PI : (this.lean || 0) + ((kind === 'drag' ? 0.9 : 1.35 * fast) - (this.lean || 0)) * Math.min(1, dt * 3); // head first after them in the dive
-    if (D && D.phase === 'spin') for (const a of A) { a.sh.rotation.set(-1.5, 0, -a.sx * 0.24); a.el.rotation.set(0, 0, 0); } // straight out and in together: the hands on the villain's ankles (heroduel.js HANDS)
+    const C = this.clip; let bodyY = 0;
+    if (C) { C.t += dt; playClip(r, C.clip, C.t); this.lean = r.body.rotation.x; bodyY = r.hips.position.y - 0.94; r.hips.position.y = 0.94; } // a keyframed move (clips.js): its lean and hip drop are its own
+    else if (D && D.phase === 'spin') for (const a of A) { a.sh.rotation.set(-1.5, 0, -a.sx * 0.24); a.el.rotation.set(0, 0, 0); } // straight out and in together: the hands on the villain's ankles (heroduel.js HANDS)
     else if (kind === 'kick') { L[1].hip.rotation.x = -1.7 * k; L[1].knee.rotation.x = 0.9 * (1 - k); L[0].knee.rotation.x = 0.3; r.torso.rotation.x = -0.35 * k; for (const a of A) { a.sh.rotation.set(-0.5, 0, a.sx * (0.6 + 0.4 * k)); a.el.rotation.set(-0.8, 0, 0); } }
     else if (kind === 'laser') { if (this.P.hero === 'Nova') { for (const a of A) { a.sh.rotation.set(0.45, 0, a.sx * 0.25); a.el.rotation.set(-0.9, 0, 0); } r.torso.rotation.x = 0.15; } else for (const a of A) { a.sh.rotation.set(-1.55, 0, -a.sx * 0.12); a.el.rotation.set(0, 0, 0); } } // Nova's from her eyes, fists back; the others' from their hands
     else if (kind === 'crouch') { A[1].sh.rotation.set(0.5, 0, 0.1); A[1].el.rotation.set(-1.4, 0, 0); A[0].sh.rotation.set(-1.0, 0, -0.15); A[0].el.rotation.set(-1.7, 0, 0); r.torso.rotation.x = 0.4; for (const l of L) { l.hip.rotation.x = -0.4; l.knee.rotation.x = 0.8; } } // wound up for the uppercut
@@ -704,8 +707,8 @@ export class Flight {
     else if (this.punch > 0) { A[1].sh.rotation.set(-1.6, 0, 0.1); A[0].sh.rotation.set(0.4, 0, -0.2); A[0].el.rotation.set(-1.4, 0, 0); r.torso.rotation.x = 0.3; }
     else if (fast > 0.5) { A[1].sh.rotation.set(-3.0, 0, 0.1); A[0].sh.rotation.set(0.25, 0, -0.1); }
     else { for (const a of A) a.sh.rotation.set(0.1, 0, a.sx * 0.3); for (const L of r.legs) { L.hip.rotation.x = 0.1; L.knee.rotation.x = 0.25; } }
-    r.body.rotation.x = this.lean; r.head.rotation.x = -this.lean * 0.6;
-    r.root.position.set(-Math.sin(this.lean) * HIP, -Math.cos(this.lean) * HIP + (fast < 0.5 && !D ? Math.sin((this.wingT || 0) * 2) * 0.15 : 0), 0); // treading air (held still in a fight)
+    r.body.rotation.x = this.lean; if (!C) r.head.rotation.x = -this.lean * 0.6;
+    r.root.position.set(-Math.sin(this.lean) * HIP, -Math.cos(this.lean) * HIP + bodyY + (fast < 0.5 && !D ? Math.sin((this.wingT || 0) * 2) * 0.15 : 0), 0); // treading air (held still in a fight)
     r.cape.update(dt, this.lean > 0.5 ? 0.12 : Math.min(0.6, this.speed / 30), 0.3 + Math.min(0.7, this.speed / 20));
     this.wingT = (this.wingT || 0) + dt; r.wings.forEach((w, i) => { w.rotation.z = Math.sin(this.wingT * 55 + i * 1.3) * 0.45 + 0.15; });
     if (this.obj.visible) detail(r, null, true);

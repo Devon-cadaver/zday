@@ -167,7 +167,8 @@ let frameErrs = 0;
 function frame() { requestAnimationFrame(frame); try { frameBody(); } catch (e) { if (frameErrs++ < 5) console.error(e); } } // the next frame comes whatever happens in this one
 function frameBody() {
   if (loadingEl) { loadingEl.remove(); loadingEl = null; }
-  const dt = Math.min(0.05, clock.getDelta());
+  let dt = Math.min(0.05, clock.getDelta());
+  if (game.hitStop > 0) { game.hitStop -= dt; dt *= 0.08; } // a blow landing: everything held a few frames (heroduel.js)
   time += dt;
   sky.update(dt);
   if (globe.active || !W) { controls.enabled = false; if (globe.active) globe.frame(dt); frames++; fpsT += dt; globeWas = true; return; } // up on the globe (or nothing built yet): the city waits

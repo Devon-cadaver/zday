@@ -12,6 +12,7 @@ import * as THREE from 'three';
 import { toss } from './brawl.js';
 import { sfx } from './audio.js';
 import { LAB } from './lab.js';
+import { CLIPS, playClip } from './clips.js';
 
 const HIP = 0.94 * 2.2; // the hero is flown by the hips (flight.js)
 const HANDS = [1.24, 1.1]; // the hands held out ahead and together for the spin (flight.js heroPose): ahead of the hips, up from them
@@ -107,6 +108,7 @@ export class Duel {
     this.vhp.textContent = v.name.toUpperCase() + ' ' + Math.max(0, Math.round(v.hp));
     if (v.beaten || v.hp <= 0) { LAB.stats.won++; return this.end(v.name + ' is beaten!', true); }
     if (v.flinch > 0) v.flinch = Math.max(0, v.flinch - h * 4);
+    if (this.reacts) { for (const c of this.reacts) c.t += h; this.reacts = this.reacts.filter(c => c === v.react); }
     if (!this.second && v.hp < this.hpMax * 0.5) this.secondWind();
     if (v.pinned === 'reel' || v.pinned === 'dazed' || v.pinned === 'grab') v.yaw = Math.atan2(F.pos.x - v.x, F.pos.z - v.z); // facing the hero
     if (F.act && (F.act.t += h) >= F.act.T) F.act = null;
@@ -123,6 +125,10 @@ export class Duel {
     if (this.spawned >= this.total && this.live.every(s => s.dead)) this.daze();
     return true;
   }
+  // keyframed moves (clips.js): the hero's clip, the villain's reaction, a moment's hit stop when a blow lands
+  play(name) { this.F.clip = { clip: CLIPS[name], t: 0 }; }
+  react(name, hold = 0) { const v = this.v, c = { clip: CLIPS[name], t: 0, hold, play(r) { return playClip(r, this.clip, this.t) || this.t < this.clip.keys[this.clip.keys.length - 1].t + this.hold; } }; v.react = c; this.reacts = this.reacts || []; this.reacts.push(c); }
+  stop(s = 0.07) { this.g.hitStop = Math.max(this.g.hitStop || 0, s); }
   // the villain winds up (a flash, a sound): a dodge circle to one side of them, tapped in time the hero sidesteps and the
   // swing misses; too late and it lands: a hit, and the weak spots up at the time are lost
   windUp() {
@@ -219,7 +225,7 @@ export class Duel {
   }
   // after a move: FLY AT THEM, for 5 s
   thrown(text) {
-    this.phase = 'thrown'; this.t = 0; this.F.act = null; this.title(text);
+    this.phase = 'thrown'; this.t = 0; this.F.act = null; this.F.clip = null; this.title(text);
     this.button(['🚀 FLY AT THEM!', () => { const F = this.F, v = this.v; this.end('', false); F.lockOn(v, true); }]);
   }
   _thrown() {
@@ -277,27 +283,43 @@ export class Duel {
   // ---------- the sky slam: hold to launch (the longer, the higher), tap to fly up after them, hold to smash them down
   // (the longer, the harder, and the bigger the crater)
   // jab combo: three tap circles on a beat, each landed a jab, all three a knock-back; one late and they shrug it off
-  go_jab() { const F = this.F; this.phase = 'jab'; this.t = 0; this.jabN = 0; this.jabT = 0; this.v.pinned = 'reel'; F.act = { kind: 'kick', t: 0, T: 0.2 }; }
+  go_jab() { const F = this.F; this.phase = 'jab'; this.t = 0; this.jabN = 0; this.jabT = 0; this.landT = -1; this.v.pinned = 'reel'; F.act = null; this.play('guardL'); }
   _jab(h) {
     const v = this.v, F = this.F, beat = 0.6 * (F.P.slow || 1);
-    if (!this.ring2) { this.jabT += h; if (this.jabT >= beat * 0.55) { this.circle('tap', 'JAB'); this.ring2.style.animation = 'zdDodge ' + beat.toFixed(2) + 's linear forwards'; this.jabT = 0; } return true; }
-    this.place(this.ring2); this.jabT += h;
-    if (this.tapped) { this.dropCircle(); this.jabN++; const n = this.jabN; this.hit(14); v.flinch = 1; F.act = { kind: 'upper', t: 0, T: 0.25 }; sfx('crash', v.x, v.y + 2, v.z, { gain: 0.7, rate: 1.2 + n * 0.1 }); this.g.fire.burst(v.x, (v.y || 0) + 2.4, v.z, 4, 0.8); this.title('👊 ' + 'JAB! '.repeat(n));
-      if (n >= 3) { const dx = v.x - F.pos.x, dz = v.z - F.pos.z, d = Math.hypot(dx, dz) || 1; v.gripped = false; toss(v, dx / d * 24, 7, dz / d * 24); this.hit(30); this.g.shake = Math.max(this.g.shake || 0, 0.4); return this.thrown('💥 THREE JABS AND A KNOCK-BACK! GO AFTER ' + v.name.toUpperCase() + '!'); }
+    const dx = v.x - F.pos.x, dz = v.z - F.pos.z, d = Math.hypot(dx, dz) || 1; if (d > 2.4) { F.pos.x += dx / d * h * 6; F.pos.z += dz / d * h * 6; } // stepping in close
+    if (this.landT >= 0) { // a punch on its way: it lands at the clip's contact key
+      this.landT += h; if (this.landT >= 0.08) { const n = this.jabN; this.landT = -1; this.hit(n >= 3 ? 30 : 14); this.react(n >= 3 ? 'hitBody' : n % 2 ? 'hitHeadR' : 'hitHeadL'); this.stop(n >= 3 ? 0.09 : 0.05); v.flinch = 1;
+        sfx('crash', v.x, v.y + 2, v.z, { gain: 0.7, rate: 1.2 + n * 0.1 }); this.g.fire.burst(v.x, (v.y || 0) + (n >= 3 ? 1.6 : 2.4), v.z, 5, 0.9); this.g.shake = Math.max(this.g.shake || 0, n >= 3 ? 0.4 : 0.15);
+        if (n >= 3) { v.gripped = false; toss(v, dx / d * 24, 7, dz / d * 24); return this.thrown('💥 THREE JABS AND A KNOCK-BACK! GO AFTER ' + v.name.toUpperCase() + '!'); } }
       return true; }
+    if (!this.ring2) { this.jabT += h; if (this.jabT >= beat * 0.55) { this.circle('tap', 'JAB'); this.ring2.style.animation = 'zdDodge ' + beat.toFixed(2) + 's linear forwards'; this.jabT = 0; this.play(this.jabN % 2 ? 'guardR' : 'guardL'); } return true; }
+    this.place(this.ring2); this.jabT += h;
+    if (this.tapped) { this.dropCircle(); this.jabN++; const n = this.jabN; this.landT = 0; this.play(n >= 3 ? 'cross' : n % 2 ? 'jabL' : 'jabR'); this.title('👊 ' + 'JAB! '.repeat(Math.min(2, n)) + (n >= 3 ? 'CROSS!' : '')); return true; }
     if (this.jabT >= beat) { this.dropCircle(); const dx = v.x - F.pos.x, dz = v.z - F.pos.z, d = Math.hypot(dx, dz) || 1; v.gripped = false; toss(v, dx / d * 10, 4, dz / d * 10); return this.thrown('They shrugged it off. Go after ' + v.name + '!'); }
     return true;
   }
   // uppercut: they go up; a tap circle to fly up after them and punch them away, miss it and they fall back
-  go_upper() { const v = this.v, F = this.F; this.phase = 'upper'; this.t = 0; this.gy = this.groundAt(v.x, v.z); this.y0 = v.y || 0; this.top = this.y0 + 22; v.pinned = 'air'; F.act = { kind: 'upper', t: 0, T: 0.4 }; this.hit(20); this.g.fire.burst(v.x, this.y0 + 3, v.z, 12, 1.8); sfx('thud', v.x, v.y + 2, v.z, { gain: 1.3, rate: 0.8 }); this.g.shake = Math.max(this.g.shake || 0, 0.3); }
+  go_upper() { const v = this.v, F = this.F; this.phase = 'upper'; this.sub = 'coil'; this.t = 0; this.gy = this.groundAt(v.x, v.z); this.y0 = v.y || 0; this.top = this.y0 + 22; this.upDone = false; v.pinned = 'reel'; F.act = null; this.play('uppercut'); }
   _upper(h) {
-    const v = this.v, F = this.F, u = Math.min(1, this.t / 0.7);
-    if (!this.upDone) { v.y = this.y0 + (this.top - this.y0) * ease(u) + (u >= 1 ? Math.sin(this.t * 3) * 0.3 : 0); if (this.t > 0.3 && !this.ring2) this.circle('tap', 'TAP'); if (this.ring2) this.place(this.ring2);
-      if (this.tapped) { this.upDone = true; this.dropCircle(); this.t = 0; this.hy0 = F.pos.y; F.act = { kind: 'rise', t: 0, T: 1e9 }; sfx('whoosh', F.pos.x, F.pos.y, F.pos.z, { gain: 1, rate: 0.9 }); this.title('⬆ UP AFTER THEM!'); }
-      else if (this.t > 2.2) { this.dropCircle(); v.gripped = false; toss(v, 0, 0, 0); return this.thrown('They fell back down. Go after ' + v.name + '!'); }
+    const v = this.v, F = this.F, s = this.sub, dx0 = F.pos.x - v.x, dz0 = F.pos.z - v.z, d0 = Math.hypot(dx0, dz0) || 1;
+    if (s === 'coil') { // down low in front of them, then the fist drives up through the chin at the clip's contact key
+      F.pos.x += (v.x + dx0 / d0 * 1.7 - F.pos.x) * Math.min(1, h * 8); F.pos.z += (v.z + dz0 / d0 * 1.7 - F.pos.z) * Math.min(1, h * 8); F.pos.y += (this.y0 + HIP - 0.4 - F.pos.y) * Math.min(1, h * 8);
+      if (this.t >= 0.28) { this.sub = 'up'; this.t = 0; v.pinned = 'air'; this.hit(20); this.react('hitUp', 2); this.stop(0.08); this.g.fire.burst(v.x, this.y0 + 2.6, v.z, 6, 1.0); sfx('thud', v.x, v.y + 2, v.z, { gain: 1.3, rate: 0.8 }); this.g.shake = Math.max(this.g.shake || 0, 0.3); }
       return true; }
-    const k = Math.min(1, this.t / 0.45); F.pos.y = this.hy0 + (this.top - 1 - this.hy0) * ease(k); const dx = F.pos.x - v.x, dz = F.pos.z - v.z, d = Math.hypot(dx, dz) || 1; F.pos.x += (v.x + dx / d * 2 - F.pos.x) * Math.min(1, h * 6); F.pos.z += (v.z + dz / d * 2 - F.pos.z) * Math.min(1, h * 6);
-    if (k >= 1) { F.act = { kind: 'upper', t: 0, T: 0.4 }; v.gripped = false; toss(v, -dx / d * 36, 6, -dz / d * 36); this.hit(45); sfx('crash', v.x, v.y + 2, v.z, { gain: 1, rate: 0.8 }); this.g.fire.burst(v.x, v.y + 2, v.z, 12, 2); this.g.shake = Math.max(this.g.shake || 0, 0.45); return this.thrown('💥 PUNCHED OUT OF THE SKY! GO AFTER ' + v.name.toUpperCase() + '!'); }
+    if (s === 'up') { const u = Math.min(1, this.t / 0.7); v.y = this.y0 + (this.top - this.y0) * ease(u) + (u >= 1 ? Math.sin(this.t * 3) * 0.3 : 0); if (this.t > 0.3 && !this.ring2) this.circle('tap', 'TAP'); if (this.ring2) this.place(this.ring2);
+      if (this.tapped) { this.sub = 'rise'; this.dropCircle(); this.t = 0; this.hy0 = F.pos.y; F.clip = null; F.act = { kind: 'rise', t: 0, T: 1e9 }; sfx('whoosh', F.pos.x, F.pos.y, F.pos.z, { gain: 1, rate: 0.9 }); this.title('⬆ UP AFTER THEM!'); }
+      else if (this.t > 2.2) { this.dropCircle(); F.clip = null; v.gripped = false; toss(v, 0, 0, 0); return this.thrown('They fell back down. Go after ' + v.name + '!'); }
+      return true; }
+    if (s === 'rise') { const k = Math.min(1, this.t / 0.45); F.pos.y = this.hy0 + (this.top + 2.5 - this.hy0) * ease(k); F.pos.x += (v.x + dx0 / d0 * 2.2 - F.pos.x) * Math.min(1, h * 6); F.pos.z += (v.z + dz0 / d0 * 2.2 - F.pos.z) * Math.min(1, h * 6);
+      if (k >= 1) { this.sub = 'wind'; this.t = 0; F.act = null; this.play('windup'); this.title('\uD83D\uDCA5 WIND UP...'); } return true; }
+    if (s === 'wind') { F.pos.y = this.top + 2.5 + Math.sin(this.t * 6) * 0.1; if (this.t >= 0.32) { this.sub = 'dash'; this.t = 0; this.play('dash'); this.hit(45); this.react('hitBody', 3); this.stop(0.07);
+        v.gripped = false; v.pinned = null; toss(v, -dx0 / d0 * 30, -16, -dz0 / d0 * 30); sfx('crash', v.x, v.y + 2, v.z, { gain: 1, rate: 0.8 }); this.g.fire.burst(v.x, v.y + 2, v.z, 12, 2); this.g.shake = Math.max(this.g.shake || 0, 0.45); this.title('\uD83D\uDCA5 DOWN THEY GO!'); } return true; }
+    if (s === 'dash') { // flying down after them, right on their heels, a streak behind, until they hit the street
+      const dx = F.pos.x - v.x, dz = F.pos.z - v.z, d = Math.hypot(dx, dz) || 1, gy = this.groundAt(v.x, v.z);
+      if (v.tossed && this.t < 2.5 && (v.y || 0) > gy + 0.5) { F.pos.x += (v.x + dx / d * 1.4 - F.pos.x) * Math.min(1, h * 10); F.pos.z += (v.z + dz / d * 1.4 - F.pos.z) * Math.min(1, h * 10); F.pos.y += ((v.y || 0) + 2.8 - F.pos.y) * Math.min(1, h * 10); F.yaw = Math.atan2(-(v.z - F.pos.z), v.x - F.pos.x); if (Math.random() < 0.7) this.g.fire.burst(F.pos.x - Math.cos(F.yaw) * 0.6, F.pos.y + 0.6, F.pos.z + Math.sin(F.yaw) * 0.6, 1, 0.6); return true; }
+      F.clip = null; F.act = { kind: 'hammer', t: 0, T: 0.35 }; F.pos.set(v.x + dx / d * 3, gy + HIP + 0.3, v.z + dz / d * 3);
+      this.g.disasters.decals.add('crack', v.x, v.z, 8, 8); this.g.fire.dustCloud(v.x, v.z, 3, 3); this.g.fire.burst(v.x, gy + 1, v.z, 12, 1.8); sfx('thud', v.x, gy, v.z, { gain: 1.2, rate: 0.7 }); this.g.shake = Math.max(this.g.shake || 0, 0.4); this.hit(10); v.react = null;
+      return this.thrown('\uD83D\uDCA5 PUNCHED INTO THE STREET! GO AFTER ' + v.name.toUpperCase() + '!'); }
     return true;
   }
   // ground pound: hold the circle to wind up, let go and the hero slams the street beside them: a ring of force that
@@ -461,7 +483,7 @@ export class Duel {
     const v = this.v, B = this.g.disasters.brawl;
     this.dropBeam(); if (this.dodge) { this.dodge.el.remove(); this.dodge = null; } if (this.chipEl) { this.chipEl.remove(); this.chipEl = null; } if (this.aimEl) { this.aimEl.remove(); this.aimEl = null; }
     if (this.S) { const i = B.drags.indexOf(this.S); if (i >= 0) { B.drags.splice(i, 1); v.gripped = false; if (!v.tossed && !v.gone) toss(v, this.S.dx * 10, 4, this.S.dz * 10); } this.S = null; }
-    v.pinned = null; v.flinch = 0;
+    v.pinned = null; v.flinch = 0; v.react = null; this.F.clip = null;
     if (v.gripped) { v.gripped = false; if (!v.tossed && !v.gone) toss(v, 0, 2, 0); } // dropped, falls to the ground
     this.el.remove(); this.F.duelOver(won); if (why) this.F.tip(why);
     return false;
