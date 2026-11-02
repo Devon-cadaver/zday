@@ -1915,6 +1915,7 @@ export class People {
     }
   }
 
+  hide(j) { const s = this.st[j]; if (s === S.DEAD || s === S.EVAC) return false; if (s === S.PILE || s === S.CLIMB) { const k = this.bt[j]; if (k >= 0) this.bPile[k] = Math.max(0, this.bPile[k] - 1); } if (s === S.INSIDE) { const k = this.bt[j]; if (k >= 0) this.bIn[k] = Math.max(0, this.bIn[k] - 1); } this.st[j] = S.EVAC; this.lvl[j] = -1; this.inf[j] = 0; this.target[j] = -1; this.bt[j] = -1; this.dirty[j] = 1; return true; }
   vanish(j) { const s = this.st[j]; if (s !== S.ZOMBIE && s !== S.FALLING && s !== S.TURNING) return false; this.st[j] = S.EVAC; this.lvl[j] = -1; this.inf[j] = 0; this.target[j] = -1; this.bt[j] = -1; this.dirty[j] = 1; return true; }
   bite(i, j, Z) {
     this.st[j] = S.GRABBED; this.t1[j] = Z.biteT; this.target[j] = i;

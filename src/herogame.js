@@ -33,7 +33,7 @@ export const TREE = {
 const START_MOVES = ['spin', 'kick', 'laser', 'drag', 'wind', 'fire']; // and two powers to start with
 const TEAM = { hero: [['nova', 'Nova', 'Nova'], ['dragonfly', 'Dragonfly', 'Dragonfly'], ['tempo', 'Tempo', 'Tempo']], villain: [['tyrant', 'Tyrant', 'Tyrant'], ['blur', 'Blur', 'Blur'], ['weaver', 'Weaver', 'Weaver']] };
 // a town's trouble, along the road: disasters by type, villains by name
-const WAVES = [['tornado'], ['riot'], ['flood', 'blur'], ['quake', 'tyrant'], ['aliens'], ['haboob', 'weaver'], ['kaiju'], ['worm', 'blur'], ['plant', 'tyrant'], ['volcano', 'weaver'], ['tsunami', 'blur'], ['rift', 'tyrant'], ['sinkhole', 'weaver', 'blur'], ['blackhole', 'tyrant'], ['spill', 'blur', 'weaver'], ['coldwave', 'tyrant', 'weaver'], ['kaiju', 'blur', 'tyrant', 'weaver']];
+const WAVES = [['zombies'], ['tornado'], ['riot'], ['flood', 'blur'], ['quake', 'tyrant'], ['aliens'], ['haboob', 'weaver'], ['kaiju'], ['worm', 'blur'], ['plant', 'tyrant'], ['volcano', 'weaver'], ['tsunami', 'blur'], ['rift', 'tyrant'], ['sinkhole', 'weaver', 'blur'], ['blackhole', 'tyrant'], ['spill', 'blur', 'weaver'], ['coldwave', 'tyrant', 'weaver'], ['kaiju', 'blur', 'tyrant', 'weaver']];
 const REP = (r) => (r >= 60 ? 'Hero' : r >= 35 ? 'Vigilante' : r >= 15 ? 'Menace' : 'Villain');
 const SW = ['#ff3fcf', '#3dff5c', '#29e3ff', '#ffd23d', '#ff5a2a', '#8f5bff', '#f4f1ea', '#20242e'];
 const CSS = `
@@ -117,6 +117,7 @@ export class HeroGame {
     this.labWas = { hero: LAB.hero, villain: LAB.villain, moves: LAB.moves, army: LAB.army }; // the Sandbox's own settings, put back after
     LAB.hero = this.level; LAB.villain = Math.max(1, s.idx + 1); LAB.moves = this.moves(); LAB.spotK = 1 + 0.15 * this.count('spot'); LAB.toughK = 1 + 0.2 * this.count('tough'); LAB.army = this.side === 'villain' ? s.idx >= 2 : s.idx >= 4 && s.idx % 3 === 1;
     const D = g.disasters, B = g.city.bounds, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2, F = g.flight, hero = this.side === 'hero', wave = WAVES[s.idx % WAVES.length], evs = [], vs = [];
+    if (hero && wave[0] === 'zombies' && g.horde) { this.zombieLevel(key); return; }
     for (const e of D.list) if (e.type === 'villains' && e.alive) for (const w of e.who) if (!w.gone) w.state = 'gone';
     if (hero) { for (const w of wave) { if (['blur', 'tyrant', 'weaver'].includes(w)) vs.push(w); else { const e = D.start(w, cx + (Math.random() - 0.5) * 120, cz + (Math.random() - 0.5) * 120); if (e) evs.push(e); } } }
     const hunted = hero && s.rep < 15, rivals = hero ? (hunted ? TEAM.hero.filter(t => t[0] !== s.flyer).map(t => t[2]) : []) : TEAM.hero.slice(0, Math.min(3, 1 + Math.floor(s.idx / 3))).map(t => t[2]);
@@ -128,9 +129,22 @@ export class HeroGame {
     const town = PLACES[key].name, seen = s.towns[key]; F.tip(hero ? (hunted ? 'You have gone too far. The other heroes are coming for you!' : seen && seen.fear > 200 ? 'The people of ' + town + ' remember you. They run' : s.rep >= 60 ? 'The people of ' + town + ' cheer as you fly in. Use your powers and Lock on' : 'Defend ' + town + '. Use your powers and Lock on') : 'Bring down ' + need + ' buildings in ' + town + ' and beat the heroes who come');
     if (hero && (s.rep < 35 || (seen && seen.fear > 200))) g.people.scare(cx, cz, 400, 0.5);
   }
+  // the zombie level (Sean, 10b): the town down to about 20 people and a few cops, the rest of its people's slots dropped again as
+  // zombies, hundreds; Nova on foot with the whole kit (horde.js). Cleared: the town is saved
+  zombieLevel(key) {
+    const g = this.g, s = this.s, P = g.people, B = g.city.bounds, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2, pool = []; let kept = 0;
+    for (let j = 0; j < P.active; j++) { if (P.kind[j] !== 0) continue; if (kept < 20 && P.isCivilian(j) && P.lvl[j] === -1 && Math.hypot(P.x[j] - cx, P.z[j] - cz) < 60) { kept++; continue; } if (P.hide(j)) pool.push(j); }
+    for (let i = pool.length - 1; i > 0; i--) { const k = Math.floor(Math.random() * (i + 1)); const t = pool[i]; pool[i] = pool[k]; pool[k] = t; }
+    P.spawnOfficers(cx + 20, cz, 2); P.spawnOfficers(cx - 20, cz, 2);
+    const n = Math.min(400 + 100 * Math.min(3, s.idx), pool.length); this.round = { evs: [], need: 0, t: 0, downs: 0, hero: true, key, ended: false, zombie: true, n };
+    g.horde.start({ n, pool, level: true, onEnd: (won, H) => { this.round.horde = H; this.finish(won, won ? null : 'Overrun by the horde'); } });
+    this.rep = document.createElement('div'); this.rep.id = 'zd-rep'; document.body.appendChild(this.rep);
+    g.toast ? g.toast('Defend ' + PLACES[key].name + ': ' + n + ' zombies in the streets. Tap to punch, swipe to dash, hold to slam') : 0;
+  }
   placeNow() { try { return new URLSearchParams(location.search).get('place') || null; } catch (e) { return null; } }
   update() {
     const R = this.round; if (!R || R.ended) return; const F = this.g.flight, S = LAB.stats; R.t += 1 / 60;
+    if (R.zombie) { const H = this.g.horde; if (!H.active) return this.finish(false, 'You left the town'); this.rep.innerHTML = 'Hero · ' + H.left + ' zombies<div class="bar"><i style="width:' + Math.max(0, 100 - H.left / R.n * 100) + '%"></i></div>'; return; }
     const live = R.evs.filter(e => e.alive && (e.type !== 'villains' || e.who.some(w => !w.gone && !w.beaten))).length;
     const fear = LAB.fear(), rep = R.hero ? Math.max(0, Math.min(100, this.s.rep - fear / 30)) : 0;
     this.rep.innerHTML = R.hero ? REP(rep) + (live ? ' · ' + live + ' to stop' : '') + '<div class="bar"><i style="width:' + rep + '%"></i></div>' : S.buildings + '/' + R.need + ' buildings<div class="bar"><i style="width:' + Math.min(100, S.buildings / R.need * 100) + '%"></i></div>';
@@ -141,6 +155,7 @@ export class HeroGame {
   }
   finish(won, why) {
     const R = this.round, s = this.s, S = LAB.stats, F = this.g.flight, g = this.g; R.ended = true; const fear = LAB.fear(); if (this.rep) { this.rep.remove(); this.rep = null; }
+    if (R.zombie) { const H = R.horde || g.horde, xp = won ? 300 + H.kills + (H.bitten < 10 ? 100 : 0) : 20 + Math.round(H.kills / 4); if (H.active) H.stop(true); const lv0 = this.level; s.xp += xp; const up = this.level - lv0; if (won) s.idx = Math.min(PATH.length - 1, s.idx + 1); s.towns[R.key] = { won: (s.towns[R.key] && s.towns[R.key].won) || won, fear: 0 }; if (won) s.rep = Math.min(100, s.rep + 6); HS.save(); this.round = null; g.heroGo = false; this.hub('<b>' + (won ? 'TOWN SAVED' : (why || 'NOT THIS TIME')) + '</b> · +' + xp + ' XP' + (up ? ' · <b>LEVEL UP!</b> A skill point to spend' : '') + '<br>Zombies dusted ' + H.kills + ' · bitten ' + H.bitten + ' times · ' + Math.round(H.time) + ' s'); return; }
     F.onStopped = null; for (const e of R.evs) if (e.type === 'villains') for (const w of e.who) { if (w.beaten && !s.trophies.includes(w.name)) s.trophies.push(w.name); }
     let xp = 0, lines = [];
     if (R.hero) { const was = s.rep; xp = won ? Math.max(50, 200 + 100 * s.idx + (S.stopped || 0) * 60 + S.won * 80 + S.saved * 30 - Math.round(fear / 4)) : 25; const gain = won ? 6 : 0; s.rep = Math.max(0, Math.min(100, s.rep + gain - fear / 30)); if (R.hunted && !won) { s.rep = Math.min(100, s.rep + 15); xp = 0; lines.push('The heroes beat you. You wake in the tower, and it is a lesson'); } lines.push('Reputation ' + Math.round(was) + ' to ' + Math.round(s.rep) + ': ' + REP(s.rep)); s.towns[R.key] = { won: (s.towns[R.key] && s.towns[R.key].won) || won, fear: Math.round(fear) }; if (R.hunted && won) lines.push('You beat the heroes. This town now lives in fear of you'); }
