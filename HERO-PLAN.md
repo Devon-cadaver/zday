@@ -19,7 +19,7 @@ Build order (one thing at a time, each tested in the Sandbox and pushed). The ch
   - [ ] 3d. Ranged powers: freeze, fire, lightning, sonic clap, gravity pulse, wind blast, shield, telekinesis
   - [ ] 3e. The combat animation pass: a clip system, more joints, choreographed moves, villain reactions, hit stop, camera punch-ins
     - [x] 3e.1 the clip system, the chest, wrists and ankles, the uppercut and the jab combo done properly (the fight camera side on)
-    - [ ] 3e.2 the rest of the moves choreographed
+    - [x] 3e.2 the rest of the moves choreographed (kick, sky slam, ground pound, throw, hammer throw, elbow drop, a settle after every move)
     - [ ] 3e.3 villain reactions for every hit, speed streaks, camera punch-ins
     - [ ] 3e.4 more detail on the figures: one hero first (Sean), to see how far it can go, then the rest and the villains; and texture, so they stop looking shiny and balloon-like (matte cloth, seams, a weave, the suit catching light like fabric)
   - [ ] 3f. From the street-fight inspiration: two villains at once, a breakable mask, villains retreating, the rogue army
