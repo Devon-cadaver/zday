@@ -188,13 +188,13 @@ export class Flight {
     } // up from the street fight: the grab button's place in the air
     // the finger as a stick: how far it has gone from where it came down
     let id = null, ox = 0, oy = 0;
-    ov.addEventListener('pointerdown', (e) => { if (id !== null) return; id = e.pointerId; ox = e.clientX; oy = e.clientY; this.stick.style.display = 'block'; this.stick.style.left = ox + 'px'; this.stick.style.top = oy + 'px'; this.knob.style.transform = ''; try { ov.setPointerCapture(id); } catch (er) { /* fine */ } e.preventDefault(); });
+    let t0 = 0, far = false; ov.addEventListener('pointerdown', (e) => { if (id !== null) return; t0 = performance.now(); far = false; id = e.pointerId; ox = e.clientX; oy = e.clientY; this.stick.style.display = 'block'; this.stick.style.left = ox + 'px'; this.stick.style.top = oy + 'px'; this.knob.style.transform = ''; try { ov.setPointerCapture(id); } catch (er) { /* fine */ } e.preventDefault(); });
     ov.addEventListener('pointermove', (e) => {
-      if (e.pointerId !== id) return;
+      if (e.pointerId !== id) return; if (Math.hypot(e.clientX - ox, e.clientY - oy) > 14) far = true; if (this.engaged && !far) return; // in close a tap is a punch, only a real drag flies off
       const dx = Math.max(-1, Math.min(1, (e.clientX - ox) / 70)), dy = Math.max(-1, Math.min(1, (e.clientY - oy) / 70));
       this.ix = dx; this.iy = this.invert ? -dy : dy; this.knob.style.transform = 'translate(' + dx * 30 + 'px,' + dy * 30 + 'px)';
     });
-    const up = (e) => { if (e.pointerId !== id) return; id = null; this.ix = this.iy = 0; this.stick.style.display = 'none'; };
+    const up = (e) => { if (e.pointerId !== id) return; id = null; this.ix = this.iy = 0; this.stick.style.display = 'none'; if (this.engaged && !far && performance.now() - t0 < 350 && this.fromHorde) this.fromHorde.airPunch(); };
     ov.addEventListener('pointerup', up); ov.addEventListener('pointercancel', up);
     // two fingers: a pinch zooms (the stick let go meanwhile); the mouse wheel too
     const pts = new Map(); let pinch = null;
@@ -326,7 +326,7 @@ export class Flight {
   stop(quiet = false) {
     if (!this.active) return;
     const g = this.g, { camera, controls, post } = this.ctx;
-    this.fromHorde = null; this.fromBase = null; this.smashing = null; this.hovering = false; this.flyBtn = null; this.smashBtn = null; this.boosting = false; this.lock = null; this.dropInside(); this.inB = -1; this.clearShots(); if (this.power) { this.power.dispose(); this.power = null; this.powerBtn = null; } if (this.army) { this.army.dispose(); this.army = null; } if (this.getaways) { for (const G of this.getaways) G.finish(); this.getaways = []; }
+    this.fromHorde = null; this.fromBase = null; this.smashing = null; this.hovering = false; this.flyBtn = null; this.smashBtn = null; this.boosting = false; this.engaged = null; this.spinHold = false; this.lock = null; this.dropInside(); this.inB = -1; this.clearShots(); if (this.power) { this.power.dispose(); this.power = null; this.powerBtn = null; } if (this.army) { this.army.dispose(); this.army = null; } if (this.getaways) { for (const G of this.getaways) G.finish(); this.getaways = []; }
     this.active = false; document.body.classList.remove('zd-flying');
     const hr = this.obj.userData.hero; g.disasters.ctx.scene.remove(this.obj); if (this.streak) { this.streak.dispose(g.disasters.ctx.scene); this.streak = null; }
     if (hr) { hr.cape.g.dispose(); if (hr.smooth && hr.smooth.mesh) { hr.smooth.mesh.geometry.dispose(); const m = hr.smooth.mesh.material; (Array.isArray(m) ? m : [m]).forEach(x => x && x.dispose()); } } else this.obj.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); // its own shapes and paint (a hero's are shared with the rest: only the cape is its own)
@@ -378,11 +378,12 @@ export class Flight {
       _v.set(P.seat[0], P.seat[1], 0).applyQuaternion(this.q); cam.position.copy(this.pos).add(_v);
       cam.quaternion.copy(this.q).multiply(SEAT_TURN); cam.up.set(0, 1, 0).applyQuaternion(this.q);
     } else if (this.view === 'iso' && this.state !== 'down') { // the town's lens, behind and well above the hero's heading, aimed a little ahead of them
-      this.ctx.post.opts.dof = this.pos.y < 30; // high up, the whole town stays sharp to steer by
-      const fl = Math.hypot(_f.x, _f.z) || 1, dist = ISO_DIST * 1.35 * this.zoom, ce = Math.cos(ISO_EL) * dist, cy = this.pos.y + Math.sin(ISO_EL) * dist, b0 = Math.atan2(-_f.x / fl, -_f.z / fl);
+      const H1 = this.fromHorde, hd = H1 && H1.heldS, en = this.engaged, wk = hd ? (hd.legs ? 2.8 : 1.9) : en ? (en.legs ? 1.9 : 1.5) : 1; this.closeK = (this.closeK || 1) + (wk - (this.closeK || 1)) * (1 - Math.exp(-dt * 3)); const ck = Math.min(1, (this.closeK - 1) / 0.4), el = ISO_EL + (Math.min(ISO_EL, 0.42) - ISO_EL) * ck;
+      this.ctx.post.opts.dof = this.pos.y < 30 && ck === 0; // high up, the whole town stays sharp to steer by
+      const fl = Math.hypot(_f.x, _f.z) || 1, dist = ISO_DIST * 1.35 * this.zoom * this.closeK, ce = Math.cos(el) * dist, cy = this.pos.y + Math.sin(el) * dist; let b0 = Math.atan2(-_f.x / fl, -_f.z / fl); if (this.spinHold) { if (this.spinB == null) this.spinB = b0; b0 = this.spinB; } else this.spinB = null;
       this.swing(dt, (a) => _u.set(this.pos.x + Math.sin(a) * ce, cy, this.pos.z + Math.cos(a) * ce), b0); _v.set(this.pos.x + Math.sin(b0 + this.azOff) * ce, cy, this.pos.z + Math.cos(b0 + this.azOff) * ce);
       if (this.snap) cam.position.copy(_v); else cam.position.lerp(_v, 1 - Math.exp(-dt * 3)); cam.up.set(0, 1, 0);
-      const ah = this.hovering ? 0 : 8; cam.lookAt(_u.set(this.pos.x + _f.x / fl * ah, this.pos.y, this.pos.z + _f.z / fl * ah)); // floating: she is in the middle of the view
+      const ah = this.hovering || this.spinHold ? 0 : 8; cam.lookAt(_u.set(this.pos.x + _f.x / fl * ah, this.pos.y + (hd ? (hd.y - this.pos.y) * 0.4 : 0), this.pos.z + _f.z / fl * ah)); // floating: she is in the middle of the view
     } else {
       const fl = Math.hypot(_f.x, _f.z) || 1, back = P.chase[0] * this.zoom, hi = P.chase[1] * Math.pow(this.zoom, 0.8);
       _v.set(this.pos.x - _f.x / fl * back, this.pos.y + hi - _f.y * back * 0.5, this.pos.z - _f.z / fl * back);
@@ -686,12 +687,12 @@ export class Flight {
     if (this.lock && !again) { this.lock = null; this.tip('Lock let go: flying free'); return; }
     if (this.fromBase) { this.tip('Nothing to lock on in the base; Land to come down'); return; }
     if (this.fromHorde && this.fromHorde.o.boss && !v) { const e = this.fromHorde.o.boss; this.lock = { zombie: -1, name: 'it', get x() { return e.x; }, get z() { return e.z; }, y: 0, get gone() { return !e.alive; } }; this.tip('Locked on! Straight at it, down to fight; or SMASH LAND'); sfx('whoosh', this.pos.x, this.pos.y, this.pos.z, { gain: 0.9 }); return; }
-    if (this.fromHorde && !v) { const H = this.fromHorde, P = this.g.people; let bj = -1, bd = 1e9; for (const j of H.ids) { if (!H.isT(j)) continue; const d2 = (P.x[j] - this.pos.x) ** 2 + (P.z[j] - this.pos.z) ** 2; if (d2 < bd) { bd = d2; bj = j; } } const mc = H.nearMachine(this.pos.x, this.pos.y, this.pos.z, 1e9); if (mc) { /* in the air, the machines first; LAND is for the ground */ const m = mc.m; this.lock = { machine: m, name: 'it', get x() { return m.x; }, get z() { return m.z; }, get y() { return m.y; }, get gone() { return !H.machineUp(m); } }; this.tip('Locked on! Straight at it'); sfx('whoosh', this.pos.x, this.pos.y, this.pos.z, { gain: 0.9 }); return; } if (bj < 0) { this.tip('Nothing left to lock on'); return; } this.lock = { zombie: bj, name: 'a zombie', get x() { return P.x[bj]; }, get z() { return P.z[bj]; }, get y() { return P.y[bj]; }, get gone() { return !H.isT(bj); } }; this.tip('Locked on a zombie! Straight at it, down to fight; or SMASH LAND'); sfx('whoosh', this.pos.x, this.pos.y, this.pos.z, { gain: 0.9 }); return; } // up from the street fight: the nearest zombie within a block
+    if (this.fromHorde && !v) { const H = this.fromHorde, P = this.g.people; let bj = -1, bd = 1e9; for (const j of H.ids) { if (!H.isT(j)) continue; const d2 = (P.x[j] - this.pos.x) ** 2 + (P.z[j] - this.pos.z) ** 2; if (d2 < bd) { bd = d2; bj = j; } } const mc = H.nearMachine(this.pos.x, this.pos.y, this.pos.z, 1e9); if (mc) { /* in the air, the machines first; LAND is for the ground */ const m = mc.m; this.engaged = null; this.lock = { machine: m, name: 'it', get x() { return m.legs ? (m.legs[0].fx + m.x) / 2 : m.x; }, get z() { return m.legs ? (m.legs[0].fz + m.z) / 2 : m.z; }, get y() { return m.legs ? 26 : m.y; }, get gone() { return !H.machineUp(m); } }; this.tip('Locked on! Straight at it'); sfx('whoosh', this.pos.x, this.pos.y, this.pos.z, { gain: 0.9 }); return; } if (bj < 0) { this.tip('Nothing left to lock on'); return; } this.lock = { zombie: bj, name: 'a zombie', get x() { return P.x[bj]; }, get z() { return P.z[bj]; }, get y() { return P.y[bj]; }, get gone() { return !H.isT(bj); } }; this.tip('Locked on a zombie! Straight at it, down to fight; or SMASH LAND'); sfx('whoosh', this.pos.x, this.pos.y, this.pos.z, { gain: 0.9 }); return; } // up from the street fight: the nearest zombie within a block
     if (!v) { let bd = 1e9; for (const e of this.g.disasters.list) if (e.alive && e.type === 'villains') for (const w of e.who) { if (w.gone || w.beaten) continue; const d = Math.hypot(w.x - this.pos.x, w.z - this.pos.z); if (d < bd) { bd = d; v = w; } } }
     if (!v || v.gone || v.beaten) { const B = this.g.city.bounds; this.lock = null; this.g.disasters.start('villains', (B.x0 + B.x1) / 2, (B.z0 + B.z1) / 2); this.tip('More villains are coming! Press Lock on again'); return; } // all beaten: three more
     this.lock = v; this.tip('Locked on ' + v.name + '! Flying straight at them'); sfx('whoosh', this.pos.x, this.pos.y, this.pos.z, { gain: 0.9 });
   }
-  unhover() { this.hovering = false; this.thr = this.speed = Math.max(this.P.start || 30, 20); }
+  unhover() { this.engaged = null; this.hovering = false; this.thr = this.speed = Math.max(this.P.start || 30, 20); }
   // back onto the base's floor (base.js land) from a flight round its hall
   landBase() { const Bs = this.fromBase; if (!Bs || this.state !== 'fly') return; this.fromBase = null; const x = this.pos.x, z = this.pos.z, cam = this.ctx.camera; this.g.camBlend = { pos: cam.position.clone(), quat: cam.quaternion.clone(), fov: cam.fov, t: 0, T: 1.0 }; this.stop(true); Bs.land(x, z); }
   // back down into the street fight she took off from (horde.js land): a plain landing where she is, or the smash: straight down first, a shockwave where she lands
@@ -701,7 +702,7 @@ export class Flight {
     const v = this.lock, P = this.P; this.hovering = false;
     if (!v || v.gone || v.beaten) { this.lock = null; return false; }
     const ty = Math.max(2.4, (v.y || 0) + HIP), dx = v.x - this.pos.x, dy = ty - this.pos.y, dz = v.z - this.pos.z, d = Math.hypot(dx, dy, dz) || 0.01;
-    if (v.machine) { if (d < 10) { this.fromHorde.hitMachine(v.machine, 34, 'HIT'); this.lock = null; this.hovering = true; this.speed = this.thr = 0; this.pos.y += 2; this.tip('Hit! GRAB it, Lock on again, or ram it'); this.power.ramT = 0.8; return true; } }
+    if (v.machine) { if (d < 10) { this.fromHorde.hitMachine(v.machine, 10, 'HIT'); this.lock = null; this.hovering = true; this.engaged = v.machine; this.speed = this.thr = 0; this.tip('In close: tap to punch, or GRAB IT'); this.power.ramT = 0.8; return true; } }
     else if (v.zombie != null) { if (d < 7) { this.landHorde(false); return true; } }
     else if (d < 6.5) { if (this.inB >= 0) { this.burstOut(this.inB, this.pos.x, this.pos.y, this.pos.z); this.inB = -1; } this.speed = 0; this.fightFoe(v); return true; } // reached them: down into the fight
     let a = Math.atan2(-dz, dx) - this.yaw; a = Math.atan2(Math.sin(a), Math.cos(a));
@@ -742,6 +743,7 @@ export class Flight {
     else if (kind === 'rise') { A[1].sh.rotation.set(-3.0, 0, 0.1); A[0].sh.rotation.set(0.2, 0, -0.15); }
     else if (kind === 'hammerUp' || kind === 'hammer' || kind === 'dive') { const s = kind === 'hammer' ? u : 0; for (const a of A) { a.sh.rotation.set(-3.0 + 2.3 * s, 0, -a.sx * 0.15); a.el.rotation.set(0, 0, 0); } r.torso.rotation.x = kind === 'hammerUp' ? -0.25 : 0.35 * s; } // fists together over the head, brought down
     else if (kind === 'drag') { A[1].sh.rotation.set(0.9, 0, 0.25); A[1].el.rotation.set(0, 0, 0); A[0].sh.rotation.set(-2.9, 0, -0.1); } // one hand back on their throat, the other ahead
+    else if (this.spinHold) { for (const a of A) { a.sh.rotation.set(-1.5, 0, -a.sx * 0.24); a.el.rotation.set(0, 0, 0); } }
     else if (this.punch > 0) { A[1].sh.rotation.set(-1.6, 0, 0.1); A[0].sh.rotation.set(0.4, 0, -0.2); A[0].el.rotation.set(-1.4, 0, 0); r.torso.rotation.x = 0.3; }
     else if (fast > 0.5) { A[1].sh.rotation.set(-3.0, 0, 0.1); A[0].sh.rotation.set(0.25, 0, -0.1); }
     else { for (const a of A) a.sh.rotation.set(0.1, 0, a.sx * 0.3); for (const L of r.legs) { L.hip.rotation.x = 0.1; L.knee.rotation.x = 0.25; } }
