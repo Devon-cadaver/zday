@@ -99,33 +99,39 @@ export function rig(o = {}) {
   const parts = [], part = (g, mat, sx, sy, sz, x, y, z, parent) => { const me = new THREE.Mesh(g, mat); me.scale.set(sx, sy, sz); me.position.set(x, y, z); me.castShadow = true; parent.add(me); parts.push(me); return me; };
   const pivot = (parent, x, y, z) => { const p = new THREE.Group(); p.position.set(x, y, z); parent.add(p); return p; };
   const hips = pivot(body, 0, 0.94, 0);
-  const sl = o.slim ? 0.88 : 1;
+  const sl = o.slim ? 0.88 : 1, fancy = !!mt.fancy, keep = (p) => { p.userData.keep = true; return p; }; // fancy (cloth.js looks): the extra parts, kept over the smooth body
   part(m.box, mt.suit, 0.3 * sl, 0.16, 0.18, 0, 0, 0, hips);
   const legs = [-1, 1].map(sx => {
     const hip = pivot(hips, sx * 0.09, -0.04, 0); part(m.limb, mt.leg || mt.suit, 0.075 * sl, 0.46, 0.075 * sl, 0, 0, 0, hip); // leg: leggings in a colour of their own
     const knee = pivot(hip, 0, -0.45, 0); part(m.limb, mt.leg || mt.suit, 0.06 * sl, 0.44, 0.06 * sl, 0, 0, 0, knee);
     const ank = pivot(knee, 0, -0.45, 0); part(m.box, mt.boot || mt.suit, 0.1, 0.07, 0.22, 0, 0, 0.05, ank); // the boot on its ankle
+    if (fancy) keep(part(m.box, mt.boot, 0.1, 0.035, 0.1, 0, 0.065, 0, ank)); // the boot's cuff
     return { hip, knee, ank };
   });
   const torso = pivot(hips, 0, 0.06, 0); // the waist
   part(m.box, mt.suit, 0.36 * sl, 0.26, 0.2, 0, 0.16, 0, torso);
   if (mt.belt) part(m.box, mt.belt, 0.37 * sl, 0.05, 0.21, 0, 0.05, 0, torso);
+  if (fancy && mt.badge) keep(part(m.box, mt.badge, 0.07, 0.055, 0.03, 0, 0.05, 0.105, torso)); // the buckle
   const chest = pivot(torso, 0, 0.3, 0); // the chest bends on its own above the waist (clips.js)
   part(m.box, mt.suit, 0.36 * sl, 0.26, 0.2, 0, 0.11, 0, chest);
   part(m.box, mt.suit, 0.44 * sl, 0.1, 0.22, 0, 0.2, 0, chest); // shoulders
   if (mt.badge) part(m.box, mt.badge, 0.12, 0.12, 0.02, 0, 0.06, 0.105, chest); // the emblem on the chest
+  if (fancy) keep(part(m.box, mt.suit, 0.17 * sl, 0.045, 0.11, 0, 0.3, 0.015, chest)); // the collar
   const head = pivot(chest, 0, 0.4, 0);
   part(m.ball, mt.skin, 0.11, 0.13, 0.115, 0, 0, 0, head);
   part(m.ball, mt.hair, 0.117, 0.085, 0.122, 0, 0.055, -0.014, head); // the hair
   if (o.longHair) part(m.box, mt.hair, 0.12, 0.26, 0.06, 0, -0.1, -0.1, head).userData.keep = true; // a long ponytail down the back
   part(m.box, mt.skin, 0.06, 0.08, 0.06, 0, -0.13, 0, head); // neck
+  if (fancy) { const fm = mt.face || mt.hair; for (const sx of [-1, 1]) { keep(part(m.ball, fm, 0.019, 0.015, 0.012, sx * 0.04, 0.012, 0.106, head)); keep(part(m.box, fm, 0.042, 0.008, 0.01, sx * 0.04, 0.045, 0.108, head)); } keep(part(m.box, fm, 0.034, 0.006, 0.01, 0, -0.045, 0.11, head)); } // eyes, brows, a mouth
   const eyes = o.eyes ? [-1, 1].map(sx => { const e = part(m.ball, mt.eye || m.eye, 0.024, 0.02, 0.016, sx * 0.042, 0.015, 0.108, head); e.userData.keep = true; return e; }) : null;
   const arms = [];
   (o.arms === 6 ? [0.18, 0.04, -0.1] : [0.18]).forEach((y, row) => {
     for (const sx of [-1, 1]) {
       const sh = pivot(chest, sx * 0.23 * sl, y, 0); part(m.limb, mt.suit, 0.055 * sl, 0.3, 0.055 * sl, 0, 0, 0, sh);
+      if (fancy && row === 0) keep(part(m.ball, mt.suit, 0.078, 0.05, 0.078, 0, 0.012, 0, sh)); // a shoulder pad
       const el = pivot(sh, 0, -0.29, 0); part(m.limb, mt.suit, 0.045 * sl, 0.27, 0.045 * sl, 0, 0, 0, el);
       const wr = pivot(el, 0, -0.29, 0); part(m.ball, mt.glove || mt.skin, 0.045, 0.05, 0.045, 0, 0, 0, wr); // the hand on its wrist
+      if (fancy) keep(part(m.box, mt.glove || mt.suit, 0.064, 0.03, 0.064, 0, 0.03, 0, wr)); // the glove's cuff
       arms.push({ sh, el, wr, sx, row });
     }
   });
@@ -138,22 +144,23 @@ function smoothBody(r) {
   const mt = r.mt, o = r.o, sl = o.slim ? 0.88 : 1, glo = (mm, c) => (mm.emissive ? mm.emissive[c] * (mm.emissiveIntensity ?? 1) : 0); // a neon suit keeps its glow up close
   const col = (mm, d = [1, 1, 1]) => (mm && mm.color ? [mm.color.r + glo(mm, 'r'), mm.color.g + glo(mm, 'g'), mm.color.b + glo(mm, 'b')] : d);
   const suit = col(mt.suit), skin = col(mt.skin), boot = col(mt.boot || mt.suit), glove = col(mt.glove || mt.skin), hair = col(mt.hair), belt = mt.belt ? col(mt.belt) : null, badge = mt.badge ? col(mt.badge) : null, leg = mt.leg ? col(mt.leg) : null;
-  const body = new Body(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: mt.suit.roughness ?? 0.45, metalness: mt.suit.metalness ?? 0.05 }));
+  const fancy = !!mt.fancy, dim = (cc) => [cc[0] * 0.74, cc[1] * 0.74, cc[2] * 0.74], seamS = dim(suit), seamB = dim(boot); // seams: the suit's colour darkened
+  const body = new Body(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: mt.suit.roughness ?? 0.45, metalness: mt.suit.metalness ?? 0.05, bumpMap: mt.suit.bumpMap || null, bumpScale: mt.suit.bumpScale ?? 1 }));
   const T = (q, pts, ref) => { const t = body.add({ lumps: 0, tile: 0.3, ...q }); t.src = pts; t.refSrc = ref; };
   const H = r.hips, Tq = r.torso, Ch = r.chest, Hd = r.head;
   T({ rings: 16, cols: 14, len: 0.8, radii: [0.12, 0.15, 0.14, 0.17, 0.21, 0.1].map(v => v * sl), bulge: [0, 0, 0.012, 0.01, 0], capStart: true, capEnd: true, shape: (u, c, s) => 1 / Math.sqrt((c / 0.62) ** 2 + s * s),
-    tint: (u, c, s) => (belt && u > 0.24 && u < 0.3 ? belt : badge && c > 0.75 && u > 0.6 && u < 0.72 && Math.abs(s) < 0.4 ? badge : suit) },
+    tint: (u, c, s) => (belt && u > 0.24 && u < 0.3 ? belt : badge && c > 0.75 && u > 0.6 && u < 0.72 && Math.abs(s) < 0.4 ? badge : fancy && (Math.abs(s) > 0.965 || (c > 0.985 && u > 0.32) || Math.abs(u - 0.56) < 0.012) ? seamS : suit) }, // seams down the sides, the front, and across the chest
     [[H, 0, -0.08, 0], [H, 0, 0.02, 0], [Tq, 0, 0.12, 0], [Ch, 0, 0.02, 0], [Ch, 0, 0.2, 0], [Ch, 0, 0.3, 0]], [Ch, 0, 0, 1]);
   T({ rings: 14, cols: 12, len: 0.4, radii: [0.05, 0.045, 0.085, 0.112, 0.06], capStart: true, capEnd: true, shape: (u, c, s) => 1 / Math.sqrt((c / 1.05) ** 2 + (s / 0.93) ** 2),
     tint: (u, c) => (u > 0.72 || (u > 0.5 && c < -0.2) ? hair : skin) }, // hair over the crown and down the back
     [[Ch, 0, 0.28, 0], [Hd, 0, -0.12, 0], [Hd, 0, -0.06, 0.012], [Hd, 0, 0.03, 0], [Hd, 0, 0.14, -0.01]], [Hd, 0, 0, 1]);
   for (const L of r.legs) {
     const sx = Math.sign(L.hip.position.x) || 1;
-    T({ rings: 16, cols: 10, len: 1.0, radii: [0.085 * sl, 0.08 * sl, 0.058 * sl, 0.045, 0.045, 0.035], bulge: [0, 0.014, 0.012, 0, 0], capStart: true, capEnd: true, tint: (u) => (u > 0.72 ? boot : leg && u > 0.12 ? leg : suit) },
+    T({ rings: 16, cols: 10, len: 1.0, radii: [0.085 * sl, 0.08 * sl, 0.058 * sl, 0.045, 0.045, 0.035], bulge: [0, 0.014, 0.012, 0, 0], capStart: true, capEnd: true, tint: (u) => (u > 0.72 ? boot : fancy && u > 0.675 ? seamS : leg && u > 0.12 ? leg : suit) },
       [[H, sx * 0.06, 0.02, 0], [L.hip, 0, 0, 0], [L.knee, 0, 0, 0], [L.ank, 0, 0.05, 0], [L.ank, 0, 0, 0.06], [L.ank, 0, -0.01, 0.15]], [H, 0, 0, 1]);
   }
   for (const A of r.arms) {
-    T({ rings: 14, cols: 9, len: 0.75, radii: [0.07 * sl, 0.058 * sl, 0.046 * sl, 0.04, 0.045, 0], bulge: [0, 0.01, 0.008, 0, 0], capStart: true, capEnd: true, tint: (u) => (u > 0.8 ? glove : suit) },
+    T({ rings: 14, cols: 9, len: 0.75, radii: [0.07 * sl, 0.058 * sl, 0.046 * sl, 0.04, 0.045, 0], bulge: [0, 0.01, 0.008, 0, 0], capStart: true, capEnd: true, tint: (u) => (u > 0.8 ? glove : fancy && u > 0.74 ? seamS : suit) },
       [[Ch, A.sx * 0.13 * sl, A.sh.position.y, 0], [A.sh, 0, 0, 0], [A.el, 0, 0, 0], [A.wr, 0, 0.03, 0], [A.wr, 0, -0.02, 0], [A.wr, 0, -0.07, 0]], [Ch, 0, 0, 1]);
   }
   const mesh = body.build([0, 1, 0], 2.2); mesh.visible = false; r.body.add(mesh);

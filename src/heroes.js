@@ -12,6 +12,7 @@
 // out of the water two at a time and fly them up onto a roof clear of it, and
 // Tempo holds back the incoming wave with his bubbles.
 import * as THREE from 'three';
+import { clothMat } from './cloth.js';
 import { rig, relax, handsOnHips, tumble, detail, pinPose } from './villains.js';
 import { tossStep, toss } from './brawl.js';
 import { fightPose } from './melee.js';
@@ -57,7 +58,9 @@ function kit() {
   };
   // each their own neon, glowing a little, so they stand out from the town, from the villains and from each other
   const neon = (hex) => { const c = new THREE.Color(hex); return { suit: std(hex, { roughness: 0.35, emissive: c, emissiveIntensity: 0.45 }), boot: std(hex, { roughness: 0.4, emissive: c, emissiveIntensity: 0.3 }), cape: std(hex, { side: THREE.DoubleSide, roughness: 0.55, emissive: c, emissiveIntensity: 0.3 }) }; };
-  HM.look = { Dragonfly: neon('#3dff5c'), Nova: neon('#ff3fcf'), Tempo: neon('#29e3ff') };
+  // Nova in cloth (3e.4, the first of the three to get the detail): a matte woven suit that keeps a little of her glow, dark boots and gloves, and the fancy parts the rig adds (villains.js rig: cuffs, pads, a collar, a buckle, a face)
+  const cloth = (hex) => { const c = new THREE.Color(hex); return { suit: clothMat(hex, { emissive: c, emissiveIntensity: 0.22 }), boot: clothMat('#2a1a33', { bumpScale: 0.15 }), glove: clothMat('#2a1a33', { bumpScale: 0.15 }), cape: clothMat(hex, { side: THREE.DoubleSide, emissive: c, emissiveIntensity: 0.16, repeat: [5, 9] }), face: std('#2a1b1a', { roughness: 0.6 }), fancy: true }; };
+  HM.look = { Dragonfly: neon('#3dff5c'), Nova: cloth('#ff3fcf'), Tempo: neon('#29e3ff') };
   return HM;
 }
 
