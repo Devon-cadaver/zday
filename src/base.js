@@ -66,7 +66,7 @@ export function baseBuilding(cfg, y0) {
 const HALL = { y: 33 }, OFFICE = { w: 30, d: 22 }, BASEMENT = { w: 120, d: 90 }; // the basement hall inside (Sean: as big as we like), 30 m up over the outskirts beyond the town's east edge, on its 3 m podium
 const EL = 0.95, AZ = Math.atan2(0.6, 0.8), _a = new THREE.Vector3(), _ray = new THREE.Raycaster(), _pl = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), _hit = new THREE.Vector3(), _m = new THREE.Vector2();
 const CSSB = `body.zd-flying #zd-bar,body.zd-flying #zd-dis,body.zd-flying #zd-followchip,body.zd-flying #zd-globe,body.zd-flying #zd-top{display:none!important}
-#zd-base{position:fixed;inset:0;z-index:30;touch-action:none;font-family:system-ui,sans-serif;color:#fff;user-select:none}
+#zd-base{position:fixed;inset:0;z-index:28;touch-action:none;font-family:system-ui,sans-serif;color:#fff;user-select:none}
 #zd-base .hint{position:absolute;left:12px;right:12px;top:calc(14px + env(safe-area-inset-top));text-align:center;font:700 13px/1.4 system-ui,sans-serif;text-shadow:0 1px 3px #000;opacity:.9;transition:opacity .4s}
 #zd-base .threat{position:absolute;left:50%;transform:translateX(-50%);top:calc(64px + env(safe-area-inset-top));width:200px;font:800 10px/1 system-ui,sans-serif;letter-spacing:.08em;text-align:center;text-shadow:0 1px 3px #000}
 #zd-base .threat i{display:block;height:8px;margin-top:5px;border-radius:5px;background:rgba(0,0,0,.45);overflow:hidden}
@@ -121,7 +121,7 @@ export class HomeBase {
   }
   // o.level: the horde of the level going on outside; the door takes her back to it, and the ring and the attacks wait
   start(o = {}) {
-    this.level = o.level || null; const g = this.g, { camera, controls, post } = this.ctx, S = g.disasters.ctx.scene; if (!this.placed) this.place();
+    this.level = o.level || null; if (this.g.paused) this.g.setPaused(false); const g = this.g, { camera, controls, post } = this.ctx, S = g.disasters.ctx.scene; if (!this.placed) this.place();
     for (const p of [g.flight, g.drive, g.takeover, g.bandGame, g.fightTest, g.horde]) if (p && p.active) p.stop(true); if (g.takeover && g.takeover.picking) g.takeover.endPick();
     this.active = true; controls.enabled = false; g.setFollow(-1); document.body.classList.add('zd-flying'); this.savedDof = post.opts.dof; post.opts.dof = true; this.ext.visible = false; this.floorY = HALL.y;
     const O = OFFICE, Bm = BASEMENT;
