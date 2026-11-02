@@ -318,7 +318,7 @@ export function villainModel(name, of) { // of: an outfit (the roster's robot le
     for (const L of r.legs) L.knee.rotation.x = 2.0;
     for (const a of r.arms) { a.sh.rotation.set(-0.7 + a.row * 0.55, 0, a.sx * (0.95 + a.row * 0.2)); a.el.rotation.set(-1.0, 0, -a.sx * 0.3); }
   } else handsOnHips(r);
-  r.root.userData.tick = (dt) => r.cape.update(dt, 0.12, 0.35); r.cape.update(0.1, 0.12, 0.35); detail(r, null, true);
+  r.root.userData.tick = (dt) => r.cape.update(dt, 0.12, 0.35); r.cape.update(0.1, 0.12, 0.35); if (!of) detail(r, null, true);
   return r.root;
 }
 
