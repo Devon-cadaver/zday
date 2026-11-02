@@ -36,7 +36,7 @@ export class HeroPower {
   show() { const P = POWER[this.id]; if (this.F.powerBtn) this.F.powerBtn.textContent = P.icon + ' ' + P.name; }
   target() { const F = this.F; let best = null, bd = 1e9; for (const e of F.g.disasters.list) { if (!e.alive || !WEAK[e.type] || e.heroHp <= 0) continue; const w = where(e), d = w && w.x != null ? Math.hypot(w.x - F.pos.x, w.z - F.pos.z) : 9e8; if (d > REACH && !WHOLE[e.type]) continue; if (d < bd) { bd = d; best = e; } } return best; }
   use() {
-    const F = this.F, g = F.g; if (this.cool > 0 || F.state !== 'fly') return false; this.cool = 1.3; const id = this.id, P = POWER[id], H0 = F.fromHorde; if (H0 && id === loadKit().stun) H0.freezeIt(); if (H0 && H0.o.fleet) { const mc = H0.nearMachine(F.pos.x, F.pos.y, F.pos.z, 110); this.show(); F.punch = 0.4; sfx(P.snd, F.pos.x, F.pos.y, F.pos.z, { gain: 0.8 }); if (!mc) { this.effect(id, P, F.pos.x + Math.cos(F.yaw) * 40, Math.max(2, F.pos.y - 10), F.pos.z - Math.sin(F.yaw) * 40); F.tip('Nothing near enough: get closer to a saucer or a tripod'); return false; } this.effect(id, P, mc.m.x, mc.m.y, mc.m.z); H0.hitMachine(mc.m, (WEAK.aliens[id] || 0.5) * 6, 'POWER'); return true; } const e = this.target();
+    const F = this.F, g = F.g; if (this.cool > 0 || F.state !== 'fly') return false; this.cool = 1.3; const id = this.id, P = POWER[id], H0 = F.fromHorde; const froze = !!(H0 && id === loadKit().stun && H0.freezeIt()); if (H0 && H0.o.fleet) { const mc = H0.nearMachine(F.pos.x, F.pos.y, F.pos.z, 110); this.show(); F.punch = 0.4; sfx(P.snd, F.pos.x, F.pos.y, F.pos.z, { gain: 0.8 }); if (!mc) { this.effect(id, P, F.pos.x + Math.cos(F.yaw) * 40, Math.max(2, F.pos.y - 10), F.pos.z - Math.sin(F.yaw) * 40); F.tip('Nothing near enough: get closer to a saucer or a tripod'); return false; } this.effect(id, P, mc.m.x, mc.m.y, mc.m.z); H0.hitMachine(mc.m, (WEAK.aliens[id] || 0.5) * 6, 'POWER'); return true; } const e = this.target();
     const fx = Math.cos(F.yaw), fz = -Math.sin(F.yaw), w = e && where(e), tx = w && w.x != null ? w.x : F.pos.x + fx * 40, tz = w && w.x != null ? w.z : F.pos.z + fz * 40, ty = w && w.x != null ? Math.max(2, Math.min(40, (w.y || 0) + 8)) : Math.max(2, F.pos.y - 10);
     this.show(); F.punch = 0.4; sfx(P.snd, F.pos.x, F.pos.y, F.pos.z, { gain: 0.8 }); this.effect(id, P, tx, ty, tz);
     if (!e) { F.tip('Nothing near enough to use ' + P.name + ' on'); return false; }
@@ -45,7 +45,7 @@ export class HeroPower {
     if (e.type === 'kaiju' && e.damage) e.damage(k * 20);
     if (e.heroHp <= 0) { finish(e); LAB.stats.stopped = (LAB.stats.stopped || 0) + 1; g.disasters.flash(0.2); F.tip('You stopped the ' + NAME[e.type] + '!'); if (F.onStopped) F.onStopped(e); return true; }
     const left = Math.round(e.heroHp), best = Object.keys(W).filter(q => W[q] === 3).map(q => POWER[q].name)[0];
-    F.tip(k >= 3 ? 'Direct hit on the ' + NAME[e.type] + '! ' + left + '% left' : k >= 2 ? 'That hurts the ' + NAME[e.type] + '. ' + left + '% left' : P.name + ' barely touches the ' + NAME[e.type] + '. Try ' + best + '. ' + left + '% left');
+    F.tip(froze ? 'Frozen! Hit it now' : k >= 3 ? 'Direct hit on the ' + NAME[e.type] + '! ' + left + '% left' : k >= 2 ? 'That hurts the ' + NAME[e.type] + '. ' + left + '% left' : P.name + ' barely touches the ' + NAME[e.type] + '. Try ' + best + '. ' + left + '% left');
     return true;
   }
   effect(id, P, x, y, z) {
