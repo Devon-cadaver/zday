@@ -17,7 +17,7 @@ import { SEE } from './see.js';
 import { DisasterTV } from './tv.js';
 import { THUMB } from './thumbs.js';
 import { LAB } from './lab.js';
-import { HeroGame, HS } from './herogame.js';
+import { HeroGame, HS, pickScreen } from './herogame.js';
 import { loadKit, saveKit, STUNS, KNOCKS, MELEES } from './kit.js';
 
 const CSS = `
@@ -636,7 +636,7 @@ export class Game {
     };
     if (which === 'tv') { const ks = Object.keys(PLACES), key = ks[Math.floor(Math.random() * ks.length)]; G.choose({ title: 'DISASTER TV · LIVE', sub: 'The end of the world, as it happens. First: ' + PLACES[key].name, key, arrive }); return; } // the whole world, then down into a town of its own choosing
     if (which === 'sandbox') { G.choose({ title: 'SANDBOX', sub: 'Tap a city to play there \u00B7 win in one to learn its name', arrive, back: () => this.showMenu() }); return; }
-    if (which === 'hero' || which === 'villain') { const s = HS.load()[which], k = PATH[s.idx % PATH.length]; G.choose({ title: (which === 'hero' ? 'DEFEND' : 'DESTROY') + ' \u00B7 TOWN ' + (s.idx + 1), sub: PLACES[k].name, key: k, arrive }); return; } // the hero game (herogame.js)
+    if (which === 'hero' || which === 'villain') { pickScreen(which, (id) => { const s = HS.load().chars[id], k = PATH[s.idx % PATH.length]; G.choose({ title: (which === 'hero' ? 'DEFEND' : 'DESTROY') + ' \u00B7 ' + HS.name(id).toUpperCase() + ' \u00B7 LEVEL ' + (s.idx + 1), sub: PLACES[k].name, key: k, arrive: (kk) => { this.heroGo = true; arrive(kk); } }); }, () => this.showMenu()); return; } // the hero game (herogame.js)
     const key = this.profile.town(which);
     G.choose({ title: (which === 'be' ? 'BE THE DISASTER' : 'COMMANDER') + ' \u00B7 LEVEL ' + (PATH.indexOf(key) + 1), sub: PLACES[key].name, key, road: true, mode: which, status: this.townStatus(which), arrive });
   }

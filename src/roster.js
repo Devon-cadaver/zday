@@ -90,7 +90,7 @@ export function startRoster({ canvas, list, root }) {
   for (const [k, Z] of ZTYPES.entries()) {
     const base = ARCHETYPES[k % 3 === 0 ? 0 : k % 3 === 1 ? 4 : 2].roll(r);
     const L = Z.look(base); L.scale = Z.scale || 1; L.torso = Z.torso || 1;
-    add(Z.robot ? 'Robots' : 'Zombies', Z.name, figure(L, Z.anim), 2.3 * (Z.scale || 1));
+    add(Z.robot ? 'Robots' : Z.alien ? 'Aliens' : 'Zombies', Z.name, figure(L, Z.anim), 2.3 * (Z.scale || 1));
   }
   // ---------- vehicles
   const order = ['Police', 'Fire and rescue', 'Military', 'Aircraft', 'Civilian'];

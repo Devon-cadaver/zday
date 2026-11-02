@@ -47,6 +47,11 @@ Build order (one thing at a time, each tested in the Sandbox and pushed). The ch
   - [x] 11d. Base attacks: a BASE THREAT meter filled by levels won and fights won; full, coming home brings an alarm and an attack: the robot leader breaking into the hall (the ring fight at level 5 with every move) or his army at the town's gate by the base (80 robots: drones, troopers and brutes, fought as a horde). Won, the meter empties and XP is paid. The roster shows the robots and the ten bases.
   - [x] 11e. The on-foot UI the same everywhere: the left half of the screen a joystick where the finger lands (walk), the right half the fight (tap punch, swipe dash, hold block), a bottom row of four (GRAB, the two powers, TAKE OFF or TEAM). Take-off and landing animated (a crouch and a leap, a touchdown) with the camera eased across, in the town's view.
   - [x] 11f. The base as an office (the stations round an elevator) over a basement that is its own level with the ring; the base's controls as everywhere, with a row of four shortcuts; take-off only from the street outside; a mini map of the town and the base.
+- 12. The whole game, ready for agent testing (Sean, 2026-11-02).
+  - [x] 12a. Pick 1 of your 3 at the start of Defend or Destroy (each levels apart); a hero who falls moves to Destroy, a villain who does too well to Defend. Levels 1 aliens, 2 zombies, 3 the worm, 4 the kaiju on both sides. Defend: on foot and in the air with the kit, the worm and kaiju as giant fights. Destroy: flown, the disaster on your side, the heroes coming for you.
+  - [ ] 12b. Destroy's rival fights in the fight-test engine instead of the old circle duel.
+  - [ ] 12c. Agents play the whole game through and report what breaks or drags.
+  - [ ] 12d. The weather levels, with their own play style, after these.
 
 Also done on the way: the stuck zoom on a phone fixed; the plan page at plan.html.
 

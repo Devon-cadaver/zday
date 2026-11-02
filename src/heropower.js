@@ -40,7 +40,7 @@ export class HeroPower {
     const fx = Math.cos(F.yaw), fz = -Math.sin(F.yaw), w = e && where(e), tx = w && w.x != null ? w.x : F.pos.x + fx * 40, tz = w && w.x != null ? w.z : F.pos.z + fz * 40, ty = w && w.x != null ? Math.max(2, Math.min(40, (w.y || 0) + 8)) : Math.max(2, F.pos.y - 10);
     this.show(); F.punch = 0.4; sfx(P.snd, F.pos.x, F.pos.y, F.pos.z, { gain: 0.8 }); this.effect(id, P, tx, ty, tz);
     if (!e) { F.tip('Nothing near enough to use ' + P.name + ' on'); return false; }
-    const W = WEAK[e.type], k = W[id] || 0.5; e.heroHp = (e.heroHp ?? 100) - k * 7; LAB.stats.saved = LAB.stats.saved || 0;
+    const W = WEAK[e.type], k = W[id] || 0.5; e.heroHp = (e.heroHp ?? 100) - k * 7 * (F.fromHorde && F.fromHorde.o.boss ? 0.35 : 1); // a giant fight is not won by pressing Use from the air LAB.stats.saved = LAB.stats.saved || 0;
     if (e.type === 'plant' && id === 'fire') g.disasters.burnPlants(tx, tz, 14, 2);
     if (e.type === 'kaiju' && e.damage) e.damage(k * 20);
     if (e.heroHp <= 0) { finish(e); LAB.stats.stopped = (LAB.stats.stopped || 0) + 1; g.disasters.flash(0.2); F.tip('You stopped the ' + NAME[e.type] + '!'); if (F.onStopped) F.onStopped(e); return true; }

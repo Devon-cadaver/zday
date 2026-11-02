@@ -339,6 +339,12 @@ ZTYPES.push(
   { ...ZTYPES[1], id: 'drone', name: 'Robot drone', robot: true, w: 0, hp: 1, scale: 0.85, look: (L) => ROBOT(L, { skin: C('#c9d3dc'), shirt: C('#5a6a7a') }) },
   { ...ZTYPES[0], id: 'trooper', name: 'Robot trooper', robot: true, w: 0, hp: 2, chase: 2.6, lunge: 3.8, scale: 1, look: (L) => ROBOT(L) },
   { ...ZTYPES[3], id: 'brute', name: 'Robot brute', robot: true, w: 0, hp: 4, scale: 1.2, torso: 1.6, pop: false, look: (L) => ROBOT(L, { skin: C('#8f97a3'), shirt: C('#3a3f47'), pants: C('#20242a') }) });
+// the invasion's soldiers (herogame.js level 1), in the same way
+const ALIEN = (L, o) => ({ ...L, shirt: C('#27332e'), pants: C('#171f1c'), skin: C('#7fd07a'), accent: C('#3aff9a'), accent2: C('#171f1c'), hat: 0, flags: FLAG.BALD, blood: 0, ...o });
+ZTYPES.push(
+  { ...ZTYPES[1], id: 'grunt', name: 'Alien grunt', alien: true, w: 0, hp: 1, scale: 0.9, look: (L) => ALIEN(L) },
+  { ...ZTYPES[0], id: 'soldier', name: 'Alien soldier', alien: true, w: 0, hp: 2, chase: 2.6, lunge: 3.8, scale: 1.05, look: (L) => ALIEN(L, { skin: C('#58b0a0'), shirt: C('#1f2c3a') }) });
+export const ALIEN_TYPES = ZTYPES.map((z, i) => (z.alien ? i : -1)).filter((i) => i >= 0);
 export const ROBOT_TYPES = ZTYPES.map((z, i) => (z.robot ? i : -1)).filter((i) => i >= 0);
 export const RADIOACTIVE = ZTYPES.length - 1;
 export function rollZombieType(r) {
