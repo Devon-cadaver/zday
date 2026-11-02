@@ -689,7 +689,7 @@ export class Game {
     sideAdd(cp); this.rose = cp.querySelector('.rose'); this.roseA = 999;
     // pause: the world and the round clock stop (the camera still moves); a tap goes on
     const pz = this.pauseBtn = document.createElement('button'); pz.type = 'button'; pz.id = 'zd-pause'; pz.title = 'Pause'; pz.setAttribute('aria-label', 'Pause');
-    const ps = this.pausedEl = document.createElement('div'); ps.id = 'zd-paused'; ps.hidden = true; ps.innerHTML = 'PAUSED<div class="row"></div><small>Sound, music and the radio</small><button type="button" data-station style="display:block;margin:8px auto 2px;padding:10px 14px;border-radius:10px;border:1px solid rgba(255,194,51,.6);background:rgba(255,194,51,.16);color:#ffe2a0;font:700 13px system-ui,sans-serif;cursor:pointer;touch-action:manipulation">\u{1F3B6} RADIO STATION</button>'; ps.addEventListener('click', (e) => e.stopPropagation()); ps.querySelector('[data-station]').onclick = () => { if (this.audio) openStation(this.audio.music); };
+    const ps = this.pausedEl = document.createElement('div'); ps.id = 'zd-paused'; ps.hidden = true; ps.innerHTML = 'PAUSED<div class="row"></div><small>Sound, music and the radio</small><button type="button" data-station style="display:block;margin:8px auto 2px;padding:10px 14px;border-radius:10px;border:1px solid rgba(255,194,51,.6);background:rgba(255,194,51,.16);color:#ffe2a0;font:700 13px system-ui,sans-serif;cursor:pointer;touch-action:manipulation">\u{1F3B6} RADIO STATION</button><button type="button" data-home style="display:block;width:100%;margin:6px auto 2px;padding:10px 14px;border-radius:10px;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.08);color:#fff;font:700 13px system-ui,sans-serif;cursor:pointer;touch-action:manipulation">MAIN MENU</button>'; ps.addEventListener('click', (e) => e.stopPropagation()); { const q = this.homeBtn = ps.querySelector('[data-home]'); q.onclick = () => { if (q.dataset.sure) { this.leaveToMenu(); return; } q.dataset.sure = '1'; q.textContent = 'LEAVE THIS GAME? TAP AGAIN'; clearTimeout(this.homeT); this.homeT = setTimeout(() => this.homeReset(), 4000); }; } ps.querySelector('[data-station]').onclick = () => { if (this.audio) openStation(this.audio.music); };
     pz.onclick = () => this.setPaused(!this.paused); sideAdd(pz); document.body.append(ps); this.setPaused(false);
     const barH = () => document.documentElement.style.setProperty('--zd-bar-h', this.bar.offsetHeight + 'px');
     if (window.ResizeObserver) new ResizeObserver(barH).observe(this.bar); else setInterval(barH, 500);
@@ -735,8 +735,11 @@ export class Game {
   }
   setSpeed(s) { this.speed = s; this.setLabel(this.speedBtn, s + 'x'); }
 
+  homeReset() { if (this.homeBtn) { delete this.homeBtn.dataset.sure; this.homeBtn.textContent = 'MAIN MENU'; } }
+  // from the pause menu, whatever is going on (Sean). In a town with nothing else holding the camera, up through the clouds as usual; a level, a flight, a fight or the base: straight there
+  leaveToMenu() { const d = this.disasters, busy = (this.horde && this.horde.active) || (this.flight && this.flight.active) || (this.fightTest && this.fightTest.active) || (this.base && this.base.active); this.setPaused(false); if (busy || !d) location.href = location.pathname; else this.toMenu(); }
   setPaused(on) {
-    this.paused = on; this.pausedEl.hidden = !on; this.pauseBtn.classList.toggle('on', on);
+    this.paused = on; this.pausedEl.hidden = !on; this.pauseBtn.classList.toggle('on', on); this.homeReset();
     const row = this.pausedEl.querySelector('.row'), side = document.getElementById('zd-side'); for (const id of ['zd-sound', 'zd-music', 'zd-radiob']) { const b = document.getElementById(id); if (b) (on ? row : side).appendChild(b); } // the sound buttons sit in the pause menu (Sean), back on the side (hidden there, shown on the main menu) when play goes on
     this.pauseBtn.innerHTML = on ? svg('<path d="M7 5v14l12-7z"/>') : svg('<rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/>');
     this.pauseBtn.title = on ? 'Carry on' : 'Pause';

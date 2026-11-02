@@ -67,11 +67,37 @@ function isleAt(x, y, z) {
   return [bd, bt];
 }
 
-// the map: colour, and what is where (for placing the towns)
+// the planet's colours, worked out for each pixel on screen (Sean: no pixels when zoomed in) from the map below, with finer noise added on top so a coast keeps its detail however close you are
+const GLSL_HEAD = `uniform sampler2D tH, tN; uniform vec2 tS; varying vec3 vP; varying vec2 vU;
+const mat3 TURN = mat3(0.36, 0.48, -0.8, -0.8, 0.6, 0.0, 0.48, 0.64, 0.6);
+float pn(vec3 p, float f) { p = TURN * p * f / 256.0; return (texture2D(tN, p.xy).r + texture2D(tN, (TURN * p.yzx).xy + 0.37).r) * 0.5 - 0.5; }
+/* the map read smoothly (a cubic curve through four lookups): a plain lookup leaves steps along a coast */
+vec4 bic(vec2 uv) { vec2 st = uv * tS - 0.5, f = fract(st), i = st - f, f2 = f * f, f3 = f2 * f, w0 = (1.0 - f) * (1.0 - f) * (1.0 - f) / 6.0, w1 = (4.0 - 6.0 * f2 + 3.0 * f3) / 6.0, w2 = (1.0 + 3.0 * f + 3.0 * f2 - 3.0 * f3) / 6.0, w3 = f3 / 6.0, g0 = w0 + w1, g1 = w2 + w3, a = (i - 0.5 + w1 / g0) / tS, b = (i + 1.5 + w3 / g1) / tS;
+  return g0.y * (g0.x * texture2D(tH, a) + g1.x * texture2D(tH, vec2(b.x, a.y))) + g1.y * (g0.x * texture2D(tH, vec2(a.x, b.y)) + g1.x * texture2D(tH, b)); }
+float eg(float a, float v, float w) { return smoothstep(a - w, a + w, v); }`;
+const GLSL_BODY = `{ vec3 n = normalize(vP); vec4 m0 = bic(vU); float n0 = pn(n, 14.0), n1 = pn(n, 45.0), n2 = pn(n, 140.0), n3 = pn(n, 500.0);
+  float h = m0.r + n1 * 0.05 + n2 * 0.02 + n3 * 0.008, m = m0.g + n1 * 0.07 + n2 * 0.025 + n3 * 0.008, al = abs(asin(clamp(n.y, -1.0, 1.0))) * 57.29578;
+  float wh = max(fwidth(h), 0.0006), wm = max(fwidth(m), 0.0015), wa = max(fwidth(al), 0.15);
+  const float sea = 0.5;
+  const vec3 DEEP = vec3(26.0, 70.0, 104.0) / 255.0, SHALLOW = vec3(58.0, 128.0, 150.0) / 255.0, SAND = vec3(217.0, 199.0, 150.0) / 255.0, GRASS = vec3(134.0, 160.0, 88.0) / 255.0, FOREST = vec3(74.0, 104.0, 56.0) / 255.0, DESERT = vec3(216.0, 180.0, 116.0) / 255.0, ROCK = vec3(132.0, 118.0, 100.0) / 255.0, SNOW = vec3(236.0, 240.0, 238.0) / 255.0, PINK = vec3(226.0, 168.0, 186.0) / 255.0;
+  vec3 c = mix(GRASS, FOREST, max(0.0, m - 0.45) * 5.0); c = mix(c, FOREST, eg(0.53, m, wm));
+  float desert = (1.0 - eg(34.0, al, wa)) * (1.0 - eg(0.5, m, wm)); c = mix(c, mix(DESERT, SAND, clamp((0.42 - m) * 2.0, 0.0, 1.0)), desert);
+  float rock = eg(0.66, h, wh), shore = 1.0 - eg(sea + 0.012, h, wh);
+  c = mix(c, PINK, min(0.5, max(0.0, (0.5 + n1 * 2.2 - 0.56) * 6.0)) * step(0.5, m0.b) * (1.0 - desert) * (1.0 - rock) * (1.0 - shore)); /* cherry blossom */
+  c = mix(c, mix(ROCK, SNOW, clamp((h - 0.72) / 0.06, 0.0, 1.0)), rock);
+  c = mix(c, mix(SAND, GRASS, smoothstep(sea + 0.006, sea + 0.014, h) * 0.5), shore);
+  c = mix(c, SNOW, eg(68.0 + (m - 0.5) * 12.0, al, wa));
+  c *= 0.86 + (h - sea) * 0.9 + n0 * 0.3 + n2 * 0.12 + n3 * 0.06; /* relief and grain */
+  vec3 o = mix(mix(DEEP, SHALLOW, smoothstep(sea - 0.08, sea, h)), SAND, smoothstep(sea - 0.006, sea, h) * 0.6);
+  diffuseColor.rgb = pow(mix(o, c, eg(sea, h, wh)), vec3(2.2)); }`;
+// noise for it, one lattice cell to a texel, tiling; far off its mipmaps even out to nothing, so the detail only comes in up close
+function noiseTexture() {
+  const N = 256, a = new Uint8Array(N * N), r = (x, y) => hash3((x + N) % N, (y + N) % N, 7); for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { let v = 0; for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) v += r(x + i, y + j) * (2 - Math.abs(i)) * (2 - Math.abs(j)); a[y * N + x] = Math.max(0, Math.min(255, (0.5 + (v / 16 - 0.5) * 2.4) * 255)); } // softened, so its grid does not show
+  const t = new THREE.DataTexture(a, N, N, THREE.RedFormat, THREE.UnsignedByteType); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true; t.needsUpdate = true; return t;
+}
+// the map: height, moisture and the Far Isles for the shader, and what is where (for placing the towns)
 function paint(W, H) {
-  const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'), img = g.createImageData(W, H), d = img.data, bio = new Uint8Array(W * H), hgt = new Float32Array(W * H);
-  const col = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
-  const DEEP = [26, 70, 104], SHALLOW = [58, 128, 150], SAND = [217, 199, 150], GRASS = [134, 160, 88], FOREST = [74, 104, 56], DESERT = [216, 180, 116], ROCK = [132, 118, 100], SNOW = [236, 240, 238];
+  const f = new Uint16Array(W * H * 4), half = THREE.DataUtils.toHalfFloat, bio = new Uint8Array(W * H), hgt = new Float32Array(W * H);
   for (let y = 0; y < H; y++) {
     const lat = (0.5 - (y + 0.5) / H) * Math.PI, cl = Math.cos(lat), sl = Math.sin(lat), al = Math.abs(lat) * 180 / Math.PI;
     for (let x = 0; x < W; x++) {
@@ -85,21 +111,11 @@ function paint(W, H) {
         isle = 1 - ss(hw + 0.06, hw + 0.12, d); h += (want - h) * isle; m += (Math.max(m, 0.52) - m) * isle;
       }
       hgt[i] = h;
-      let rgb, b;
-      if (h < sea) { rgb = col(col(DEEP, SHALLOW, ss(sea - 0.08, sea, h)), SAND, ss(sea - 0.006, sea, h) * 0.6); b = BIOME.OCEAN; } // shallows paling into the beach
-      else if (al > 68 + (m - 0.5) * 12) { rgb = SNOW; b = BIOME.ICE; }
-      else if (h < sea + 0.012) { rgb = col(SAND, GRASS, ss(sea + 0.006, sea + 0.014, h) * 0.5); b = BIOME.COAST; }
-      else if (h > 0.66) { rgb = col(ROCK, SNOW, Math.max(0, (h - 0.72) / 0.06)); b = BIOME.MOUNT; }
-      else if (al < 34 && m < 0.5) { rgb = col(DESERT, SAND, Math.max(0, 0.42 - m) * 2); b = BIOME.DESERT; }
-      else if (m > 0.53) { rgb = FOREST; b = BIOME.FOREST; }
-      else { rgb = col(GRASS, FOREST, Math.max(0, m - 0.45) * 5); b = BIOME.GRASS; }
-      if (isle > 0.5 && (b === BIOME.GRASS || b === BIOME.FOREST)) { const s = fbm(px * 30, py * 30, pz * 30, 2); if (s > 0.56) rgb = col(rgb, [226, 168, 186], Math.min(0.5, (s - 0.56) * 6)); } // cherry blossom
-      const k = h < sea ? 1 : 0.86 + (h - sea) * 0.9 + (fbm(px * 14, py * 14, pz * 14, 2) - 0.5) * 0.16; // a little relief and grain on the land
-      d[i * 4] = rgb[0] * k; d[i * 4 + 1] = rgb[1] * k; d[i * 4 + 2] = rgb[2] * k; d[i * 4 + 3] = 255; bio[i] = b;
+      bio[i] = h < sea ? BIOME.OCEAN : al > 68 + (m - 0.5) * 12 ? BIOME.ICE : h < sea + 0.012 ? BIOME.COAST : h > 0.66 ? BIOME.MOUNT : al < 34 && m < 0.5 ? BIOME.DESERT : m > 0.53 ? BIOME.FOREST : BIOME.GRASS;
+      const o = ((H - 1 - y) * W + x) * 4; f[o] = half(h); f[o + 1] = half(m); f[o + 2] = half(isle); f[o + 3] = half(1); // the top row last, as a texture wants it
     }
   }
-  g.putImageData(img, 0, 0);
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  const t = new THREE.DataTexture(f, W, H, THREE.RGBAFormat, THREE.HalfFloatType); t.wrapS = THREE.RepeatWrapping; t.magFilter = t.minFilter = THREE.LinearFilter; t.generateMipmaps = false; t.needsUpdate = true;
   return { t, bio, hgt, W, H };
 }
 function cloudTexture(W, H) {
@@ -136,7 +152,9 @@ export class Globe {
     const cam = this.cam = new THREE.PerspectiveCamera(32, innerWidth / innerHeight, 0.1, 400);
     const low = innerWidth * devicePixelRatio < 1400, map = this.map = paint(low ? 768 : 1024, low ? 384 : 512);
     const sun = new THREE.DirectionalLight('#fff4e0', 2.6); sun.position.set(30, 18, 24); scene.add(sun, new THREE.HemisphereLight('#c8dcff', '#2a2420', 0.55));
-    this.planet = new THREE.Mesh(new THREE.SphereGeometry(R, 96, 64), new THREE.MeshStandardMaterial({ map: map.t, roughness: 0.85, metalness: 0 })); scene.add(this.planet);
+    const land = new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0 }), noise = noiseTexture();
+    land.onBeforeCompile = (s) => { s.uniforms.tH = { value: map.t }; s.uniforms.tN = { value: noise }; s.uniforms.tS = { value: new THREE.Vector2(map.W, map.H) }; s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vP; varying vec2 vU;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvP = position; vU = uv;'); s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\n' + GLSL_HEAD).replace('#include <map_fragment>', GLSL_BODY); };
+    this.planet = new THREE.Mesh(new THREE.SphereGeometry(R, 192, 128), land); scene.add(this.planet);
     this.clouds = new THREE.Mesh(new THREE.SphereGeometry(R * 1.012, 64, 48), new THREE.MeshStandardMaterial({ map: cloudTexture(512, 256), transparent: true, depthWrite: false, roughness: 1 })); scene.add(this.clouds);
     const atmo = new THREE.Mesh(new THREE.SphereGeometry(R * 1.06, 64, 48), new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.BackSide,
       vertexShader: 'varying vec3 vN, vV; void main() { vec4 w = modelMatrix * vec4(position, 1.0); vN = normalize(mat3(modelMatrix) * normal); vV = normalize(cameraPosition - w.xyz); gl_Position = projectionMatrix * viewMatrix * w; }',
