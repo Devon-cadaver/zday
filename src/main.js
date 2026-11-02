@@ -32,6 +32,7 @@ import { noZoom } from './nozoom.js';
 import { FightTest } from './fighttest.js';
 import { Horde } from './horde.js';
 import { HomeBase } from './base.js';
+import { MiniMap } from './minimap.js';
 
 const P = new URLSearchParams(location.search);
 CURVE.on = P.get('curve') !== '0'; // ?curve=0: the flat world, to compare
@@ -188,6 +189,7 @@ function frameBody() {
   sky.step(dt); // up off the city, or down to it
   game.compassStep(dt);
   if (fl) pilot.frame(dt, tg); // the plane or what is driven, and the camera behind it or in its seat
+  if (game.minimap) game.minimap.update(dt);
   if (game.camBlend) { const B = game.camBlend; B.t += dt; const u = Math.min(1, B.t / B.T), k = u * u * (3 - 2 * u); camera.position.lerpVectors(B.pos, camera.position, k); camera.quaternion.slerpQuaternions(B.quat, camera.quaternion, k); if (B.fov != null) { if (B.fovTo == null) B.fovTo = camera.fov; camera.fov = B.fov + (B.fovTo - B.fov) * k; camera.updateProjectionMatrix(); } if (u >= 1) game.camBlend = null; } // a view handed from one pilot to another (a take-off, a landing) eased across instead of cut
   outskirts.update(time, scene, sun, disasters.lightK, disasters.sunK);
   sun.position.copy(tg).addScaledVector(daylight.sunDir, 700); // the sun (or the moon) where the day and night cycle has it
@@ -226,7 +228,7 @@ game.flight = new Flight(game, { camera, controls, post, renderer }); // the San
 game.drive = new Drive(game, { camera, controls, post, renderer }); // and on the ground: the tank, the police officer and their cars
 game.takeover = new TakeOver(game, { camera, controls, post, renderer }); // and a disaster's own units, driven from behind
 game.fightTest = new FightTest(game, { camera, controls, post, renderer }); // one fight, to get the combat right
-game.horde = new Horde(game, { camera, controls, post, renderer }); game.base = new HomeBase(game, { camera, controls, post, renderer }); // Nova's home base at the town's centre (the Sandbox starts inside it) // Nova against hundreds of zombies in the street
+game.horde = new Horde(game, { camera, controls, post, renderer }); game.base = new HomeBase(game, { camera, controls, post, renderer }); game.minimap = new MiniMap(game); // Nova's home base at the town's centre (the Sandbox starts inside it) // Nova against hundreds of zombies in the street
 game.bandGame = new BandGame(game, { camera, controls, post, renderer }); // and the band, played to the beat
 game.moveWorld = moveWorld;
 game.audio = new Audio(camera, controls); // sound: switched on by the first tap

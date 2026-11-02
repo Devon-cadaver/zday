@@ -1131,7 +1131,7 @@ class Sandbox {
     g.addButton('zd-reset', 'Reset', () => this.reset());
     g.addButton('zd-menu-btn', 'Menu', () => g.toMenu());
     this.buildPanel(); this.bindHold();
-    setTimeout(() => { if (!g.base) return; g.addButton('zd-basebtn', 'Home Base', () => g.base.start()); g.base.place(); if (!new URLSearchParams(location.search).has('out')) g.base.start(); }, 0); // the Sandbox starts inside the base (base.js); ?out=1 starts in the street
+    setTimeout(() => { if (!g.base) return; g.addButton('zd-basebtn', 'Home Base', () => g.base.start()); g.addButton('zd-takeoff', 'Take off', () => { const F = g.flight; if (F.active || g.base.active) return; F.heroGame = true; F.start((HS.load().hero || {}).flyer || 'nova'); F.pos.set(g.base.x, g.base.y + 2, g.base.z + g.base.S.d / 2 + 5); F.yaw = Math.PI / 2; F.pitch = 0.8; F.speed = 4; F.thr = 4; F.setView('iso'); g.toast('Up from the base. Land anywhere in the street', 2500); }); /* take-off from the street outside the base (Sean: not from inside) */ g.base.place(); if (!new URLSearchParams(location.search).has('out')) g.base.start(); }, 0); // the Sandbox starts inside the base (base.js); ?out=1 starts in the street
     this.dropsLeft = START_DROPS; this.clock = -1; this.milestone = 0;
     g.toast('Open Disasters to unleash a disaster, then fly a plane, drive a tank or patrol as a police officer', 4500);
   }
