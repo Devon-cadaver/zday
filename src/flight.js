@@ -438,9 +438,10 @@ export class Flight {
       this.inB = inK;
     }
   }
+  // the pieces kept small (under about a metre): the chase camera is close, and big ones flying past filled a phone's screen
   burstIn(k, x, y, z) {
     const g = this.g, b = g.city.buildings[k], fx = Math.cos(this.yaw), fz = -Math.sin(this.yaw), col = wallHex(b);
-    for (let i = 0; i < 18; i++) { const s = 0.4 + Math.random() * 1.2, v = 4 + Math.random() * 8, r = Math.random(); g.disasters.debris.add(x, y + (Math.random() - 0.5) * 3, z, s, s * 0.6, s, r < 0.5 ? col : r < 0.75 ? 0xeefcff : 0x8a8478, 'fly', { v: [-fx * v + (Math.random() - 0.5) * 7, 1 + Math.random() * 5, -fz * v + (Math.random() - 0.5) * 7] }); } // back out of the hole, toward the camera
+    for (let i = 0; i < 18; i++) { const s = 0.3 + Math.random() * 0.7, v = 4 + Math.random() * 8, r = Math.random(); g.disasters.debris.add(x, y + (Math.random() - 0.5) * 3, z, s, s * 0.6, s, r < 0.5 ? col : r < 0.75 ? 0xeefcff : 0x8a8478, 'fly', { v: [-fx * v + (Math.random() - 0.5) * 7, 1 + Math.random() * 5, -fz * v + (Math.random() - 0.5) * 7] }); } // back out of the hole, toward the camera
     g.fire.dustCloud(x, z, 4, Math.min(b.top - b.baseY, y + 5));
     sfx('crash', x, y, z, { gain: 0.9 }); sfx('glass', x, y, z, { gain: 0.6 });
     this.speed *= 0.85; this.punch = 0.4; g.shake = Math.max(g.shake || 0, 0.35);
@@ -450,11 +451,11 @@ export class Flight {
     const g = this.g, D = g.disasters, b = g.city.buildings[k]; if (g.city.dead[k]) return;
     const fx = Math.cos(this.yaw), fz = -Math.sin(this.yaw), hgt = b.top - b.baseY, col = wallHex(b), cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2, w = b.x1 - b.x0, d = b.z1 - b.z0;
     D.blowWindows(k, fx, fz, 1.2);
-    for (let i = 0; i < 22; i++) { const s = 0.4 + Math.random() * 1.4, v = 8 + Math.random() * 12; D.debris.add(x, y + (Math.random() - 0.5) * 3, z, s, s * 0.6, s, Math.random() < 0.65 ? col : 0x8a8478, 'fly', { v: [fx * v + (Math.random() - 0.5) * 6, 1 + Math.random() * 6, fz * v + (Math.random() - 0.5) * 6] }); } // out ahead of the hero
+    for (let i = 0; i < 22; i++) { const s = 0.35 + Math.random() * 0.9, v = 8 + Math.random() * 12; D.debris.add(x, y + (Math.random() - 0.5) * 3, z, s, s * 0.6, s, Math.random() < 0.65 ? col : 0x8a8478, 'fly', { v: [fx * v + (Math.random() - 0.5) * 6, 1 + Math.random() * 6, fz * v + (Math.random() - 0.5) * 6] }); } // out ahead of the hero
     sfx('crash', x, y, z, { gain: 1, rate: 0.8 }); g.shake = Math.max(g.shake || 0, 0.45);
     if (hgt < 30 && Math.random() < 0.4) { // a low one blows up
       for (let i = 0; i < 6; i++) g.fire.burst(cx + (Math.random() - 0.5) * w * 0.7, b.baseY + hgt * (0.2 + Math.random() * 0.6), cz + (Math.random() - 0.5) * d * 0.7, 16, 2.6 + Math.random());
-      for (let i = 0; i < 24; i++) { const a = Math.random() * 6.28, s = 0.5 + Math.random() * 1.6, v = 10 + Math.random() * 14; D.debris.add(cx, b.baseY + hgt * (0.3 + Math.random() * 0.5), cz, s, s * 0.6, s, Math.random() < 0.6 ? col : 0x3a3430, 'fly', { v: [Math.cos(a) * v, 4 + Math.random() * 10, Math.sin(a) * v] }); }
+      for (let i = 0; i < 24; i++) { const a = Math.random() * 6.28, s = 0.4 + Math.random() * 1.0, v = 10 + Math.random() * 14; D.debris.add(cx, b.baseY + hgt * (0.3 + Math.random() * 0.5), cz, s, s * 0.6, s, Math.random() < 0.6 ? col : 0x3a3430, 'fly', { v: [Math.cos(a) * v, 4 + Math.random() * 10, Math.sin(a) * v] }); }
       sfx('boomBig', cx, b.baseY + hgt * 0.5, cz, { gain: 0.9 }); g.shake = Math.max(g.shake, 0.9);
       g.people.scare(cx, cz, 60, 1);
     }
