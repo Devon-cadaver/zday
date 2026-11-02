@@ -9,7 +9,7 @@
 // the dust storm's devils toss it about) - the hull takes the damage, and at nothing it goes down. main.js hands the
 // camera over while it is up (frame()), and game.js's Sandbox has the buttons.
 // Or a super hero (Nova, Dragonfly, Tempo), flown the same way but slower, able to hang in the air, skimming the ground
-// and bumping off walls rather than crashing: Lock on picks the nearest villain and flies straight at them, and up close
+// and smashing straight through buildings, which come down behind them (plough): Lock on picks the nearest villain and flies straight at them, and up close
 // the fight is the kaiju game's (heroduel.js): tap the weak spots, spin and toss, fly at them again.
 import * as THREE from 'three';
 import { buildVehicle } from './vehicles.js';
@@ -41,6 +41,7 @@ const SEED_REACH = 160; // a seeding run passing this close to a tornado weakens
 const _f = new THREE.Vector3(), _u = new THREE.Vector3(), _v = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler(0, 0, 0, 'YZX');
 const HIP = 0.94 * 2.2; // a hero's hips above the feet (the rig's 0.94 at its scale): the hero is flown by the hips
 const SEAT_TURN = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2); // a camera looks down -z; the planes point along +x
+const wallHex = (b) => { const c = b.wallCol || [0.6, 0.56, 0.5]; return ((c[0] * 255) << 16) | ((c[1] * 255) << 8) | (c[2] * 255); }; // a building's wall colour, for its bricks flying
 
 // a little red and white stunt plane, nose along +x, about 7 m long, its propeller turning (userData.prop)
 function stuntModel() {
@@ -124,7 +125,7 @@ export class Flight {
     if (this.P.hero) { // villains to fight: three of them in the middle of town if there are none about
       const D = g.disasters, B = g.city.bounds;
       if (!D.list.some(e => e.alive && e.type === 'villains' && e.who.some(v => !v.gone && !v.beaten))) D.start('villains', (B.x0 + B.x1) / 2, (B.z0 + B.z1) / 2);
-      this.tip('Drag anywhere to fly. Press Lock on and ' + this.P.name + ' flies straight at the nearest villain');
+      this.tip('Drag anywhere to fly. Fly into a building to smash right through it. Press Lock on and ' + this.P.name + ' flies straight at the nearest villain');
     } else this.tip('Drag anywhere to steer: left and right to turn, ' + (this.invert ? 'up to climb, down to dive' : 'down to climb, up to dive') + '. Let go and it levels out. Pick a payload, then Drop');
   }
   spawn() {
@@ -132,7 +133,7 @@ export class Flight {
     this.pos.set(cx + Math.cos(a) * R, 95, cz + Math.sin(a) * R);
     this.yaw = Math.atan2(-(cz - this.pos.z), cx - this.pos.x); this.pitch = 0; this.roll = 0;
     this.speed = this.thr = this.P.start; this.ix = this.iy = 0; this.state = 'fly'; this.t = 0; this.obj.visible = this.view === 'chase'; this.snap = true;
-    this.hull = 100; this.caught = null; this.thrown = []; this.seedTw = null; this.lock = null; this.punch = 0; this.act = null;
+    this.hull = 100; this.caught = null; this.thrown = []; this.seedTw = null; this.lock = null; this.punch = 0; this.act = null; this.inB = -1;
     if (this.P.hero) this.pos.y = 60;
   }
   ui() {
@@ -388,16 +389,16 @@ export class Flight {
     this.speed += (this.thr - this.speed) * Math.min(1, dt * 0.8) - (P.hero ? 0 : Math.sin(this.pitch) * 9.8 * 0.6 * dt); // a hero climbs as fast as they dive
     this.speed = Math.max(P.min * 0.7, Math.min(P.max * 1.25, this.speed));
     _e.set(this.roll, this.yaw, this.pitch); _q.setFromEuler(_e); _f.set(1, 0, 0).applyQuaternion(_q);
+    const px = this.pos.x, py = this.pos.y, pz = this.pos.z; // where it was: a hero ploughs through what lies between
     this.pos.addScaledVector(_f, this.speed * dt);
     this.hazards(dt); if (this.state !== 'fly' || this.caught) return;
     // low over the streets, people duck
     if (this.pos.y < 35 && (this.scareT = (this.scareT || 0) - dt) <= 0) { this.scareT = 0.5; g.people.scare(this.pos.x, this.pos.z, 30, 0.4); }
     // into the ground, or a building
     const x = this.pos.x, y = this.pos.y, z = this.pos.z;
-    if (P.hero) { // skims the ground; flies into a wall and bounces off it, nose up
+    if (P.hero) { // skims the ground; goes straight through a building and brings it down (plough)
       if (y < 2.4) { this.pos.y = 2.4; if (this.pitch < 0) this.pitch *= 0.3; }
-      let wall = false; g.city.buildingsNear(x, z, 2, (k, d, b) => { if (y < b.roofY + 1.5) wall = true; });
-      if (wall) { _f.set(1, 0, 0).applyQuaternion(_q); this.pos.addScaledVector(_f, -this.speed * dt * 1.5); this.speed *= 0.5; this.pitch = Math.max(this.pitch, 0.7); if ((this.bumpT || 0) < this.t2) { this.bumpT = this.t2 + 1; this.damage(3, 'You bumped into a building!'); } }
+      this.plough(px, py, pz);
       return;
     }
     if (y < 1.2) { this.crash(-1); return; }
@@ -407,7 +408,7 @@ export class Flight {
   crash(k, why) {
     if (this.state !== 'fly') return;
     const g = this.g, f = g.fire, x = this.pos.x, y = Math.max(1, this.pos.y), z = this.pos.z;
-    this.state = 'down'; this.t = 0; this.obj.visible = false; this.at.set(x, y, z); this.caught = null; this.hull = 0; this.lock = null;
+    this.state = 'down'; this.t = 0; this.obj.visible = false; this.at.set(x, y, z); this.caught = null; this.hull = 0; this.lock = null; this.inB = -1;
     if (this.duel) this.duel.end('', false);
     if (this.g.audio) this.g.audio.engine(null);
     if (this.P.hero) { f.dustCloud(x, z, 6, Math.min(20, y + 4)); sfx('thud', x, y, z, { gain: 1 }); this.tip((why || 'You were knocked out of the sky!') + ' Back up in a moment'); return; } // knocked down, no fireball
@@ -421,6 +422,43 @@ export class Flight {
     if (this.state !== 'fly') return;
     this.hull -= n; if (this.hull <= 0) { this.crash(-1, why); return; }
     if ((this.hurtT || 0) < this.t2) { this.hurtT = this.t2 + 1.5; this.tip(why + (this.P.hero ? ' Health ' : ' Hull ') + Math.round(this.hull) + '%'); sfx('crash', this.pos.x, this.pos.y, this.pos.z, { gain: 0.4, rate: 1.3 }); }
+  }
+  // a hero goes straight through buildings (Sean): in through one wall in a spray of glass and brick, out through the far
+  // one, and the building comes down behind them, leaning the way they went; a low one may go up in a fireball first (a
+  // tall tower never does: it only falls, in its dust). Checked every 2 m along the way since the last frame, so a fast
+  // hero on a slow phone can't skip a small one. Everyone inside gets out first (spare)
+  plough(px, py, pz) {
+    const city = this.g.city, x = this.pos.x, y = this.pos.y, z = this.pos.z, n = Math.max(1, Math.ceil(Math.hypot(x - px, z - pz) / 2));
+    for (let i = 1; i <= n; i++) {
+      const sx = px + (x - px) * i / n, sy = py + (y - py) * i / n, sz = pz + (z - pz) * i / n;
+      let inK = -1; city.buildingsNear(sx, sz, 0.6, (k, d, b) => { if (inK < 0 && sy < b.roofY + 0.8) inK = k; });
+      if (inK === this.inB) continue;
+      if (this.inB >= 0) this.burstOut(this.inB, sx, sy, sz);
+      if (inK >= 0) this.burstIn(inK, sx, sy, sz);
+      this.inB = inK;
+    }
+  }
+  burstIn(k, x, y, z) {
+    const g = this.g, b = g.city.buildings[k], fx = Math.cos(this.yaw), fz = -Math.sin(this.yaw), col = wallHex(b);
+    for (let i = 0; i < 18; i++) { const s = 0.4 + Math.random() * 1.2, v = 4 + Math.random() * 8, r = Math.random(); g.disasters.debris.add(x, y + (Math.random() - 0.5) * 3, z, s, s * 0.6, s, r < 0.5 ? col : r < 0.75 ? 0xeefcff : 0x8a8478, 'fly', { v: [-fx * v + (Math.random() - 0.5) * 7, 1 + Math.random() * 5, -fz * v + (Math.random() - 0.5) * 7] }); } // back out of the hole, toward the camera
+    g.fire.dustCloud(x, z, 4, Math.min(b.top - b.baseY, y + 5));
+    sfx('crash', x, y, z, { gain: 0.9 }); sfx('glass', x, y, z, { gain: 0.6 });
+    this.speed *= 0.85; this.punch = 0.4; g.shake = Math.max(g.shake || 0, 0.35);
+    g.people.scare(x, z, 25, 0.8);
+  }
+  burstOut(k, x, y, z) {
+    const g = this.g, D = g.disasters, b = g.city.buildings[k]; if (g.city.dead[k]) return;
+    const fx = Math.cos(this.yaw), fz = -Math.sin(this.yaw), hgt = b.top - b.baseY, col = wallHex(b), cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2, w = b.x1 - b.x0, d = b.z1 - b.z0;
+    D.blowWindows(k, fx, fz, 1.2);
+    for (let i = 0; i < 22; i++) { const s = 0.4 + Math.random() * 1.4, v = 8 + Math.random() * 12; D.debris.add(x, y + (Math.random() - 0.5) * 3, z, s, s * 0.6, s, Math.random() < 0.65 ? col : 0x8a8478, 'fly', { v: [fx * v + (Math.random() - 0.5) * 6, 1 + Math.random() * 6, fz * v + (Math.random() - 0.5) * 6] }); } // out ahead of the hero
+    sfx('crash', x, y, z, { gain: 1, rate: 0.8 }); g.shake = Math.max(g.shake || 0, 0.45);
+    if (hgt < 30 && Math.random() < 0.4) { // a low one blows up
+      for (let i = 0; i < 6; i++) g.fire.burst(cx + (Math.random() - 0.5) * w * 0.7, b.baseY + hgt * (0.2 + Math.random() * 0.6), cz + (Math.random() - 0.5) * d * 0.7, 16, 2.6 + Math.random());
+      for (let i = 0; i < 24; i++) { const a = Math.random() * 6.28, s = 0.5 + Math.random() * 1.6, v = 10 + Math.random() * 14; D.debris.add(cx, b.baseY + hgt * (0.3 + Math.random() * 0.5), cz, s, s * 0.6, s, Math.random() < 0.6 ? col : 0x3a3430, 'fly', { v: [Math.cos(a) * v, 4 + Math.random() * 10, Math.sin(a) * v] }); }
+      sfx('boomBig', cx, b.baseY + hgt * 0.5, cz, { gain: 0.9 }); g.shake = Math.max(g.shake, 0.9);
+      g.people.scare(cx, cz, 60, 1);
+    }
+    D.destroyBuilding(k, 'collapse', { dir: Math.atan2(-fx, fz), spare: true, noCrush: true }); // leaning over the way the hero went
   }
   // the gun (the fighters): whatever is ahead and in range - the kaiju, a saucer, a walker, a dust devil - it fires at by
   // itself, a magazine at a time, then reloads
@@ -544,20 +582,22 @@ export class Flight {
     if (!v || v.gone || v.beaten) { const B = this.g.city.bounds; this.lock = null; this.g.disasters.start('villains', (B.x0 + B.x1) / 2, (B.z0 + B.z1) / 2); this.tip('More villains are coming! Press Lock on again'); return; } // all beaten: three more
     this.lock = v; this.tip('Locked on ' + v.name + '! Flying straight at them'); sfx('whoosh', this.pos.x, this.pos.y, this.pos.z, { gain: 0.9 });
   }
-  // locked on: straight at the villain, faster the further, up over a roof in the way; close enough and the fight is on (heroduel.js)
+  // locked on: straight at the villain, faster the further, up over the roofs in the way but through one close to them;
+  // close enough and the fight is on (heroduel.js)
   homeIn(dt) {
     const v = this.lock, P = this.P;
     if (!v || v.gone || v.beaten) { this.lock = null; return false; }
     const ty = Math.max(2.4, (v.y || 0) + HIP), dx = v.x - this.pos.x, dy = ty - this.pos.y, dz = v.z - this.pos.z, d = Math.hypot(dx, dy, dz) || 0.01;
-    if (d < 6.5) { this.speed = 0; this.duel = new Duel(this, v); this.obj.visible = true; SEE.on = this.saved.see; return true; }
+    if (d < 6.5) { if (this.inB >= 0) { this.burstOut(this.inB, this.pos.x, this.pos.y, this.pos.z); this.inB = -1; } this.speed = 0; this.duel = new Duel(this, v); this.obj.visible = true; SEE.on = this.saved.see; return true; } // reached them inside a building: it comes down round the fight
     let a = Math.atan2(-dz, dx) - this.yaw; a = Math.atan2(Math.sin(a), Math.cos(a));
     this.yaw += a * Math.min(1, dt * 5); this.roll += (Math.max(-1, Math.min(1, -a * 2)) - this.roll) * Math.min(1, dt * 3);
     this.pitch += (Math.atan2(dy, Math.hypot(dx, dz)) * 0.8 - this.pitch) * Math.min(1, dt * 4);
     this.speed += (Math.min(P.max * 1.6, d * 1.6 + 14) - this.speed) * Math.min(1, dt * 2.5);
-    const s = Math.min(d - 6, this.speed * dt); this.pos.x += dx / d * s; this.pos.y += dy / d * s; this.pos.z += dz / d * s;
+    const px = this.pos.x, py = this.pos.y, pz = this.pos.z, s = Math.min(d - 6, this.speed * dt); this.pos.x += dx / d * s; this.pos.y += dy / d * s; this.pos.z += dz / d * s;
     let top = -1; this.g.city.buildingsNear(this.pos.x, this.pos.z, 2, (k, dd, b) => { if (this.pos.y < b.roofY + 2.4 && b.roofY > top) top = b.roofY; });
-    if (top >= 0 && d > 14) this.pos.y = top + 2.4; // over it, not through it
+    if (top >= 0 && d > 14) this.pos.y = top + 2.4; // over the roofs on the way (straight through every one flattened 43 buildings in one crossing of the big city), through the last one
     if (this.pos.y < 2.4) this.pos.y = 2.4;
+    this.plough(px, py, pz);
     return true;
   }
   // in a fight: hanging in the air a step from the villain, at their height, facing them (they are held there); while
