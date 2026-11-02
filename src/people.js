@@ -873,6 +873,7 @@ export class People {
 
   // hurt or kill. Cars: slow hits knock walkers down, fast hits kill, armour shrugs. Shots: 1 hp.
   kill(j, vx = 0, vz = 0, cause = 'car') {
+    if (this.heroOnly && ZSTATE[this.st[j]]) return; // a level's enemies fall to the player alone (horde.js), or a level could win itself
     const wasZ = this.st[j] === S.ZOMBIE, counted = this.st[j] === S.FROZEN && this.fx[j] >= 8; // already counted when the ice (or the flash) took them
     if (wasZ) {
       const Z = this.ztype(j);
@@ -1922,6 +1923,7 @@ export class People {
   calm(j) { if (this.st[j] !== S.RIOT && this.st[j] !== S.EXT) return false; const m = this.mobs[this.bt[j]]; this.st[j] = S.FLEE; this.bt[j] = -1; this.target[j] = -1; this.inf[j] = 0; this.lvl[j] = -1; this.fx[j] = 0; this.t1[j] = 0; this.y[j] = this.groundY(this.x[j], this.z[j]); this.dirty[j] = 1; if (m) m.calmed = (m.calmed || 0) + 1; return true; }
   vanish(j) { const s = this.st[j]; if (s !== S.ZOMBIE && s !== S.FALLING && s !== S.TURNING) return false; this.st[j] = S.EVAC; this.lvl[j] = -1; this.inf[j] = 0; this.target[j] = -1; this.bt[j] = -1; this.dirty[j] = 1; return true; }
   bite(i, j, Z) {
+    if (Z.alien || Z.robot) { this.t1[i] = Z.biteT + Z.recover; this.target[i] = -1; this.panic(j, this.x[i], this.z[i], i); return; } // the invasion's soldiers and the robots scatter people; only a zombie's bite makes a zombie (Sean: level 1 just aliens)
     this.st[j] = S.GRABBED; this.t1[j] = Z.biteT; this.target[j] = i;
     this.t1[i] = Z.biteT + Z.recover; this.target[i] = -1;
     this.addBlood(this.x[j], this.z[j], 0.6 + this.r() * 0.6, this.lvl[j] >= 0 ? this.y[j] : null);

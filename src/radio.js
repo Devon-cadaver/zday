@@ -100,7 +100,7 @@ export class Radio {
       if (!e.alive || this.seen.has(e)) continue;
       this.seen.add(e); this.cue(e.type);
     }
-    const zom = p && p.stats ? p.stats.zombies : 0;
+    const zom = p && p.stats && !p.noZombieNews ? p.stats.zombies : 0; // the aliens and robots are counted as zombies; the radio should not call them that
     if (zom > 0 && !this.zed) { this.zed = true; this.say(FOR.zombies); } else if (zom === 0) this.zed = false;
     // all over: nothing left alive for a while after something was
     const live = D && D.list.some(e => e.alive && e.type !== 'heroes' && FOR[e.type]);
