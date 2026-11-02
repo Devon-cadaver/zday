@@ -188,6 +188,7 @@ function frameBody() {
   sky.step(dt); // up off the city, or down to it
   game.compassStep(dt);
   if (fl) pilot.frame(dt, tg); // the plane or what is driven, and the camera behind it or in its seat
+  if (game.camBlend) { const B = game.camBlend; B.t += dt; const u = Math.min(1, B.t / B.T), k = u * u * (3 - 2 * u); camera.position.lerpVectors(B.pos, camera.position, k); camera.quaternion.slerpQuaternions(B.quat, camera.quaternion, k); if (B.fov != null) { if (B.fovTo == null) B.fovTo = camera.fov; camera.fov = B.fov + (B.fovTo - B.fov) * k; camera.updateProjectionMatrix(); } if (u >= 1) game.camBlend = null; } // a view handed from one pilot to another (a take-off, a landing) eased across instead of cut
   outskirts.update(time, scene, sun, disasters.lightK, disasters.sunK);
   sun.position.copy(tg).addScaledVector(daylight.sunDir, 700); // the sun (or the moon) where the day and night cycle has it
   sun.target.position.copy(tg);

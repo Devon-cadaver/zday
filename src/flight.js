@@ -687,9 +687,9 @@ export class Flight {
     this.lock = v; this.tip('Locked on ' + v.name + '! Flying straight at them'); sfx('whoosh', this.pos.x, this.pos.y, this.pos.z, { gain: 0.9 });
   }
   // back onto the base's floor (base.js land) from a flight round its hall
-  landBase() { const Bs = this.fromBase; if (!Bs || this.state !== 'fly') return; this.fromBase = null; const x = this.pos.x, z = this.pos.z; this.stop(true); Bs.land(x, z); }
+  landBase() { const Bs = this.fromBase; if (!Bs || this.state !== 'fly') return; this.fromBase = null; const x = this.pos.x, z = this.pos.z, cam = this.ctx.camera; this.g.camBlend = { pos: cam.position.clone(), quat: cam.quaternion.clone(), fov: cam.fov, t: 0, T: 1.0 }; this.stop(true); Bs.land(x, z); }
   // back down into the street fight she took off from (horde.js land): a plain landing where she is, or the smash: straight down first, a shockwave where she lands
-  landHorde(smash, now) { const H = this.fromHorde; if (!H || this.state !== 'fly') return; if (smash && !now) { this.smashing = true; this.lock = null; this.speed = 0; this.tip('SMASH LANDING!'); return; } this.fromHorde = null; const x = this.pos.x, z = this.pos.z; this.stop(true); H.land(x, z, smash); }
+  landHorde(smash, now) { const H = this.fromHorde; if (!H || this.state !== 'fly') return; if (smash && !now) { this.smashing = true; this.lock = null; this.speed = 0; this.tip('SMASH LANDING!'); return; } this.fromHorde = null; const x = this.pos.x, z = this.pos.z, cam = this.ctx.camera; this.g.camBlend = { pos: cam.position.clone(), quat: cam.quaternion.clone(), fov: cam.fov, t: 0, T: 1.0 }; this.stop(true); H.land(x, z, smash); }
   // locked on: straight at the villain, faster the further, through every building in the way; close enough and the fight is on (heroduel.js)
   homeIn(dt) {
     const v = this.lock, P = this.P;
