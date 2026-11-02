@@ -36,6 +36,7 @@ const PLANES = {
   tempo: { name: 'Tempo', hero: 'Tempo', min: 6, max: 64, start: 28, turn: 1.8, climb: 1.4, chase: [10, 3.4], seat: [1.9, 0.7], sound: 'wind', punch: 0.9, slow: 1.45 },
 };
 const CEIL = 650, KMH = 3.6, FOV_CHASE = 62, FOV_COCKPIT = 72, INVERT = 'zday_fly_invert';
+const FOV_ISO = 18, ISO_DIST = 64, ISO_EL = 0.84; // a fight is watched the way the town is (Sean): the town's narrow lens, far off and high (about 48 degrees), the miniature look with the blur on
 // what each plane carries, in the order the payload button goes round; wait: seconds before the next; R: the blast's reach; s: the bomb's size
 const LOADS = { stunt: ['seed', 'small', 'big', 'napalm', 'nuke'], jet: ['small', 'big', 'napalm', 'nuke'], a10: ['small', 'big', 'napalm'], seeder: ['seed', 'small'], b2: ['big', 'nuke'], b52: ['carpet', 'big', 'napalm', 'nuke'] };
 const LOAD = { seed: { name: 'Storm seeding', wait: 8 }, small: { name: 'Small bomb', wait: 0.35, R: 12, s: 0.7, kaiju: 40 }, big: { name: 'Big bomb', wait: 1.2, R: 26, s: 1.3, kaiju: 120 }, napalm: { name: 'Napalm', wait: 2.5, s: 1.1, kaiju: 70 }, carpet: { name: 'Carpet bombs', wait: 3, R: 12, s: 0.7, kaiju: 40, stick: 8 }, nuke: { name: 'Nuke', wait: 10, R: 200, s: 2.4 } }; // kaiju: what a hit does to it, on top of the blast
@@ -326,12 +327,15 @@ export class Flight {
     if (burner) { burner.scale.set(0.6 + k * 0.9, 1, 1); burner.material.opacity = 0.35 + 0.55 * k; }
     // the camera: behind and above it, easing after it (no roll, so the horizon stays put), or in its seat
     _f.set(1, 0, 0).applyQuaternion(this.q);
-    if (this.duel && this.state === 'fly') { // a fight: over the hero's shoulder, the villain in front; held still while they spin
-      const v = this.duel.v, fx = Math.cos(this.yaw), fz = -Math.sin(this.yaw), back = 13 * this.zoom, side = 7 * this.zoom;
-      const ph = this.duel.phase;
-      if (ph === 'spin') _v.copy(cam.position); else _v.set(this.pos.x - fx * back - fz * side, this.pos.y + 7 * Math.pow(this.zoom, 0.8), this.pos.z - fz * back + fx * side);
-      cam.position.lerp(_v, 1 - Math.exp(-dt * (ph === 'slam' ? 12 : 4))); cam.up.set(0, 1, 0);
-      if (ph === 'spin') cam.lookAt(this.pos); else if (ph === 'slam') cam.lookAt(_u.set(v.x, (v.y || 0) + HIP, v.z)); else cam.lookAt(_u.set(this.pos.x + (v.x - this.pos.x) * 0.65, Math.max(this.pos.y, (v.y || 0) + HIP) + 0.5, this.pos.z + (v.z - this.pos.z) * 0.65));
+    if (this.duel && this.state === 'fly') { // a fight: the town's view, high and far over the two of them, the hero nearer the camera than the villain, following them up through a sky slam
+      const D = this.duel, v = D.v, ph = D.phase;
+      if (!D.cam) { // the view's way, set once a fight: from the villain through the hero, then raised
+        let dx = this.pos.x - v.x, dz = this.pos.z - v.z; const l = Math.hypot(dx, dz); if (l < 0.5) { dx = -Math.cos(this.yaw); dz = Math.sin(this.yaw); } else { dx /= l; dz /= l; }
+        D.cam = { dx, dz }; cam.fov = FOV_ISO; cam.updateProjectionMatrix(); this.ctx.post.opts.dof = true;
+      }
+      const mx = (this.pos.x + v.x) / 2, my = (this.pos.y + Math.max(2.4, (v.y || 0) + HIP)) / 2, mz = (this.pos.z + v.z) / 2, dist = ISO_DIST * this.zoom, ce = Math.cos(ISO_EL) * dist; // between them
+      _v.set(mx + D.cam.dx * ce, my + Math.sin(ISO_EL) * dist, mz + D.cam.dz * ce);
+      cam.position.lerp(_v, 1 - Math.exp(-dt * (ph === 'slam' ? 12 : 4))); cam.up.set(0, 1, 0); cam.lookAt(_u.set(mx, my, mz));
     } else if (this.view === 'cockpit' && this.state === 'fly') {
       _v.set(P.seat[0], P.seat[1], 0).applyQuaternion(this.q); cam.position.copy(this.pos).add(_v);
       cam.quaternion.copy(this.q).multiply(SEAT_TURN); cam.up.set(0, 1, 0).applyQuaternion(this.q);
@@ -620,8 +624,8 @@ export class Flight {
     }
     this.pitch -= this.pitch * Math.min(1, dt * 4); this.roll -= this.roll * Math.min(1, dt * 4); this.speed = 0;
   }
-  // the fight over (heroduel.js): back to flying
-  duelOver(won) { this.duel = null; this.act = null; this.lock = null; this.obj.visible = this.view === 'chase' && this.state === 'fly'; SEE.on = this.view === 'cockpit' ? false : this.saved.see; this.speed = this.thr = Math.max(this.thr, this.P.start * 0.6); this.pitch = 0.5; } // nose up, clear of the street
+  // the fight over (heroduel.js): the flying lens and no blur again (eased back to), nose up, clear of the street
+  duelOver(won) { this.duel = null; this.act = null; this.lock = null; this.obj.visible = this.view === 'chase' && this.state === 'fly'; SEE.on = this.view === 'cockpit' ? false : this.saved.see; const cam = this.ctx.camera; cam.fov = this.view === 'cockpit' ? FOV_COCKPIT * Math.max(0.35, Math.min(1.25, this.zoom || 1)) : FOV_CHASE; cam.updateProjectionMatrix(); this.ctx.post.opts.dof = false; this.speed = this.thr = Math.max(this.thr, this.P.start * 0.6); this.pitch = 0.5; } // nose up, clear of the street
   // a hero's pose: flat out along the way at speed, one fist ahead; upright and treading air slow or in a fight; a punch;
   // arms out holding on while spinning a villain round. The rig set so the hips are where the hero is
   heroPose(r, dt) {

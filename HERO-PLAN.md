@@ -31,6 +31,17 @@ Built (2026-11-01): a Hero lab block in the Sandbox panel under Be a hero: hero 
 
 The fights stay in the town's own view (Sean: the models are too plain up close for first or third person). When a fight starts the chase camera hands back to the town camera, which glides in over the two of them at a fight distance (closer than the town view, far enough that they read as miniatures, the tilt-shift blur on), turned so the hero is nearer the camera than the villain, and follows them when a throw moves the fight. The weak spots, dodge circles and hold circles are screen overlays as now, so they work at any distance; the spin, throws and sky slam are watched from above and look like the kaiju game. Flying between fights stays in the chase view (or the town view with the hero as a dot, to be tried in the lab: both, then Sean picks).
 
+Built (2026-11-01, 3a): the fight camera is the town's lens (fov 18), 64 m off and 48 degrees up, from the villain's side of the hero, so the hero is nearer the camera; it eases between them and follows them up through a sky slam; the blur is on. Flying between fights is still the chase view.
+
+The street fight (Sean's inspiration, 2026-11-01: a film's street brawl between the hero, two invading soldiers and the army). The beats we take from it, in our own game:
+- Two villains at once: a fast, trained one who out-fights the hero up close, and a huge one who relies on strength and slams the hero across the street. Fighting both is harder than the sum; the hero can split them up (throw the big one into a building two blocks away, then deal with the fast one).
+- The hero gets thrown too: through a diner, into a train station, into a building. Taking a hit can mean the hero crashing through a building, with the same floors and dust, and climbing out.
+- A rogue army unit arrives and attacks everyone: jets and helicopters fire missiles at hero and villains alike, soldiers on the ground are useless against the villains and in danger from them. The hero can stop a jet being torn apart, catch a missile, and pull a soldier out from under a villain.
+- Saving the soldiers and the crowd turns the army: the commander calls off the attack and the town's fear of the hero drops (the collateral and reputation meter, item 5). Ignore them and the army keeps firing at you too.
+- A villain's weakness: a mask or breather the hero can break (a special weak spot), after which the villain is dazed by the world's noise and light for a while, easy to hit, and will try to retreat.
+- The army's missile can finish a dazed villain; a dropship (or a getaway) comes to carry a beaten villain off, so villains retreat rather than die.
+- The hero is not invincible: a villain with training can out-fight them; protecting people costs the hero openings.
+
 Villains fight back:
 - Counters: while you tap weak spots, the villain winds up (a flash and a sound); a dodge circle appears left or right and you have half a second. Miss it and you take a hit and lose the combo.
 - Grabs: a villain can grab you; mash the circle (or rub the stick) to break free, or a teammate breaks it after a moment.
