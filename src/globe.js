@@ -157,10 +157,14 @@ export class Globe {
       r.legs.forEach((L, k) => { L.hip.rotation.x = k ? -0.15 : 0.3; L.knee.rotation.x = k ? 0.3 : 0.65; });
       return { r, a, b, ph: i * 2.1 }; });
   }
+  // the secret button's first three shots (Sean): the next hero still there is hit, and goes spinning off the screen. Where to aim, on the page
+  knockNext() { const w = (this.state === 'menu' && !this.rise && this.watch || []).find(q => !q.fly); if (!w) return null; const v = w.r.root.position.clone(); v.y += 0; const P = v.clone().add(new THREE.Vector3(0, 2.2, 0)).project(this.cam); this.knock(w); return [(P.x + 1) / 2 * innerWidth, (1 - P.y) / 2 * innerHeight]; }
+  knock(w) { const l = Math.hypot(w.a, w.b) || 1; w.fly = { t: 0, vx: w.a / l * 26, vy: w.b / l * 26 + 3, spin: w.a > 0 ? 1 : -1 }; }
+  knockAll() { for (const w of this.watch || []) if (!w.fly) this.knock(w); }
   watchStep(dt) {
     if (!this.watch || !this.watch.length) return; const on = this.state === 'menu' && !this.rise; if (!on) { for (const w of this.watch) w.r.root.visible = false; return; }
     const c = this.cam.position, cl = c.length() || 1, zx = c.x / cl, zy = c.y / cl, zz = c.z / cl; let rx = zz, rz = -zx; const rl = Math.hypot(rx, rz) || 1; rx /= rl; rz /= rl; const ux = -zy * rz, uy = zz * rx - zx * rz, uz = zy * rx;
-    for (const w of this.watch) { const r = w.r, s = Math.sin(this.t * 0.6 + w.ph), a = w.a, b = w.b + s * 0.35, k = 13; r.root.visible = true; r.root.position.set(rx * a + ux * b + zx * k, uy * b + zy * k, rz * a + uz * b + zz * k); r.root.lookAt(0, 0, 0); r.root.rotateZ(Math.sin(this.t * 0.4 + w.ph) * 0.06); if (r.root.userData.tick) r.root.userData.tick(dt); else if (r.cape) r.cape.update(dt, 0.12, 0.35); detail(r, null, true); }
+    for (const w of this.watch) { const r = w.r; if (w.fly) { w.fly.t += dt; if (w.fly.t > 2.5) { r.root.visible = false; continue; } w.a += w.fly.vx * dt; w.b += w.fly.vy * dt; w.fly.vx *= 1 + dt * 0.6; w.fly.vy *= 1 + dt * 0.6; } const s = Math.sin(this.t * 0.6 + w.ph), a = w.a, b = w.b + s * 0.35, k = 13; r.root.visible = true; r.root.position.set(rx * a + ux * b + zx * k, uy * b + zy * k, rz * a + uz * b + zz * k); r.root.lookAt(0, 0, 0); r.root.rotateZ(Math.sin(this.t * 0.4 + w.ph) * 0.06); if (w.fly) { r.root.rotateZ(w.fly.t * 11 * w.fly.spin); r.root.rotateX(w.fly.t * 7); } if (r.root.userData.tick) r.root.userData.tick(dt); else if (r.cape) r.cape.update(dt, 0.12, 0.35); detail(r, null, true); }
   }
   // the planet, built the first time it is opened
   build() {
@@ -408,7 +412,7 @@ export class Globe {
   backdrop() {
     if (!this.built) this.build();
     const was = this.active;
-    this.watchers();
+    this.watchKey = this.watch && this.watch.some(w => w.fly) ? null : this.watchKey; this.watchers(); // back on the menu, those knocked away have come back
     this.active = true; this.state = 'menu'; this.status = null; this.arrive = null; this.fly = this.rise = this.turn = null; this.armed = false;
     this.uiEl.style.display = 'none'; this.backBtn.style.display = 'none'; this.metBtn.style.display = 'none';
     this.here.visible = false; this.showRoad(true, null); this.relabel(); // the menu: the trail of the towns played in either mode

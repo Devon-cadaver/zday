@@ -714,6 +714,8 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 
 - Alien options page (Sean, 2026-11-02, to choose from; not in the game): creatures.html, src/creatures.js, a third entry in vite.config. The soldiers as they are (the game's own figures), three other ground units (Greys, Mantis drones, Dome walkers) and four running dogs (Silver hound, Maw, Stalker, Plated runner), in plain shapes with a gallop cycle. One canvas with a scissored view per tile, as the roster does. Waiting on his choice.
 
+- The secret button (Sean, 2026-11-02): held, light rises up the saucer's dome over the 7 s (BIG_SHOT, was 15) and it turns pulsing green when the planet-buster is ready, as the orb does (game.js orbFire, .dglow clipped by .dfill). Under 1 s a laser, then a nuke, as before. The first three shots each go at the next hero over the planet (globe knockNext) and knock them spinning off the screen; after that shots hit the planet. The planet-buster takes any left. They are back the next time the menu opens.
+
 ## Next
 - The hero game (Sean, 2026-11-01): see HERO-PLAN.md for the whole plan and build order. Next up: floors inside smashed buildings, then the Sandbox hero lab.
 

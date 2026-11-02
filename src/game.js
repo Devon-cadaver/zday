@@ -173,7 +173,9 @@ const CSS = `
 #zd-menu .ufo .orbfire{position:absolute;left:50%;top:88.7%;width:9%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;border:0;padding:0;background:none;cursor:pointer;touch-action:none;-webkit-tap-highlight-color:transparent;transition:box-shadow .2s}
 #zd-menu .ufo .orbfire.charge{box-shadow:0 0 14px 4px rgba(120,220,255,.85),inset 0 0 10px rgba(255,255,255,.8)}
 #zd-menu .ufo .orbfire.ready{animation:zdOrb .35s ease-in-out infinite alternate}
-#zd-menu .ufo .orbfire.mega{animation:zdOrbM .16s ease-in-out infinite alternate} /* held 15 s: the planet-buster */
+#zd-menu .ufo .orbfire.mega{animation:zdOrbM .16s ease-in-out infinite alternate} /* held 7 s: the planet-buster */
+#zd-menu .ufo .hull .dglow.mega{fill:#5cff7a;animation:zdDomeM .22s ease-in-out infinite alternate}
+@keyframes zdDomeM{from{opacity:.65}to{opacity:1}}
 @keyframes zdOrbM{from{box-shadow:0 0 20px 8px rgba(60,255,110,.95),inset 0 0 14px #eaffef}to{box-shadow:0 0 38px 16px rgba(140,255,120,.95),inset 0 0 16px #b8ffc8}} /* green: the planet-buster is ready (Sean) */
 @keyframes zdOrb{from{box-shadow:0 0 14px 5px rgba(255,80,60,.9),inset 0 0 12px rgba(255,220,200,.9)}to{box-shadow:0 0 26px 10px rgba(255,140,40,.95),inset 0 0 14px #fff}}
 #zd-menufx{position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:5} /* under the menu (6): the beam passes behind the ship */
@@ -357,6 +359,7 @@ const SAUCER = '<svg class="hull" viewBox="0 0 400 230" preserveAspectRatio="non
   '<ellipse cx="200" cy="56" rx="96" ry="21" fill="#1c2133" stroke="#2f364d" stroke-width="2"/>' +
   '<ellipse cx="200" cy="57" rx="88" ry="17" fill="none" stroke="#5fe0ff" stroke-width="4" filter="url(#ufG)"/><ellipse cx="200" cy="57" rx="88" ry="17" fill="none" stroke="#bff4ff" stroke-width="1.6"/>' + // the dome's glowing ring
   '<path d="M126 55 Q128 10 200 7 Q272 10 274 55 Q200 70 126 55Z" fill="url(#ufD)" stroke="#6c7896" stroke-width="1.2"/>' + // the dome
+  '<clipPath id="ufDc"><rect class="dfill" x="120" y="71" width="160" height="0"/></clipPath><path class="dglow" clip-path="url(#ufDc)" d="M126 55 Q128 10 200 7 Q272 10 274 55 Q200 70 126 55Z" fill="#5fe0ff" opacity="0"/>' + // the secret button charging: light rising up the dome
   '<path d="M150 30 Q200 14 250 30" fill="none" stroke="rgba(255,255,255,.28)" stroke-width="2"/>' +
   '<path d="M136 49 A64 7 0 0 0 264 49" fill="none" stroke="#a8f2ff" stroke-width="3.2" stroke-linecap="round" stroke-dasharray="0.5 12.5" class="spin s4"/>' + // the dome's lights going round
   '<path d="M189 210 L211 210 L207 220 L193 220 Z" fill="#151925" stroke="#3a4258" stroke-width="1.4"/><rect x="197.5" y="219" width="5" height="8" rx="1.2" fill="#2a3044" stroke="#4a5470" stroke-width="1"/><circle cx="200" cy="227" r="1.6" fill="#8ff0ff"/>' + // the gun under the belly (the orb fires it)
@@ -381,6 +384,7 @@ class Idle {
   phase() { return 0.06; }
 }
 
+const BIG_SHOT = 7000; // how long the secret button is held for the planet-buster (Sean)
 export class Game {
   constructor({ camera, controls, renderer, mode, post, world }) {
     Object.assign(this, { camera, controls, renderer, post });
@@ -448,9 +452,11 @@ export class Game {
   // second (it glows, then pulses red) and let go, it drops a nuke there. Only light and sound: nothing on the map
   orbFire(btn) {
     let t0 = 0, rdy = 0, mega = 0;
-    const calm = () => { t0 = 0; clearTimeout(rdy); clearTimeout(mega); btn.classList.remove('charge', 'ready', 'mega'); };
-    btn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); calm(); t0 = performance.now(); btn.classList.add('charge'); try { btn.setPointerCapture(e.pointerId); } catch (er) { /* fine */ } rdy = setTimeout(() => btn.classList.add('ready'), 1000); mega = setTimeout(() => { btn.classList.remove('ready'); btn.classList.add('mega'); }, 15000); });
-    const go = (e) => { if (!t0) return; e.stopPropagation(); const held = performance.now() - t0; calm(); if (held >= 15000) this.planetBuster(btn); else this.menuShot(held >= 1000 ? 'nuke' : 'laser', btn); }; // held 15 s: the whole planet
+    const ufo = () => btn.closest('.ufo'), dome = (k, on) => { const u = ufo(), rc = u && u.querySelector('.dfill'), gl = u && u.querySelector('.dglow'); if (!rc || !gl) return; const h = 64 * k; rc.setAttribute('y', (71 - h).toFixed(1)); rc.setAttribute('height', h.toFixed(1)); gl.setAttribute('opacity', on ? (0.45 + 0.4 * k).toFixed(2) : '0'); gl.classList.toggle('mega', on && k >= 1); };
+    let raf = 0; const fill = () => { if (!t0) return; dome(Math.min(1, (performance.now() - t0) / BIG_SHOT), true); raf = requestAnimationFrame(fill); }; // the dome fills as it is held, and turns green when the big shot is ready
+    const calm = () => { t0 = 0; cancelAnimationFrame(raf); dome(0, false); clearTimeout(rdy); clearTimeout(mega); btn.classList.remove('charge', 'ready', 'mega'); };
+    btn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); calm(); t0 = performance.now(); btn.classList.add('charge'); try { btn.setPointerCapture(e.pointerId); } catch (er) { /* fine */ } rdy = setTimeout(() => btn.classList.add('ready'), 1000); mega = setTimeout(() => { btn.classList.remove('ready'); btn.classList.add('mega'); }, BIG_SHOT); fill(); });
+    const go = (e) => { if (!t0) return; e.stopPropagation(); const held = performance.now() - t0; calm(); if (held >= BIG_SHOT) this.planetBuster(btn); else this.menuShot(held >= 1000 ? 'nuke' : 'laser', btn); }; // held 7 s: the whole planet
     btn.addEventListener('pointerup', go); btn.addEventListener('pointercancel', calm);
     btn.addEventListener('click', (e) => e.stopPropagation());
   }
@@ -461,7 +467,7 @@ export class Game {
     const fx = layer('zd-menufx', '<radialGradient id="zfxB"><stop offset="0" stop-color="#fff"/><stop offset=".35" stop-color="#b8f6ff"/><stop offset="1" stop-color="#36c8ff" stop-opacity="0"/></radialGradient><radialGradient id="zfxN"><stop offset="0" stop-color="#fff"/><stop offset=".3" stop-color="#ffe9a0"/><stop offset=".65" stop-color="#ff7a2e"/><stop offset="1" stop-color="#c22a10" stop-opacity="0"/></radialGradient>'); // under the menu: the beam passes behind the ship
     const top = layer('zd-menuflash', '<radialGradient id="zfxM"><stop offset="0" stop-color="#fff"/><stop offset=".4" stop-color="#9af0ff"/><stop offset="1" stop-color="#36c8ff" stop-opacity="0"/></radialGradient>'); // over everything: the muzzle flash, the nuke's white
     const u = btn.closest('.ufo').getBoundingClientRect(), x0 = u.left + u.width * 0.5, y0 = u.top + u.height * 226 / 230; // the gun's muzzle under the belly (the hull's 400 x 230)
-    const nuke = kind === 'nuke', [x1, y1] = G.screenPoint(nuke ? 0.35 : 0.55), pr = G.screenRadius();
+    const hero = G.knockNext && G.knockNext(), nuke = kind === 'nuke', [x1, y1] = hero || G.screenPoint(nuke ? 0.35 : 0.55), pr = G.screenRadius(); // the first three shots: a hero each
     const glow = el('line', { x1: x0, y1: y0, x2: x1, y2: y1, stroke: nuke ? '#ff6ad5' : '#36c8ff', 'stroke-width': nuke ? 14 : 8, 'stroke-linecap': 'round', opacity: 0.55 });
     const core = el('line', { x1: x0, y1: y0, x2: x1, y2: y1, stroke: '#fff', 'stroke-width': nuke ? 4.5 : 2.5, 'stroke-linecap': 'round' });
     const muzzle = el('circle', { cx: x0, cy: y0, r: nuke ? 16 : 10, fill: 'url(#zfxM)' });
@@ -493,12 +499,12 @@ export class Game {
     };
     requestAnimationFrame(step);
   }
-  // held 15 s and let go (Sean): a beam like a pillar, the whole planet bursts - a white-out, a fireball, a shockwave, the
+  // held 7 s and let go (Sean): a beam like a pillar, the whole planet bursts - a white-out, a fireball, a shockwave, the
   // pieces flying - and is gone; two seconds later a black hole opens where it was, draws the pieces back in, and the planet
   // gathers back out of it as the hole closes. Light and sound only
   planetBuster(btn) {
     const G = this.globe; if (!G || !G.planetScale || this.busting) return;
-    this.busting = true;
+    this.busting = true; if (G.knockAll) G.knockAll();
     const music = this.audio && this.audio.music; let cut = false; // the song: stopped at the blast, back once the planet is whole (music.js)
     const NS = 'http://www.w3.org/2000/svg', el = (tag, at) => { const n = document.createElementNS(NS, tag); for (const k in at) n.setAttribute(k, at[k]); return n; };
     const layer = (id) => { let l = document.getElementById(id); if (!l) { l = el('svg', { id }); document.body.appendChild(l); } return l; };
