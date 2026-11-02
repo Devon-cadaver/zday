@@ -1960,7 +1960,8 @@ export class People {
   }
 
   // ---------- render sync
-  sync() {
+  sync() { const L = this.crLayer; if (L) L.begin(); this.syncAll(); if (L) L.end(this.time); }
+  syncAll() {
     const arr = this.mesh.instanceMatrix.array, anim = this.anim;
     const m = this._m4, q = this._q, e = this._e, p = this._p;
     const cops = []; // officers at work (the last few zombies are drawn to them)
@@ -2005,6 +2006,7 @@ export class People {
       arr[o + 8] = sn; arr[o + 9] = 0; arr[o + 10] = c; arr[o + 11] = 0;
       arr[o + 12] = this.x[i]; arr[o + 13] = y; arr[o + 14] = this.z[i]; arr[o + 15] = 1;
       anim[i] = an;
+      if (this.crLayer && this.crLayer.put(i, this.zt[i], arr, o, t)) arr.fill(0, o, o + 16); // drawn by the creature layer instead
       if (s === S.DEAD) { dead++; continue; }
       if (s === S.ALIEN) continue;
       if ((s === S.EXT || s === S.AIR) && this.wz[i]) { zombies++; continue; }

@@ -11,7 +11,8 @@ import { PATH, PLACES, placeKey } from './places.js';
 import { heroRig } from './heroes.js';
 import { villainRig, detail } from './villains.js';
 import { POWER, finish as endDisaster } from './heropower.js';
-import { ALIEN_TYPES } from './figures.js';
+import { ALIEN_MIX } from './figures.js';
+import { CreatureLayer } from './creaturekit.js';
 
 
 const KEY = 'zday_hero';
@@ -173,7 +174,7 @@ export class HeroGame {
     const g = this.g, s = this.s, P = g.people, D = g.disasters, B = g.city.bounds, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2, n = 150, pool = []; LAB.reset();
     for (let j = 0; j < P.active && pool.length < n; j++) { if (P.kind[j] === 0 && P.isCivilian(j) && P.lvl[j] === -1 && Math.hypot(P.x[j] - cx, P.z[j] - cz) > 60 && P.hide(j)) pool.push(j); }
     const e = D.start('aliens', cx, cz, { life: 99999, noSquads: true, tripods: 2, n: 6 }); if (e) { e.launchT = 0.5; e.dropT = 8; } this.round = { evs: e ? [e] : [], need: 0, t: 0, downs: 0, hero: true, key, ended: false, zombie: true, n, noun: ' aliens' };
-    g.horde.start({ n, pool, level: true, fleet: e, types: ALIEN_TYPES, label: 'ALIENS', verb: ' DOWN', onEnd: (won, H) => { this.round.horde = H; this.finish(won, won ? null : 'The invasion took you down'); } });
+    g.people.crLayer = new CreatureLayer(g.disasters.ctx.scene, g.people.active + 64); g.horde.start({ n, pool, level: true, fleet: e, types: ALIEN_MIX, label: 'ALIENS', verb: ' DOWN', onEnd: (won, H) => { this.round.horde = H; this.finish(won, won ? null : 'The invasion took you down'); } });
     this.rep = document.createElement('div'); this.rep.id = 'zd-rep'; document.body.appendChild(this.rep);
     g.toast ? g.toast('Defend ' + PLACES[key].name + ': ' + n + ' alien soldiers in the streets, the fleet overhead') : 0;
   }

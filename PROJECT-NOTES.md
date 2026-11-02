@@ -716,6 +716,8 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 
 - The secret button (Sean, 2026-11-02): held, light rises up the saucer's dome over the 7 s (BIG_SHOT, was 15) and it turns pulsing green when the planet-buster is ready, as the orb does (game.js orbFire, .dglow clipped by .dfill). Under 1 s a laser, then a nuke, as before. The first three shots each go at the next hero over the planet (globe knockNext) and knock them spinning off the screen; after that shots hit the planet. The planet-buster takes any left. They are back the next time the menu opens.
 
+- Level 1's crowd (Sean, 2026-11-02: loved every one on the options page; add them all, a few silver soldiers as commanders, a sphere helmet that a punch knocks off). creaturekit.js holds the shapes and CreatureLayer: when the level starts each kind's stride is recorded as 10 whole merged shapes, one instanced mesh each, so a crowd costs one matrix per creature. figures.js: seven new ZTYPES with creature set (their own chase and lunge speeds) and ALIEN_MIX (3 each of Grey, Mantis, Dome walker, 2 each of the dogs, 1 commander: about 8 of 150). people.sync gives the layer each one's matrix and blanks the figure, so moving, biting, falling, throwing and counting need no change. Commanders keep their figure and wear the sphere: in sweep a punch or kick knocks it off and leaves them standing, a bigger hit takes helmet and commander together. Also fixed: RADIOACTIVE was the last ZTYPE, which the added alien and robot kinds had changed.
+
 ## Next
 - The hero game (Sean, 2026-11-01): see HERO-PLAN.md for the whole plan and build order. Next up: floors inside smashed buildings, then the Sandbox hero lab.
 
