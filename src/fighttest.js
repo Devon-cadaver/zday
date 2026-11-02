@@ -48,7 +48,7 @@ const ATK = {
   counter: { clip: CLIPS.cross, at: 0.08, end: 0.4, dmg: 40, react: 'blownBack', knock: [22, 7], stop: 0.12, shake: 0.6, reach: 4 },
 };
 const COMBO = ['jabL', 'jabR', 'cross'];
-const A0 = 0.95, A1 = Math.PI * 2 - 0.95, SMASH_DMG = [18, 22, 26, 30]; // the swing's ends: their head on the ground in front, then behind
+const A0 = 0.95, A1 = Math.PI * 2 - 0.95, SMASH_DMG = [12, 14, 16]; // the swing's ends: their head on the ground in front, then behind
 const G = 24, ARENA = 40, TAP_MS = 220, SWIPE_PX = 26, COMBO_T = 0.6;
 const CSS = `
 #zd-fight{position:fixed;left:0;top:0;right:0;bottom:0;z-index:28;touch-action:none;user-select:none;-webkit-user-select:none;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#fff}
@@ -123,7 +123,7 @@ export class FightTest {
   restart() {
     const h = this.h, v = this.v, cx = this.cx, cz = this.cz; if (this.endEl) { this.endEl.remove(); this.endEl = null; }
     Object.assign(h, { x: cx - 5, z: cz + 3.5, y: this.top, vx: 0, vz: 0, vy: 0, hp: h.hpMax, yaw: 0 }); Object.assign(v, { x: cx + 5, z: cz - 3.5, y: this.top, vx: 0, vz: 0, vy: 0, hp: v.hpMax, yaw: 0 }); h.go('idle', C.guard); v.go('idle', C.guard);
-    this.over = false; this.combo = 0; this.comboT = 0; this.buffer = false; this.counterT = 0; this.slow = 0; this.cool = 1.4; this.dirC = 1; this.mash = 0; this.hits = 0; this.hitsT = 0; this.atk = null; this.tellOff(); this.say('', 0); const hi = this.el.querySelector('.hint'); hi.style.opacity = '0.9'; clearTimeout(this.hintT); this.hintT = setTimeout(() => { hi.style.opacity = '0'; }, 12000);
+    this.over = false; this.grabCd = 0; this.combo = 0; this.comboT = 0; this.buffer = false; this.counterT = 0; this.slow = 0; this.cool = 1.4; this.dirC = 1; this.mash = 0; this.hits = 0; this.hitsT = 0; this.atk = null; this.tellOff(); this.say('', 0); const hi = this.el.querySelector('.hint'); hi.style.opacity = '0.9'; clearTimeout(this.hintT); this.hintT = setTimeout(() => { hi.style.opacity = '0'; }, 12000);
   }
   stop() { if (!this.active) return; this.active = false; removeEventListener('keydown', this.onKey); travel(placeKey(), 'sandbox'); }
   say(text, T = 0.7, col = '#fff') { this.sayEl.textContent = text; this.sayEl.style.color = col; this.sayEl.style.opacity = text ? '1' : '0'; this.sayT = T; }
@@ -131,7 +131,7 @@ export class FightTest {
   tap() {
     if (this.over) return; const h = this.h, v = this.v;
     if (h.state === 'ankles') { this.smash(); return; } if (h.state === 'smash') { this.buffer = true; return; }
-    if (v.state === 'down' && v.hp > 0 && ['idle', 'attack', 'land'].includes(h.state)) { v.t = 0; this.startAtk('ankle'); return; }
+    if (v.state === 'down' && v.hp > 0 && this.grabCd <= 0 && ['idle', 'attack', 'land'].includes(h.state)) { v.t = 0; this.startAtk('ankle'); return; }
     if (h.state === 'grabbed') { this.mash++; sfx('thud', h.x, h.y + 2, h.z, { gain: 0.5, rate: 1.4 }); return; }
     if (this.counterT > 0 && ['idle', 'dodge', 'attack'].includes(h.state)) { this.counterT = 0; this.slow = 0; this.startAtk('counter'); return; }
     if (v.state === 'air' && this.launched && ['idle', 'attack'].includes(h.state)) { this.launched = false; h.go('slamUp', CLIPS.windup); h.y0 = h.y; this.say('', 0); sfx('whoosh', h.x, h.y, h.z, { gain: 1, rate: 0.8 }); return; }
@@ -155,7 +155,7 @@ export class FightTest {
     const g = this.g, h = this.h, v = this.v; if (this.ptrs) for (const p of this.ptrs.values()) if (!p.used && !p.held && performance.now() - p.t > TAP_MS) { p.used = true; if (this.hold()) p.held = true; }
     if (!g.paused && dt > 0) {
       if (this.slow > 0) { this.slow -= dt; } const ft = dt * (this.slow > 0 ? 0.3 : 1);
-      if (this.counterT > 0) this.counterT -= dt; if (this.sayT > 0) { this.sayT -= dt; if (this.sayT <= 0) this.say('', 0); } if (this.hitsT > 0) { this.hitsT -= dt; if (this.hitsT <= 0) this.hits = 0; } if (this.comboT > 0) this.comboT -= ft;
+      if (this.counterT > 0) this.counterT -= dt; if (this.sayT > 0) { this.sayT -= dt; if (this.sayT <= 0) this.say('', 0); } if (this.hitsT > 0) { this.hitsT -= dt; if (this.hitsT <= 0) this.hits = 0; } if (this.comboT > 0) this.comboT -= ft; if (this.grabCd > 0) this.grabCd -= ft;
       this.heroStep(ft); this.vilStep(ft); this.separate(); this.clamp(h); this.clamp(v);
       h.pose(ft, this.top, this.grounded(h)); v.pose(ft, this.top, this.grounded(v));
       this.hh.style.width = Math.max(0, h.hp / h.hpMax * 100) + '%'; this.vh.style.width = Math.max(0, v.hp / v.hpMax * 100) + '%';
@@ -193,10 +193,10 @@ export class FightTest {
   // the blow, if the bodies really meet
   contact(A) {
     const h = this.h, v = this.v, d = this.dist(), hit = d <= A.reach && Math.abs(v.y - h.y) < 4 && (A.ankle ? v.state === 'down' : !['down', 'getup', 'flung', 'air', 'slammed', 'swung', 'pinned'].includes(v.state)); if (!hit) { sfx('whoosh', h.x, h.y + 2, h.z, { gain: 0.4, rate: 1.7 }); return; }
-    if (A.ankle) { h.yaw = Math.atan2(v.x - h.x, v.z - h.z); this.smashes = 0; this.swingA = A0; this.atk = null; v.go('pinned', C.swung); h.go('ankles', C.spinH); h.armsA = A0; this.swingPlace(); this.g.hitStop = Math.max(this.g.hitStop || 0, 0.04); sfx('thud', v.x, v.y + 1, v.z, { gain: 0.9 }); this.say('TAP: SMASH \u00B7 HOLD: SPIN', 1.2, '#ffd27a'); return; }
+    if (A.ankle) { this.grabCd = 10; h.yaw = Math.atan2(v.x - h.x, v.z - h.z); this.smashes = 0; this.swingA = A0; this.atk = null; v.go('pinned', C.swung); h.go('ankles', C.spinH); h.armsA = A0; this.swingPlace(); this.g.hitStop = Math.max(this.g.hitStop || 0, 0.04); sfx('thud', v.x, v.y + 1, v.z, { gain: 0.9 }); this.say('TAP: SMASH \u00B7 HOLD: SPIN', 1.2, '#ffd27a'); return; }
     const breaks = A === ATK.heavy || A === ATK.counter;
     if (v.state === 'block' && !breaks && !A.seize) { this.hurtV(1); this.spark(v.x, v.y + 3, v.z, 1.4, [1.2, 1.4, 2.2]); sfx('thud', v.x, v.y + 2, v.z, { gain: 0.8, rate: 1.7 }); this.say('BLOCKED! HOLD TO BREAK IT', 0.9, '#9fd4ff'); this.combo = 0; this.comboT = 0; this.buffer = false; const b = Math.hypot(h.x - v.x, h.z - v.z) || 1; h.vx = (h.x - v.x) / b * 9; h.vz = (h.z - v.z) / b * 9; this.atk = null; h.go('hurt', CLIPS.hitBody); this.g.hitStop = Math.max(this.g.hitStop || 0, 0.05); v.go('idle', C.guard); this.vilAtk('jab'); v.T = 0.3; return; }
-    if (v.state === 'wind' && v.armor && !breaks) { this.hurtV(A.dmg * 0.5); this.spark(v.x, v.y + 3, v.z, 1.6, [2.2, 0.8, 0.5]); sfx('thud', v.x, v.y + 2, v.z, { gain: 0.8, rate: 0.9 }); this.say('NOT STOPPING! DODGE!', 0.8, '#ff8a7a'); return; }
+    if ((v.state === 'wind' || v.state === 'strike') && v.armor && !breaks) { this.hurtV(A.dmg * 0.5); this.spark(v.x, v.y + 3, v.z, 1.6, [2.2, 0.8, 0.5]); sfx('thud', v.x, v.y + 2, v.z, { gain: 0.8, rate: 0.9 }); this.say('NOT STOPPING! DODGE!', 0.8, '#ff8a7a'); return; }
     v.armor = false;
     const nx = (v.x - h.x) / (d || 1), nz = (v.z - h.z) / (d || 1), dmg = A.dmg + (A === ATK.heavy ? 30 * (this.heavyK || 0) : 0); this.tellOff(); this.hurtV(dmg);
     this.hits++; this.hitsT = 1.2; if (this.hits >= 2) this.say(this.hits + ' HITS', 0.7, '#ffd27a'); this.g.hitStop = Math.max(this.g.hitStop || 0, A.stop); this.g.shake = Math.max(this.g.shake || 0, A.shake); this.spark(v.x - nx, v.y + 3, v.z - nz, A.knock || A.launch ? 3 : 1.8); sfx(A.knock || A.launch ? 'crash' : 'thud', v.x, v.y + 2, v.z, { gain: A.knock ? 1 : 0.8, rate: A.knock ? 0.8 : 1.2 });
@@ -210,9 +210,9 @@ export class FightTest {
   swingPlace() { const h = this.h, v = this.v, a = this.swingA, fx = Math.sin(h.yaw), fz = Math.cos(h.yaw), s = Math.sin(a), c = Math.cos(a); v.x = h.x + fx * 1.28 * s; v.z = h.z + fz * 1.28 * s; v.y = this.top + 3.25 - 1.28 * c; v.yaw = h.yaw; v.bodyX = Math.atan2(s, -c); }
   smash() { const h = this.h; this.fromA = this.swingA; this.toA = this.swingA < Math.PI ? A1 : A0; this.buffer = false; h.go('smash'); sfx('whoosh', h.x, h.y + 3, h.z, { gain: 1, rate: 0.7 }); }
   smashHit() {
-    const h = this.h, v = this.v, n = this.smashes++, s = Math.sin(this.swingA), hx = h.x + Math.sin(h.yaw) * 5 * s, hz = h.z + Math.cos(h.yaw) * 5 * s; this.hurtV(SMASH_DMG[Math.min(n, 3)]); this.puff({ x: hx, z: hz }, 0.5 + n * 0.15); this.g.hitStop = Math.max(this.g.hitStop || 0, 0.09); this.g.shake = Math.max(this.g.shake || 0, 0.6 + n * 0.15); sfx('crash', hx, this.top, hz, { gain: 1, rate: 0.75 }); this.hits++; this.hitsT = 1.2; this.say(this.smashes + ' SMASH' + (this.smashes > 1 ? 'ES' : '') + '!', 0.7, '#ffd27a');
+    const h = this.h, v = this.v, n = this.smashes++, s = Math.sin(this.swingA), hx = h.x + Math.sin(h.yaw) * 5 * s, hz = h.z + Math.cos(h.yaw) * 5 * s; this.hurtV(SMASH_DMG[Math.min(n, 2)]); this.puff({ x: hx, z: hz }, 0.5 + n * 0.15); this.g.hitStop = Math.max(this.g.hitStop || 0, 0.09); this.g.shake = Math.max(this.g.shake || 0, 0.6 + n * 0.15); sfx('crash', hx, this.top, hz, { gain: 1, rate: 0.75 }); this.hits++; this.hitsT = 1.2; this.say(this.smashes + ' SMASH' + (this.smashes > 1 ? 'ES' : '') + '!', 0.7, '#ffd27a');
     if (v.hp <= 0) { v.bodyX = null; v.y = this.top; v.go('down', C.down); h.go('idle', C.guard); return; }
-    if (this.smashes >= 4) { this.kickFree(); return; }
+    if (this.smashes >= 3) { this.kickFree(); return; }
     h.go('ankles'); h.armsA = this.swingA; v.bodyX = Math.atan2(s, -Math.cos(this.swingA)); if (this.buffer) this.smash();
   }
   kickFree() { const h = this.h, v = this.v, fx = Math.sin(h.yaw) * (this.swingA < Math.PI ? 1 : -1), fz = Math.cos(h.yaw) * (this.swingA < Math.PI ? 1 : -1); v.y = this.top; v.x = h.x + fx * 3; v.z = h.z + fz * 3; v.go('getup', C.getup); h.vx = -fx * 7; h.vz = -fz * 7; h.go('hurt', CLIPS.hitBody); sfx('thud', v.x, v.y + 1, v.z, { gain: 0.8 }); this.say('KICKED FREE!', 0.7, '#ff8a7a'); }
@@ -244,7 +244,7 @@ export class FightTest {
       case 'strike': this.slide(v, dt, 6); if (!this.vl && v.t >= (v.kind === 'grab' ? 0.2 : 0.09)) { this.vl = true; if (v.kind === 'jab') { if (d < 3.5 && this.canHit()) { this.hitHero(8, 7); } } else if (d < 3.1 && this.canHit()) { h.go('grabbed', C.held); h.yaw = Math.atan2(v.x - h.x, v.z - h.z); v.go('hold', C.hold); this.mash = 0; this.hurtH(4, 'TAP TAP TAP!'); this.say('TAP TAP TAP!', 1.2, '#ff8a7a'); return; } } if (v.t > (v.kind === 'grab' ? 0.7 : 0.42)) { v.go('idle', C.guard); this.cool = 0.5 + Math.random() * 0.9; } break;
       case 'rush': { const st = 27 * dt; v.x += v.fx * st; v.z += v.fz * st; v.ran += st; v.phase += st * 1.1; v.walkK = 1; if (d < 2.7 && this.canHit()) { this.fling(16, v.fx, v.fz, 'CHARGED!'); v.go('stumble', C.stumble); break; } if (v.ran > 22) v.go('stumble', C.stumble); break; }
       case 'block': this.face(v, h, dt, 12); this.slide(v, dt); if (v.t > 0.6) { v.go('idle', C.guard); this.cool = 0.2; } break;
-      case 'stumble': v.walkK *= 0.8; if (v.t > 0.8) { v.go('idle', C.guard); this.cool = 0.5 + Math.random() * 0.6; } break;
+      case 'stumble': v.armor = false; v.walkK *= 0.8; if (v.t > 0.8) { v.go('idle', C.guard); this.cool = 0.5 + Math.random() * 0.6; } break;
       case 'hold': { const fx = Math.sin(v.yaw), fz = Math.cos(v.yaw); h.x = v.x + fx * 1.4; h.z = v.z + fz * 1.4; h.y = this.top + 2.4; if (this.mash >= 5) { h.y = this.top; h.go('hurt', CLIPS.hitBody); h.vx = fx * 6; h.vz = fz * 6; v.go('stun', CLIPS.hitBody); v.vx = -fx * 5; v.vz = -fz * 5; this.say('BROKE FREE!', 0.7, '#8affb0'); break; } if (v.t >= 1.15) { v.go('stumble', CLIPS.throw); this.fling(16, fx, fz, 'THROWN!'); h.y = this.top + 2; } break; }
       case 'stun': this.slide(v, dt, 8); if (v.hp <= 0) { v.go('flung', CLIPS.blownBack); v.vy = 4; break; } if (v.t > 0.42) { v.go('idle', C.guard); this.cool = 0.35 + Math.random() * 0.5; } break;
       case 'air': case 'flung': case 'slammed': v.vy -= G * dt; v.y += v.vy * dt; this.slide(v, dt, 1); if (v.y <= this.top) { const hard = v.state === 'slammed', was = v.state; v.y = this.top; v.vy = 0; v.vx *= 0.2; v.vz *= 0.2; v.go('down', hard ? CLIPS.crushed : C.down); if (hard) { this.hurtV(40); this.puff(v, 1); this.g.shake = Math.max(this.g.shake || 0, 1); this.g.hitStop = 0.1; this.say('SLAMMED!', 0.9, '#ffd27a'); v.play(C.down); } else { if (was === 'air') this.hurtV(6); this.puff(v, 0.5 + 0.5 * (v.tossK || 0)); v.tossK = 0; } this.launched = false; } break;
