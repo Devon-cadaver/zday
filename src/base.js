@@ -61,12 +61,17 @@ export function baseBuilding(cfg, y0) {
   S.build(B); g.position.y = y0; return g;
 }
 
+const HALL = { w: 120, d: 90, y: 33 }; // the basement hall inside (Sean: as big as we like), 30 m up over the outskirts beyond the town's east edge, on its 3 m podium
 const EL = 0.95, AZ = Math.atan2(0.6, 0.8), _a = new THREE.Vector3(), _ray = new THREE.Raycaster(), _pl = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), _hit = new THREE.Vector3(), _m = new THREE.Vector2();
 const CSSB = `body.zd-flying #zd-bar,body.zd-flying #zd-dis,body.zd-flying #zd-followchip,body.zd-flying #zd-globe,body.zd-flying #zd-top{display:none!important}
 #zd-base{position:fixed;inset:0;z-index:30;touch-action:none;font-family:system-ui,sans-serif;color:#fff;user-select:none}
 #zd-base .hint{position:absolute;left:12px;right:12px;top:calc(14px + env(safe-area-inset-top));text-align:center;font:700 13px/1.4 system-ui,sans-serif;text-shadow:0 1px 3px #000;opacity:.9;transition:opacity .4s}
 #zd-base .act{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(24px + env(safe-area-inset-bottom));display:none}
 #zd-base .act.show{display:block}
+#zd-base .stick{position:absolute;right:18px;bottom:calc(22px + env(safe-area-inset-bottom));width:118px;height:118px;border-radius:50%;background:rgba(255,255,255,.08);box-shadow:0 0 0 2px rgba(255,255,255,.18) inset;touch-action:none}
+#zd-base .stick i{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;background:linear-gradient(180deg,#ff5ad5,#b23cff);box-shadow:0 4px 12px rgba(0,0,0,.4);pointer-events:none}
+#zd-base .fly{position:absolute;left:14px;bottom:calc(24px + env(safe-area-inset-bottom))}
+#zd-base .fly button{font:800 13px/1 system-ui,sans-serif;color:#fff;background:linear-gradient(180deg,#5a4a8a,#2b2244);border:0;border-radius:14px;padding:14px 16px;box-shadow:0 4px 14px rgba(0,0,0,.4)}
 #zd-base .act button,#zd-base .panel button{font:800 15px/1 system-ui,sans-serif;color:#fff;background:linear-gradient(180deg,#ff5ad5,#b23cff);border:0;border-radius:14px;padding:14px 22px;box-shadow:0 4px 14px rgba(0,0,0,.4)}
 #zd-base .panel{position:absolute;left:12px;right:12px;bottom:calc(18px + env(safe-area-inset-bottom));max-height:70vh;overflow:auto;background:rgba(18,12,30,.94);border-radius:18px;padding:14px 14px 16px;box-shadow:0 8px 30px rgba(0,0,0,.5)}
 #zd-base .panel h3{margin:0 0 8px;font:800 17px/1.2 system-ui,sans-serif;color:#ffd27a}
@@ -84,7 +89,7 @@ export class HomeBase {
   constructor(g, ctx) { this.g = g; this.ctx = ctx; this.active = false; this.near = 1.5; this.focus = 30; this.lod = 0; this.cfg = loadBase(); const st = document.createElement('style'); st.textContent = CSSB; document.head.appendChild(st); }
   get S() { return STYLES[this.cfg.style] || STYLES.tower; }
   // the site: the town's centre, the city's own buildings there taken away; the base as seen from the street
-  place() { const g = this.g, B = g.city.bounds; this.x = (B.x0 + B.x1) / 2; this.z = (B.z0 + B.z1) / 2; this.y = g.people.groundY(this.x, this.z); const R = 26; g.city.buildingsNear(this.x, this.z, R, (k) => g.city.hideBuilding(k)); g.city.takeStreetNear(this.x, this.z, R); this.rebuild(); this.placed = true; }
+  place() { const g = this.g, B = g.city.bounds; this.x = B.x1 + 48; this.z = (B.z0 + B.z1) / 2; /* just outside the town's east edge (Sean), not its centre */ this.y = g.people.groundY(this.x, this.z); this.hx = B.x1 + 320; this.hz = this.z; const R = 26; g.city.buildingsNear(this.x, this.z, R, (k) => g.city.hideBuilding(k)); g.city.takeStreetNear(this.x, this.z, R); this.rebuild(); this.placed = true; }
   rebuild() { const S = this.g.disasters.ctx.scene; if (this.ext) S.remove(this.ext); this.ext = baseBuilding(this.cfg, this.y); this.ext.position.x = this.x; this.ext.position.z = this.z; S.add(this.ext); this.ext.visible = !this.active; }
   hideAll() { if (this.ext) this.ext.visible = false; if (this.room) this.room.visible = false; }
   // inside: the floor and walls of the chosen style, five stations, Nova at the door
@@ -92,27 +97,30 @@ export class HomeBase {
     const g = this.g, { camera, controls, post } = this.ctx, S = g.disasters.ctx.scene; if (!this.placed) this.place();
     for (const p of [g.flight, g.drive, g.takeover, g.bandGame, g.fightTest, g.horde]) if (p && p.active) p.stop(true); if (g.takeover && g.takeover.picking) g.takeover.endPick();
     this.active = true; controls.enabled = false; g.setFollow(-1); document.body.classList.add('zd-flying'); this.savedDof = post.opts.dof; post.opts.dof = true; this.ext.visible = false;
-    const { w, d } = this.S, y = this.y + 3, room = this.room = new THREE.Group(); room.position.set(this.x, y, this.z); S.add(room); // the room on a 3 m podium: the town's people walk on underneath, out of sight
+    const { w, d } = HALL, y = HALL.y, hx = this.hx, hz = this.hz, room = this.room = new THREE.Group(); room.position.set(hx, y, hz); S.add(room); // the hall on its podium, off beyond the town
     const std = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9, ...o }), box = (bw, bh, bd, x, by, z, m) => { const q = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), m); q.position.set(x, by, z); q.castShadow = q.receiveShadow = true; room.add(q); return q; };
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.6, d - 0.6).rotateX(-Math.PI / 2), std('#5a5560')); floor.position.y = 0.06; floor.receiveShadow = true; room.add(floor); box(w + 1, 3, d + 1, 0, -1.5, 0, std('#3a3540')); for (let i = 0; i < 4; i++) box(4, 0.75, 1.2, 0, -0.375 - i * 0.75, d / 2 + 1.1 + i * 1.2, std('#4a4550'));
     const wm = std(new THREE.Color(this.cfg.wall).lerp(new THREE.Color('#ffffff'), 0.35)); box(w, 5, 0.4, 0, 2.5, -d / 2, wm); box(0.4, 5, d, -w / 2, 2.5, 0, wm); box(0.4, 1.1, d, w / 2, 0.55, 0, wm); box(w / 2 - 1.6, 1.1, 0.4, -w / 4 - 0.8, 0.55, d / 2, wm); box(w / 2 - 1.6, 1.1, 0.4, w / 4 + 0.8, 0.55, d / 2, wm); // the far walls full height, the near two (the camera's side) a rail
     const st = this.stations = [
-      { id: 'costume', name: 'Wardrobe', act: 'Change costume', x: -w / 2 + 2.6, z: -d / 2 + 2.2 },
-      { id: 'computer', name: 'Computer', act: 'Skills and powers', x: w / 2 - 2.6, z: -d / 2 + 2.2 },
-      { id: 'ring', name: 'Ring console', act: 'The robot: set it up, fight', x: w / 2 - 2.4, z: 3 },
-      { id: 'blueprints', name: 'Blueprints', act: 'Change the base', x: -w / 2 + 2.4, z: 3 },
+      { id: 'costume', name: 'Wardrobe', act: 'Change costume', x: -16, z: 30 },
+      { id: 'computer', name: 'Computer', act: 'Skills and powers', x: 16, z: 30 },
+      { id: 'ring', name: 'Ring console', act: 'The robot: set it up, fight', x: 18, z: 0 },
+      { id: 'blueprints', name: 'Blueprints', act: 'Change the base', x: -18, z: 12 },
       { id: 'door', name: 'Door', act: 'Go outside', x: 0, z: d / 2 - 1.2 },
     ];
     box(2.6, 2.8, 0.9, st[0].x, 1.4, st[0].z - 0.6, std('#7a5a3a')); box(2.2, 0.9, 1.1, st[1].x, 0.45, st[1].z - 0.6, std('#2b2b2e')); box(1.4, 0.9, 0.1, st[1].x, 1.35, st[1].z - 0.9, std('#29e3ff', { emissive: new THREE.Color('#29e3ff'), emissiveIntensity: 0.6 }));
     box(1.2, 1.1, 0.8, st[2].x, 0.55, st[2].z, std('#2b2b2e')); box(1, 0.5, 0.08, st[2].x, 1.3, st[2].z - 0.2, std('#ff5a5a', { emissive: new THREE.Color('#ff5a5a'), emissiveIntensity: 0.6 }));
     box(2.4, 0.9, 1.4, st[3].x, 0.45, st[3].z, std('#8a7a5a')); box(2.2, 0.05, 1.2, st[3].x, 0.93, st[3].z, std('#9fd4ff'));
-    const ring = new THREE.Mesh(new THREE.RingGeometry(5, 5.45, 64).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: new THREE.Color(1.8, 0.4, 0.3), side: THREE.DoubleSide })); ring.position.set(0, 0.09, 1.5); room.add(ring); this.ringAt = { x: this.x, z: this.z + 1.5 };
+    const ring = new THREE.Mesh(new THREE.RingGeometry(12, 12.6, 96).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: new THREE.Color(1.8, 0.4, 0.3), side: THREE.DoubleSide })); ring.position.set(0, 0.09, -4); room.add(ring); this.ringAt = { x: hx, z: hz - 4 };
+    for (const px of [-40, -20, 20, 40]) for (const pz of [-30, -10, 10]) box(1.6, 5, 1.6, px, 2.5, pz, wm); // the basement's pillars
     for (const s of st) { const m = new THREE.Mesh(new THREE.CircleGeometry(1.1, 24).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.9, 0.7, 0.3), transparent: true, opacity: 0.35 })); m.position.set(s.x, 0.08, s.z); room.add(m); s.mark = m; }
-    this.h = new Body(heroRig('Nova', HS.outfit('Nova')), 100); S.add(this.h.r.root); this.h.x = this.x; this.h.z = this.z + d / 2 - 3; this.h.y = y; this.floorY = y; this.h.yaw = Math.PI; this.goal = null; this.nearS = null; this.panel = null;
+    this.h = new Body(heroRig('Nova', HS.outfit('Nova')), 100); S.add(this.h.r.root); this.h.x = hx; this.h.z = hz + d / 2 - 3; this.h.y = y; this.floorY = y; this.h.yaw = Math.PI; this.goal = null; this.nearS = null; this.panel = null;
     camera.fov = innerWidth < innerHeight ? 28 : 18; camera.up.set(0, 1, 0); camera.updateProjectionMatrix(); this.look = new THREE.Vector3(this.h.x, y + 1, this.h.z); this.place2(1);
-    const el = this.el = document.createElement('div'); el.id = 'zd-base'; el.innerHTML = '<div class="hint">HOME BASE &middot; tap the floor to walk &middot; the wardrobe, the computer, the ring, the blueprints, the door</div><div class="act"><button type="button"></button></div>'; document.body.appendChild(el);
+    const el = this.el = document.createElement('div'); el.id = 'zd-base'; el.innerHTML = '<div class="hint">HOME BASE &middot; tap the floor to walk &middot; the wardrobe, the computer, the ring, the blueprints, the door &middot; TAKE OFF to fly round the hall</div><div class="act"><button type="button"></button></div><div class="fly"><button type="button" data-fly>\u2708 TAKE OFF</button></div><div class="stick"><i></i></div>'; document.body.appendChild(el);
+    // the joystick (Sean, for whoever would rather not tap): the knob's offset from the pad's centre, up to 40 px, is her walking direction on the screen
+    const pad = el.querySelector('.stick'), knob = pad.querySelector('i'); const stickAt = (e) => { const r = pad.getBoundingClientRect(); let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2); const l = Math.hypot(dx, dy); if (l > 40) { dx *= 40 / l; dy *= 40 / l; } this.stick = [dx / 40, dy / 40]; knob.style.transform = 'translate(' + dx + 'px,' + dy + 'px)'; }; pad.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); try { pad.setPointerCapture(e.pointerId); } catch (x) { /* fine */ } this.goal = null; stickAt(e); }); pad.addEventListener('pointermove', (e) => { if (this.stick) stickAt(e); }); for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) pad.addEventListener(ev, () => { this.stick = null; knob.style.transform = ''; }); el.querySelector('[data-fly]').onclick = (e) => { e.stopPropagation(); this.takeOff(); };
     this.actEl = el.querySelector('.act'); this.actEl.querySelector('button').onclick = (e) => { e.stopPropagation(); if (this.nearS) this.open(this.nearS.id); };
-    el.addEventListener('pointerdown', (e) => { if (e.target.closest('button') || e.target.closest('.panel')) return; e.preventDefault(); _m.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); _ray.setFromCamera(_m, camera); _pl.constant = -this.floorY; if (_ray.ray.intersectPlane(_pl, _hit)) { const hx = Math.max(this.x - w / 2 + 0.8, Math.min(this.x + w / 2 - 0.8, _hit.x)), hz = Math.max(this.z - d / 2 + 0.8, Math.min(this.z + d / 2 - 0.8, _hit.z)); this.goal = [hx, hz]; } });
+    el.addEventListener('pointerdown', (e) => { if (e.target.closest('button') || e.target.closest('.panel') || e.target.closest('.stick')) return; e.preventDefault(); _m.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); _ray.setFromCamera(_m, camera); _pl.constant = -this.floorY; if (_ray.ray.intersectPlane(_pl, _hit)) { this.goal = [Math.max(hx - w / 2 + 0.8, Math.min(hx + w / 2 - 0.8, _hit.x)), Math.max(hz - d / 2 + 0.8, Math.min(hz + d / 2 - 0.8, _hit.z))]; } });
     this.onKey = (e) => { if (e.key === 'Escape') { if (this.panel) this.close(); else this.stop(); } }; addEventListener('keydown', this.onKey);
     g.toast('Home base. Tap the floor to walk; walk up to a station', 3500);
   }
@@ -121,16 +129,17 @@ export class HomeBase {
   // each frame: walk to the tap, stand at a station, the steady camera over the room
   frame(dt, tg) {
     const g = this.g, h = this.h; if (!g.paused && dt > 0) {
-      if (this.goal) { const dx = this.goal[0] - h.x, dz = this.goal[1] - h.z, d = Math.hypot(dx, dz); if (d < 0.25) { this.goal = null; h.walkK = Math.max(0, h.walkK - dt * 6); } else { const sp = Math.min(5, d * 4), st = Math.min(d, sp * dt); h.x += dx / d * st; h.z += dz / d * st; h.yaw = Math.atan2(dx, dz); h.walkK = Math.min(1, h.walkK + dt * 6); h.phase += dt * 9; } }
+      if (this.stick) { const cam = this.ctx.camera, [sx, sy] = this.stick, m = Math.min(1, Math.hypot(sx, sy)); _a.setFromMatrixColumn(cam.matrixWorld, 0); _a.y = 0; _a.normalize(); const fx = -cam.matrixWorld.elements[8], fz = -cam.matrixWorld.elements[10], fl = Math.hypot(fx, fz) || 1, wx = _a.x * sx - fx / fl * sy, wz = _a.z * sx - fz / fl * sy, wl = Math.hypot(wx, wz) || 1, { w, d } = HALL, st = 5 * m * dt; if (m > 0.08) { h.x = Math.max(this.hx - w / 2 + 0.8, Math.min(this.hx + w / 2 - 0.8, h.x + wx / wl * st)); h.z = Math.max(this.hz - d / 2 + 0.8, Math.min(this.hz + d / 2 - 0.8, h.z + wz / wl * st)); h.yaw = Math.atan2(wx, wz); h.walkK = Math.min(1, h.walkK + dt * 6); h.phase += dt * 9 * m; } else h.walkK = Math.max(0, h.walkK - dt * 6); }
+      else if (this.goal) { const dx = this.goal[0] - h.x, dz = this.goal[1] - h.z, d = Math.hypot(dx, dz); if (d < 0.25) { this.goal = null; h.walkK = Math.max(0, h.walkK - dt * 6); } else { const sp = Math.min(5, d * 4), st = Math.min(d, sp * dt); h.x += dx / d * st; h.z += dz / d * st; h.yaw = Math.atan2(dx, dz); h.walkK = Math.min(1, h.walkK + dt * 6); h.phase += dt * 9; } }
       else h.walkK = Math.max(0, h.walkK - dt * 6);
-      let best = null, bd = 2.2 * 2.2; for (const s of this.stations) { const d2 = (this.x + s.x - h.x) ** 2 + (this.z + s.z - h.z) ** 2; if (d2 < bd) { bd = d2; best = s; } }
+      let best = null, bd = 2.2 * 2.2; for (const s of this.stations) { const d2 = (this.hx + s.x - h.x) ** 2 + (this.hz + s.z - h.z) ** 2; if (d2 < bd) { bd = d2; best = s; } }
       if (best !== this.nearS) { this.nearS = best; this.actEl.classList.toggle('show', !!best && !this.panel); if (best) { this.actEl.querySelector('button').textContent = best.act; sfx('thud', h.x, h.y, h.z, { gain: 0.15, rate: 2.2 }); } }
       for (const s of this.stations) s.mark.material.opacity = s === best ? 0.7 : 0.3;
       h.pose(dt, h.y, true);
     }
     this.place2(dt); g.focusAt = _a.copy(this.look); tg.set(this.look.x, 0, this.look.z); this.focus = this.ctx.camera.position.distanceTo(g.focusAt);
   }
-  place2(dt) { const h = this.h, cam = this.ctx.camera, D = 24, ce = Math.cos(EL) * D; this.look.lerp(_a.set(h.x, h.y + 1, h.z), Math.min(1, dt * 6)); cam.position.set(this.look.x + Math.sin(AZ) * ce, this.look.y + Math.sin(EL) * D, this.look.z + Math.cos(AZ) * ce); cam.lookAt(this.look); }
+  place2(dt) { const h = this.h, cam = this.ctx.camera, D = 28, ce = Math.cos(EL) * D; this.look.lerp(_a.set(h.x, h.y + 1, h.z), Math.min(1, dt * 6)); cam.position.set(this.look.x + Math.sin(AZ) * ce, this.look.y + Math.sin(EL) * D, this.look.z + Math.cos(AZ) * ce); cam.lookAt(this.look); }
   // ---------- the stations' panels
   close() { if (this.panel) { this.panel.remove(); this.panel = null; } if (this.actEl) this.actEl.classList.toggle('show', !!this.nearS); }
   open(id) {
@@ -152,6 +161,9 @@ export class HomeBase {
   // her rig again in the costume just picked
   redress() { const S = this.g.disasters.ctx.scene, o = this.h; S.remove(o.r.root); const h = this.h = new Body(heroRig('Nova', HS.outfit('Nova')), 100); S.add(h.r.root); h.x = o.x; h.z = o.z; h.y = o.y; h.yaw = o.yaw; }
   retint() { if (!this.room) return; const c = new THREE.Color(this.cfg.wall).lerp(new THREE.Color('#ffffff'), 0.35); this.room.children.forEach(m => { if (m.geometry && m.geometry.type === 'BoxGeometry' && (m.position.y === 2.5 || m.position.y === 0.55)) m.material.color.copy(c); }); }
+  // ---------- into the air inside the hall and back (Sean: practice flying in there): the flight pilot from where she stands, Land puts her back on the floor
+  takeOff() { const g = this.g, F = g.flight, h = this.h, S = g.disasters.ctx.scene; if (!this.active || this.panel) return; this.flying = true; this.active = false; S.remove(h.r.root); this.el.style.display = 'none'; F.heroGame = true; F.fromBase = this; F.start(HS.load().hero.flyer || 'nova'); F.pos.set(h.x, h.y + 1.5, h.z); F.yaw = Math.atan2(-Math.cos(h.yaw), Math.sin(h.yaw)); F.pitch = 0.6; F.speed = 14; F.thr = 14; sfx('whoosh', h.x, h.y, h.z, { gain: 0.9, rate: 0.9 }); }
+  land(x, z) { const g = this.g, h = this.h, S = g.disasters.ctx.scene, { camera, controls, post } = this.ctx, { w, d } = HALL; this.flying = false; this.active = true; h.x = Math.max(this.hx - w / 2 + 1, Math.min(this.hx + w / 2 - 1, x)); h.z = Math.max(this.hz - d / 2 + 1, Math.min(this.hz + d / 2 - 1, z)); h.y = this.floorY; h.vx = h.vz = 0; this.goal = null; S.add(h.r.root); this.el.style.display = ''; controls.enabled = false; g.setFollow(-1); document.body.classList.add('zd-flying'); post.opts.dof = true; camera.fov = innerWidth < innerHeight ? 28 : 18; camera.up.set(0, 1, 0); camera.updateProjectionMatrix(); this.look.set(h.x, h.y + 1, h.z); this.place2(1); }
   // the ring: the fight test's engine in this room, the robot in Tyrant's frame at the level and with the moves set at the console
-  fight() { const g = this.g, R = { ...this.cfg.robot }; this.stop(true, true); g.fightTest.start({ ring: { x: this.ringAt.x, z: this.ringAt.z, y: this.floorY, r: 7 }, robot: R }); }
+  fight() { const g = this.g, R = { ...this.cfg.robot }; this.stop(true, true); g.fightTest.start({ ring: { x: this.ringAt.x, z: this.ringAt.z, y: this.floorY, r: 14 }, robot: R }); }
 }

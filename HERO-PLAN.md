@@ -43,7 +43,8 @@ Build order (one thing at a time, each tested in the Sandbox and pushed). The ch
 - 11. The open world and the base (Sean, 2026-11-02).
   - [x] 11a. The zombie level from the air: TAKE OFF from the street fight, fly round, lock on a zombie within a block and come down to fight it, LAND anywhere, or SMASH LAND (straight down, a shockwave on the street); the kit's spells from the air.
   - [ ] 11b. Ragdoll cars and trees: shockwaves and fighting throw them about; a special move to pick up cars, trees and buildings and toss them.
-  - [x] 11c. The Sandbox as a Home Base: inside, the wardrobe (costume), the computer (who flies, the kit), the ring (a practice fight against her robot, its level and moves set at the console beside it), the blueprints (the base's look from the street: ten styles after Sean's sheet, five hero and five villain, and the wall, trim, window and door colours), the door (Go outside to the town and its disasters).
+  - [x] 11c. The Sandbox as a Home Base: inside, the wardrobe (costume), the computer (who flies, the kit), the ring (a practice fight against her robot, its level and moves set at the console beside it), the blueprints (the base's look from the street: ten styles after Sean's sheet, five hero and five villain, and the wall, trim, window and door colours), the door (Go outside: the base stands just outside the town's east edge). The inside is a 120 by 90 m basement hall with TAKE OFF and Land to practise flying, and a joystick bottom right.
+  - [ ] 11d. Random attacks at the base, inside the hall and outside in the street: zombies, or hordes of robots.
 
 Also done on the way: the stuck zoom on a phone fixed; the plan page at plan.html.
 
