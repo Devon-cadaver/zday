@@ -300,6 +300,7 @@ export class Kaiju {
   update(h) {
     const D = this.D, B = D.ctx.city.bounds;
     h *= D.slowAt(this.x, 30, this.z); // held in one of Tempo's time bubbles, it all but stops
+    if (this.frozen > 0) { this.frozen -= h; return; } // Freeze (horde.freezeIt) holds it
     this.t += h; if (this.flame) { this.flame.update(h); this.core.update(h); } // its fire burns on its own clock
     if (this.state !== 'leave' && this.t > this.life) this.retreat('The monster is wandering back out of the city');
     if (this.state === 'leave' && (this.x < B.x0 - 100 || this.x > B.x1 + 100 || this.z < B.z0 - 100 || this.z > B.z1 + 100)) { this.alive = false; return; }
@@ -520,6 +521,7 @@ export class Kaiju {
   // dt 0: exactly the pose (for working out where a foot lands); otherwise each joint eases towards it, the tentacles
   // move, and the body is swept through the rig
   sync(dt = 0) {
+    if (this.frozen > 0) dt = 0;
     const r = this.rig, A = this.act, o = {};
     if (dt > 0) this.st = (this.st || 0) + dt;
     if (this.flame) { const lk = Math.max(0.6, this.D.lightK || 1), sc = this.D.ctx.fire.uniforms.uScale.value; this.flame.sync(lk, sc); this.core.sync(lk, sc); }

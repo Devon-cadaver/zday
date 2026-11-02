@@ -130,6 +130,7 @@ export class Tripod {
   steer(x, z) { this.tx = x; this.tz = z; }
 
   update(h) {
+    if (this.frozen > 0) { this.frozen -= h; return; } // Freeze (horde.freezeIt) holds it
     const D = this.D;
     this.t += h;
     if (this.state === 'wreck' || this.state === 'held' || this.state === 'hurled') return; // held, hurled: a hero has it (herofight.js)

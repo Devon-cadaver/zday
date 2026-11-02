@@ -139,6 +139,7 @@ export class Invasion {
   }
 
   saucerStep(s, h) {
+    if (s.frozen > 0) { s.frozen -= h; return; } // Freeze (horde.freezeIt) holds it
     const D = this.D, { people, traffic, fire, city } = D.ctx;
     s.t += h;
     if (s.state === 'wreck' || s.state === 'gone' || s.state === 'held' || s.state === 'tossed') return; // held, tossed: a hero has it (herofight.js)

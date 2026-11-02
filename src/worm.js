@@ -174,6 +174,7 @@ export class Worm {
   update(h) {
     const D = this.D, { city } = D.ctx, B = city.bounds;
     h *= D.slowAt(this.x, Math.max(4, this.y), this.z); // a time bubble holds it
+    if (this.frozen > 0) { this.frozen -= h; return; } // Freeze (horde.freezeIt) holds it
     this.t += h;
     if (this.phase === 'gone') { if ((this.goneT += h) > 4) this.alive = false; return; }
     // heading: round towards the goal
