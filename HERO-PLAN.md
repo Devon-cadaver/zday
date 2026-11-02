@@ -22,7 +22,7 @@ Build order (one thing at a time, each tested in the Sandbox and pushed). The ch
     - [x] 3e.2 the rest of the moves choreographed (kick, sky slam, ground pound, throw, hammer throw, elbow drop, a settle after every move)
     - [x] 3e.3 villain reactions for every hit, speed streaks, camera punch-ins
     - [x] 3e.4 Nova first: a matte woven suit with seams, dark gloves and boots with cuffs, shoulder pads, a collar, a buckle, a face (Sean to judge how far to take it)
-    - [ ] 3e.5 the same for Dragonfly, Tempo and the villains, as far as Sean likes it
+    - [x] 3e.5 the same for Dragonfly, Tempo and the villains (cloth, cuffs, pads, collars, faces)
   - [ ] 3f. From the street-fight inspiration: two villains at once, a breakable mask, villains retreating, the rogue army
 - [ ] 4. Powers against disasters, one disaster at a time
 - [ ] 5. The collateral meter: damage, fear, reputation, towns that remember you

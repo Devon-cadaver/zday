@@ -18,6 +18,7 @@ import { Body, sweepTubes } from './flesh.js';
 import { sfx } from './audio.js';
 import { heroesWin } from './heroes.js';
 import { fightPose } from './melee.js';
+import { clothMat } from './cloth.js';
 
 const S = 2.2; // a villain stands a bit over twice as tall as a person, so you can pick them out from above
 const NEAR = 330; // closer than this to the camera, a figure has its smooth body
@@ -54,7 +55,8 @@ const VM = {};
 function vmats(name) {
   if (VM[name]) return VM[name];
   const m = kit(), L = LOOK[name]; if (!L) return m;
-  return (VM[name] = { ...m, suit: new THREE.MeshStandardMaterial({ color: L[0], roughness: 0.42, metalness: 0.15 }), cape: new THREE.MeshStandardMaterial({ color: L[1], roughness: 0.6, side: THREE.DoubleSide }) });
+  const dark = new THREE.Color(L[0]).multiplyScalar(0.45).getHex(); // the gloves and boots: the suit's colour, darker
+  return (VM[name] = { ...m, suit: clothMat(L[0]), cape: clothMat(L[1], { side: THREE.DoubleSide, repeat: [5, 9] }), glove: clothMat(dark, { bumpScale: 0.15 }), boot: clothMat(dark, { bumpScale: 0.15 }), face: new THREE.MeshStandardMaterial({ color: '#1a1016', roughness: 0.6 }), fancy: true }); // in cloth, with the fancy parts (3e.5)
 }
 
 const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
@@ -122,7 +124,7 @@ export function rig(o = {}) {
   part(m.ball, mt.hair, 0.117, 0.085, 0.122, 0, 0.055, -0.014, head); // the hair
   if (o.longHair) part(m.box, mt.hair, 0.12, 0.26, 0.06, 0, -0.1, -0.1, head).userData.keep = true; // a long ponytail down the back
   part(m.box, mt.skin, 0.06, 0.08, 0.06, 0, -0.13, 0, head); // neck
-  if (fancy) { const fm = mt.face || mt.hair; for (const sx of [-1, 1]) { keep(part(m.ball, fm, 0.019, 0.015, 0.012, sx * 0.04, 0.012, 0.106, head)); keep(part(m.box, fm, 0.042, 0.008, 0.01, sx * 0.04, 0.045, 0.108, head)); } keep(part(m.box, fm, 0.034, 0.006, 0.01, 0, -0.045, 0.11, head)); } // eyes, brows, a mouth
+  if (fancy) { const fm = mt.face || mt.hair; for (const sx of [-1, 1]) { if (!o.eyes) keep(part(m.ball, fm, 0.019, 0.015, 0.012, sx * 0.04, 0.012, 0.106, head)); keep(part(m.box, fm, 0.042, 0.008, 0.01, sx * 0.04, 0.045, 0.108, head)); } keep(part(m.box, fm, 0.034, 0.006, 0.01, 0, -0.045, 0.11, head)); } // eyes, brows, a mouth
   const eyes = o.eyes ? [-1, 1].map(sx => { const e = part(m.ball, mt.eye || m.eye, 0.024, 0.02, 0.016, sx * 0.042, 0.015, 0.108, head); e.userData.keep = true; return e; }) : null;
   const arms = [];
   (o.arms === 6 ? [0.18, 0.04, -0.1] : [0.18]).forEach((y, row) => {

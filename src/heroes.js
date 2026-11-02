@@ -59,8 +59,8 @@ function kit() {
   // each their own neon, glowing a little, so they stand out from the town, from the villains and from each other
   const neon = (hex) => { const c = new THREE.Color(hex); return { suit: std(hex, { roughness: 0.35, emissive: c, emissiveIntensity: 0.45 }), boot: std(hex, { roughness: 0.4, emissive: c, emissiveIntensity: 0.3 }), cape: std(hex, { side: THREE.DoubleSide, roughness: 0.55, emissive: c, emissiveIntensity: 0.3 }) }; };
   // Nova in cloth (3e.4, the first of the three to get the detail): a matte woven suit that keeps a little of her glow, dark boots and gloves, and the fancy parts the rig adds (villains.js rig: cuffs, pads, a collar, a buckle, a face)
-  const cloth = (hex) => { const c = new THREE.Color(hex); return { suit: clothMat(hex, { emissive: c, emissiveIntensity: 0.22 }), boot: clothMat('#2a1a33', { bumpScale: 0.15 }), glove: clothMat('#2a1a33', { bumpScale: 0.15 }), cape: clothMat(hex, { side: THREE.DoubleSide, emissive: c, emissiveIntensity: 0.16, repeat: [5, 9] }), face: std('#2a1b1a', { roughness: 0.6 }), fancy: true }; };
-  HM.look = { Dragonfly: neon('#3dff5c'), Nova: cloth('#ff3fcf'), Tempo: neon('#29e3ff') };
+  const cloth = (hex, dark = '#2a1a33') => { const c = new THREE.Color(hex); return { suit: clothMat(hex, { emissive: c, emissiveIntensity: 0.22 }), boot: clothMat(dark, { bumpScale: 0.15 }), glove: clothMat(dark, { bumpScale: 0.15 }), cape: clothMat(hex, { side: THREE.DoubleSide, emissive: c, emissiveIntensity: 0.16, repeat: [5, 9] }), face: std('#2a1b1a', { roughness: 0.6 }), fancy: true }; };
+  HM.look = { Dragonfly: cloth('#3dff5c', '#15321c'), Nova: cloth('#ff3fcf'), Tempo: cloth('#29e3ff', '#132e36') }; // all three in cloth (3e.5)
   return HM;
 }
 
