@@ -18,6 +18,7 @@ import { DisasterTV } from './tv.js';
 import { THUMB } from './thumbs.js';
 import { LAB } from './lab.js';
 import { HeroGame, HS } from './herogame.js';
+import { loadKit, saveKit, STUNS, KNOCKS, MELEES } from './kit.js';
 
 const CSS = `
 #zd-top{position:fixed;left:0;right:0;top:0;display:flex;gap:6px;align-items:center;justify-content:center;flex-wrap:wrap;
@@ -41,6 +42,7 @@ const CSS = `
 .zd-dock .zd-btn svg{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .zd-dock .zd-btn .l{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-width:100%}
 .zd-dock .zd-btn.on{border-color:#a6ff4d;color:#a6ff4d}
+.kit .zd-btn.on{border-color:#a6ff4d;color:#a6ff4d}.kit .g{display:flex;flex-wrap:wrap;gap:6px}.kit .zd-btn{padding:8px 10px;font-size:12px}
 .zd-extra{order:1;display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap;max-width:100%}
 #zd-help{background:rgba(200,60,40,.9);border-color:rgba(255,160,130,.6);color:#fff0e8;padding:10px 16px}
 #zd-help.on{background:rgba(230,80,50,.95)}
@@ -1108,6 +1110,8 @@ const SANDBOX_MSGS = {
 const START_DROPS = 3;
 
 class Sandbox {
+  // the kit (kit.js): one pick a slot, the fight test and the horde read it
+  kitHtml() { const k = loadKit(); return [['stun', 'Stun', STUNS], ['knock', 'Knockback', KNOCKS], ['melee', 'Melee', MELEES]].map(([slot, name, T]) => '<div class="h">' + name + '</div><div class="g">' + Object.entries(T).map(([id, o]) => '<button class="zd-btn' + (k[slot] === id ? ' on' : '') + '" type="button" data-kit="' + slot + ':' + id + '" title="' + o.blurb + '">' + o.icon + ' ' + o.name + (o.cost ? ' · ' + o.cost : '') + '</button>').join('') + '</div><div style="font-size:11px;opacity:.7;margin:-2px 0 6px">' + T[k[slot]].blurb + '</div>').join(''); }
   constructor(g) {
     this.g = g; this.msgs = SANDBOX_MSGS; this.kind = 'sandbox';
     if (g.disasters) g.disasters.boats.auto = true; // rescue boats come by themselves here
@@ -1139,7 +1143,7 @@ class Sandbox {
       '<div class="h">Help</div><div class="g two"><button class="zd-btn auto" type="button" data-auto>Auto responders: On</button><button class="zd-btn hero" type="button" data-hero>Hero signal \u262E</button></div>' +
       '<div class="h">Fly a plane</div><div class="g cards">' + [['stunt', 'Stunt plane'], ['jet', 'F-16 fighter'], ['a10', 'A-10 Warthog'], ['seeder', 'Cloud seeder'], ['b2', 'B-2 bomber'], ['b52', 'B-52 bomber']].map(([k, n]) => '<button class="zd-btn fly" type="button" data-fly="' + k + '"><span class="th">' + THUMB[k] + '</span><span class="nm">' + n + '</span></button>').join('') + '</div>' +
       '<div class="h">Be a hero</div><div class="g cards">' + [['nova', 'Nova'], ['dragonfly', 'Dragonfly'], ['tempo', 'Tempo']].map(([k, n]) => '<button class="zd-btn fly" type="button" data-fly="' + k + '"><span class="th">' + THUMB[k] + '</span><span class="nm">' + n + '</span></button>').join('') + '</div>' + // flown like the planes, villains to fight (flight.js, heroduel.js)
-      '<div class="h">Fight test</div><div class="g"><button class="zd-btn fly" type="button" data-fight style="flex-basis:100%">⚔ Nova vs Tyrant: tap, swipe, hold</button><button class="zd-btn fly" type="button" data-horde style="flex-basis:100%">🧟 The horde: Nova vs 300 zombies in the street</button></div>' +
+      '<div class="h">Fight test</div><div class="g"><button class="zd-btn fly" type="button" data-fight style="flex-basis:100%">⚔ Nova vs Tyrant: tap, swipe, hold</button><button class="zd-btn fly" type="button" data-horde style="flex-basis:100%">🧟 The horde: Nova vs 300 zombies in the street</button></div><div class="kit">' + this.kitHtml() + '</div>' +
       '<div class="h">Hero lab</div><div class="lab">' + // levels, moves, a villain to spawn, the readout (lab.js)
         ['hero', 'villain'].map(w => '<label>' + (w === 'hero' ? 'Hero' : 'Villain') + ' level <b data-lv="' + w + '">' + LAB[w] + '</b><input type="range" min="1" max="20" value="' + LAB[w] + '" data-lab="' + w + '"></label>').join('') +
         '<div class="g">' + [['spin', 'Spin & toss'], ['kick', 'Kick'], ['laser', 'Laser'], ['drag', 'Neck drag'], ['slam', 'Sky slam'], ['jab', 'Jab combo'], ['upper', 'Uppercut'], ['pound', 'Ground pound'], ['fling', 'Throw into a building'], ['hammer', 'Hammer throw'], ['elbow', 'Elbow drop'], ['freeze', 'Freeze'], ['fire', 'Fire blast'], ['lightning', 'Lightning'], ['sonic', 'Sonic clap'], ['gravity', 'Gravity pulse'], ['wind', 'Wind blast'], ['shield', 'Shield'], ['tk', 'Telekinesis']].map(([k, n]) => '<button class="zd-btn' + (LAB.moves[k] ? ' sel' : '') + '" type="button" data-move="' + k + '">' + n + '</button>').join('') + '</div>' +
@@ -1166,7 +1170,8 @@ class Sandbox {
     d.querySelector('[data-labarmy]').onclick = (e) => { LAB.army = !LAB.army; e.currentTarget.textContent = 'Rogue army: ' + (LAB.army ? 'On' : 'Off'); e.currentTarget.classList.toggle('sel', LAB.army); LAB.save(); }; // they arrive when a hero takes off (army.js)
     d.querySelector('[data-labon]').onclick = (e) => { LAB.on = !LAB.on; e.currentTarget.textContent = 'Readout: ' + (LAB.on ? 'On' : 'Off'); e.currentTarget.classList.toggle('sel', LAB.on); LAB.save(); };
     d.querySelector('[data-take]').onclick = () => { this.pending = null; this.close(); if (g.takeover) g.takeover.pick(); }; // a disaster's own unit, yours (takeover.js)
-    d.querySelector('[data-fight]').onclick = () => { this.pending = null; this.close(); if (g.fightTest) g.fightTest.start(); }; d.querySelector('[data-horde]').onclick = () => { this.pending = null; this.close(); if (g.horde) g.horde.start(); }; // one fight on a bare plaza (fighttest.js)
+    d.querySelector('[data-fight]').onclick = () => { this.pending = null; this.close(); if (g.fightTest) g.fightTest.start(); }; d.querySelector('[data-horde]').onclick = () => { this.pending = null; this.close(); if (g.horde) g.horde.start(); };
+    const kitOn = () => d.querySelectorAll('[data-kit]').forEach(b => { b.onclick = () => { const [slot, id] = b.dataset.kit.split(':'), k = loadKit(); k[slot] = id; saveKit(k); d.querySelector('.kit').innerHTML = this.kitHtml(); kitOn(); }; }); kitOn(); // one fight on a bare plaza (fighttest.js)
     d.querySelector('[data-band]').onclick = () => { this.pending = null; this.close(); if (g.bandGame) g.bandGame.start(); }; // the band, played (rhythm.js)
     d.querySelectorAll('[data-drive]').forEach(b => { b.onclick = () => { this.pending = null; this.close(); if (g.drive) g.drive.start(b.dataset.drive); }; }); // on the ground (drive.js)
     d.querySelector('[data-hero]').onclick = () => { const tg = g.controls.target; g.disasters.start('heroes', tg.x, tg.z); this.pending = null; this.close(); if (this.clock < 0) this.clock = 0; }; // the peace sign goes up over the middle of the view
