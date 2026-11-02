@@ -125,6 +125,7 @@ export class Flight {
     this.loads = LOADS[this.kind] || []; this.load = 0; this.bombs = []; this.coolT = 0; this.seedT = 0;
     try { this.invert = localStorage.getItem(INVERT) === '1'; } catch (e) { this.invert = false; }
     this.ui(); this.active = true; controls.enabled = false; post.opts.dof = false; g.setFollow(-1); LAB.reset();
+    if (this.P.hero && !this.viewSet) { this.view = 'iso'; this.viewSet = true; } // heroes start in the town's view (Sean); after that the view is as it was left
     document.body.classList.add('zd-flying');
     this.spawn(); this.setView(this.view);
     if (this.P.hero) { // villains to fight: three of them in the middle of town if there are none about
@@ -137,7 +138,7 @@ export class Flight {
     const B = this.g.city.bounds, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2, a = Math.random() * Math.PI * 2, R = Math.max(B.x1 - B.x0, B.z1 - B.z0) * 0.5 + 60;
     this.pos.set(cx + Math.cos(a) * R, 95, cz + Math.sin(a) * R);
     this.yaw = Math.atan2(-(cz - this.pos.z), cx - this.pos.x); this.pitch = 0; this.roll = 0;
-    this.speed = this.thr = this.P.start; this.ix = this.iy = 0; this.state = 'fly'; this.t = 0; this.obj.visible = this.view === 'chase'; this.snap = true;
+    this.speed = this.thr = this.P.start; this.ix = this.iy = 0; this.state = 'fly'; this.t = 0; this.obj.visible = this.view !== 'cockpit'; this.snap = true;
     this.hullMax = this.P.hero ? LAB.heroHealth() : 100; this.hull = this.hullMax; this.caught = null; this.thrown = []; this.seedTw = null; this.lock = null; this.punch = 0; this.act = null; this.inB = -1; this.downAt = false; this.clearShots(); // a hero's health by the lab's level
     if (this.P.hero) this.pos.y = 60;
   }
@@ -154,7 +155,7 @@ export class Flight {
     this.lockBtn = bar.querySelector('[data-f="lock"]'); this.invBtn.onclick = () => this.setInvert(!this.invert);
     if (this.lockBtn) this.lockBtn.onclick = () => this.lockOn(); else { this.loadBtn.onclick = () => this.cycle(); this.dropBtn.onclick = () => this.drop(); this.cycle(0); }
     this.setInvert(this.invert, true);
-    bar.querySelector('[data-f="view"]').onclick = () => this.setView(this.view === 'chase' ? 'cockpit' : 'chase');
+    bar.querySelector('[data-f="view"]').onclick = () => this.setView(this.nextView());
     bar.querySelector('[data-f="slow"]').onclick = () => this.throttle(-1);
     bar.querySelector('[data-f="fast"]').onclick = () => this.throttle(1);
     bar.querySelector('[data-f="exit"]').onclick = () => this.stop();
@@ -177,7 +178,7 @@ export class Flight {
     this.keys = new Set();
     this.onKey = (e) => {
       const down = e.type === 'keydown', k = e.key.toLowerCase();
-      if (down && (k === 'v')) this.setView(this.view === 'chase' ? 'cockpit' : 'chase');
+      if (down && (k === 'v')) this.setView(this.nextView());
       if (down && k === 'escape') { this.stop(); return; }
       if (down && (k === 'shift' || k === '+' || k === '=')) this.throttle(1);
       if (down && (k === 'control' || k === '-')) this.throttle(-1);
@@ -275,12 +276,15 @@ export class Flight {
     } else { const to = w === 'rain' ? 'storm' : 'rain'; D.weather.set(to); this.tip(to === 'storm' ? 'The clouds boil up into a thunderstorm' : 'The seeded clouds start to rain'); }
   }
   throttle(d) { const P = this.P; this.thr = Math.max(P.min, Math.min(P.max, this.thr + d * (P.max - P.min) / 5)); }
+  // the views: chase (behind the plane), cockpit, and iso (the town's own lens, high and far, following the hero across the
+  // miniature town: Sean). Heroes start in iso
+  nextView() { return this.view === 'chase' ? 'cockpit' : this.view === 'cockpit' ? 'iso' : 'chase'; }
   setView(v) {
     this.view = v; const cam = this.ctx.camera;
-    cam.fov = v === 'cockpit' ? FOV_COCKPIT * Math.max(0.35, Math.min(1.25, this.zoom || 1)) : FOV_CHASE; cam.updateProjectionMatrix();
-    this.near = v === 'cockpit' ? 0.5 : 1.5; this.obj.visible = v === 'chase' && this.state === 'fly'; this.snap = true;
+    cam.fov = v === 'cockpit' ? FOV_COCKPIT * Math.max(0.35, Math.min(1.25, this.zoom || 1)) : v === 'iso' ? FOV_ISO : FOV_CHASE; cam.updateProjectionMatrix();
+    this.near = v === 'cockpit' ? 0.5 : 1.5; this.obj.visible = v !== 'cockpit' && this.state === 'fly'; this.snap = true; this.ctx.post.opts.dof = v === 'iso' && !!this.active;
     SEE.on = v === 'cockpit' ? false : this.saved.see; // walls see-through only between the chase camera and the plane
-    this.ov.classList.toggle('cockpit', v === 'cockpit'); this.viewBtn.textContent = v === 'cockpit' ? 'Chase view' : 'Cockpit';
+    this.ov.classList.toggle('cockpit', v === 'cockpit'); this.viewBtn.textContent = v === 'chase' ? 'Cockpit' : v === 'cockpit' ? 'Iso view' : 'Chase view';
   }
   // down: back to the town as it was, the view over where the plane last was
   stop(quiet = false) {
@@ -343,6 +347,11 @@ export class Flight {
     } else if (this.view === 'cockpit' && this.state === 'fly') {
       _v.set(P.seat[0], P.seat[1], 0).applyQuaternion(this.q); cam.position.copy(this.pos).add(_v);
       cam.quaternion.copy(this.q).multiply(SEAT_TURN); cam.up.set(0, 1, 0).applyQuaternion(this.q);
+    } else if (this.view === 'iso' && this.state !== 'down') { // the town's lens, behind and well above the hero's heading, aimed a little ahead of them
+      const fl = Math.hypot(_f.x, _f.z) || 1, dist = ISO_DIST * 1.35 * this.zoom, ce = Math.cos(ISO_EL) * dist;
+      _v.set(this.pos.x - _f.x / fl * ce, this.pos.y + Math.sin(ISO_EL) * dist, this.pos.z - _f.z / fl * ce);
+      if (this.snap) cam.position.copy(_v); else cam.position.lerp(_v, 1 - Math.exp(-dt * 3)); cam.up.set(0, 1, 0);
+      cam.lookAt(_u.set(this.pos.x + _f.x / fl * 8, this.pos.y, this.pos.z + _f.z / fl * 8));
     } else {
       const fl = Math.hypot(_f.x, _f.z) || 1, back = P.chase[0] * this.zoom, hi = P.chase[1] * Math.pow(this.zoom, 0.8);
       _v.set(this.pos.x - _f.x / fl * back, this.pos.y + hi - _f.y * back * 0.5, this.pos.z - _f.z / fl * back);
@@ -438,7 +447,7 @@ export class Flight {
   // then up again where they fell
   hurl(vx, vy, vz, why) {
     if (this.state !== 'fly') return;
-    this.state = 'tossed'; this.vel = new THREE.Vector3(vx, vy, vz); this.lock = null; this.speed = Math.hypot(vx, vz); this.act = { kind: 'dive', t: 0, T: 1e9 }; this.obj.visible = this.view === 'chase'; this.t = 0;
+    this.state = 'tossed'; this.vel = new THREE.Vector3(vx, vy, vz); this.lock = null; this.speed = Math.hypot(vx, vz); this.act = { kind: 'dive', t: 0, T: 1e9 }; this.obj.visible = this.view !== 'cockpit'; this.t = 0;
     if (why) this.tip(why);
   }
   tossStep(dt) {
@@ -454,7 +463,7 @@ export class Flight {
     }
   }
   getUp() { // back on their feet, flying low, slow, nose up
-    this.state = 'fly'; this.downAt = false; this.pos.copy(this.at); this.pos.y = Math.max(this.pos.y, 2.4) + 0.5; this.speed = this.thr = Math.max(this.P.min, this.P.start * 0.5); this.pitch = 0.4; this.roll = 0; this.yaw += Math.PI; this.obj.visible = this.view === 'chase'; this.caught = null;
+    this.state = 'fly'; this.downAt = false; this.pos.copy(this.at); this.pos.y = Math.max(this.pos.y, 2.4) + 0.5; this.speed = this.thr = Math.max(this.P.min, this.P.start * 0.5); this.pitch = 0.4; this.roll = 0; this.yaw += Math.PI; this.obj.visible = this.view !== 'cockpit'; this.caught = null;
     this.tip('Back up! Press Lock on to go after them'); if (this.g.audio) this.g.audio.engine(this.P.sound, 0.3);
   }
   // shots at a hero flying in: a villain locked on from 30 to 220 m away throws something every couple of seconds, aimed
@@ -677,7 +686,7 @@ export class Flight {
     this.pitch -= this.pitch * Math.min(1, dt * 4); this.roll -= this.roll * Math.min(1, dt * 4); this.speed = 0;
   }
   // the fight over (heroduel.js): the flying lens and no blur again (eased back to), nose up, clear of the street
-  duelOver(won) { this.duel = null; this.act = null; this.lock = null; this.obj.visible = this.view === 'chase' && this.state === 'fly'; SEE.on = this.view === 'cockpit' ? false : this.saved.see; const cam = this.ctx.camera; cam.fov = this.view === 'cockpit' ? FOV_COCKPIT * Math.max(0.35, Math.min(1.25, this.zoom || 1)) : FOV_CHASE; cam.updateProjectionMatrix(); this.ctx.post.opts.dof = false; this.speed = this.thr = Math.max(this.thr, this.P.start * 0.6); this.pitch = 0.5; } // nose up, clear of the street
+  duelOver(won) { this.duel = null; this.act = null; this.lock = null; this.obj.visible = this.view !== 'cockpit' && this.state === 'fly'; SEE.on = this.view === 'cockpit' ? false : this.saved.see; const cam = this.ctx.camera; cam.fov = this.view === 'cockpit' ? FOV_COCKPIT * Math.max(0.35, Math.min(1.25, this.zoom || 1)) : this.view === 'iso' ? FOV_ISO : FOV_CHASE; cam.updateProjectionMatrix(); this.ctx.post.opts.dof = this.view === 'iso'; this.speed = this.thr = Math.max(this.thr, this.P.start * 0.6); this.pitch = 0.5; } // nose up, clear of the street
   // a hero's pose: flat out along the way at speed, one fist ahead; upright and treading air slow or in a fight; a punch;
   // arms out holding on while spinning a villain round. The rig set so the hips are where the hero is
   heroPose(r, dt) {

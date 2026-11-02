@@ -35,12 +35,13 @@ CURVE.on = P.get('curve') !== '0'; // ?curve=0: the flat world, to compare
 const coarse = matchMedia('(pointer: coarse)').matches;
 const low = P.get('q') === 'low' || (coarse && P.get('q') !== 'high');
 const num = (k, d) => (P.has(k) ? parseFloat(P.get(k)) : d);
-noZoom(); // no double-tap zoom on phones (nozoom.js)
+noZoom(); // no double-tap or pinch zoom on phones (nozoom.js)
+const LW = () => document.documentElement.clientWidth || innerWidth, LH = () => document.documentElement.clientHeight || innerHeight; // the layout viewport: innerWidth shrinks when a phone's page is zoomed in, and the picture went small with it
 const mode = P.get('mode') || 'menu'; // menu | commander | be | sandbox | tv
 
 const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', preserveDrawingBuffer: P.has('shot') });
 renderer.setPixelRatio(Math.min(devicePixelRatio, low ? 1.5 : 2));
-renderer.setSize(innerWidth, innerHeight);
+renderer.setSize(LW(), LH());
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.NoToneMapping;
@@ -51,7 +52,7 @@ const haze = new THREE.Color('#d9bf95');
 scene.background = haze;
 scene.fog = new THREE.FogExp2(haze, num('fog', 0.0006));
 
-const camera = new THREE.PerspectiveCamera(num('fov', 18), innerWidth / innerHeight, 10, 7000); // far: zoomed right out, the horizon where the world curves away
+const camera = new THREE.PerspectiveCamera(num('fov', 18), LW() / LH(), 10, 7000); // far: zoomed right out, the horizon where the world curves away
 const controls = new MapControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
@@ -148,8 +149,8 @@ if (needWorld) buildWorld();
 
 addEventListener('resize', () => {
   globe.resize();
-  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight); post.setSize();
+  camera.aspect = LW() / LH(); camera.updateProjectionMatrix();
+  renderer.setSize(LW(), LH()); post.setSize();
 });
 
 const clock = new THREE.Clock();
@@ -158,7 +159,7 @@ let frames = 0, fpsT = 0, fps = 0, time = 0;
 // fewer pixels on a device that cannot keep up (Sean's older phones): under 26 fps for 3 s, a quarter step down to 0.8 at the
 // least; back up a step after 20 s over 45 fps (the blur's cost goes with the fourth power of it, the rest with the square)
 const PR_MAX = Math.min(devicePixelRatio, low ? 1.5 : 2); let prK = PR_MAX, slowT = 0, fastT = 0, prDownAt = -1e9, prN = 0, prT0 = performance.now(); // measured in real time (the frame step is capped, which flatters a slow phone)
-const setPR = (k) => { prK = k; renderer.setPixelRatio(k); renderer.setSize(innerWidth, innerHeight); post.setSize(); };
+const setPR = (k) => { prK = k; renderer.setPixelRatio(k); renderer.setSize(LW(), LH()); post.setSize(); };
 let loadingEl = document.getElementById('zd-loading'); // index.html's Loading, gone with the first frame
 const M = 10;
 
