@@ -1131,6 +1131,7 @@ class Sandbox {
     g.addButton('zd-reset', 'Reset', () => this.reset());
     g.addButton('zd-menu-btn', 'Menu', () => g.toMenu());
     this.buildPanel(); this.bindHold();
+    setTimeout(() => { if (!g.base) return; g.addButton('zd-basebtn', 'Home Base', () => g.base.start()); g.base.place(); if (!new URLSearchParams(location.search).has('out')) g.base.start(); }, 0); // the Sandbox starts inside the base (base.js); ?out=1 starts in the street
     this.dropsLeft = START_DROPS; this.clock = -1; this.milestone = 0;
     g.toast('Open Disasters to unleash a disaster, then fly a plane, drive a tank or patrol as a police officer', 4500);
   }

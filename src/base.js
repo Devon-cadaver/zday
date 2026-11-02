@@ -1,0 +1,157 @@
+// The Home Base (Sean, 11c): the Sandbox now starts inside Nova's base, a building on the town's centre whose look from the street
+// (its style, wall, trim, window and door colours) is hers to pick. Inside, she walks where you tap, up to the wardrobe (her costume),
+// the computer (skills and powers: the kit, who flies), the ring (a practice fight against her robot, its level and powers set at the
+// console beside it, fought with the fight test's engine), the blueprints (the base's look) and the door (outside, to the town and its
+// disasters). The base is a pilot like the horde: main.js runs its frame while it is active.
+import * as THREE from 'three';
+import { heroRig } from './heroes.js';
+import { Body, C } from './fighttest.js';
+import { HS } from './herogame.js';
+import { loadKit, saveKit, STUNS, KNOCKS, MELEES } from './kit.js';
+import { sfx } from './audio.js';
+
+const KEY = 'zday_base';
+// ten bases after Sean's sheet (2026-11-02): five for a hero, five for a villain, each a build over the same helpers (box, cyl, cone,
+// windows) in the picked colours. w, d: the footprint, and the room inside
+export const STYLES = {
+  tower: { name: 'Hero Tower', side: 'hero', w: 20, d: 16, build: (B) => { B.box(12, 30, 10, 0, 15, 0, B.win); B.box(13, 1, 11, 0, 30.5, 0, B.trim); B.box(8, 10, 10, -10, 5, 0, B.wall); B.box(8, 14, 10, 10, 7, 0, B.wall); B.wins(8, 10, -10, 0, 2, 2); B.wins(8, 14, 10, 0, 3, 2); B.box(5, 5, 0.3, 0, 22, 5.2, B.door); B.cone(0.3, 6, 0, 31, 0, B.trim); B.door(5.1); } },
+  lab: { name: 'Research Lab', side: 'hero', w: 22, d: 16, build: (B) => { B.box(22, 7, 16, 0, 3.5, 0, B.wall); B.box(22.6, 0.6, 16.6, 0, 7.3, 0, B.trim); B.wins(22, 7, 0, 8.02, 1, 5); B.wins(22, 7, 0, -8.02, 1, 5); B.dome(5.5, -4, 7, -1, B.win, 1); B.cyl(1.2, 1.2, 3, 7, 8.5, 2, B.trim); B.dish(7, 10.5, 2); B.box(6, 1.2, 0.4, 0, 8.6, 6, B.win); B.door(8.1); } },
+  mountain: { name: 'Mountain HQ', side: 'hero', w: 22, d: 18, build: (B) => { B.rock(11, 24, 0, 0); B.rock(6, 14, -8, 4); B.rock(5, 12, 8, -3); B.cone(1.2, 10, 0, 26, 0, B.trim); B.box(5, 4.5, 1, 0, 2.3, 8.6, B.wall); B.box(2.4, 3.6, 0.4, 0, 1.8, 9.2, B.win); B.box(3, 0.4, 2, 0, 9.5, 5.5, B.trim); B.box(8, 0.6, 8, 0, 0.3, 12, B.trim); B.door(9.4, 4); } },
+  fortress: { name: 'Sky Fortress', side: 'hero', w: 26, d: 18, build: (B) => { B.box(26, 0.8, 18, 0, 0.4, 0, B.trim); B.hangar(7, 9, 12, -4, 0, B.wall); B.box(2, 1.6, 0.4, -4, 2, 6.2, B.win); B.cyl(1.6, 1.6, 10, 9, 5.8, -4, B.wall); B.cyl(3, 2.4, 2.4, 9, 12, -4, B.win); B.cone(0.15, 4, 9, 15, -4, B.trim); B.jet(6, 4); B.jet(10, 1); B.strip(0, 0.85, 6, 20, 0.4, B.win); B.door(9.1, 6); } },
+  hideout: { name: 'Secret Hideout', side: 'hero', w: 20, d: 16, build: (B) => { B.rock(7, 6, 0, 0); B.box(14, 4, 9, -1, 8, 0, B.wall); B.box(9, 4, 8, 2, 12, -1, B.wall); B.box(15, 0.4, 10, -1, 10.2, 0, B.trim); B.box(10, 0.4, 9, 2, 14.2, -1, B.trim); B.wins(14, 4, -1, 4.5, 1, 4, 8); B.wins(9, 4, 2, 3, 1, 3, 12); B.tree(-8, 4, 7); B.tree(8, -4, 6); B.tree(-7, -5, 5); B.tree(7, 5, 5); B.box(1.6, 6, 0.3, 6, 3, 7, B.win); B.door(8.1, 1); } },
+  castle: { name: 'Dark Castle', side: 'villain', w: 22, d: 18, build: (B) => { B.box(14, 14, 11, 0, 7, 0, B.wall); B.box(8, 8, 8, 0, 18, 0, B.wall); B.cone(5.7, 7, 0, 25.5, 0, B.trim); for (const [x, z] of [[-9, -7], [9, -7], [-9, 7], [9, 7]]) { B.cyl(2.2, 2.4, 16, x, 8, z, B.wall); B.cone(2.8, 5, x, 18.5, z, B.trim); B.box(0.9, 1.6, 0.3, x, 10, z + 2.3, B.win); } B.wins(14, 14, 0, 5.52, 3, 3); B.box(3, 4, 0.4, 0, 2, 5.6, B.door); B.door(5.7); } },
+  factory: { name: 'Evil Factory', side: 'villain', w: 24, d: 18, build: (B) => { B.box(24, 9, 18, 0, 4.5, 0, B.wall); B.box(24.6, 0.8, 18.6, 0, 9.4, 0, B.trim); B.box(10, 5, 10, 0, 11.5, -2, B.wall); for (const x of [-8, 0, 8]) { B.cyl(1.4, 1.8, 12, x, 14, -5, B.trim); B.smoke(x, 20, -5); } B.wins(24, 9, 0, 9.02, 1, 6, 0, 2.6); B.box(4, 4.5, 0.5, 0, 2.3, 9.1, B.door); B.box(2.4, 2.4, 0.2, 0, 6.5, 9.3, B.win); B.door(9.2, 0); } },
+  lair: { name: 'Overlord Lair', side: 'villain', w: 22, d: 18, build: (B) => { B.cyl(9, 11, 8, 0, 4, 0, B.wall); B.cyl(6.5, 8, 9, 0, 12.5, 0, B.wall); B.cyl(4, 5.5, 8, 0, 21, 0, B.wall); B.dome(4, 0, 25, 0, B.trim, 0); B.cone(0.4, 8, 0, 29, 0, B.trim); for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; B.cone(0.8, 5, Math.cos(a) * 9.5, 9, Math.sin(a) * 9.5, B.trim); B.strip(Math.cos(a) * 8.6, 12.5, Math.sin(a) * 8.6, 0.5, 9, B.win, a); } B.box(3, 4.5, 0.6, 0, 2.3, 10.8, B.door); B.door(11, 0); } },
+  temple: { name: 'Ritual Temple', side: 'villain', w: 24, d: 20, build: (B) => { for (let i = 0; i < 6; i++) B.box(24 - i * 3.6, 2.6, 20 - i * 3, 0, 1.3 + i * 2.6, 0, i % 2 ? B.trim : B.wall); B.box(3, 6, 3, 0, 18.5, 0, B.wall); B.box(0.5, 60, 0.5, 0, 50, 0, B.win); B.cone(1.5, 4, 0, 23.5, 0, B.win); B.box(3.2, 14, 1, 0, 7, 9.2, B.trim); B.box(2, 3.6, 0.4, 0, 1.8, 10.2, B.door); B.strip(0, 15.6, 0, 0.8, 28, B.win, Math.PI / 2); B.door(10.3, 0); } },
+  chaos: { name: 'Chaos Stronghold', side: 'villain', w: 22, d: 18, build: (B) => { B.rock(10, 10, 0, 0); for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2, r = 9 + (i % 2) * 1.5; B.box(2.2, 9 + (i % 3) * 3, 2.2, Math.cos(a) * r, 4.5 + (i % 3) * 1.5, Math.sin(a) * r, B.wall, a + 0.4); } B.cyl(4, 6, 12, 0, 10, 0, B.wall); B.horn(0, 16, 0, 1); B.horn(0, 16, 0, -1); B.box(3.4, 5, 0.6, 0, 2.5, 9.8, B.door); B.box(2.2, 3.6, 0.3, 0, 2, 10.2, B.win); B.strip(0, 9.5, 8.5, 2.6, 5, B.win, 0); B.door(10.3, 0); } },
+};
+export const SWATCH = {
+  wall: ['#8a5a44', '#b9b1a0', '#e8dcc2', '#4a4f57', '#2b2b2e', '#9fb7c9', '#c75c3a', '#3c5a3f'],
+  trim: ['#e8dcc2', '#ffffff', '#2b2b2e', '#d4a84b', '#7a5a3a', '#ff3fcf', '#29e3ff', '#8a1c2a'],
+  win: ['#9fd4ff', '#ffe9a8', '#29e3ff', '#ff3fcf', '#c9f0d8', '#ffffff', '#5a6a7a', '#ffb060'],
+  door: ['#8a1c2a', '#3a2a1a', '#1a4a8a', '#2b2b2e', '#d4a84b', '#ffffff', '#ff3fcf', '#3c5a3f'],
+};
+const SUITS = ['#ff3fcf', '#29e3ff', '#3dff5c', '#ffd24a', '#ff4a4a', '#ffffff', '#7a3cff', '#1a1a1a'], DARKS = ['#1a1a1a', '#3a2a1a', '#2b2b4a', '#4a1a2a', '#e8dcc2', '#5a5a5a'];
+const DEF = { style: 'tower', wall: '#8a5a44', trim: '#e8dcc2', win: '#9fd4ff', door: '#8a1c2a', robot: { level: 2, jab: true, grab: true, charge: true, laser: false } };
+export function loadBase() { let o = null; try { o = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { /* no storage */ } return { ...DEF, ...(o || {}), robot: { ...DEF.robot, ...((o && o.robot) || {}) } }; }
+export function saveBase(b) { try { localStorage.setItem(KEY, JSON.stringify(b)); } catch (e) { /* no storage */ } }
+
+// the base from the street: the style's build over these helpers, in the picked colours (walls, trim, lit windows, the door)
+export function baseBuilding(cfg, y0) {
+  const S = STYLES[cfg.style] || STYLES.tower, g = new THREE.Group(), std = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.85, ...o });
+  const wall = std(cfg.wall), trim = std(cfg.trim, { roughness: 0.6 }), win = new THREE.MeshStandardMaterial({ color: cfg.win, emissive: new THREE.Color(cfg.win), emissiveIntensity: 0.6, roughness: 0.3, metalness: 0.2 }), door = std(cfg.door, { roughness: 0.5 }), rockM = std(new THREE.Color(cfg.wall).lerp(new THREE.Color('#555'), 0.5), { flatShading: true }), leaf = std('#2f6b3a');
+  const put = (q, x, y, z, ry) => { q.position.set(x, y, z); if (ry) q.rotation.y = ry; q.castShadow = q.receiveShadow = true; g.add(q); return q; };
+  const B = {
+    wall, trim, win, door,
+    box: (w, h, d, x, y, z, m, ry) => put(new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m), x, y, z, ry),
+    cyl: (rt, rb, h, x, y, z, m) => put(new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, 14), m), x, y, z),
+    cone: (r, h, x, y, z, m) => put(new THREE.Mesh(new THREE.ConeGeometry(r, h, 10), m), x, y + h / 2, z),
+    dome: (r, x, y, z, m, detail) => put(new THREE.Mesh(new THREE.IcosahedronGeometry(r, detail), Object.assign(m.clone(), { flatShading: true })), x, y, z),
+    rock: (r, h, x, z) => { const q = new THREE.Mesh(new THREE.ConeGeometry(r, h, 7), rockM); const p = q.geometry.attributes.position; for (let i = 0; i < p.count; i++) if (p.getY(i) < h / 2 - 0.1) { p.setX(i, p.getX(i) * (0.8 + Math.random() * 0.4)); p.setZ(i, p.getZ(i) * (0.8 + Math.random() * 0.4)); } q.geometry.computeVertexNormals(); put(q, x, h / 2, z); },
+    wins: (w, h, x, z, floors, n, y0 = 0, fh0) => { const fh = fh0 || h / (floors + 0.3); for (let f = 0; f < floors; f++) for (let i = 0; i < n; i++) B.box(1.1, 1.4, 0.12, x - w / 2 + w / (n + 1) * (i + 1), y0 + fh * f + fh * 0.6, z, win); },
+    strip: (x, y, z, w, h, m, ry) => put(new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.25), m), x, y, z, ry),
+    hangar: (r, len, x, y, z, m) => { const q = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 16, 1, false, 0, Math.PI), m); q.rotation.z = Math.PI / 2; q.rotation.y = Math.PI / 2; put(q, x, y, z); B.box(0.4, r, r * 2, x - len / 2, y + r / 2, z, m); },
+    dish: (x, y, z) => { const q = new THREE.Mesh(new THREE.ConeGeometry(2.2, 1, 16, 1, true), trim); q.rotation.x = -0.9; put(q, x, y + 1, z); B.cyl(0.15, 0.15, 2.2, x, y, z, trim); },
+    jet: (x, z) => { B.box(3, 0.5, 1.2, x, 1.2, z, trim); B.box(1.2, 0.3, 3.4, x - 0.3, 1.2, z, trim); B.cone(0.4, 1.4, x + 1.9, 0.6, z, trim); },
+    tree: (x, z, h) => { B.cyl(0.2, 0.3, h * 0.4, x, h * 0.2, z, std('#4a3424')); B.cone(h * 0.32, h * 0.7, x, h * 0.3, z, leaf); },
+    smoke: (x, y, z) => { for (let i = 0; i < 3; i++) B.dome(1 + i * 0.5, x + i * 0.8, y + i * 1.6, z, std('#5a5a5a', { transparent: true, opacity: 0.6 }), 0); },
+    horn: (x, y, z, s) => { const q = new THREE.Mesh(new THREE.ConeGeometry(1.2, 9, 8), trim); q.rotation.z = -s * 0.5; put(q, x + s * 2.5, y + 4, z); },
+    door: (zf, y = 0) => { B.box(2.4, 3.2, 0.3, 0, y + 1.6, zf, door); B.box(3.2, 0.3, 1.2, 0, y + 3.4, zf + 0.4, trim); },
+  };
+  S.build(B); g.position.y = y0; return g;
+}
+
+const EL = 0.95, AZ = Math.atan2(0.6, 0.8), _a = new THREE.Vector3(), _ray = new THREE.Raycaster(), _pl = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), _hit = new THREE.Vector3(), _m = new THREE.Vector2();
+const CSSB = `body.zd-flying #zd-bar,body.zd-flying #zd-dis,body.zd-flying #zd-followchip,body.zd-flying #zd-globe,body.zd-flying #zd-top{display:none!important}
+#zd-base{position:fixed;inset:0;z-index:30;touch-action:none;font-family:system-ui,sans-serif;color:#fff;user-select:none}
+#zd-base .hint{position:absolute;left:12px;right:12px;top:calc(14px + env(safe-area-inset-top));text-align:center;font:700 13px/1.4 system-ui,sans-serif;text-shadow:0 1px 3px #000;opacity:.9;transition:opacity .4s}
+#zd-base .act{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(24px + env(safe-area-inset-bottom));display:none}
+#zd-base .act.show{display:block}
+#zd-base .act button,#zd-base .panel button{font:800 15px/1 system-ui,sans-serif;color:#fff;background:linear-gradient(180deg,#ff5ad5,#b23cff);border:0;border-radius:14px;padding:14px 22px;box-shadow:0 4px 14px rgba(0,0,0,.4)}
+#zd-base .panel{position:absolute;left:12px;right:12px;bottom:calc(18px + env(safe-area-inset-bottom));max-height:70vh;overflow:auto;background:rgba(18,12,30,.94);border-radius:18px;padding:14px 14px 16px;box-shadow:0 8px 30px rgba(0,0,0,.5)}
+#zd-base .panel h3{margin:0 0 8px;font:800 17px/1.2 system-ui,sans-serif;color:#ffd27a}
+#zd-base .panel .h{font:700 12px/1 system-ui,sans-serif;opacity:.75;margin:10px 0 6px;letter-spacing:.04em;text-transform:uppercase}
+#zd-base .panel .row{display:flex;flex-wrap:wrap;gap:8px}
+#zd-base .panel .row button{padding:10px 14px;font-size:13px;background:#3a2f55}
+#zd-base .panel .row button.on{background:linear-gradient(180deg,#ff5ad5,#b23cff);box-shadow:0 0 0 2px #fff inset}
+#zd-base .panel .sw{width:34px;height:34px;border-radius:10px;padding:0;border:3px solid transparent}
+#zd-base .panel .sw.on{border-color:#fff}
+#zd-base .panel .go{width:100%;margin-top:12px;padding:14px;font-size:16px}
+#zd-base .panel .x{position:absolute;right:10px;top:8px;background:none;box-shadow:none;padding:8px 10px;font-size:18px}
+#zd-base .panel p{margin:4px 0 0;font:500 12px/1.4 system-ui,sans-serif;opacity:.8}`;
+
+export class HomeBase {
+  constructor(g, ctx) { this.g = g; this.ctx = ctx; this.active = false; this.near = 1.5; this.focus = 30; this.lod = 0; this.cfg = loadBase(); const st = document.createElement('style'); st.textContent = CSSB; document.head.appendChild(st); }
+  get S() { return STYLES[this.cfg.style] || STYLES.tower; }
+  // the site: the town's centre, the city's own buildings there taken away; the base as seen from the street
+  place() { const g = this.g, B = g.city.bounds; this.x = (B.x0 + B.x1) / 2; this.z = (B.z0 + B.z1) / 2; this.y = g.people.groundY(this.x, this.z); const R = 26; g.city.buildingsNear(this.x, this.z, R, (k) => g.city.hideBuilding(k)); g.city.takeStreetNear(this.x, this.z, R); this.rebuild(); this.placed = true; }
+  rebuild() { const S = this.g.disasters.ctx.scene; if (this.ext) S.remove(this.ext); this.ext = baseBuilding(this.cfg, this.y); this.ext.position.x = this.x; this.ext.position.z = this.z; S.add(this.ext); this.ext.visible = !this.active; }
+  hideAll() { if (this.ext) this.ext.visible = false; if (this.room) this.room.visible = false; }
+  // inside: the floor and walls of the chosen style, five stations, Nova at the door
+  start() {
+    const g = this.g, { camera, controls, post } = this.ctx, S = g.disasters.ctx.scene; if (!this.placed) this.place();
+    for (const p of [g.flight, g.drive, g.takeover, g.bandGame, g.fightTest, g.horde]) if (p && p.active) p.stop(true); if (g.takeover && g.takeover.picking) g.takeover.endPick();
+    this.active = true; controls.enabled = false; g.setFollow(-1); document.body.classList.add('zd-flying'); this.savedDof = post.opts.dof; post.opts.dof = true; this.ext.visible = false;
+    const { w, d } = this.S, y = this.y + 3, room = this.room = new THREE.Group(); room.position.set(this.x, y, this.z); S.add(room); // the room on a 3 m podium: the town's people walk on underneath, out of sight
+    const std = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9, ...o }), box = (bw, bh, bd, x, by, z, m) => { const q = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), m); q.position.set(x, by, z); q.castShadow = q.receiveShadow = true; room.add(q); return q; };
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.6, d - 0.6).rotateX(-Math.PI / 2), std('#5a5560')); floor.position.y = 0.06; floor.receiveShadow = true; room.add(floor); box(w + 1, 3, d + 1, 0, -1.5, 0, std('#3a3540')); for (let i = 0; i < 4; i++) box(4, 0.75, 1.2, 0, -0.375 - i * 0.75, d / 2 + 1.1 + i * 1.2, std('#4a4550'));
+    const wm = std(new THREE.Color(this.cfg.wall).lerp(new THREE.Color('#ffffff'), 0.35)); box(w, 5, 0.4, 0, 2.5, -d / 2, wm); box(0.4, 5, d, -w / 2, 2.5, 0, wm); box(0.4, 1.1, d, w / 2, 0.55, 0, wm); box(w / 2 - 1.6, 1.1, 0.4, -w / 4 - 0.8, 0.55, d / 2, wm); box(w / 2 - 1.6, 1.1, 0.4, w / 4 + 0.8, 0.55, d / 2, wm); // the far walls full height, the near two (the camera's side) a rail
+    const st = this.stations = [
+      { id: 'costume', name: 'Wardrobe', act: 'Change costume', x: -w / 2 + 2.6, z: -d / 2 + 2.2 },
+      { id: 'computer', name: 'Computer', act: 'Skills and powers', x: w / 2 - 2.6, z: -d / 2 + 2.2 },
+      { id: 'ring', name: 'Ring console', act: 'The robot: set it up, fight', x: w / 2 - 2.4, z: 3 },
+      { id: 'blueprints', name: 'Blueprints', act: 'Change the base', x: -w / 2 + 2.4, z: 3 },
+      { id: 'door', name: 'Door', act: 'Go outside', x: 0, z: d / 2 - 1.2 },
+    ];
+    box(2.6, 2.8, 0.9, st[0].x, 1.4, st[0].z - 0.6, std('#7a5a3a')); box(2.2, 0.9, 1.1, st[1].x, 0.45, st[1].z - 0.6, std('#2b2b2e')); box(1.4, 0.9, 0.1, st[1].x, 1.35, st[1].z - 0.9, std('#29e3ff', { emissive: new THREE.Color('#29e3ff'), emissiveIntensity: 0.6 }));
+    box(1.2, 1.1, 0.8, st[2].x, 0.55, st[2].z, std('#2b2b2e')); box(1, 0.5, 0.08, st[2].x, 1.3, st[2].z - 0.2, std('#ff5a5a', { emissive: new THREE.Color('#ff5a5a'), emissiveIntensity: 0.6 }));
+    box(2.4, 0.9, 1.4, st[3].x, 0.45, st[3].z, std('#8a7a5a')); box(2.2, 0.05, 1.2, st[3].x, 0.93, st[3].z, std('#9fd4ff'));
+    const ring = new THREE.Mesh(new THREE.RingGeometry(5, 5.45, 64).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: new THREE.Color(1.8, 0.4, 0.3), side: THREE.DoubleSide })); ring.position.set(0, 0.09, 1.5); room.add(ring); this.ringAt = { x: this.x, z: this.z + 1.5 };
+    for (const s of st) { const m = new THREE.Mesh(new THREE.CircleGeometry(1.1, 24).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.9, 0.7, 0.3), transparent: true, opacity: 0.35 })); m.position.set(s.x, 0.08, s.z); room.add(m); s.mark = m; }
+    this.h = new Body(heroRig('Nova', HS.outfit('Nova')), 100); S.add(this.h.r.root); this.h.x = this.x; this.h.z = this.z + d / 2 - 3; this.h.y = y; this.floorY = y; this.h.yaw = Math.PI; this.goal = null; this.nearS = null; this.panel = null;
+    camera.fov = innerWidth < innerHeight ? 28 : 18; camera.up.set(0, 1, 0); camera.updateProjectionMatrix(); this.look = new THREE.Vector3(this.h.x, y + 1, this.h.z); this.place2(1);
+    const el = this.el = document.createElement('div'); el.id = 'zd-base'; el.innerHTML = '<div class="hint">HOME BASE &middot; tap the floor to walk &middot; the wardrobe, the computer, the ring, the blueprints, the door</div><div class="act"><button type="button"></button></div>'; document.body.appendChild(el);
+    this.actEl = el.querySelector('.act'); this.actEl.querySelector('button').onclick = (e) => { e.stopPropagation(); if (this.nearS) this.open(this.nearS.id); };
+    el.addEventListener('pointerdown', (e) => { if (e.target.closest('button') || e.target.closest('.panel')) return; e.preventDefault(); _m.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); _ray.setFromCamera(_m, camera); _pl.constant = -this.floorY; if (_ray.ray.intersectPlane(_pl, _hit)) { const hx = Math.max(this.x - w / 2 + 0.8, Math.min(this.x + w / 2 - 0.8, _hit.x)), hz = Math.max(this.z - d / 2 + 0.8, Math.min(this.z + d / 2 - 0.8, _hit.z)); this.goal = [hx, hz]; } });
+    this.onKey = (e) => { if (e.key === 'Escape') { if (this.panel) this.close(); else this.stop(); } }; addEventListener('keydown', this.onKey);
+    g.toast('Home base. Tap the floor to walk; walk up to a station', 3500);
+  }
+  stop(quiet, keepRoom) { if (!this.active) return; const g = this.g, { camera, controls, post } = this.ctx, S = g.disasters.ctx.scene; this.active = false; if (!keepRoom) post.opts.dof = this.savedDof; this.close(); if (this.el) this.el.remove(); removeEventListener('keydown', this.onKey); if (this.h) S.remove(this.h.r.root); if (!keepRoom) { if (this.room) S.remove(this.room); this.room = null; this.ext.visible = true; } document.body.classList.remove('zd-flying'); g.focusAt = null;
+    if (!quiet) { const d = this.S.d / 2; controls.target.set(this.x, this.y + 7, this.z); camera.fov = 45; camera.updateProjectionMatrix(); camera.position.set(this.x + 22, this.y + 26, this.z + d + 30); camera.lookAt(controls.target); controls.enabled = true; controls.update(); g.toast('Outside the base. Open Disasters to unleash one; Home Base to go back in', 3500); } }
+  // each frame: walk to the tap, stand at a station, the steady camera over the room
+  frame(dt, tg) {
+    const g = this.g, h = this.h; if (!g.paused && dt > 0) {
+      if (this.goal) { const dx = this.goal[0] - h.x, dz = this.goal[1] - h.z, d = Math.hypot(dx, dz); if (d < 0.25) { this.goal = null; h.walkK = Math.max(0, h.walkK - dt * 6); } else { const sp = Math.min(5, d * 4), st = Math.min(d, sp * dt); h.x += dx / d * st; h.z += dz / d * st; h.yaw = Math.atan2(dx, dz); h.walkK = Math.min(1, h.walkK + dt * 6); h.phase += dt * 9; } }
+      else h.walkK = Math.max(0, h.walkK - dt * 6);
+      let best = null, bd = 2.2 * 2.2; for (const s of this.stations) { const d2 = (this.x + s.x - h.x) ** 2 + (this.z + s.z - h.z) ** 2; if (d2 < bd) { bd = d2; best = s; } }
+      if (best !== this.nearS) { this.nearS = best; this.actEl.classList.toggle('show', !!best && !this.panel); if (best) { this.actEl.querySelector('button').textContent = best.act; sfx('thud', h.x, h.y, h.z, { gain: 0.15, rate: 2.2 }); } }
+      for (const s of this.stations) s.mark.material.opacity = s === best ? 0.7 : 0.3;
+      h.pose(dt, h.y, true);
+    }
+    this.place2(dt); g.focusAt = _a.copy(this.look); tg.set(this.look.x, 0, this.look.z); this.focus = this.ctx.camera.position.distanceTo(g.focusAt);
+  }
+  place2(dt) { const h = this.h, cam = this.ctx.camera, D = 24, ce = Math.cos(EL) * D; this.look.lerp(_a.set(h.x, h.y + 1, h.z), Math.min(1, dt * 6)); cam.position.set(this.look.x + Math.sin(AZ) * ce, this.look.y + Math.sin(EL) * D, this.look.z + Math.cos(AZ) * ce); cam.lookAt(this.look); }
+  // ---------- the stations' panels
+  close() { if (this.panel) { this.panel.remove(); this.panel = null; } if (this.actEl) this.actEl.classList.toggle('show', !!this.nearS); }
+  open(id) {
+    this.close(); if (id === 'door') { this.stop(); return; } const p = this.panel = document.createElement('div'); p.className = 'panel'; this.el.appendChild(p); this.actEl.classList.remove('show');
+    const sw = (key, list, cur) => '<div class="row">' + list.map(c => '<button type="button" class="sw' + (c === cur ? ' on' : '') + '" data-' + key + '="' + c + '" style="background:' + c + '"></button>').join('') + '</div>';
+    const draw = () => {
+      if (id === 'costume') { const O = HS.outfit('Nova') || {}; p.innerHTML = '<button type="button" class="x">✕</button><h3>Wardrobe</h3><div class="h">Suit</div>' + sw('suit', SUITS, O.suit || '#ff3fcf') + '<div class="h">Cape</div>' + sw('cape', SUITS, O.cape || '#ff3fcf') + '<div class="h">Boots and gloves</div>' + sw('dark', DARKS, O.dark || '#1a1a1a') + '<p>Worn everywhere: the tower, the levels, the ring.</p>';
+        p.querySelectorAll('[data-suit],[data-cape],[data-dark]').forEach(b => { b.onclick = () => { const D = HS.load(), k = Object.keys(b.dataset)[0]; D.outfits.Nova = { ...(D.outfits.Nova || {}), [k]: b.dataset[k] }; HS.save(); this.redress(); draw(); }; }); }
+      if (id === 'computer') { const k = loadKit(), hs = HS.load().hero, who = [['nova', 'Nova'], ['dragonfly', 'Dragonfly'], ['tempo', 'Tempo']]; p.innerHTML = '<button type="button" class="x">✕</button><h3>Skills and powers</h3><div class="h">Who flies the levels</div><div class="row">' + who.map(([id2, n]) => '<button type="button" data-who="' + id2 + '"' + (hs.flyer === id2 ? ' class="on"' : '') + '>' + n + '</button>').join('') + '</div>' + [['stun', 'Stun', STUNS], ['knock', 'Knockback', KNOCKS], ['melee', 'Melee', MELEES]].map(([slot, name, T]) => '<div class="h">' + name + '</div><div class="row">' + Object.keys(T).map(pid => '<button type="button" data-kit="' + slot + ':' + pid + '"' + (k[slot] === pid ? ' class="on"' : '') + '>' + (T[pid].icon || '') + ' ' + T[pid].name + '</button>').join('') + '</div>').join('') + '<p>Level ' + (1 + Math.floor(Math.sqrt(hs.xp / 100))) + ' &middot; ' + hs.xp + ' XP &middot; skills are bought in the tower between levels.</p>';
+        p.querySelectorAll('[data-kit]').forEach(b => { b.onclick = () => { const [slot, pid] = b.dataset.kit.split(':'), kk = loadKit(); kk[slot] = pid; saveKit(kk); draw(); }; }); p.querySelectorAll('[data-who]').forEach(b => { b.onclick = () => { const D = HS.load(); D.hero.flyer = b.dataset.who; HS.save(); draw(); }; }); }
+      if (id === 'ring') { const R = this.cfg.robot; p.innerHTML = '<button type="button" class="x">✕</button><h3>The robot</h3><div class="h">Level</div><div class="row">' + [1, 2, 3, 4, 5].map(l => '<button type="button" data-lv="' + l + '"' + (R.level === l ? ' class="on"' : '') + '>' + l + '</button>').join('') + '</div><div class="h">Its moves</div><div class="row">' + [['jab', 'Jabs'], ['grab', 'Grabs'], ['charge', 'Charges'], ['laser', 'Eye laser']].map(([k2, n]) => '<button type="button" data-tog="' + k2 + '"' + (R[k2] ? ' class="on"' : '') + '>' + n + '</button>').join('') + '</div><p>Health ' + Math.round(300 * (0.5 + 0.25 * R.level)) + ', its blows &times;' + (0.6 + 0.2 * R.level).toFixed(1) + '. Your kit is what the computer says.</p><button type="button" class="go" data-go>⚔ FIGHT THE ROBOT</button>';
+        p.querySelectorAll('[data-lv]').forEach(b => { b.onclick = () => { R.level = +b.dataset.lv; saveBase(this.cfg); draw(); }; }); p.querySelectorAll('[data-tog]').forEach(b => { b.onclick = () => { R[b.dataset.tog] = !R[b.dataset.tog]; saveBase(this.cfg); draw(); }; }); p.querySelector('[data-go]').onclick = () => this.fight(); }
+      if (id === 'blueprints') { const c = this.cfg; p.innerHTML = '<button type="button" class="x">✕</button><h3>Blueprints</h3>' + ['hero', 'villain'].map(side => '<div class="h">' + side + ' bases</div><div class="row">' + Object.keys(STYLES).filter(s => STYLES[s].side === side).map(s => '<button type="button" data-style="' + s + '"' + (c.style === s ? ' class="on"' : '') + '>' + STYLES[s].name + '</button>').join('') + '</div>').join('') + '<div class="h">Walls</div>' + sw('wall', SWATCH.wall, c.wall) + '<div class="h">Trim</div>' + sw('trim', SWATCH.trim, c.trim) + '<div class="h">Windows</div>' + sw('win', SWATCH.win, c.win) + '<div class="h">Door</div>' + sw('door', SWATCH.door, c.door) + '<p>Seen from the street when you go outside; the walls in here take the wall colour.</p>';
+        p.querySelectorAll('[data-style],[data-wall],[data-trim],[data-win],[data-door]').forEach(b => { b.onclick = () => { const k2 = Object.keys(b.dataset)[0]; c[k2] = b.dataset[k2]; saveBase(c); this.rebuild(); this.retint(); draw(); }; }); }
+      p.querySelector('.x').onclick = () => this.close();
+    };
+    draw();
+  }
+  // her rig again in the costume just picked
+  redress() { const S = this.g.disasters.ctx.scene, o = this.h; S.remove(o.r.root); const h = this.h = new Body(heroRig('Nova', HS.outfit('Nova')), 100); S.add(h.r.root); h.x = o.x; h.z = o.z; h.y = o.y; h.yaw = o.yaw; }
+  retint() { if (!this.room) return; const c = new THREE.Color(this.cfg.wall).lerp(new THREE.Color('#ffffff'), 0.35); this.room.children.forEach(m => { if (m.geometry && m.geometry.type === 'BoxGeometry' && (m.position.y === 2.5 || m.position.y === 0.55)) m.material.color.copy(c); }); }
+  // the ring: the fight test's engine in this room, the robot in Tyrant's frame at the level and with the moves set at the console
+  fight() { const g = this.g, R = { ...this.cfg.robot }; this.stop(true, true); g.fightTest.start({ ring: { x: this.ringAt.x, z: this.ringAt.z, y: this.floorY, r: 7 }, robot: R }); }
+}

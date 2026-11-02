@@ -42,7 +42,7 @@ export class Horde {
   constructor(g, ctx) { this.g = g; this.ctx = ctx; this.active = false; this.near = 1.5; this.focus = 60; this.lod = 0; }
   // o: n (how many), pool (slots to drop them from), level (the hero game's: no Restart or Leave, onEnd(won) instead)
   start(o = {}) {
-    const g = this.g; for (const p of [g.flight, g.drive, g.takeover, g.bandGame, g.fightTest]) if (p && p.active) p.stop(true); if (g.takeover && g.takeover.picking) g.takeover.endPick();
+    const g = this.g; for (const p of [g.flight, g.drive, g.takeover, g.bandGame, g.fightTest, g.base]) if (p && p.active) p.stop(true); if (g.base) g.base.hideAll(); if (g.takeover && g.takeover.picking) g.takeover.endPick();
     const P = g.people, B = g.city.bounds, { camera, controls, post } = this.ctx, S = g.disasters.ctx.scene, p = P.snapWalkable((B.x0 + B.x1) / 2, (B.z0 + B.z1) / 2, 80);
     this.cx = p ? p[0] : (B.x0 + B.x1) / 2; this.cz = p ? p[1] : (B.z0 + B.z1) / 2; this.o = o; this.riot = o.mode === 'riot' ? o.riot : null; if (this.riot) { const m = this.riot.mob || (P.mobs && P.mobs[0]); if (m && m.x != null) { const q = P.snapWalkable(m.x + 8, m.z + 8, 40); if (q) { this.cx = q[0]; this.cz = q[1]; } } } this.N0 = this.riot ? this.riot.members.length : (o.n || 300); this.pool0 = o.pool || [];
     this.mate = (HS.load().hero.skills.tag || !o.level) ? ['Dragonfly', 'Tempo'][Math.floor(Math.random() * 2)] : null; // the team move: earned in the tower by Tag team, free in the Sandbox
