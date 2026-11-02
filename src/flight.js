@@ -10,14 +10,13 @@
 // camera over while it is up (frame()), and game.js's Sandbox has the buttons.
 // Or a super hero (Nova, Dragonfly, Tempo), flown the same way but slower, able to hang in the air, skimming the ground
 // and smashing straight through buildings, which come down behind them (plough): Lock on picks the nearest villain and flies straight at them, and up close
-// the fight is the kaiju game's (heroduel.js): tap the weak spots, spin and toss, fly at them again.
+// the fight is the fight engine's (fighttest.js), down in the street where they are; then back into the air.
 import * as THREE from 'three';
 import { buildVehicle } from './vehicles.js';
 import { sfx } from './audio.js';
 import { SEE } from './see.js';
 import { heroRig } from './heroes.js';
 import { relax, detail, villainRig , S } from './villains.js';
-import { Duel } from './heroduel.js';
 import { Interior } from './interior.js';
 import { LAB } from './lab.js';
 import { playClip } from './clips.js';
@@ -313,7 +312,7 @@ export class Flight {
   stop(quiet = false) {
     if (!this.active) return;
     const g = this.g, { camera, controls, post } = this.ctx;
-    this.fromHorde = null; this.fromBase = null; this.smashing = false; if (this.duel) this.duel.end('', false); this.lock = null; this.dropInside(); this.inB = -1; this.clearShots(); if (this.power) { this.power.dispose(); this.power = null; this.powerBtn = null; } if (this.army) { this.army.dispose(); this.army = null; } if (this.getaways) { for (const G of this.getaways) G.finish(); this.getaways = []; }
+    this.fromHorde = null; this.fromBase = null; this.smashing = false; this.lock = null; this.dropInside(); this.inB = -1; this.clearShots(); if (this.power) { this.power.dispose(); this.power = null; this.powerBtn = null; } if (this.army) { this.army.dispose(); this.army = null; } if (this.getaways) { for (const G of this.getaways) G.finish(); this.getaways = []; }
     this.active = false; document.body.classList.remove('zd-flying');
     const hr = this.obj.userData.hero; g.disasters.ctx.scene.remove(this.obj); if (this.streak) { this.streak.dispose(g.disasters.ctx.scene); this.streak = null; }
     if (hr) { hr.cape.g.dispose(); if (hr.smooth && hr.smooth.mesh) { hr.smooth.mesh.geometry.dispose(); const m = hr.smooth.mesh.material; (Array.isArray(m) ? m : [m]).forEach(x => x && x.dispose()); } } else this.obj.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); // its own shapes and paint (a hero's are shared with the rest: only the cape is its own)
@@ -344,7 +343,6 @@ export class Flight {
     }
     if (run) this.t2 = (this.t2 || 0) + dt; // the clock the hurt and hit timers go by
     if (run && this.punch > 0) this.punch -= dt;
-    if (run && this.duel && this.state === 'fly') { this.hover(dt); if (this.duel) this.duel.step(dt); }
     else if (run && this.state === 'fly') this.fly(dt);
     else if (run && this.state === 'tossed') this.tossStep(dt);
     else if (run && this.state === 'down' && (this.t += dt) > (this.downAt ? 1.4 : 2.6)) { if (this.downAt) this.getUp(); else { this.spawn(); this.setView(this.view); } }
@@ -358,21 +356,11 @@ export class Flight {
     const prop = this.obj.userData.prop, burner = this.obj.userData.burner, k = (this.thr - P.min) / (P.max - P.min);
     if (prop) prop.rotation.x += dt * (40 + 50 * k);
     if (this.obj.userData.hero) this.heroPose(this.obj.userData.hero, dt);
-    if (this.streak) this.streak.update(this.pos, this.state === 'tossed' || (!!this.duel && !!this.duel.dash) || (this.state === 'fly' && !this.duel && this.speed > 55), cam, dt);
+    if (this.streak) this.streak.update(this.pos, this.state === 'tossed' || (this.state === 'fly' && !this.duel && this.speed > 55), cam, dt);
     if (burner) { burner.scale.set(0.6 + k * 0.9, 1, 1); burner.material.opacity = 0.35 + 0.55 * k; }
     // the camera: behind and above it, easing after it (no roll, so the horizon stays put), or in its seat
     _f.set(1, 0, 0).applyQuaternion(this.q);
-    if (this.duel && this.state === 'fly') { // a fight: the town's view, high and far over the two of them, the hero nearer the camera than the villain, following them up through a sky slam
-      const D = this.duel, v = D.v, ph = D.phase;
-      if (!D.cam) { // the view's way, set once a fight: side on to the two of them (the hero's moves read in profile), from whichever side the camera is nearer, then raised
-        let dx = this.pos.x - v.x, dz = this.pos.z - v.z; const l = Math.hypot(dx, dz); if (l < 0.5) { dx = -Math.cos(this.yaw); dz = Math.sin(this.yaw); } else { dx /= l; dz /= l; }
-        const sx = -dz, sz = dx, side = (cam.position.x - this.pos.x) * sx + (cam.position.z - this.pos.z) * sz >= 0 ? 1 : -1; D.cam = { dx: sx * side, dz: sz * side }; cam.fov = FOV_ISO; cam.updateProjectionMatrix(); this.ctx.post.opts.dof = true;
-      }
-      if (D.punchT > 0) D.punchT = Math.max(0, D.punchT - dt); const pk = 1 - 0.16 * (D.punchT > 0 ? D.punchT / 0.35 : 0); // a punch-in at a contact, easing back out
-      const mx = (this.pos.x + v.x) / 2, my = (this.pos.y + Math.max(2.4, (v.y || 0) + HIP)) / 2, mz = (this.pos.z + v.z) / 2, dist = ISO_DIST * this.zoom * pk, el = ISO_EL - 0.18, ce = Math.cos(el) * dist; // between them, a little lower than the flying view
-      _v.set(mx + D.cam.dx * ce, my + Math.sin(el) * dist, mz + D.cam.dz * ce);
-      cam.position.lerp(_v, 1 - Math.exp(-dt * (ph === 'slam' || D.punchT > 0.25 ? 12 : 4))); cam.up.set(0, 1, 0); cam.lookAt(_u.set(mx, my, mz));
-    } else if (this.view === 'cockpit' && this.state === 'fly') {
+    if (this.view === 'cockpit' && this.state === 'fly') {
       _v.set(P.seat[0], P.seat[1], 0).applyQuaternion(this.q); cam.position.copy(this.pos).add(_v);
       cam.quaternion.copy(this.q).multiply(SEAT_TURN); cam.up.set(0, 1, 0).applyQuaternion(this.q);
     } else if (this.view === 'iso' && this.state !== 'down') { // the town's lens, behind and well above the hero's heading, aimed a little ahead of them
@@ -397,13 +385,13 @@ export class Flight {
       this.hudT = 0.15;
       const th = this.threat, hull = Math.max(0, Math.round(this.hull / (this.hullMax || 100) * 100)), L = this.lock;
       this.hud.textContent = P.name.toUpperCase() + ' · ' + Math.round(this.speed * KMH) + ' km/h · ' + Math.max(0, Math.round(this.pos.y)) + ' m · ' + (P.hero ? 'health ' : 'hull ') + hull + '%' + (this.P.gun ? ' · gun ' + (this.reload > 0 ? 'reloading' : this.ammo) : '') +
-        (this.duel ? '\nFIGHTING ' + this.duel.v.name.toUpperCase() : L ? '\nLOCKED ON ' + L.name.toUpperCase() + ' ' + Math.round(Math.hypot(L.x - this.pos.x, L.z - this.pos.z)) + ' m' : th && th.d < 600 ? '\n' + th.name.toUpperCase() + ' ' + Math.max(0, Math.round(th.d)) + ' m' : '') + (LAB.on && P.hero ? '\n' + LAB.line() : '');
+        (L ? '\nLOCKED ON ' + L.name.toUpperCase() + ' ' + Math.round(Math.hypot(L.x - this.pos.x, L.z - this.pos.z)) + ' m' : th && th.d < 600 ? '\n' + th.name.toUpperCase() + ' ' + Math.max(0, Math.round(th.d)) + ' m' : '') + (LAB.on && P.hero ? '\n' + LAB.line() : '');
       this.hud.style.color = hull < 35 ? '#ff8a7a' : th && th.d < 60 ? '#ffd27a' : '#fff';
       document.body.style.setProperty('--zd-hud-end', Math.round(this.hud.getBoundingClientRect().bottom + 6) + 'px'); // the fight's panel sits under the HUD, however tall it is (the lab's lines)
       if (this.state === 'fly' && this.hull < 60) g.fire.spray(this.pos.x - _f.x * 3, this.pos.z - _f.z * 3, this.pos.y, this.hull < 30 ? 4 : 2, 1, 2.2); // smoke off a hurt plane
       if (g.audio) g.audio.engine(this.state === 'fly' ? this.P.sound : null, k);
       if (this.dropBtn) { this.dropBtn.textContent = this.seedT > 0 ? 'Seeding' : 'Drop'; this.dropBtn.classList.toggle('wait', this.coolT > 0 || this.seedT > 0 || this.state !== 'fly'); }
-      if (this.lockBtn) { this.lockBtn.textContent = this.lock ? 'Let go of the lock' : '\uD83C\uDFAF Lock on'; this.lockBtn.classList.toggle('on', !!this.lock); this.bar.style.visibility = this.duel ? 'hidden' : ''; }
+      if (this.lockBtn) { this.lockBtn.textContent = this.lock ? 'Let go of the lock' : '\uD83C\uDFAF Lock on'; this.lockBtn.classList.toggle('on', !!this.lock); this.bar.style.visibility = ''; }
     }
     if (this.view === 'cockpit') this.hz.style.transform = 'translate(-50%,' + (this.pitch * 260).toFixed(0) + 'px) rotate(' + (-this.roll).toFixed(3) + 'rad)';
   }
@@ -459,7 +447,6 @@ export class Flight {
     if (this.state !== 'fly') return;
     const g = this.g, f = g.fire, x = this.pos.x, y = Math.max(1, this.pos.y), z = this.pos.z;
     this.state = 'down'; this.t = 0; this.obj.visible = false; this.at.set(x, y, z); this.caught = null; this.hull = 0; this.lock = null; this.inB = -1; this.dropInside(); this.downAt = false; this.clearShots();
-    if (this.duel) this.duel.end('', false);
     if (this.g.audio) this.g.audio.engine(null);
     if (this.P.hero) { f.dustCloud(x, z, 6, Math.min(20, y + 4)); sfx('thud', x, y, z, { gain: 1 }); this.tip((why || 'You were knocked out of the sky!') + ' Back up in a moment'); return; } // knocked down, no fireball
     f.burst(x, y, z, 16, 2.4); f.burst(x, y + 2, z, 10, 1.6);
@@ -673,12 +660,12 @@ export class Flight {
       if (v.gone || v.beaten) continue;
       const d = Math.hypot(v.x - this.pos.x, (v.y || 0) + HIP - this.pos.y, v.z - this.pos.z); this.note(v.name, d);
       if (this.P.hero && !v.tossed && !v.gripped && d < 12 && (v.hitT || 0) < this.t2) { v.hitT = this.t2 + 2.5; this.g.shake = Math.max(this.g.shake || 0, 0.3); this.damage(LAB.villainHit(6), v.name + ' hit you!'); }
-      if (this.P.hero && v === this.lock && !this.duel && !v.tossed && !v.gripped && d > 30 && d < 220) { if ((v.shotT = (v.shotT ?? 1.2) - h) <= 0) { v.shotT = Math.max(1, 2.6 - 0.06 * LAB.villain); this.shoot(v); } } // throwing things at a hero flying in
+      if (this.P.hero && v === this.lock && !v.tossed && !v.gripped && d > 30 && d < 220) { if ((v.shotT = (v.shotT ?? 1.2) - h) <= 0) { v.shotT = Math.max(1, 2.6 - 0.06 * LAB.villain); this.shoot(v); } } // throwing things at a hero flying in
     }
   }
   // Lock on (a hero): the nearest villain still up, and the hero flies straight at them (homeIn); pressed again, the lock let go
   lockOn(v, again = false) {
-    if (this.state !== 'fly' || this.duel) return;
+    if (this.state !== 'fly') return;
     if (this.lock && !again) { this.lock = null; this.tip('Lock let go: flying free'); return; }
     if (this.fromBase) { this.tip('Nothing to lock on in the base; Land to come down'); return; }
     if (this.fromHorde && this.fromHorde.o.boss && !v) { const e = this.fromHorde.o.boss; this.lock = { zombie: -1, name: 'it', get x() { return e.x; }, get z() { return e.z; }, y: 0, get gone() { return !e.alive; } }; this.tip('Locked on! Straight at it, down to fight; or SMASH LAND'); sfx('whoosh', this.pos.x, this.pos.y, this.pos.z, { gain: 0.9 }); return; }
@@ -691,13 +678,13 @@ export class Flight {
   landBase() { const Bs = this.fromBase; if (!Bs || this.state !== 'fly') return; this.fromBase = null; const x = this.pos.x, z = this.pos.z, cam = this.ctx.camera; this.g.camBlend = { pos: cam.position.clone(), quat: cam.quaternion.clone(), fov: cam.fov, t: 0, T: 1.0 }; this.stop(true); Bs.land(x, z); }
   // back down into the street fight she took off from (horde.js land): a plain landing where she is, or the smash: straight down first, a shockwave where she lands
   landHorde(smash, now) { const H = this.fromHorde; if (!H || this.state !== 'fly') return; if (smash && !now) { this.smashing = true; this.lock = null; this.speed = 0; this.tip('SMASH LANDING!'); return; } this.fromHorde = null; const x = this.pos.x, z = this.pos.z, cam = this.ctx.camera; this.g.camBlend = { pos: cam.position.clone(), quat: cam.quaternion.clone(), fov: cam.fov, t: 0, T: 1.0 }; this.stop(true); H.land(x, z, smash); }
-  // locked on: straight at the villain, faster the further, through every building in the way; close enough and the fight is on (heroduel.js)
+  // locked on: straight at the villain, faster the further, through every building in the way; close enough and the fight is on (fightFoe)
   homeIn(dt) {
     const v = this.lock, P = this.P;
     if (!v || v.gone || v.beaten) { this.lock = null; return false; }
     const ty = Math.max(2.4, (v.y || 0) + HIP), dx = v.x - this.pos.x, dy = ty - this.pos.y, dz = v.z - this.pos.z, d = Math.hypot(dx, dy, dz) || 0.01;
     if (v.zombie != null) { if (d < 7) { this.landHorde(false); return true; } }
-    else if (d < 6.5) { if (this.inB >= 0) { this.burstOut(this.inB, this.pos.x, this.pos.y, this.pos.z); this.inB = -1; } this.speed = 0; this.duel = new Duel(this, v); this.obj.visible = true; SEE.on = this.saved.see; return true; } // reached them inside a building: it comes down round the fight
+    else if (d < 6.5) { if (this.inB >= 0) { this.burstOut(this.inB, this.pos.x, this.pos.y, this.pos.z); this.inB = -1; } this.speed = 0; this.fightFoe(v); return true; } // reached them: down into the fight
     let a = Math.atan2(-dz, dx) - this.yaw; a = Math.atan2(Math.sin(a), Math.cos(a));
     this.yaw += a * Math.min(1, dt * 5); this.roll += (Math.max(-1, Math.min(1, -a * 2)) - this.roll) * Math.min(1, dt * 3);
     this.pitch += (Math.atan2(dy, Math.hypot(dx, dz)) * 0.8 - this.pitch) * Math.min(1, dt * 4);
@@ -709,32 +696,26 @@ export class Flight {
     this.plough(px, py, pz); // straight through everything in the way, as when flown by hand (Sean)
     return true;
   }
-  // in a fight: hanging in the air a step from the villain, at their height, facing them (they are held there); while
-  // spinning them, still, turning with them; once they are thrown, watching them go
-  hover(dt) {
-    const D = this.duel, v = D.v, k = Math.min(1, dt * 3);
-    if (D.phase === 'spots' || D.phase === 'dazed') {
-      const dx = this.pos.x - v.x, dz = this.pos.z - v.z, d = Math.hypot(dx, dz) || 1;
-      this.pos.x += (v.x + dx / d * 5.5 - this.pos.x) * k; this.pos.z += (v.z + dz / d * 5.5 - this.pos.z) * k; this.pos.y += (Math.max(2.4, (v.y || 0) + HIP) - this.pos.y) * k;
-    }
-    if (D.phase === 'spin') this.pos.y += (Math.max(this.pos.y, 14) - this.pos.y) * Math.min(1, dt * 1.2); // rising as they whirl round
-    if (D.phase !== 'drag' && D.phase !== 'slam') { // dragging them (brawl.js steers) or the sky slam (heroduel.js places the hero): hands off
-      let a = Math.atan2(-(v.z - this.pos.z), v.x - this.pos.x) - this.yaw; a = Math.atan2(Math.sin(a), Math.cos(a));
-      this.yaw += a * Math.min(1, dt * (D.phase === 'spin' ? 25 : 5));
-    }
-    this.pitch -= this.pitch * Math.min(1, dt * 4); this.roll -= this.roll * Math.min(1, dt * 4); this.speed = 0;
+  // Lock on reached them (Sean: only the one fighting, everywhere): the flight set down, the fight engine in the street where they are, against them; then back into the air from there,
+  // beaten they flee, and a loss is a knock out of the sky. What they have left stays on them for the next round. The camera eased across both ways
+  fightFoe(v) {
+    const g = this.g, T = g.fightTest, D = g.disasters, P = g.people, cam = this.ctx.camera, s = { kind: this.kind, P: this.P, heroGame: this.heroGame, onStopped: this.onStopped, view: this.view, stats: { ...LAB.stats }, hullK: this.hull / (this.hullMax || 100), hero: this.P.hero };
+    const q = P.snapWalkable(v.x, v.z, 40) || [v.x, v.z], lvl = LAB.villain || 1, hpMax = 180 + 70 * lvl; v.gripped = true; v.rig.root.visible = false; g.camBlend = { pos: cam.position.clone(), quat: cam.quaternion.clone(), fov: cam.fov, t: 0, T: 1.1 };
+    this.stop(true); this.fighting = true;
+    T.start({ ring: { x: q[0], z: q[1], y: P.groundY(q[0], q[1]), r: 26 }, street: true, who: s.hero, hp: Math.max(20, s.hullK * 100), foe: { name: v.name, hpMax, hp: v.fightHp ?? hpMax, dmgK: 0.75 + 0.1 * lvl }, onEnd: (won, F2) => {
+      const x = F2.h.x, z = F2.h.z, y = F2.h.y, yaw = F2.h.yaw, left = F2.h.hp, foeLeft = F2.v.hp; g.camBlend = { pos: cam.position.clone(), quat: cam.quaternion.clone(), fov: cam.fov, t: 0, T: 1.1 }; T.stop(true); this.fighting = false; this.heroGame = s.heroGame; this.start(s.kind); this.P = s.P; this.onStopped = s.onStopped; Object.assign(LAB.stats, s.stats); this.pos.set(x, y + 1.5, z); this.yaw = Math.atan2(-Math.cos(yaw), Math.sin(yaw)); this.pitch = 0.9; this.speed = 5; this.thr = Math.max(this.P.start || 5, 5); this.setView(s.view); this.hull = this.hullMax * Math.max(0.2, left / 100);
+      v.gripped = false; v.rig.root.visible = true; v.x = F2.v.x; v.z = F2.v.z;
+      if (won) { LAB.stats.won++; delete v.fightHp; v.heroWin = true; for (const e of D.list) if (e.type === 'villains' && e.who.includes(v)) e.beat(v, s.hero); this.tip(v.name + ' is beaten!'); } else { v.fightHp = Math.max(40, foeLeft); this.crash(-1, v.name + ' knocked you out!'); }
+    } });
   }
-  // the fight over (heroduel.js): the flying lens and no blur again (eased back to), nose up, clear of the street
-  duelOver(won) { this.duel = null; this.act = null; this.clip = null; this.lock = null; this.obj.visible = this.view !== 'cockpit' && this.state === 'fly'; SEE.on = this.view === 'cockpit' ? false : this.saved.see; const cam = this.ctx.camera; cam.fov = this.view === 'cockpit' ? FOV_COCKPIT * Math.max(0.35, Math.min(1.25, this.zoom || 1)) : this.view === 'iso' ? FOV_ISO : FOV_CHASE; cam.updateProjectionMatrix(); this.ctx.post.opts.dof = this.view === 'iso'; this.speed = this.thr = Math.max(this.thr, this.P.start * 0.6); this.pitch = 0.5; } // nose up, clear of the street
   // a hero's pose: flat out along the way at speed, one fist ahead; upright and treading air slow or in a fight; a punch;
   // arms out holding on while spinning a villain round. The rig set so the hips are where the hero is
   heroPose(r, dt) {
-    const A = r.arms, L = r.legs, D = this.duel, fast = D ? 0 : Math.max(0, Math.min(1, (this.speed - 10) / 14)), act = this.act, kind = act && act.kind;
+    const A = r.arms, L = r.legs, fast = Math.max(0, Math.min(1, (this.speed - 10) / 14)), act = this.act, kind = act && act.kind;
     const u = act ? Math.min(1, act.t / act.T) : 0, k = Math.sin(Math.PI * u); // a move: how far through it; out and back
     relax(r); this.lean = kind === 'dive' ? Math.PI : (this.lean || 0) + ((kind === 'drag' ? 0.9 : 1.35 * fast) - (this.lean || 0)) * Math.min(1, dt * 3); // head first after them in the dive
     const C = this.clip; let bodyY = 0;
     if (C) { C.t += dt; playClip(r, C.clip, C.t); this.lean = r.body.rotation.x; bodyY = r.hips.position.y - 0.94; r.hips.position.y = 0.94; } // a keyframed move (clips.js): its lean and hip drop are its own
-    else if (D && (D.phase === 'spin' || D.phase === 'hammer')) for (const a of A) { a.sh.rotation.set(-1.5, 0, -a.sx * 0.24); a.el.rotation.set(0, 0, 0); } // straight out and in together: the hands on the villain's ankles (heroduel.js HANDS)
     else if (kind === 'kick') { L[1].hip.rotation.x = -1.7 * k; L[1].knee.rotation.x = 0.9 * (1 - k); L[0].knee.rotation.x = 0.3; r.torso.rotation.x = -0.35 * k; for (const a of A) { a.sh.rotation.set(-0.5, 0, a.sx * (0.6 + 0.4 * k)); a.el.rotation.set(-0.8, 0, 0); } }
     else if (kind === 'laser') { if (this.P.hero === 'Nova') { for (const a of A) { a.sh.rotation.set(0.45, 0, a.sx * 0.25); a.el.rotation.set(-0.9, 0, 0); } r.torso.rotation.x = 0.15; } else for (const a of A) { a.sh.rotation.set(-1.55, 0, -a.sx * 0.12); a.el.rotation.set(0, 0, 0); } } // Nova's from her eyes, fists back; the others' from their hands
     else if (kind === 'crouch') { A[1].sh.rotation.set(0.5, 0, 0.1); A[1].el.rotation.set(-1.4, 0, 0); A[0].sh.rotation.set(-1.0, 0, -0.15); A[0].el.rotation.set(-1.7, 0, 0); r.torso.rotation.x = 0.4; for (const l of L) { l.hip.rotation.x = -0.4; l.knee.rotation.x = 0.8; } } // wound up for the uppercut

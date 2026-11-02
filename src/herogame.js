@@ -128,12 +128,14 @@ export class HeroGame {
       '<div>Reputation: <b>' + rep + '</b> (' + Math.round(s.rep) + ')</div>' + repBar(s) + '<div style="opacity:.7;font-size:11px">' + (hero ? 'Fall under 15 and you become a villain' : 'Climb to 60 and you become a hero') + '</div>' +
       '<h2>Who fights</h2><div class="two"><canvas></canvas><div class="cards">' + cardsHtml(this.side, s.flyer) + '</div></div>' +
       '<h2>Level ' + (s.idx + 1) + ': ' + levelName(s) + '</h2><div><b>' + esc(P.name) + '</b> · town ' + (s.idx + 1) + ' of ' + PATH.length + (hunted ? ' · <span style="color:#ff8a7a">the heroes are hunting you</span>' : '') + '</div><div style="opacity:.75;font-size:12px">' + esc(P.blurb || '') + '</div><button type="button" class="go" data-go2>' + (hero ? 'FLY TO DEFEND IT' : 'FLY IN AND WRECK IT') + '</button>' +
+      '<div class="lab" style="margin-top:12px">Testing: jump to a level</div><div class="row">' + WAVES.slice(0, 4).map((w, i) => '<button type="button" class="b' + (s.idx === i ? ' on' : '') + '" data-jump="' + i + '">' + (i + 1) + ' ' + w[0] + '</button>').join('') + '</div>' +
       '<h2>Skills · ' + this.points + ' point' + (this.points === 1 ? '' : 's') + ' to spend</h2>' + skills +
       (s.trophies.length ? '<h2>Trophy wall</h2><div>' + s.trophies.map(esc).join(', ') + '</div>' : '') +
       '<h2>' + (hero ? 'The tower' : 'The lair') + ': ' + Math.min(lv, 12) + ' floor' + (lv > 1 ? 's' : '') + '</h2><svg width="160" height="' + (Math.min(lv, 12) * 22 + 20) + '">' + floors + '</svg>' +
       '<button type="button" class="b" data-out style="width:100%;margin-top:14px">Back to the menu</button></div>';
     const $ = (q) => this.el.querySelector(q);
     $('[data-go2]').onclick = () => this.start();
+    this.el.querySelectorAll('[data-jump]').forEach(b => { b.onclick = () => { s.idx = +b.dataset.jump; HS.save(); this.msg = ''; this.draw(); }; }); // Sean, testing the fights: straight to any of the first four
     $('[data-out]').onclick = () => { this.closeHub(); this.g.toMenu ? this.g.toMenu() : location.reload(); };
     this.el.querySelectorAll('[data-who]').forEach(b => { b.onclick = () => { HS.load().last[this.side] = b.dataset.who; HS.save(); this.s = HS.load()[this.side]; this.msg = ''; this.draw(); }; });
     this.el.querySelectorAll('[data-skill]').forEach(b => { b.onclick = () => { const id = b.dataset.skill; if (!id) return; s.skills[id] = 1; HS.save(); this.draw(); }; });
@@ -212,9 +214,10 @@ export class HeroGame {
     const fear = LAB.fear(), rep = R.hero ? Math.max(0, Math.min(100, this.s.rep - fear / 30)) : 0;
     this.rep.innerHTML = R.hero ? REP(rep) + (live ? ' · ' + live + ' to stop' : '') + '<div class="bar"><i style="width:' + rep + '%"></i></div>' : S.buildings + '/' + R.need + ' buildings<div class="bar"><i style="width:' + Math.min(100, S.buildings / R.need * 100) + '%"></i></div>';
     const down = F.state === 'down' && !F.downAt; if (down && !R.wasDown) R.downs++; R.wasDown = down;
+    if (F.fighting) return; // on foot, in the fight (flight.js fightFoe)
     if (!F.active) return this.finish(false, 'You left the town');
     if (R.downs >= 3) return this.finish(false, 'Knocked out of the sky three times');
-    if (R.t > 1 && !F.duel && (R.hero ? live === 0 : S.buildings >= R.need && live === 0)) this.finish(true);
+    if (R.t > 1 && (R.hero ? live === 0 : S.buildings >= R.need && live === 0)) this.finish(true);
   }
   // over the line: a hero under 15 becomes a villain (now picked under Destroy), a villain at 60 a hero (Defend). Returns the line for the tally
   cross(s) { const n = HS.name(s.flyer); if (s.side === 'hero' && s.rep < 15) { s.side = 'villain'; s.rep = 14; return '<br><b style="color:#ff8a7a">' + n + ' has gone too far: now a villain. You will find them under Destroy</b>'; } if (s.side === 'villain' && s.rep >= 60) { s.side = 'hero'; s.rep = 60; return '<br><b style="color:#6cff8a">' + n + ' has done too much good: now a hero. You will find them under Defend</b>'; } return ''; }

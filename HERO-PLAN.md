@@ -49,7 +49,7 @@ Build order (one thing at a time, each tested in the Sandbox and pushed). The ch
   - [x] 11f. The base as an office (the stations round an elevator) over a basement that is its own level with the ring; the base's controls as everywhere, with a row of four shortcuts; take-off only from the street outside; a mini map of the town and the base.
 - 12. The whole game, ready for agent testing (Sean, 2026-11-02).
   - [x] 12a. Pick 1 of your 3 at the start of Defend or Destroy (each levels apart); a hero who falls moves to Destroy, a villain who does too well to Defend. Levels 1 aliens, 2 zombies, 3 the worm, 4 the kaiju on both sides. Defend: on foot and in the air with the kit, the worm and kaiju as giant fights. Destroy: flown, the disaster on your side, the heroes coming for you.
-  - [ ] 12b. Destroy's rival fights in the fight-test engine instead of the old circle duel.
+  - [x] 12b. The old circle duel gone: Lock on brings you down into the fight engine against that villain or hero, in the street where they are, and back into the air after, everywhere (Destroy, Defend's villains, the Sandbox's flying heroes).
   - [ ] 12c. Agents play the whole game through and report what breaks or drags.
   - [ ] 12d. The weather levels, with their own play style, after these.
 
