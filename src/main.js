@@ -30,6 +30,7 @@ import { Radio } from './radio.js';
 import { damageOf, rememberDamage, takeMeteor } from './world.js';
 import { noZoom } from './nozoom.js';
 import { FightTest } from './fighttest.js';
+import { Horde } from './horde.js';
 
 const P = new URLSearchParams(location.search);
 CURVE.on = P.get('curve') !== '0'; // ?curve=0: the flat world, to compare
@@ -174,7 +175,7 @@ function frameBody() {
   sky.update(dt);
   if (globe.active || !W) { controls.enabled = false; if (globe.active) globe.frame(dt); frames++; fpsT += dt; globeWas = true; return; } // up on the globe (or nothing built yet): the city waits
   if (globeWas) { globeWas = false; controls.enabled = !sky.busy(); }
-  const { city, outskirts, daylight, disasters, sirens } = W, B = city.bounds, pilot = [game.flight, game.drive, game.takeover, game.bandGame, game.fightTest].find(c => c && c.active) || null, fl = !!pilot; // flying a plane, on the ground (drive.js), driving a disaster (takeover.js) or playing the band (rhythm.js): it has the camera
+  const { city, outskirts, daylight, disasters, sirens } = W, B = city.bounds, pilot = [game.flight, game.drive, game.takeover, game.bandGame, game.fightTest, game.horde].find(c => c && c.active) || null, fl = !!pilot; // flying a plane, on the ground (drive.js), driving a disaster (takeover.js) or playing the band (rhythm.js): it has the camera
   if (!fl) controls.update();
   // keep the view over the city
   const tg = controls.target;
@@ -223,6 +224,7 @@ game.flight = new Flight(game, { camera, controls, post, renderer }); // the San
 game.drive = new Drive(game, { camera, controls, post, renderer }); // and on the ground: the tank, the police officer and their cars
 game.takeover = new TakeOver(game, { camera, controls, post, renderer }); // and a disaster's own units, driven from behind
 game.fightTest = new FightTest(game, { camera, controls, post, renderer }); // one fight, to get the combat right
+game.horde = new Horde(game, { camera, controls, post, renderer }); // Nova against hundreds of zombies in the street
 game.bandGame = new BandGame(game, { camera, controls, post, renderer }); // and the band, played to the beat
 game.moveWorld = moveWorld;
 game.audio = new Audio(camera, controls); // sound: switched on by the first tap

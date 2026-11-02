@@ -1,6 +1,6 @@
 // The fight test (Sean: pick one fight and nail the combat, with no circles to tap). Nova against Tyrant on a bare plaza, a steady
 // iso camera, a health bar each. Tap anywhere: the hero lunges and strikes, in rhythm a combo (jab, jab, cross). Tap, tap, hold: an
-// uppercut that launches them, then tap to slam them down. The kit (Sean), each slot to be chosen from many later: 2 powers (a stun, a knockback), 2 melee attacks (tap combo, hold heavy), a block, 2 grabs (spin and toss; the feet and smash), 2 finishers, which alone can end the fight: at zero health Tyrant stands dazed and wobbly and two gold buttons appear; the neck drag (hold and steer, let go to fling) or the sky (hold: the higher; tap: fly up past them; hold: the grab; hold: the shockwave, up to a mini nuke). Blocking and dashing cost power. Tap, hold: grabbed and spun round, let go to toss. Hold from rest: a charged heavy. Swipe: a dodge that way; dodged just
+// uppercut that launches them, then tap to slam them down. The kit (Sean), each slot to be chosen from many later: 2 powers (a stun, a knockback), 2 melee attacks (tap combo, hold heavy), a block, 2 grabs (spin and toss; the feet and smash), 2 finishers, which alone can end the fight: at zero health Tyrant stands dazed and wobbly and two gold buttons appear; the neck drag (hold and steer, let go to fling) or the sky (hold: the higher; tap: fly up past them; hold: the grab; hold: the shockwave, up to a mini nuke). Blocking and dashing cost power. When Nova drops to no health she stands dazed and Tyrant does a finisher on her: the neck drag or the sky (vfin). Tap, hold: grabbed and spun round, let go to toss. Hold from rest: a charged heavy. Swipe: a dodge that way; dodged just
 // as a blow comes, time slows and a tap counters. Tyrant walks round the hero and has three attacks you read on the body and on
 // the ground (jab, charge, grab), each stopped by a hit while winding up. Blows land only if the bodies really meet. Good fighting fills a meter that pays for two powers: a stun (ice, no damage, under 2 s) and a knockback (the laser, next to no damage, stops anything, frees you from a grab). Sandbox card;
 // main.js hands it the camera like the planes. Leaving reloads the town, so nothing here has to be put back.
@@ -17,7 +17,7 @@ const still = (p) => ({ keys: [key(0, p)] });
 const GUARD = CLIPS.guardL.keys[0].p;
 const COILED = { bodyY: -0.1, torso: 0.45, chest: 0.2, head: -0.3, shL: { x: 0.5, z: -0.4 }, shR: { x: 0.5, z: 0.4 }, elL: -1.2, elR: -1.2, hipL: -0.6, hipR: -0.2, kneeL: 0.9, kneeR: 0.5 };
 const KD = { body: -1.5, head: 0.3, shL: { x: -0.4, z: -1.1 }, shR: { x: -0.4, z: 1.1 }, elL: -0.4, elR: -0.3, hipL: -0.3, kneeL: 0.5, kneeR: 0.1 };
-const C = {
+export const C = {
   guard: still(GUARD),
   dodge: still({ body: 0.3, torso: 0.4, chest: 0.2, shL: { x: -0.3, z: -0.5 }, shR: { x: 0.5, z: 0.5 }, elL: -1.3, elR: -1.3, hipL: -0.8, kneeL: 1.2, hipR: 0.4, kneeR: 0.5 }),
   charge: { keys: [key(0, GUARD), key(0.3, CLIPS.hammerUp.keys[0].p, 'out')] },
@@ -56,7 +56,7 @@ const COMBO = ['jabL', 'jabR', 'cross'];
 const COST = { freeze: 50, laser: 35 }, CAN_TARGET = ['idle', 'close', 'wind', 'strike', 'rush', 'stumble', 'stun', 'block', 'frozen'];
 const A0 = 0.95, A1 = Math.PI * 2 - 0.95, SMASH_DMG = [12, 14, 16]; // the swing's ends: their head on the ground in front, then behind
 const AZ0 = Math.atan2(0.6, 0.8), G = 24, ARENA = 40, TAP_MS = 220, SWIPE_PX = 26, COMBO_T = 0.6, DASH_COST = 12;
-const CSS = `
+export const CSS = `
 #zd-fight{position:fixed;left:0;top:0;right:0;bottom:0;z-index:28;touch-action:none;user-select:none;-webkit-user-select:none;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#fff}
 body.zd-flying #zd-bar,body.zd-flying #zd-dis,body.zd-flying #zd-followchip,body.zd-flying #zd-globe,body.zd-flying #zd-top{display:none!important}
 #zd-fight .bars{position:absolute;left:12px;right:64px;top:calc(10px + env(safe-area-inset-top));display:flex;gap:10px;pointer-events:none;font:800 12px/1.2 system-ui,sans-serif;text-shadow:0 1px 3px #000}
@@ -87,7 +87,7 @@ body.zd-flying #zd-bar,body.zd-flying #zd-dis,body.zd-flying #zd-followchip,body
 `;
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3();
 
-class Body {
+export class Body {
   constructor(r, hpMax) {
     this.r = r; this.hp = this.hpMax = hpMax; this.x = 0; this.y = 0; this.z = 0; this.vx = 0; this.vz = 0; this.vy = 0; this.yaw = 0; this.state = 'idle'; this.t = 0; this.clip = C.guard; this.ct = 0; this.blend = 1; this.phase = 0; this.walkK = 0;
     this.joints = [r.body, r.torso, r.chest, r.head]; for (const a of r.arms) this.joints.push(a.sh, a.el, a.wr); for (const l of r.legs) this.joints.push(l.hip, l.knee, l.ank); this.snap = this.joints.map(() => new THREE.Euler());
@@ -113,7 +113,7 @@ class Body {
 export class FightTest {
   constructor(g, ctx) { this.g = g; this.ctx = ctx; this.active = false; this.near = 1.5; this.focus = 60; this.lod = 0; }
   start() {
-    const g = this.g, D = g.disasters; for (const p of [g.flight, g.drive, g.takeover, g.bandGame]) if (p && p.active) p.stop(true); if (g.takeover && g.takeover.picking) g.takeover.endPick();
+    const g = this.g, D = g.disasters; for (const p of [g.flight, g.drive, g.takeover, g.bandGame, g.horde]) if (p && p.active) p.stop(true); if (g.takeover && g.takeover.picking) g.takeover.endPick();
     const B = g.city.bounds, cx = this.cx = (B.x0 + B.x1) / 2, cz = this.cz = (B.z0 + B.z1) / 2, { camera, controls, post } = this.ctx, S = D.ctx.scene;
     this.active = true; controls.enabled = false; g.setFollow(-1); document.body.classList.add('zd-flying'); post.opts.dof = true;
     // clear a district and raise a bare plaza over its streets, so the people and cars of the town are out of the fight
@@ -148,17 +148,17 @@ export class FightTest {
   restart() {
     const h = this.h, v = this.v, cx = this.cx, cz = this.cz; if (this.endEl) { this.endEl.remove(); this.endEl = null; }
     Object.assign(h, { x: cx - 5, z: cz + 3.5, y: this.top, vx: 0, vz: 0, vy: 0, hp: h.hpMax, yaw: 0 }); Object.assign(v, { x: cx + 5, z: cz - 3.5, y: this.top, vx: 0, vz: 0, vy: 0, hp: v.hpMax, yaw: 0 }); h.go('idle', C.guard); v.go('idle', C.guard);
-    this.over = false; this.fin = false; this.finSaid = false; if (this.vh) this.vh.style.background = 'linear-gradient(90deg,#b23cff,#ff5a5a)'; if (this.boxes) { for (const b of this.boxes) { b.up = true; b.m.visible = true; } for (const m of this.scars) this.g.disasters.ctx.scene.remove(m); this.scars.length = 0; this.lastScar = null; } this.energy = 40; this.finKind = null; this.finStage = null; this.finSlow = 1; this.waving = false; this.finLet = false; this.k1 = this.k2 = this.k3 = 0; if (this.finEl) this.finEl.classList.remove('show'); v.bodyX = null; if (this.ice) this.dropIce(); this.v.overT = 0; this.grabCd = 0; this.combo = 0; this.comboT = 0; this.buffer = false; this.counterT = 0; this.slow = 0; this.cool = 1.4; this.dirC = 1; this.mash = 0; this.hits = 0; this.hitsT = 0; this.atk = null; this.tellOff(); this.say('', 0); const hi = this.el.querySelector('.hint'); this.hint0 = this.hint0 || hi.innerHTML; hi.innerHTML = this.hint0; hi.style.opacity = '0.9'; clearTimeout(this.hintT); this.hintT = setTimeout(() => { hi.style.opacity = '0'; }, 12000);
+    this.over = false; this.fin = false; this.finSaid = false; if (this.vh) this.vh.style.background = 'linear-gradient(90deg,#b23cff,#ff5a5a)'; if (this.boxes) { for (const b of this.boxes) { b.up = true; b.m.visible = true; } for (const m of this.scars) this.g.disasters.ctx.scene.remove(m); this.scars.length = 0; this.lastScar = null; } this.energy = 40; this.finKind = null; this.finStage = null; this.hDazed = false; this.vfKind = null; this.vfStage = null; this.finSlow = 1; this.waving = false; this.finLet = false; this.k1 = this.k2 = this.k3 = 0; if (this.finEl) this.finEl.classList.remove('show'); v.bodyX = null; if (this.ice) this.dropIce(); this.v.overT = 0; this.grabCd = 0; this.combo = 0; this.comboT = 0; this.buffer = false; this.counterT = 0; this.slow = 0; this.cool = 1.4; this.dirC = 1; this.mash = 0; this.hits = 0; this.hitsT = 0; this.atk = null; this.tellOff(); this.say('', 0); const hi = this.el.querySelector('.hint'); this.hint0 = this.hint0 || hi.innerHTML; hi.innerHTML = this.hint0; hi.style.opacity = '0.9'; clearTimeout(this.hintT); this.hintT = setTimeout(() => { hi.style.opacity = '0'; }, 12000);
   }
   stop() { if (!this.active) return; this.active = false; removeEventListener('keydown', this.onKey); travel(placeKey(), 'sandbox'); }
   say(text, T = 0.7, col = '#fff') { this.sayEl.textContent = text; this.sayEl.style.color = col; this.sayEl.style.opacity = text ? '1' : '0'; this.sayT = T; }
   // ---------- input
-  blockOn() { const h = this.h; if (this.over || !['idle', 'attack', 'lunge', 'charge', 'land', 'dodge', 'cast'].includes(h.state)) return; if (this.energy < 1) { this.say('NO POWER TO BLOCK', 0.6, '#9fd4ff'); return; } this.energy -= this.energy / 3; this.atk = null; this.buffer = false; this.charging = false; this.combo = 0; this.comboT = 0; h.vx *= 0.2; h.vz *= 0.2; h.go('block', C.guardUp); this.blkEl.classList.add('on'); }
+  blockOn() { const h = this.h; if (this.over || this.hDazed || !['idle', 'attack', 'lunge', 'charge', 'land', 'dodge', 'cast'].includes(h.state)) return; if (this.energy < 1) { this.say('NO POWER TO BLOCK', 0.6, '#9fd4ff'); return; } this.energy -= this.energy / 3; this.atk = null; this.buffer = false; this.charging = false; this.combo = 0; this.comboT = 0; h.vx *= 0.2; h.vz *= 0.2; h.go('block', C.guardUp); this.blkEl.classList.add('on'); }
   blockOff() { const h = this.h; this.blkEl.classList.remove('on'); if (h.state === 'block') h.go('idle', C.guard); }
   // a blow taken on the block: a fifth of it; just as it was raised, none, and they stagger. Grabs go straight through a block
   blocked(n, kb) { const h = this.h, v = this.v, d = this.dist() || 1, parry = h.t < 0.22; h.hp -= parry ? 0 : n * 0.2; h.vx = (h.x - v.x) / d * kb; h.vz = (h.z - v.z) / d * kb; this.gain(parry ? 18 : 5); this.spark(h.x, h.y + 3, h.z, parry ? 3 : 2, [1, 1.7, 2.6]); sfx('thud', h.x, h.y + 3, h.z, { gain: 0.9, rate: 1.5 }); this.g.hitStop = Math.max(this.g.hitStop || 0, parry ? 0.1 : 0.05); this.say(parry ? 'PARRY!' : 'BLOCKED', 0.6, '#9fd4ff'); if (parry) { v.vx = -h.vx * 0.7; v.vz = -h.vz * 0.7; v.go('stun', CLIPS.hitBody); v.t = -0.35; } }
   tap() {
-    if (this.over) return; const h = this.h, v = this.v; if (this.finKind) { this.finTap(); return; } if (v.state === 'dazed') { this.say('PICK A FINISHER', 0.6, '#ffd27a'); return; }
+    if (this.over || this.hDazed) return; const h = this.h, v = this.v; if (this.finKind) { this.finTap(); return; } if (v.state === 'dazed') { this.say('PICK A FINISHER', 0.6, '#ffd27a'); return; }
     if (h.state === 'ankles') { this.smash(); return; } if (h.state === 'smash') { this.buffer = true; return; }
     if (v.state === 'down' && v.hp > 0 && this.grabCd <= 0 && ['idle', 'attack', 'land'].includes(h.state)) { v.t = 0; this.startAtk('ankle'); return; }
     if (h.state === 'grabbed') { this.mash++; sfx('thud', h.x, h.y + 2, h.z, { gain: 0.5, rate: 1.4 }); return; }
@@ -168,14 +168,14 @@ export class FightTest {
   nextAtk() { if (this.comboT <= 0) this.combo = 0; this.startAtk(COMBO[this.combo % 3]); }
   startAtk(name) { const h = this.h, v = this.v; this.spinLet = false; if (name !== 'heavy' && name !== 'counter' && name !== 'seize' && ['idle', 'close'].includes(v.state) && !this.over && Math.random() < 0.45) { v.go('block', C.block); v.vx = 0; v.vz = 0; } this.atk = name; this.landed = false; this.buffer = false; this.comboT = 0; if (this.dist() > ATK[name].reach - 0.9) { h.go('lunge', ATK[name].clip === CLIPS.hammerDown ? C.charge : C.guard); sfx('whoosh', h.x, h.y, h.z, { gain: 0.5, rate: 1.5 }); } else { h.go('attack', ATK[name].clip); } }
   swipe(dx, dy) {
-    if (this.over) return; const h = this.h, v = this.v; if (!['idle', 'attack', 'lunge', 'charge'].includes(h.state)) return; if (this.energy < DASH_COST) { this.say('NO POWER TO DASH', 0.6, '#9fd4ff'); return; } this.energy -= DASH_COST;
+    if (this.over || this.hDazed) return; const h = this.h, v = this.v; if (!['idle', 'attack', 'lunge', 'charge'].includes(h.state)) return; if (this.energy < DASH_COST) { this.say('NO POWER TO DASH', 0.6, '#9fd4ff'); return; } this.energy -= DASH_COST;
     const cam = this.ctx.camera; _a.setFromMatrixColumn(cam.matrixWorld, 0); _a.y = 0; _a.normalize(); cam.getWorldDirection(_b); _b.y = 0; _b.normalize(); const l = Math.hypot(dx, dy) || 1, wx = _a.x * dx / l - _b.x * dy / l, wz = _a.z * dx / l - _b.z * dy / l, wl = Math.hypot(wx, wz) || 1;
     h.vx = wx / wl * 27; h.vz = wz / wl * 27; h.go('dodge', C.dodge); h.yaw = Math.atan2(h.vx, h.vz); this.combo = 0; this.comboT = 0; this.buffer = false; this.charging = false; sfx('whoosh', h.x, h.y, h.z, { gain: 0.8, rate: 1.1 });
     // just in time: the blow about to land or landing, and near enough to have mattered
     const late = (v.state === 'wind' && v.T - v.t < 0.28) || v.state === 'strike' || v.state === 'rush'; if (late && (this.dist() < 7 || v.state === 'rush' || v.kind === 'charge')) { this.gain(25); this.counterT = 0.95; this.slow = 0.45; this.say('COUNTER! TAP!', 0.9, '#ffd27a'); }
   }
-  hold() { const h = this.h, v = this.v; if (this.finKind) return this.finHold(); if (v.state === 'dazed') return false; if (h.state === 'ankles') { v.go('swung', C.swung); h.go('spin', C.spinH); this.spinA = h.yaw; this.turned = 0; this.spinAdd = 0; this.say('SPIN! LET GO TO TOSS', 0.8, '#ffd27a'); sfx('whoosh', h.x, h.y + 2, h.z, { gain: 0.9 }); return true; } if (this.over || !['idle', 'attack'].includes(h.state) || (h.state === 'attack' && !this.landed)) return false; if (this.combo === 1 && this.comboT > 0) { this.startAtk('seize'); return true; } h.go('charge', C.charge); this.charging = true; this.k = 0; return true; }
-  release() { const h = this.h; if (this.finKind) { this.finRelease(); return; } if (h.state === 'spin') { this.toss(); return; } if (this.atk === 'seize' || this.atk === 'neck') { this.spinLet = true; return; } if (h.state !== 'charge') return; this.charging = false; this.heavyK = this.k; this.startAtk('heavy'); }
+  hold() { const h = this.h, v = this.v; if (this.hDazed) return false; if (this.finKind) return this.finHold(); if (v.state === 'dazed') return false; if (h.state === 'ankles') { v.go('swung', C.swung); h.go('spin', C.spinH); this.spinA = h.yaw; this.turned = 0; this.spinAdd = 0; this.say('SPIN! LET GO TO TOSS', 0.8, '#ffd27a'); sfx('whoosh', h.x, h.y + 2, h.z, { gain: 0.9 }); return true; } if (this.over || !['idle', 'attack'].includes(h.state) || (h.state === 'attack' && !this.landed)) return false; if (this.combo === 1 && this.comboT > 0) { this.startAtk('seize'); return true; } h.go('charge', C.charge); this.charging = true; this.k = 0; return true; }
+  release() { const h = this.h; if (this.hDazed) { if (h.state === 'charge') { this.charging = false; h.go('idle', C.guard); } return; } if (this.finKind) { this.finRelease(); return; } if (h.state === 'spin') { this.toss(); return; } if (this.atk === 'seize' || this.atk === 'neck') { this.spinLet = true; return; } if (h.state !== 'charge') return; this.charging = false; this.heavyK = this.k; this.startAtk('heavy'); }
   // ---------- each frame
   dist() { return Math.hypot(this.v.x - this.h.x, this.v.z - this.h.z); }
   face(f, o, dt, k = 14) { let a = Math.atan2(o.x - f.x, o.z - f.z) - f.yaw; a = Math.atan2(Math.sin(a), Math.cos(a)); f.yaw += a * Math.min(1, dt * k); }
@@ -185,22 +185,22 @@ export class FightTest {
       if (this.slow > 0) { this.slow -= dt; } this.rdt = dt; const ft = dt * (this.slow > 0 ? 0.3 : 1) * (this.finSlow || 1);
       if (this.counterT > 0) this.counterT -= dt; if (this.sayT > 0) { this.sayT -= dt; if (this.sayT <= 0) this.say('', 0); } if (this.hitsT > 0) { this.hitsT -= dt; if (this.hitsT <= 0) this.hits = 0; } if (this.comboT > 0) this.comboT -= ft; if (this.grabCd > 0) this.grabCd -= ft;
       this.heroStep(ft); this.vilStep(ft); this.separate(); this.clamp(h); this.clamp(v);
-      h.pose(ft, this.top, this.grounded(h)); v.pose(v.state === 'frozen' ? 0 : ft, this.top, this.grounded(v)); if (v.state === 'dazed') this.wobble(v); this.fxStep(dt);
+      h.pose(ft, this.top, this.grounded(h)); v.pose(v.state === 'frozen' ? 0 : ft, this.top, this.grounded(v)); if (v.state === 'dazed') this.wobble(v); if (h.state === 'dazed') this.wobble(h); this.fxStep(dt);
       this.ee.style.width = this.energy + '%'; for (const k in this.pwBtn) this.pwBtn[k].classList.toggle('ok', this.energy >= COST[k]);
       this.hh.style.width = Math.max(0, h.hp / h.hpMax * 100) + '%'; this.vh.style.width = Math.max(0, v.hp / v.hpMax * 100) + '%';
-      this.heroStreak.update(_c.set(h.x, h.y + 2.2, h.z), ['lunge', 'dodge', 'skyRise', 'skyDive', 'finRun'].includes(h.state), this.ctx.camera, ft); this.vilStreak.update(_c.set(v.x, v.y + 2.2, v.z), v.state === 'rush', this.ctx.camera, ft);
+      this.heroStreak.update(_c.set(h.x, h.y + 2.2, h.z), ['lunge', 'dodge', 'skyRise', 'skyDive', 'finRun'].includes(h.state), this.ctx.camera, ft); this.vilStreak.update(_c.set(v.x, v.y + 2.2, v.z), v.state === 'rush' || v.state === 'vrise' || v.state === 'vdive', this.ctx.camera, ft);
     }
     this.place(dt); g.focusAt = _a.copy(this.look); tg.set(g.focusAt.x, 0, g.focusAt.z); this.focus = this.ctx.camera.position.distanceTo(g.focusAt);
   }
-  grounded(f) { return f.y <= this.top + 0.01 && !['down', 'getup', 'flung', 'air', 'slammed', 'grabbed', 'held', 'swung', 'pinned', 'dragged', 'drag', 'hang', 'dived', 'skyRise', 'skyTop', 'skyGrab', 'skyDive'].includes(f.state); }
+  grounded(f) { return f.y <= this.top + 0.01 && !['down', 'getup', 'flung', 'air', 'slammed', 'grabbed', 'held', 'swung', 'pinned', 'dragged', 'drag', 'hang', 'dived', 'skyRise', 'skyTop', 'skyGrab', 'skyDive', 'vdragged', 'vdrag', 'vair', 'vhang', 'vdived', 'vrise', 'vgrab', 'vdive'].includes(f.state); }
   clamp(f) { for (const b of this.boxes) { if (!b.up) continue; const ox = f.x - b.x, oz = f.z - b.z, m = b.hw + 1.1; if (Math.abs(ox) < m && Math.abs(oz) < m) { if (Math.abs(ox) > Math.abs(oz)) f.x = b.x + Math.sign(ox) * m; else f.z = b.z + Math.sign(oz) * m; } } const dx = f.x - this.cx, dz = f.z - this.cz, d = Math.hypot(dx, dz); if (d > ARENA) { f.x = this.cx + dx / d * ARENA; f.z = this.cz + dz / d * ARENA; f.vx *= 0.3; f.vz *= 0.3; } }
-  separate() { const h = this.h, v = this.v; if (Math.abs(h.y - v.y) > 3 || v.state === 'swung' || v.state === 'pinned' || v.state === 'dragged' || h.state === 'grabbed' || h.state === 'dodge' || v.state === 'rush') return; const dx = v.x - h.x, dz = v.z - h.z, d = Math.hypot(dx, dz) || 0.01; if (d < 1.9) { const p = (1.9 - d) / 2, nx = dx / d, nz = dz / d; h.x -= nx * p; h.z -= nz * p; v.x += nx * p; v.z += nz * p; } }
+  separate() { const h = this.h, v = this.v; if (this.hDazed || Math.abs(h.y - v.y) > 3 || v.state === 'swung' || v.state === 'pinned' || v.state === 'dragged' || h.state === 'grabbed' || h.state === 'dodge' || v.state === 'rush') return; const dx = v.x - h.x, dz = v.z - h.z, d = Math.hypot(dx, dz) || 0.01; if (d < 1.9) { const p = (1.9 - d) / 2, nx = dx / d, nz = dz / d; h.x -= nx * p; h.z -= nz * p; v.x += nx * p; v.z += nz * p; } }
   walk(f, tx, tz, sp, dt) { const dx = tx - f.x, dz = tz - f.z, d = Math.hypot(dx, dz) || 1; f.x += dx / d * sp * dt; f.z += dz / d * sp * dt; f.phase += sp * dt * 1.1; f.walkK += (1 - f.walkK) * Math.min(1, dt * 10); }
   slide(f, dt, fr = 7) { f.x += f.vx * dt; f.z += f.vz * dt; const k = Math.exp(-fr * dt); f.vx *= k; f.vz *= k; }
   heroStep(dt) {
     const h = this.h, v = this.v; h.t += dt; h.walkK *= Math.exp(-dt * 10); const d = this.dist();
     switch (h.state) {
-      case 'idle': if (this.finKind && !this.over && (this.finStage === 'run' || this.finStage === 'up')) { h.go('finRun', C.guard); break; } this.slide(h, dt); this.face(h, v, dt); if (d > 9 && !this.over) this.walk(h, v.x, v.z, 5.5, dt); if (h.clip !== C.guard) h.play(C.guard); break;
+      case 'idle': if (this.hDazed && !this.over) { this.dazeHero(); break; } if (this.finKind && !this.over && (this.finStage === 'run' || this.finStage === 'up')) { h.go('finRun', C.guard); break; } this.slide(h, dt); this.face(h, v, dt); if (d > 9 && !this.over) this.walk(h, v.x, v.z, 5.5, dt); if (h.clip !== C.guard) h.play(C.guard); break;
       case 'lunge': { this.face(h, v, dt, 22); const A = ATK[this.atk], gap = A.reach - 1, sp = 30; if (v.state === 'air') { h.go('idle', C.guard); break; } if (d <= gap || h.t > 0.7) { h.go('attack', A.clip); break; } h.x += (v.x - h.x) / d * sp * dt; h.z += (v.z - h.z) / d * sp * dt; h.phase += dt * 30; h.walkK = 0.6; break; }
       case 'attack': { const A = ATK[this.atk]; this.face(h, v, dt, 18); this.slide(h, dt); if (!this.landed && h.t >= A.at) { this.landed = true; this.contact(A); if (h.state !== 'attack') break; } if (h.t >= A.end) this.afterAtk(); else if (this.buffer && this.landed && h.t >= A.at + 0.09 && COMBO.includes(this.atk)) this.afterAtk(); break; }
       case 'charge': this.face(h, v, dt); this.k = Math.min(1, this.k + dt / 0.9); h.r.root.position.y += 0; if (Math.random() < 0.3 * this.k) this.g.disasters.brawl.stunts.ring(h.x, this.top + 0.3, h.z, 1.6 + 2 * this.k, 0.25, new THREE.Color(1.6, 0.5, 1.4), 0.6); break;
@@ -212,10 +212,14 @@ export class FightTest {
       case 'block': this.slide(h, dt, 6); this.face(h, v, dt, 12); this.energy = Math.max(0, this.energy - this.rdt * 10); if (this.energy <= 0) { this.blockOff(); this.say('NO POWER', 0.5, '#9fd4ff'); } break;
       case 'cast': if (h.t > 0.32) h.go('idle', C.guard); break;
       case 'dodge': this.slide(h, dt, 4); if (h.t > 0.26) { h.vx *= 0.15; h.vz *= 0.15; h.go('idle', C.guard); } break;
-      case 'hurt': this.slide(h, dt); this.face(h, v, dt, 6); if (h.t > 0.4) h.go('idle', C.guard); break;
-      case 'flung': case 'air': h.vy -= G * dt; h.y += h.vy * dt; this.slide(h, dt, 1); h.play === 0; if (h.y <= this.top) { h.y = this.top; h.vy = 0; h.vx *= 0.3; h.vz *= 0.3; this.puff(h, 0.5); h.go('down', C.down); } break;
-      case 'down': this.slide(h, dt); if (h.t > 0.55 && !this.over) h.go('getup', C.getup); break;
-      case 'getup': if (h.t > 0.55) h.go('idle', C.guard); break;
+      case 'hurt': this.slide(h, dt); this.face(h, v, dt, 6); if (h.t > 0.4) { if (this.hDazed) this.dazeHero(); else h.go('idle', C.guard); } break;
+      case 'flung': case 'air': if (Math.hypot(h.vx, h.vz) > 8 && this.vfStage === 'done') this.smashBoxes(h.x, h.z, 1.2, 0); h.vy -= G * dt; h.y += h.vy * dt; this.slide(h, dt, 1); if (h.y <= this.top) { h.y = this.top; h.vy = 0; h.vx *= 0.3; h.vz *= 0.3; this.puff(h, 0.5); h.go('down', C.down); } break;
+      case 'down': this.slide(h, dt); if (this.vfStage === 'done') { if (!this.over && h.t > (this.vfKind === 'sky' ? 1.6 : 0.5)) this.finish(false); break; } if (h.t > 0.55 && !this.over) h.go('getup', C.getup); break;
+      case 'getup': if (h.t > 0.55) { if (this.hDazed) { this.dazeHero(); break; } h.go('idle', C.guard); } break;
+      case 'dazed': this.face(h, v, dt, 2); h.walkK = 0; break;
+      case 'vdragged': case 'vdived': break;
+      case 'vair': h.vy -= G * dt; h.y += h.vy * dt; if (h.vy < 1) { h.vy = 0; h.go('vhang', CLIPS.hitUp); this.vfStage = 'rise'; v.y0 = v.y; v.go('vrise', CLIPS.dash); this.finSlow = 0.5; sfx('whoosh', v.x, v.y, v.z, { gain: 1.1, rate: 0.9 }); } break;
+      case 'vhang': h.y += Math.sin(h.t * 3) * dt * 0.4; break;
       case 'finRun': { this.face(h, v, dt, 22); if (d <= 2.9 || h.t > 1.2) { if (this.finKind === 'neck') this.startAtk('neck'); else { h.go('skyCharge', C.chargeWind); this.k1 = 0; this.finStage = 'charge'; if (!this.finLet) this.say('HOLD: HIGHER!', 0.9, '#ffd27a'); } break; } h.x += (v.x - h.x) / d * 30 * dt; h.z += (v.z - h.z) / d * 30 * dt; h.phase += dt * 30; h.walkK = 0.6; break; }
       case 'skyCharge': this.face(h, v, dt, 20); this.k1 = Math.min(1, this.k1 + this.rdt / 1.6); if (Math.random() < 0.45) this.g.disasters.brawl.stunts.ring(h.x, this.top + 0.3, h.z, 1.4 + 3.5 * this.k1, 0.25, new THREE.Color(1.8, 1.4, 0.6), 0.7); if (this.finLet || this.k1 >= 1) this.skyPunch(); break;
       case 'skyRise': { const k = Math.min(1, h.t / 0.35); h.x += (v.x - h.x) * Math.min(1, dt * 14); h.z += (v.z - h.z) * Math.min(1, dt * 14); h.y = h.y0 + (v.y + 3.2 - h.y0) * (1 - (1 - k) * (1 - k)); if (k >= 1) { h.go('skyTop', CLIPS.liftOverhead); this.finSlow = 0.35; this.say('HOLD: GRAB THEM!', 1.4, '#ffd27a'); } break; }
@@ -292,7 +296,7 @@ export class FightTest {
   gain(n) { this.energy = Math.min(100, this.energy + n); }
   // a power: paid for only if it can work now
   cast(id) {
-    if (this.over) return; const h = this.h, v = this.v, free = id === 'laser' && v.state === 'hold', okH = ['idle', 'attack', 'lunge', 'dodge', 'charge', 'land', 'block'].includes(h.state) || (free && h.state === 'grabbed');
+    if (this.over || this.hDazed) return; const h = this.h, v = this.v, free = id === 'laser' && v.state === 'hold', okH = ['idle', 'attack', 'lunge', 'dodge', 'charge', 'land', 'block'].includes(h.state) || (free && h.state === 'grabbed');
     if (this.energy < COST[id]) { this.say('NOT ENOUGH ENERGY', 0.6, '#9fd4ff'); return; } if (!okH || (!CAN_TARGET.includes(v.state) && !free) || (id === 'freeze' && v.state === 'frozen')) { this.say('NOT NOW', 0.5, '#9fd4ff'); return; }
     this.energy -= COST[id]; this.atk = null; this.buffer = false; this.charging = false; this.counterT = 0; this.tellOff(); v.armor = false;
     if (free) { h.y = this.top; }
@@ -318,7 +322,7 @@ export class FightTest {
   hurtV(n) { const v = this.v; v.hp -= n; if (v.hp < 0) v.hp = 0; }
   finishable() { return this.v.state === 'dazed' && !this.over; }
   killBlow() { this.fin = true; this.hurtV(9999); this.g.disasters.flash(0.2); this.g.hitStop = Math.max(this.g.hitStop || 0, 0.16); this.g.shake = Math.max(this.g.shake || 0, 1.2); this.say('FINISHED!', 1.4, '#ffd27a'); }
-  hurtH(n, why) { const h = this.h; h.hp -= n; this.gain(4); this.combo = 0; this.comboT = 0; this.buffer = false; this.charging = false; this.hits = 0; this.counterT = 0; this.g.shake = Math.max(this.g.shake || 0, 0.4); this.g.hitStop = Math.max(this.g.hitStop || 0, 0.06); this.spark(h.x, h.y + 3, h.z, 2.2, [2.4, 0.4, 0.3]); sfx('thud', h.x, h.y + 2, h.z, { gain: 1.1, rate: 0.8 }); if (why) this.say(why, 0.7, '#ff8a7a'); }
+  hurtH(n, why) { const h = this.h; h.hp -= n; if (h.hp <= 0) { h.hp = 0; if (!this.hDazed) { this.hDazed = true; this.say('TYRANT FINISHES YOU', 1.6, '#ff8a7a'); this.hh.style.background = 'linear-gradient(90deg,#ff5a5a,#ffb0a0)'; } } this.gain(4); this.combo = 0; this.comboT = 0; this.buffer = false; this.charging = false; this.hits = 0; this.counterT = 0; this.g.shake = Math.max(this.g.shake || 0, 0.4); this.g.hitStop = Math.max(this.g.hitStop || 0, 0.06); this.spark(h.x, h.y + 3, h.z, 2.2, [2.4, 0.4, 0.3]); sfx('thud', h.x, h.y + 2, h.z, { gain: 1.1, rate: 0.8 }); if (why) this.say(why, 0.7, '#ff8a7a'); }
   spark(x, y, z, R, c = [2.2, 1.9, 1.3]) { const D = this.g.disasters; D.brawl.stunts.ring(x, y, z, R, 0.16, new THREE.Color(c[0], c[1], c[2]), 0.9); for (let i = 0; i < 5; i++) { const s = 0.12 + Math.random() * 0.14; D.debris.add(x, y, z, s, s, s, 0xfff2c0, 'fly', { v: [(Math.random() - 0.5) * 12, 2 + Math.random() * 6, (Math.random() - 0.5) * 12], life: 0.8 }); } }
   puff(f, k) { const D = this.g.disasters; D.brawl.stunts.ring(f.x, this.top + 0.25, f.z, 3 + 8 * k, 0.3, new THREE.Color(1.2, 1.1, 0.9), 0.6); for (let i = 0; i < 8 * k + 3; i++) { const a = Math.random() * 6.28, s = 0.2 + Math.random() * 0.4; D.debris.add(f.x, this.top + 0.2, f.z, s, s * 0.6, s, 0x9a9184, 'fly', { v: [Math.cos(a) * 6, 2 + Math.random() * 4, Math.sin(a) * 6], life: 0.9 }); } sfx('thud', f.x, this.top, f.z, { gain: 0.6 + k, rate: 0.7 }); }
   tellOff() { this.tell.material.opacity = 0; this.strip.material.opacity = 0; }
@@ -326,7 +330,16 @@ export class FightTest {
   vilStep(dt) {
     const h = this.h, v = this.v; v.t += dt; v.walkK *= Math.exp(-dt * 10); const d = this.dist();
     if (v.hp <= 0 && !this.fin && ['idle', 'close', 'wind', 'strike', 'rush', 'block', 'stumble', 'stun', 'pushed', 'hold'].includes(v.state)) { this.daze(); return; }
+    if (this.hDazed && !this.vfKind && !this.over && ['idle', 'close', 'wind', 'strike', 'rush', 'block', 'stumble', 'stun', 'pushed', 'hold', 'frozen'].includes(v.state)) { if (v.state === 'frozen') this.shatter(); this.vfStart(); return; }
     switch (v.state) {
+      case 'vfin': { this.face(v, h, dt, 12); if (h.state !== 'dazed') break; if (d > 2.6) { this.walk(v, h.x, h.z, 8, dt); break; } if (this.vfKind === 'neck') this.vfNeck(); else { this.vfStage = 'charge'; v.go('vcharge', C.chargeWind); } break; }
+      case 'vdrag': { const ed = Math.hypot(v.x - this.cx, v.z - this.cz); if (ed > ARENA - 8) { let ca = Math.atan2(this.cx - v.x, this.cz - v.z) - this.dragYaw; ca = Math.atan2(Math.sin(ca), Math.cos(ca)); this.dragYaw += Math.sign(ca) * Math.min(Math.abs(ca), dt * 2.6); } const fx = Math.sin(this.dragYaw), fz = Math.cos(this.dragYaw), st = 21 * dt; v.x += fx * st; v.z += fz * st; v.y = this.top + 1; v.yaw = this.dragYaw; h.x = v.x - fx * 6; h.z = v.z - fz * 6; h.y = this.top + 0.35; h.yaw = this.dragYaw + Math.PI; h.bodyX = -1.5; this.scar(h.x + fx * 4, h.z + fz * 4, this.dragYaw); if (Math.random() < 0.8) this.chips(h.x + fx * 4, h.z + fz * 4); this.g.shake = Math.max(this.g.shake || 0, 0.14); this.smashBoxes(h.x + fx * 3, h.z + fz * 3, 2.6, 0); this.smashBoxes(v.x, v.z, 2, 0); if (v.t > 3) this.vfFling(); break; }
+      case 'vcharge': this.face(v, h, dt, 20); if (Math.random() < 0.5) this.g.disasters.brawl.stunts.ring(v.x, this.top + 0.3, v.z, 1.4 + 3.5 * Math.min(1, v.t / 0.9), 0.25, new THREE.Color(1.8, 0.5, 0.5), 0.7); if (v.t > 0.9) { v.go('vpunch', CLIPS.uppercut); this.vl = false; sfx('whoosh', v.x, v.y + 2, v.z, { gain: 1, rate: 0.7 }); } break;
+      case 'vpunch': if (!this.vl && v.t >= 0.28) { this.vl = true; this.spark(h.x, h.y + 3, h.z, 3); this.g.hitStop = Math.max(this.g.hitStop || 0, 0.08); this.g.shake = Math.max(this.g.shake || 0, 0.3); sfx('crash', h.x, h.y + 2, h.z, { gain: 1, rate: 0.8 }); h.go('vair', CLIPS.hitUp); h.vy = 34; h.y = this.top + 0.5; h.x = v.x; h.z = v.z; this.vfStage = 'up'; } break;
+      case 'vrise': { const k = Math.min(1, v.t / 0.35); v.x = h.x; v.z = h.z; v.y = v.y0 + (h.y + 3.2 - v.y0) * (1 - (1 - k) * (1 - k)); if (k >= 1) { v.go('vgrab', CLIPS.hammerUp); } break; }
+      case 'vgrab': v.x = h.x; v.z = h.z; v.y = h.y + 3.2 - 0.7 * Math.min(1, v.t / 0.6); if (v.t > 0.7) { this.vfStage = 'dive'; this.finSlow = 0.3; v.go('vdive', CLIPS.hammerDown); h.go('vdived', CLIPS.crushed); this.spark(h.x, h.y + 2, h.z, 2.5, [2.2, 0.6, 0.6]); } break;
+      case 'vdive': v.y -= 60 * dt; h.x = v.x; h.z = v.z; h.y = v.y - 2.8; h.yaw = v.yaw; if (h.y <= this.top) this.vfHit(); break;
+      case 'vdone': this.face(v, h, dt, 4); break;
       case 'dazed': this.face(v, h, dt, 2); v.walkK = 0; break;
       case 'hang': v.vy = 0; v.y += Math.sin(v.t * 3) * dt * 0.4; break;
       case 'dived': break;
@@ -361,12 +374,23 @@ export class FightTest {
   vilAtk(kind) { const v = this.v; v.kind = kind; this.lastK = kind; v.T = kind === 'jab' ? 0.5 : kind === 'grab' ? 0.62 : 0.8; v.go('wind', kind === 'jab' ? C.jabWind : kind === 'grab' ? C.grabWind : C.chargeWind); sfx('whoosh', v.x, v.y + 2, v.z, { gain: 0.55, rate: kind === 'charge' ? 0.6 : 1 }); }
   canHit() { const s = this.h.state; return !['dodge', 'down', 'getup', 'flung', 'slamUp', 'slamHit', 'grabbed'].includes(s) && this.h.y < this.top + 2; }
   hitHero(n, kb) { const h = this.h, v = this.v, d = this.dist() || 1; if (h.state === 'block') { this.blocked(n, kb); return; } this.hurtH(n); h.vx = (h.x - v.x) / d * kb; h.vz = (h.z - v.z) / d * kb; h.go('hurt', CLIPS.hitHeadL); if (h.hp <= 0) this.fling(0, h.vx / kb, h.vz / kb); }
-  fling(n, fx, fz, why) { const h = this.h; this.hurtH(n, why); h.vx = fx * 18; h.vz = fz * 18; h.vy = 8; h.go('flung', CLIPS.blownBack); if (h.hp <= 0) this.finish(false); }
+  // ---------- Tyrant's finishers on her: she stands dazed, he comes for her
+  dazeHero() { const h = this.h; h.go('dazed', C.stumble); h.vx = 0; h.vz = 0; h.vy = 0; h.y = this.top; this.atk = null; this.buffer = false; this.charging = false; this.counterT = 0; this.slow = 0; this.blockOff(); this.finEl.classList.remove('show'); }
+  vfStart() { const v = this.v, h = this.h; if (['grabbed', 'block', 'charge', 'cast', 'dodge', 'lunge', 'attack'].includes(h.state)) { h.y = this.top; this.atk = null; h.go('hurt', CLIPS.hitBody); } this.tellOff(); v.armor = false; v.vx = 0; v.vz = 0; v.bodyX = null; this.vfKind = Math.random() < 0.5 ? 'neck' : 'sky'; this.vfStage = 'run'; v.go('vfin', C.guard); this.finSlow = 1; }
+  vfNeck() { const v = this.v, h = this.h; this.dragYaw = Math.atan2(v.x - h.x, v.z - h.z); this.vfStage = 'drag'; this.dragDist = 0; v.y = this.top + 1; v.go('vdrag', C.drag); h.go('vdragged', C.dragged); this.g.hitStop = Math.max(this.g.hitStop || 0, 0.05); sfx('thud', h.x, h.y + 1, h.z, { gain: 1, rate: 0.8 }); this.say('BY THE NECK!', 0.9, '#ff8a7a'); }
+  vfFling() { const v = this.v, h = this.h, fx = Math.sin(this.dragYaw), fz = Math.cos(this.dragYaw); h.bodyX = null; h.x = v.x; h.z = v.z; h.y = this.top + 1.5; h.yaw = this.dragYaw + Math.PI; h.go('flung', CLIPS.blownBack); h.vx = fx * 24; h.vz = fz * 24; h.vy = 6; v.y = this.top; v.go('vdone', CLIPS.throw); this.vfStage = 'done'; this.g.disasters.flash(0.2); this.g.hitStop = Math.max(this.g.hitStop || 0, 0.16); this.g.shake = Math.max(this.g.shake || 0, 1.2); sfx('whoosh', h.x, h.y, h.z, { gain: 1.1, rate: 0.8 }); this.say('FINISHED', 1.4, '#ff8a7a'); }
+  vfHit() { const v = this.v, h = this.h, D = this.g.disasters, S = D.ctx.scene, R = 16, x = v.x, z = v.z; this.finSlow = 1; this.vfStage = 'done'; v.y = this.top; v.vy = 0; h.y = this.top; h.bodyX = null; h.go('down', C.down); v.go('vdone', CLIPS.land);
+    for (let i = 0; i < 5; i++) D.brawl.stunts.ring(x, this.top + 0.3 + i * 0.4, z, R * (1 - i * 0.07), 0.5 + 0.2 * i, new THREE.Color(1.7, 0.6, 0.5), 0.8);
+    for (let i = 0; i < 70; i++) { const a = Math.random() * 6.28, r = Math.random() * R * 0.5, sz = 0.3 + Math.random() * 0.8; D.debris.add(x + Math.cos(a) * r, this.top + 0.3, z + Math.sin(a) * r, sz, sz * 0.6, sz, Math.random() < 0.6 ? 0xb9b1a0 : 0x7d7566, 'fly', { v: [Math.cos(a) * 16, 4 + Math.random() * 16, Math.sin(a) * 16], life: 1.8 }); }
+    for (const b of this.boxes) if (b.up && Math.hypot(b.x - x, b.z - z) < R + b.hw) this.smashBoxes(b.x, b.z, 0.1, 0);
+    const m = new THREE.Mesh(new THREE.CircleGeometry(R * 0.35, 32).rotateX(-Math.PI / 2), this.scarMat); m.position.set(x, this.top + 0.04, z); S.add(m); this.scars.push(m);
+    D.flash(0.5); this.g.shake = Math.max(this.g.shake || 0, 2); this.g.hitStop = Math.max(this.g.hitStop || 0, 0.22); sfx('collapse', x, this.top, z, { gain: 1.4, rate: 0.5 }); sfx('crash', x, this.top, z, { gain: 1, rate: 0.6 }); this.say('FINISHED', 1.6, '#ff8a7a'); }
+  fling(n, fx, fz, why) { const h = this.h; this.hurtH(n, why); h.vx = fx * 18; h.vz = fz * 18; h.vy = 8; h.go('flung', CLIPS.blownBack); }
   finish(won) { if (this.over) return; this.over = true; this.tellOff(); const e = this.endEl = document.createElement('div'); e.className = 'end'; e.innerHTML = (won ? 'YOU WIN' : 'KNOCKED OUT') + '<button type="button">Fight again</button>'; e.querySelector('button').onclick = (ev) => { ev.stopPropagation(); this.restart(); }; this.el.appendChild(e); }
   // the camera: one steady angle, in and out only as far as keeps both in view
   place(dt) {
-    const h = this.h, v = this.v, cam = this.ctx.camera, mx = (h.x + v.x) / 2, mz = (h.z + v.z) / 2, up = Math.max(0, Math.max(h.y, v.y) - this.top), sep = Math.hypot(h.x - v.x, h.z - v.z), hf = Math.tan(cam.fov * Math.PI / 360) * cam.aspect, dragging = h.state === 'drag', want = Math.max(38, (sep + (dragging ? 13 : 7)) / (2 * hf)) * (1 + up * 0.03), el = 0.58;
-    this.dist0 = this.dist0 == null ? want : this.dist0 + (want - this.dist0) * Math.min(1, dt * (h.state === 'drag' ? 6 : 2.5)); const my = this.top + 2.2 + up * 0.8, D = this.dist0, ce = Math.cos(el) * D; this.look = this.look || new THREE.Vector3(mx, my, mz); this.look.lerp(_c.set(mx + (dragging ? Math.sin(h.yaw) * 3 : 0), my, mz + (dragging ? Math.cos(h.yaw) * 3 : 0)), Math.min(1, dt * (dragging ? 18 : 7)));
+    const h = this.h, v = this.v, cam = this.ctx.camera, mx = (h.x + v.x) / 2, mz = (h.z + v.z) / 2, up = Math.max(0, Math.max(h.y, v.y) - this.top), sep = Math.hypot(h.x - v.x, h.z - v.z), hf = Math.tan(cam.fov * Math.PI / 360) * cam.aspect, dragging = h.state === 'drag' || v.state === 'vdrag', want = Math.max(38, (sep + (dragging ? 13 : 7)) / (2 * hf)) * (1 + up * 0.03), el = 0.58;
+    this.dist0 = this.dist0 == null ? want : this.dist0 + (want - this.dist0) * Math.min(1, dt * (dragging ? 6 : 2.5)); const my = this.top + 2.2 + up * 0.8, D = this.dist0, ce = Math.cos(el) * D; this.look = this.look || new THREE.Vector3(mx, my, mz); this.look.lerp(_c.set(mx + (dragging ? Math.sin(this.dragYaw) * 3 : 0), my, mz + (dragging ? Math.cos(this.dragYaw) * 3 : 0)), Math.min(1, dt * (dragging ? 18 : 7)));
     if (this.az == null) { this.az = this.azTo = AZ0; } const cy = this.look.y + Math.sin(el) * D, at = (a) => _a.set(this.look.x + Math.sin(a) * ce, cy, this.look.z + Math.cos(a) * ce);
     // a small building between the camera and either fighter: swing round until both are in view, and home again when clear
     if (this.hidden(at(this.azTo))) { let best = null; for (let k = 1; k <= 8 && best == null; k++) for (const sg of [1, -1]) { const a = this.azTo + sg * k * 0.3; if (!this.hidden(at(a))) { best = a; break; } } if (best != null) this.azTo = best; } else if (Math.abs(this.azTo - AZ0) > 0.01 && !this.hidden(at(AZ0))) this.azTo = AZ0;
