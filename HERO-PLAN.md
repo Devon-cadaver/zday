@@ -12,20 +12,20 @@ Build order (one thing at a time, each tested in the Sandbox and pushed). The ch
 
 - [x] 1. Floors inside the buildings you smash through
 - [x] 2. Hero lab in the Sandbox: hero and villain levels, moves on or off, spawn any villain, the readout, the bench script
-- [ ] 3. Combat round 3 (3f left)
+- [x] 3. Combat round 3
   - [x] 3a. Fights in the town's iso view (and an iso flying view, the heroes' default)
   - [x] 3b. Villains fight back: dodge circles, grabs, the hero thrown, a second wind, shots at a hero flying in
   - [x] 3c. Six more hand-to-hand moves and the move chips
   - [x] 3d. Ranged powers: freeze, fire, lightning, sonic clap, gravity pulse, wind blast, shield, telekinesis (in the fights; against disasters in item 4)
-  - [ ] 3e. The combat animation pass: a clip system, more joints, choreographed moves, villain reactions, hit stop, camera punch-ins
+  - [x] 3e. The combat animation pass: a clip system, more joints, choreographed moves, villain reactions, hit stop, camera punch-ins
     - [x] 3e.1 the clip system, the chest, wrists and ankles, the uppercut and the jab combo done properly (the fight camera side on)
     - [x] 3e.2 the rest of the moves choreographed (kick, sky slam, ground pound, throw, hammer throw, elbow drop, a settle after every move)
     - [x] 3e.3 villain reactions for every hit, speed streaks, camera punch-ins
     - [x] 3e.4 Nova first: a matte woven suit with seams, dark gloves and boots with cuffs, shoulder pads, a collar, a buckle, a face (Sean to judge how far to take it)
     - [x] 3e.5 the same for Dragonfly, Tempo and the villains (cloth, cuffs, pads, collars, faces)
-  - [ ] 3f. From the street-fight inspiration
+  - [x] 3f. From the street-fight inspiration
     - [x] 3f.1 a second villain joins the fight, a breakable mask, the beaten carried off by a ship
-    - [ ] 3f.2 the rogue army: jets and helicopters firing on everyone, soldiers to save, saving them turns the army
+    - [x] 3f.2 the rogue army: jets and helicopters firing on everyone, soldiers to save, saving them turns the army
 - [ ] 4. Powers against disasters, one disaster at a time
 - [ ] 5. The collateral meter: damage, fear, reputation, towns that remember you
 - [ ] 6. Outfits for the three
