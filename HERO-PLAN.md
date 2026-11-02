@@ -53,6 +53,7 @@ Build order (one thing at a time, each tested in the Sandbox and pushed). The ch
   - [x] 12b2. Levels start floating over the town: Fly, Land, Lock on, or Base. The fight goes on while you are up or in the base, where you change outfit and powers and go back out. Alien soldiers that look like aliens, dropped by the saucers.
   - [x] 12b3. Story mode: BOOST held, powers on their own buttons. Level 1's saucers and tripods are real enemies: Lock on, ram, powers; rip a saucer out of the sky and throw it; punch a tripod's legs, dodge its red marks, lift the wreck and throw it; all must be down to win.
   - [x] 12b4. Locked on a saucer or tripod, in close like against a villain: tap to punch; GRAB, then Spin Toss or Smash Down, floating.
+  - [x] 12b5. Radio station: choose the songs, repeat one, cinematic music with action music in the fights.
   - [x] 12c. Agents play the whole game through and report what breaks or drags: first round done and tuned (no stop at walls, stragglers, the giants, Destroy's goal, the HUD). Run again as the game changes.
   - [ ] 12d. The weather levels, with their own play style, after these.
 

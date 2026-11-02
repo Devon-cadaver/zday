@@ -7,11 +7,14 @@
 // own start a few seconds before its ending so it carries on, and dipped under
 // the biggest explosions. Streamed from music/ through two players that take
 // turns (a track is only fetched when it is wanted), into the sound engine's
-// master volume. The note button steps loud, medium, quiet, off.
+// master volume. The note button steps loud, medium, quiet, off. The radio station (radiobox.js) picks the songs, repeats one,
+// and with the cinematic music on (the start) the fights have action music in place of them.
 import { sideButton } from './ui.js';
+import { openStation } from './radiobox.js';
 const BASE = import.meta.env.BASE_URL || './';
 const TRACKS = { calm: 'music/calm.mp3', storm: 'music/storm.mp3', rebuild: 'music/rebuild.mp3', theme: 'music/theme.mp3', theme2: 'music/theme2.mp3' };
 const THEMES = ['theme', 'theme2'];
+const SONGS = [['theme', 'My Little Disaster'], ['theme2', 'My Little Disaster (Far Isles)'], ['calm', 'Calm Before the Storm'], ['storm', 'Desert Pursuit'], ['rebuild', 'After the Storm']];
 const LEVELS = [0, 0.2, 0.38, 0.62]; // off, quiet, medium, loud
 const FADE = 4, TAIL = 6, AFTER = 150; // a mood change; the loop back to the start; how long the clean-up music plays after a disaster
 
@@ -28,6 +31,8 @@ export class Music {
     this.level = Number.isFinite(lv) ? Math.max(0, Math.min(3, lv)) : 2;
     this.menuSong = 'theme'; this.bandSong = 'theme'; this.pos = {}; // pos: where each theme song was left
     this.ctx = null; this.players = []; this.cur = -1; this.mood = null; this.t = 0; this.stormEnd = -1e9;
+    this.songs = SONGS; this.off = []; this.repeat = false; this.cine = true; this.pick = null; this.radioCur = null; this.cineMood = null; // the radio station: songs taken off the air; pick: played with its button, for this once
+    try { const r = JSON.parse(localStorage.getItem('zday_radio') || 'null'); if (r) { this.off = (r.off || []).filter(s => TRACKS[s]); this.repeat = !!r.repeat; this.cine = r.cine !== false; } } catch (e) { /* no storage */ }
     this.button();
     document.addEventListener('visibilitychange', () => { const p = this.players[this.cur]; if (!p || !this.level) return; if (document.hidden) p.el.pause(); else p.el.play().catch(() => {}); });
   }
@@ -35,7 +40,23 @@ export class Music {
     const b = this.btn = sideButton('zd-music', 'Music');
     b.onclick = (e) => { e.stopPropagation(); this.setLevel((this.level + 3) % 4); }; // loud, medium, quiet, off, loud...
     this.show();
+    const r = sideButton('zd-station', 'Radio station'); r.textContent = '\u{1F3B6}'; r.style.fontSize = '19px'; r.onclick = (e) => { e.stopPropagation(); openStation(this); }; const st = document.createElement('style'); st.textContent = 'body:not(.zd-menu-on) #zd-station{display:none}'; document.head.appendChild(st); // the pause menu has a button of its own
   }
+  // the radio station's choices
+  saveRadio() { try { localStorage.setItem('zday_radio', JSON.stringify({ off: this.off, repeat: this.repeat, cine: this.cine })); } catch (e) { /* no storage */ } }
+  isOn(s) { return !this.off.includes(s); }
+  nextSong(not) { const L = SONGS.map(q => q[0]).filter(s => this.isOn(s) && s !== not); return L.length ? L[Math.floor(Math.random() * L.length)] : not; }
+  radioSong() { if (!this.radioCur || !this.isOn(this.radioCur)) this.radioCur = this.nextSong(this.radioCur); return this.radioCur; }
+  // what should be playing: a song played from the station; on the menus the song for the side of the world in view, if it is on the air; the cinematic music when it fits; the chosen songs
+  want() { return this.pick || (this.menuOn ? (!this.repeat && this.isOn(this.menuSong) ? this.menuSong : this.radioSong()) : (this.cine && this.cineMood) || this.radioSong()); }
+  apply() { const m = this.want(); if (!this.ctx || !this.level || this.cur < 0) { this.mood = m; return; } if (m !== this.mood) this.play(m); }
+  setCine(on) { this.cine = on; this.saveRadio(); this.apply(); }
+  setRepeat(on) { this.repeat = on; this.saveRadio(); }
+  toggleSong(s) { const i = this.off.indexOf(s); if (i >= 0) this.off.splice(i, 1); else if (SONGS.length - this.off.length > 1) this.off.push(s); if (this.pick === s && !this.isOn(s)) this.pick = null; this.saveRadio(); this.apply(); }
+  playNow(s) { if (!this.level) this.setLevel(2); this.pick = s; this.radioCur = s; this.pos[s] = 0; if (this.ctx && this.ctx.state !== 'running') this.ctx.resume(); if (this.mood === s && this.cur >= 0) this.play(s, true); else this.apply(); }
+  skip() { const n = this.nextSong(this.mood); this.pick = n; this.radioCur = n; this.pos[n] = 0; this.apply(); }
+  // nearly at its ending: on to whatever comes next, or round again, crossfaded
+  songEnd() { const m = this.mood; if (this.pick === m) this.pick = null; else if (m === this.radioCur && !this.repeat && !this.menuOn) this.radioCur = this.nextSong(m); this.pos[m] = 0; const w = this.want(); this.play(w, w === m); }
   show() { this.btn.innerHTML = levelIcon('🎵', this.level); }
   setLevel(lv) {
     this.level = lv; this.show();
@@ -60,8 +81,8 @@ export class Music {
       const el = document.createElement('audio'); el.preload = 'auto'; el.setAttribute('playsinline', '');
       const g = ctx.createGain(); g.gain.value = 0; ctx.createMediaElementSource(el).connect(g); g.connect(this.bgG);
       const pl = { el, g, primed: false }; this.players.push(pl);
-      el.addEventListener('timeupdate', () => { // on the menus (no game loop running there): near the end, round again
-        if (this.menuOn && this.players[this.cur] === pl && THEMES.includes(this.mood) && el.duration && el.currentTime > el.duration - TAIL) this.play(this.mood, true);
+      el.addEventListener('timeupdate', () => { // here and not in the game loop: none runs on the menus or when paused
+        if (this.players[this.cur] === pl && !this.bustP && el.duration && el.currentTime > el.duration - TAIL) this.songEnd();
       });
     }
   }
@@ -71,7 +92,7 @@ export class Music {
     this.primeBand();
     this.players.forEach((p, k) => {
       if (p.primed) return; p.primed = true;
-      if (this.cur < 0 && k === 0) { this.play(this.mood || (this.menuOn ? this.menuSong : 'calm')); return; }
+      if (this.cur < 0 && k === 0) { this.play(this.mood || this.want()); return; }
       if (!p.el.src) p.el.src = BASE + TRACKS.calm;
       p.el.play().then(() => { if (this.players[this.cur] !== p) p.el.pause(); }).catch(() => { p.primed = false; });
     });
@@ -121,7 +142,7 @@ export class Music {
   setMenu(on) {
     if (on !== this.menuOn) this.space(on);
     this.menuOn = on;
-    if (on) { this.setBand(0, true); if (this.ctx && this.level && !THEMES.includes(this.mood) && this.players.some(p => p.primed)) this.play(this.menuSong); else if (!THEMES.includes(this.mood)) this.mood = this.menuSong; }
+    if (on) { this.setBand(0, true); const s = this.want(); if (s !== this.mood) { if (this.ctx && this.level && this.players.some(p => p.primed)) this.play(s); else this.mood = s; } }
   }
   // the side of the world turned towards you on the menus (globe.js): its song, crossfaded in (Sean: the Far Isles the second;
   // not back and forth faster than every 3 s)
@@ -129,19 +150,20 @@ export class Music {
     if (song === this.menuSong || this.bustP) return; // not while the planet-buster has the song stopped
     const now = performance.now(); if (now - (this.songAt2 || 0) < 3000) return; this.songAt2 = now;
     this.menuSong = song;
-    if (this.menuOn && this.ctx && this.level && this.cur >= 0 && THEMES.includes(this.mood) && this.mood !== song) this.play(song);
+    if (this.menuOn && this.ctx && this.level && this.cur >= 0 && this.mood !== this.want()) this.play(this.want());
   }
-  // what the moment calls for: the storm while any other disaster is on; the clean-up through a zombie outbreak (Sean: the
-  // action music did not suit it) and for a while after anything; calm otherwise
+  // what the moment calls for: the storm while any other disaster is on or in a fight of the story (Sean: action music in place of the
+  // songs); the clean-up through a zombie outbreak (Sean: the action music did not suit it) and for a while after anything; the chosen songs otherwise
   update(dt, g) {
     if (!this.ctx || !this.players.length) return;
     this.t += dt;
     const D = g.disasters, storm = D && D.list.some(e => e.alive && e.type !== 'heroes' && e.type !== 'spill'), outbreak = g.people.stats.zombies > 0 || (D && D.list.some(e => e.alive && e.type === 'spill'));
-    if (storm || outbreak) this.stormEnd = this.t;
-    const mood = this.menuOn ? this.menuSong : storm ? 'storm' : outbreak || this.t - this.stormEnd < AFTER ? 'rebuild' : 'calm', p = this.players[this.cur];
+    const F = g.flight, fight = !!((g.horde && g.horde.active) || (g.fightTest && g.fightTest.active) || (F && F.active && (F.fromHorde || F.inLevel)));
+    if (storm || outbreak || fight) this.stormEnd = this.t;
+    this.cineMood = storm || fight ? 'storm' : outbreak || this.t - this.stormEnd < AFTER ? 'rebuild' : null;
+    const mood = this.want();
     if (!this.level) { this.mood = mood; return; }
     if (mood !== this.mood && this.cur >= 0) this.play(mood); // out of the menus the theme gives way to the game's own
-    else if (p && p.el.duration && !p.el.paused && p.el.currentTime > p.el.duration - TAIL) this.play(mood, true); // nearly at its ending: round again, crossfaded
   }
   play(mood, again = false) {
     const c = this.ctx, t = c.currentTime, f = again ? TAIL - 1 : FADE, old = this.players[this.cur], oldMood = this.mood, k = (this.cur + 1) % 2, p = this.players[k];
@@ -156,7 +178,7 @@ export class Music {
     p.g.gain.cancelScheduledValues(t); p.g.gain.setValueAtTime(0, t); p.g.gain.linearRampToValueAtTime(1, t + f);
     if (old && old !== p) {
       old.g.gain.cancelScheduledValues(t); old.g.gain.setValueAtTime(old.g.gain.value, t); old.g.gain.linearRampToValueAtTime(0, t + f);
-      setTimeout(() => { if (this.players[this.cur] !== old) { if (THEMES.includes(oldMood)) this.pos[oldMood] = old.el.currentTime; old.el.pause(); } }, (f + 0.5) * 1000);
+      setTimeout(() => { if (this.players[this.cur] !== old) { if (THEMES.includes(oldMood) && this.pos[oldMood] !== 0) this.pos[oldMood] = old.el.currentTime; old.el.pause(); } }, (f + 0.5) * 1000);
     }
   }
   // the planet-buster (game.js). The planet bursts: the song stopped dead, its echo turned up to ring on for a second and die away. false: no song playing

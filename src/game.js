@@ -1,6 +1,7 @@
 // Shared game layer: HUD scaffolding, toasts, tap input, time speed, fixed-step
 // simulation, follow camera. Modes plug in: Commander (send help to the city),
 // Be The Disaster (drive one yourself) and Sandbox (drop zombies and disasters).
+import { openStation } from './radiobox.js';
 import * as THREE from 'three';
 import { ST, KIND } from './people.js';
 import { Commander } from './commander.js';
@@ -688,7 +689,7 @@ export class Game {
     sideAdd(cp); this.rose = cp.querySelector('.rose'); this.roseA = 999;
     // pause: the world and the round clock stop (the camera still moves); a tap goes on
     const pz = this.pauseBtn = document.createElement('button'); pz.type = 'button'; pz.id = 'zd-pause'; pz.title = 'Pause'; pz.setAttribute('aria-label', 'Pause');
-    const ps = this.pausedEl = document.createElement('div'); ps.id = 'zd-paused'; ps.hidden = true; ps.innerHTML = 'PAUSED<div class="row"></div><small>Sound, music and the radio</small>'; ps.addEventListener('click', (e) => e.stopPropagation());
+    const ps = this.pausedEl = document.createElement('div'); ps.id = 'zd-paused'; ps.hidden = true; ps.innerHTML = 'PAUSED<div class="row"></div><small>Sound, music and the radio</small><button type="button" data-station style="display:block;margin:8px auto 2px;padding:10px 14px;border-radius:10px;border:1px solid rgba(255,194,51,.6);background:rgba(255,194,51,.16);color:#ffe2a0;font:700 13px system-ui,sans-serif;cursor:pointer;touch-action:manipulation">\u{1F3B6} RADIO STATION</button>'; ps.addEventListener('click', (e) => e.stopPropagation()); ps.querySelector('[data-station]').onclick = () => { if (this.audio) openStation(this.audio.music); };
     pz.onclick = () => this.setPaused(!this.paused); sideAdd(pz); document.body.append(ps); this.setPaused(false);
     const barH = () => document.documentElement.style.setProperty('--zd-bar-h', this.bar.offsetHeight + 'px');
     if (window.ResizeObserver) new ResizeObserver(barH).observe(this.bar); else setInterval(barH, 500);
