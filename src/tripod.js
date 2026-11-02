@@ -312,6 +312,7 @@ export class Tripod {
 
   // soldiers and police shoot back
   hits(h) {
+    if (this.D.ctx.people.heroOnly) return; // in a level they fall to the player alone
     if (this.player || (this.hitT -= h) > 0) return;
     this.hitT = 0.5;
     const { people, fire } = this.D.ctx; let dmg = 0, shooter = -1;

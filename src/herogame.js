@@ -168,9 +168,9 @@ export class HeroGame {
   }
   // level 1 (Sean): the invasion: the fleet overhead, its soldiers rained into the streets and fought on foot like the horde; the fleet can be hit from the air
   alienLevel(key) {
-    const g = this.g, s = this.s, P = g.people, D = g.disasters, B = g.city.bounds, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2, n = 200, pool = []; LAB.reset();
+    const g = this.g, s = this.s, P = g.people, D = g.disasters, B = g.city.bounds, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2, n = 150, pool = []; LAB.reset();
     for (let j = 0; j < P.active && pool.length < n; j++) { if (P.kind[j] === 0 && P.isCivilian(j) && P.lvl[j] === -1 && Math.hypot(P.x[j] - cx, P.z[j] - cz) > 60 && P.hide(j)) pool.push(j); }
-    const e = D.start('aliens', cx, cz, { life: 99999, noSquads: true, tripods: 0, n: 6 }); if (e) e.launchT = 0.5; this.round = { evs: e ? [e] : [], need: 0, t: 0, downs: 0, hero: true, key, ended: false, zombie: true, n, noun: ' aliens' };
+    const e = D.start('aliens', cx, cz, { life: 99999, noSquads: true, tripods: 2, n: 6 }); if (e) { e.launchT = 0.5; e.dropT = 8; } this.round = { evs: e ? [e] : [], need: 0, t: 0, downs: 0, hero: true, key, ended: false, zombie: true, n, noun: ' aliens' };
     g.horde.start({ n, pool, level: true, fleet: e, types: ALIEN_TYPES, label: 'ALIENS', verb: ' DOWN', onEnd: (won, H) => { this.round.horde = H; this.finish(won, won ? null : 'The invasion took you down'); } });
     this.rep = document.createElement('div'); this.rep.id = 'zd-rep'; document.body.appendChild(this.rep);
     g.toast ? g.toast('Defend ' + PLACES[key].name + ': ' + n + ' alien soldiers in the streets, the fleet overhead') : 0;

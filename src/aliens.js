@@ -247,6 +247,7 @@ export class Invasion {
 
   // police and soldiers below shoot at low saucers; the saucer fires back
   hits(s, h) {
+    if (this.D.ctx.people.heroOnly) return; // in a level they fall to the player alone
     if ((s.hitT -= h) > 0) return;
     s.hitT = 0.5;
     if (s.y > 50) return;
