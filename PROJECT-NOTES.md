@@ -627,7 +627,7 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 - Lock on still goes over the roofs (straight through flattened 43 buildings in one crossing of the big city); only the last 14 m to the villain go through a building (tested: 2). Free flight tested in the big city: eight low runs, 96 buildings down, 33 of 89 low ones blown up, 0 of 7 towers, health untouched, no errors. The starting tip says so; the itch description too.
 
 ## Next
-- Sean tests v1.3 on his phone; tune from his notes. Candidates: Be The Disaster score scales and ranks once real scores come in, the saucer size at close zoom, how often zombie outbreaks turn up in Commander, incident pacing, card bar height on the phone.
+- The hero game (Sean, 2026-11-01): see HERO-PLAN.md for the whole plan and build order. Next up: floors inside smashed buildings, then the Sandbox hero lab.
 
 ## Earlier plan note
 - Sean decided on 2026-10-25 to make the player the hero (emergency commander) instead of dropping zombies. The full plan is DESIGN.md (round, alert levels, units, points, levelling, 5 implementation phases). Sandbox stays at ?mode=sandbox.
