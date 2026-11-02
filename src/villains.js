@@ -245,7 +245,7 @@ class Trail {
 
 class Villain {
   constructor(V, o) {
-    this.V = V; this.D = V.D; this.x = o.x; this.z = o.z; this.y = o.y ?? 0; this.yaw = Math.random() * 6.28; this.t = Math.random() * 5; this.speed = 0; this.player = false; this.hp = 780 * LAB.villainHp(); this.trapped = 0; this.side = 'villain'; this.busyT = 0;
+    this.V = V; this.D = V.D; this.x = o.x; this.z = o.z; this.y = o.y ?? 0; this.yaw = Math.random() * 6.28; this.t = Math.random() * 5; this.speed = 0; this.player = false; this.hp = 780 * LAB.villainHp(); this.hpMax = this.hp; this.trapped = 0; this.side = 'villain'; this.busyT = 0;
     this.rig = rig({ ...(o.rig || {}), mats: vmats(o.name) }); V.scene.add(this.rig.root);
   }
   face(dx, dz, h, k = 8) { if (Math.hypot(dx, dz) < 1e-4) return; let d = Math.atan2(dx, dz) - this.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); this.yaw += d * Math.min(1, h * k); }

@@ -2,6 +2,12 @@
 
 The pivot: the main game becomes a super hero game. You start with a few powers, fly from city to city round the globe defending them from disasters, earn XP, grow stronger, unlock skills that change how you fight, dress your team of three, and build the team's home tower. Save a town carelessly and the town fears you; wreck too much and you become the villain, hunted by heroes. The Sandbox is the test bench for every move.
 
+The four menu buttons stay, with new meanings (Sean, 2026-11-01):
+- Defend: the hero game. You start as a hero and work across the globe.
+- Destroy: you start as a villain (the villain's side of the same fights and towns).
+- Sandbox: testing and random fun (the hero lab lives here).
+- Watch: set-up scenarios to sit back and watch, and bet on the outcome from the heroes and disasters involved.
+
 Build order (one thing at a time, each tested in the Sandbox and pushed):
 
 1. Floors inside the buildings you smash through (quick, and Sean asked)
@@ -41,6 +47,8 @@ The street fight (Sean's inspiration, 2026-11-01: a film's street brawl between 
 - A villain's weakness: a mask or breather the hero can break (a special weak spot), after which the villain is dazed by the world's noise and light for a while, easy to hit, and will try to retreat.
 - The army's missile can finish a dazed villain; a dropship (or a getaway) comes to carry a beaten villain off, so villains retreat rather than die.
 - The hero is not invincible: a villain with training can out-fight them; protecting people costs the hero openings.
+
+Built (2026-11-01, 3b): wind-ups with a dodge circle (miss it and the hit lands and the spots are lost), grabs with a mash circle (too slow and the villain throws you across the street, through buildings, and you get up where you land), a second wind under half health, and villains throwing bolts, rubble or webs at a hero flying in (drag left or right to weave). Still to come from the list below: villain levels beyond the lab's numbers, a villain's mask weakness, retreats.
 
 Villains fight back:
 - Counters: while you tap weak spots, the villain winds up (a flash and a sound); a dodge circle appears left or right and you have half a second. Miss it and you take a hit and lose the combo.

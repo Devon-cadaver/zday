@@ -52,6 +52,9 @@ const CSS = `
 #zd-duel .hold{position:absolute;width:88px;height:88px;margin:-44px 0 0 -44px;border-radius:50%;border:3px solid #fff;display:flex;align-items:center;justify-content:center;color:#fff;font:900 13px system-ui,-apple-system,sans-serif;letter-spacing:.06em;text-shadow:0 1px 2px #000;background:rgba(0,0,0,.35);background:radial-gradient(circle,rgba(40,20,60,.55) 55%,transparent 57%),conic-gradient(#ffd27a calc(var(--k,0) * 360deg),rgba(0,0,0,.35) 0deg);box-shadow:0 0 18px 4px rgba(255,210,122,.7);animation:zdPulse .6s ease-in-out infinite alternate;touch-action:none}
 #zd-duel .hold.tap{background:radial-gradient(circle,rgba(150,230,255,.9),rgba(40,120,255,.55) 62%,rgba(40,120,255,0) 74%);box-shadow:0 0 18px 5px rgba(120,220,255,.85)}
 @keyframes zdPulse{to{transform:scale(1.08)}}
+#zd-duel .dodge{position:absolute;width:76px;height:76px;margin:-38px 0 0 -38px;border-radius:50%;border:3px solid #fff;display:flex;align-items:center;justify-content:center;color:#fff;font:900 22px system-ui,-apple-system,sans-serif;background:radial-gradient(circle,rgba(255,90,90,.95),rgba(200,20,40,.6) 62%,rgba(200,20,40,0) 74%);box-shadow:0 0 18px 5px rgba(255,80,80,.8);animation:zdDodge .55s linear forwards;cursor:pointer}
+@keyframes zdDodge{from{transform:scale(1.3)}to{transform:scale(.7);opacity:.6}}
+#zd-duel .hold.mash{background:radial-gradient(circle,rgba(255,200,90,.95),rgba(220,110,20,.6) 62%,rgba(220,110,20,0) 74%);box-shadow:0 0 18px 5px rgba(255,180,60,.85);font-size:15px}
 `;
 
 export class Duel {
@@ -60,6 +63,7 @@ export class Duel {
     this.F = F; this.v = v; this.g = F.g; this.phase = 'spots'; this.t = 0; this.live = []; this.spawned = 0; this.total = 6; this.next = 0.35;
     this.pow = (F.P.punch || 1) * LAB.heroPow(); this.life = 1.05 * (F.P.slow || 1) * LAB.spotLife(); LAB.stats.fights++; // how hard this hero hits; how long a spot lasts (Tempo slows time); both by the lab's levels
     v.heroWin = true; // the player's own fight: win it and they are beaten (not the odds the heroes get on their own)
+    this.hpMax = Math.max(v.hp, v.hpMax || 0); this.second = !!v.second; this.windT = 1.6; this.dodge = null; // villains fight back (Sean): a wind-up every so often (a dodge circle, or a grab), and a second wind under half health
     v.gripped = true; v.pinned = 'reel'; v.flinch = 0; v.downT = 0; if (v.dropHeld) v.dropHeld(); // held where it is, reeling
     if (!document.getElementById('zd-duel-css')) { const s = document.createElement('style'); s.id = 'zd-duel-css'; s.textContent = CSS; document.head.appendChild(s); }
     const el = this.el = document.createElement('div'); el.id = 'zd-duel';
@@ -97,7 +101,8 @@ export class Duel {
     this.vhp.textContent = v.name.toUpperCase() + ' ' + Math.max(0, Math.round(v.hp));
     if (v.beaten || v.hp <= 0) { LAB.stats.won++; return this.end(v.name + ' is beaten!', true); }
     if (v.flinch > 0) v.flinch = Math.max(0, v.flinch - h * 4);
-    if (v.pinned === 'reel' || v.pinned === 'dazed') v.yaw = Math.atan2(F.pos.x - v.x, F.pos.z - v.z); // facing the hero
+    if (!this.second && v.hp < this.hpMax * 0.5) this.secondWind();
+    if (v.pinned === 'reel' || v.pinned === 'dazed' || v.pinned === 'grab') v.yaw = Math.atan2(F.pos.x - v.x, F.pos.z - v.z); // facing the hero
     if (F.act && (F.act.t += h) >= F.act.T) F.act = null;
     const fn = this['_' + this.phase];
     return fn ? fn.call(this, h) : true;
@@ -105,11 +110,69 @@ export class Duel {
   _spots(h) {
     const v = this.v;
     if ((this.next -= h) <= 0 && this.spawned < this.total) { this.next = 0.45; this.spawned++; this.spot(); }
+    if (this.dodge) { if (!this.dodgeStep(h)) return false; } else if ((this.windT -= h) <= 0 && this.spawned < this.total) { if (!this.noGrab && Math.random() < 0.12 + 0.015 * LAB.villain + (this.second ? 0.12 : 0)) return this.grab(); this.noGrab = Math.max(0, (this.noGrab || 0) - 1); this.windUp(); }
     for (const s of this.live) { if (s.dead) continue; s.life -= h; if (s.life <= 0) { s.dead = true; s.b.classList.add('miss'); setTimeout(() => s.b.remove(), 250); this.F.damage(LAB.villainHit(7), v.name + ' hit you!'); this.g.shake = Math.max(this.g.shake || 0, 0.25); } }
     this.barI.style.width = (this.spawned / this.total * 100) + '%';
     if (this.over) return false; // knocked out by that last miss
     if (this.spawned >= this.total && this.live.every(s => s.dead)) this.daze();
     return true;
+  }
+  // the villain winds up (a flash, a sound): a dodge circle to one side of them, tapped in time the hero sidesteps and the
+  // swing misses; too late and it lands: a hit, and the weak spots up at the time are lost
+  windUp() {
+    const v = this.v, side = Math.random() < 0.5 ? -1 : 1, [sx, sy] = this.screen();
+    const el = document.createElement('div'); el.className = 'dodge'; el.textContent = side < 0 ? '\u2B05' : '\u27A1'; el.style.left = Math.max(50, Math.min(innerWidth - 100, sx + side * 105)) + 'px'; el.style.top = Math.max(150, Math.min(innerHeight - 240, sy + 10)) + 'px'; this.el.appendChild(el);
+    const d = this.dodge = { el, t: 0, side, T: 0.55 * LAB.spotLife() * (this.F.P.slow || 1), done: false };
+    el.style.animationDuration = d.T.toFixed(2) + 's';
+    el.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); if (d.done) return; d.done = true; this.dodged(); });
+    this.g.fire.burst(v.x, (v.y || 0) + 2.2, v.z, 4, 0.7); sfx('whoosh', v.x, v.y, v.z, { gain: 0.8, rate: 1.3 }); v.flinch = 0.6;
+  }
+  dodgeStep(h) {
+    const d = this.dodge; d.t += h;
+    if (d.done) { if (d.t > d.T + 0.3) { d.el.remove(); this.dodge = null; this.windT = this.windGap(); } return true; }
+    if (d.t >= d.T) { // too late: the swing lands
+      d.done = true; d.el.remove(); this.dodge = null; this.windT = this.windGap();
+      for (const s of this.live) { if (s.dead) continue; s.dead = true; s.b.classList.add('miss'); setTimeout(() => s.b.remove(), 250); }
+      this.F.damage(LAB.villainHit(9), this.v.name + ' hit you!'); this.g.shake = Math.max(this.g.shake || 0, 0.4); this.F.act = { kind: 'crouch', t: 0, T: 0.5 };
+      sfx('thud', this.F.pos.x, this.F.pos.y, this.F.pos.z, { gain: 1 }); this.g.fire.burst(this.F.pos.x, this.F.pos.y + 1, this.F.pos.z, 6, 1);
+      return !this.over;
+    }
+    return true;
+  }
+  dodged() { // in time: a sidestep, the swing goes past
+    const d = this.dodge, F = this.F, el = d.el; el.classList.add('pop'); setTimeout(() => el.remove(), 200);
+    const rx = Math.sin(F.yaw), rz = Math.cos(F.yaw); F.pos.x += rx * d.side * 1.4; F.pos.z += rz * d.side * 1.4; F.act = { kind: 'crouch', t: 0, T: 0.35 };
+    sfx('whoosh', F.pos.x, F.pos.y, F.pos.z, { gain: 0.9, rate: 0.9 }); this.title('\uD83D\uDCA8 DODGED!'); setTimeout(() => { if (this.phase === 'spots') this.title('\uD83C\uDFAF WEAK SPOTS! TAP THEM!'); }, 600);
+  }
+  windGap() { return (2.6 - 0.06 * LAB.villain) * (this.second ? 0.7 : 1) * (0.8 + Math.random() * 0.5); }
+  // grabbed: a circle to mash; free in time and the villain is shoved reeling, else they hurl the hero across the street
+  grab() {
+    const v = this.v, F = this.F; this.phase = 'grab'; this.t = 0; this.mashN = 0; this.mashNeed = Math.max(3, 7 - Math.floor(LAB.hero / 4)); this.mashT = 2.2 * (F.P.slow || 1);
+    for (const s of this.live) { if (s.dead) continue; s.dead = true; s.b.remove(); } this.live.length = 0;
+    v.pinned = 'grab'; F.act = { kind: 'crouch', t: 0, T: 1e9 }; this.button(); this.noGrab = 2; // not again for the next two wind-ups
+    this.title('\u270A ' + v.name.toUpperCase() + ' HAS YOU! TAP TO BREAK FREE!'); this.circle('mash', '0/' + this.mashNeed);
+    sfx('thud', F.pos.x, F.pos.y, F.pos.z, { gain: 0.9, rate: 0.8 }); this.g.shake = Math.max(this.g.shake || 0, 0.3);
+    return true;
+  }
+  _grab(h) {
+    const v = this.v, F = this.F; if (this.ring2) { this.place(this.ring2); this.ring2.textContent = this.mashN + '/' + this.mashNeed; }
+    this.barI.style.width = Math.max(0, 100 - this.t / this.mashT * 100) + '%';
+    const dx = v.x - F.pos.x, dz = v.z - F.pos.z, d = Math.hypot(dx, dz) || 1; F.pos.x += (v.x - dx / d * 2.2 - F.pos.x) * Math.min(1, h * 6); F.pos.z += (v.z - dz / d * 2.2 - F.pos.z) * Math.min(1, h * 6); // held close
+    if (this.mashN >= this.mashNeed) { this.dropCircle(); F.act = null; this.hit(10); v.flinch = 1; sfx('crash', v.x, v.y + 2, v.z, { gain: 0.8 }); this.spawned = Math.max(this.spawned, this.total - 2); this.phase = 'spots'; this.windT = this.windGap() + 1; this.title('\uD83D\uDCAA BROKE FREE!'); v.pinned = 'reel'; return true; }
+    if (this.t >= this.mashT) { this.dropCircle(); return this.hurled(); }
+    return true;
+  }
+  hurled() { // thrown across the street: the fight is off, the villain goes about its business
+    const v = this.v, F = this.F, dx = F.pos.x - v.x, dz = F.pos.z - v.z, d = Math.hypot(dx, dz) || 1;
+    v.gripped = false; v.pinned = null; v.flinch = 0; v.hitT = (F.t2 || 0) + 3;
+    F.damage(LAB.villainHit(14), v.name + ' threw you!'); sfx('whoosh', v.x, v.y, v.z, { gain: 1, rate: 0.7 }); this.g.shake = Math.max(this.g.shake || 0, 0.5);
+    if (!this.over) F.hurl(dx / d * 34, 9, dz / d * 34, v.name + ' threw you across the street!');
+    return this.end('', false);
+  }
+  secondWind() { // under half health: faster, meaner
+    const v = this.v; this.second = v.second = true; this.life *= 0.8;
+    this.g.fire.burst(v.x, (v.y || 0) + 2.4, v.z, 14, 1.8); sfx('roar', v.x, v.y, v.z, { gain: 0.8, rate: 1.4 }); this.g.shake = Math.max(this.g.shake || 0, 0.35);
+    const was = this.ttl.textContent; this.title('\u26A1 ' + v.name.toUpperCase() + ' GETS A SECOND WIND!'); setTimeout(() => { if (!this.over && this.ttl.textContent.includes('SECOND WIND')) this.title(was); }, 1200);
   }
   // dazed: the spin, or a move picked at random
   daze() {
@@ -209,9 +272,9 @@ export class Duel {
   // a big circle over the villain: 'hold' (this.holding while held, this.let once let go) or 'tap' (this.tapped)
   circle(kind, label) {
     if (this.ring2) this.ring2.remove();
-    const c = this.ring2 = document.createElement('div'); c.className = 'hold' + (kind === 'tap' ? ' tap' : ''); c.textContent = label; this.el.appendChild(c);
+    const c = this.ring2 = document.createElement('div'); c.className = 'hold' + (kind === 'tap' ? ' tap' : kind === 'mash' ? ' mash' : ''); c.textContent = label; this.el.appendChild(c);
     this.holding = false; this.let = false; this.tapped = false;
-    c.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); if (kind === 'tap') { this.tapped = true; return; } this.holding = true; try { c.setPointerCapture(e.pointerId); } catch (er) { /* fine */ } });
+    c.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); if (kind === 'mash') { this.mashN = (this.mashN || 0) + 1; c.style.transform = 'scale(1.15)'; setTimeout(() => { c.style.transform = ''; }, 60); return; } if (kind === 'tap') { this.tapped = true; return; } this.holding = true; try { c.setPointerCapture(e.pointerId); } catch (er) { /* fine */ } });
     const up = () => { if (this.holding) { this.holding = false; this.let = true; } };
     c.addEventListener('pointerup', up); c.addEventListener('pointercancel', up);
     this.place(c); return c;
@@ -294,7 +357,7 @@ export class Duel {
   end(why, won) {
     if (this.over) return false; this.over = true;
     const v = this.v, B = this.g.disasters.brawl;
-    this.dropBeam();
+    this.dropBeam(); if (this.dodge) { this.dodge.el.remove(); this.dodge = null; }
     if (this.S) { const i = B.drags.indexOf(this.S); if (i >= 0) { B.drags.splice(i, 1); v.gripped = false; if (!v.tossed && !v.gone) toss(v, this.S.dx * 10, 4, this.S.dz * 10); } this.S = null; }
     v.pinned = null; v.flinch = 0;
     if (v.gripped) { v.gripped = false; if (!v.tossed && !v.gone) toss(v, 0, 2, 0); } // dropped, falls to the ground

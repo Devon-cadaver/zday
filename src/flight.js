@@ -44,6 +44,8 @@ const SEED_REACH = 160; // a seeding run passing this close to a tornado weakens
 const _f = new THREE.Vector3(), _u = new THREE.Vector3(), _v = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler(0, 0, 0, 'YZX');
 const HIP = 0.94 * 2.2; // a hero's hips above the feet (the rig's 0.94 at its scale): the hero is flown by the hips
 const SEAT_TURN = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2); // a camera looks down -z; the planes point along +x
+const SHOT = { Blur: { col: 0x6fb8ff, r: 0.7, glow: true }, Tyrant: { col: 0x3a3430, r: 1.1 }, Weaver: { col: 0xf4f1ea, r: 0.8 } }; // what each villain throws at a hero flying in
+const SHOT_GEO = new THREE.SphereGeometry(1, 10, 8), SHOT_BOX = new THREE.BoxGeometry(1.6, 1.2, 1.4);
 const wallHex = (b) => { const c = b.wallCol || [0.6, 0.56, 0.5]; return ((c[0] * 255) << 16) | ((c[1] * 255) << 8) | (c[2] * 255); }; // a building's wall colour, for its bricks flying
 
 // a little red and white stunt plane, nose along +x, about 7 m long, its propeller turning (userData.prop)
@@ -136,7 +138,7 @@ export class Flight {
     this.pos.set(cx + Math.cos(a) * R, 95, cz + Math.sin(a) * R);
     this.yaw = Math.atan2(-(cz - this.pos.z), cx - this.pos.x); this.pitch = 0; this.roll = 0;
     this.speed = this.thr = this.P.start; this.ix = this.iy = 0; this.state = 'fly'; this.t = 0; this.obj.visible = this.view === 'chase'; this.snap = true;
-    this.hullMax = this.P.hero ? LAB.heroHealth() : 100; this.hull = this.hullMax; this.caught = null; this.thrown = []; this.seedTw = null; this.lock = null; this.punch = 0; this.act = null; this.inB = -1; // a hero's health by the lab's level
+    this.hullMax = this.P.hero ? LAB.heroHealth() : 100; this.hull = this.hullMax; this.caught = null; this.thrown = []; this.seedTw = null; this.lock = null; this.punch = 0; this.act = null; this.inB = -1; this.downAt = false; this.clearShots(); // a hero's health by the lab's level
     if (this.P.hero) this.pos.y = 60;
   }
   ui() {
@@ -284,7 +286,7 @@ export class Flight {
   stop(quiet = false) {
     if (!this.active) return;
     const g = this.g, { camera, controls, post } = this.ctx;
-    if (this.duel) this.duel.end('', false); this.lock = null; this.dropInside(); this.inB = -1;
+    if (this.duel) this.duel.end('', false); this.lock = null; this.dropInside(); this.inB = -1; this.clearShots();
     this.active = false; document.body.classList.remove('zd-flying');
     const hr = this.obj.userData.hero; g.disasters.ctx.scene.remove(this.obj);
     if (hr) { hr.cape.g.dispose(); if (hr.smooth && hr.smooth.mesh) { hr.smooth.mesh.geometry.dispose(); const m = hr.smooth.mesh.material; (Array.isArray(m) ? m : [m]).forEach(x => x && x.dispose()); } } else this.obj.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); // its own shapes and paint (a hero's are shared with the rest: only the cape is its own)
@@ -317,7 +319,9 @@ export class Flight {
     if (run && this.punch > 0) this.punch -= dt;
     if (run && this.duel && this.state === 'fly') { this.hover(dt); if (this.duel) this.duel.step(dt); }
     else if (run && this.state === 'fly') this.fly(dt);
-    else if (run && this.state === 'down' && (this.t += dt) > 2.6) { this.spawn(); this.setView(this.view); }
+    else if (run && this.state === 'tossed') this.tossStep(dt);
+    else if (run && this.state === 'down' && (this.t += dt) > (this.downAt ? 1.4 : 2.6)) { if (this.downAt) this.getUp(); else { this.spawn(); this.setView(this.view); } }
+    if (run && this.shots.length) this.shotStep(dt);
     // the plane where it is
     _e.set(this.roll, this.yaw, this.pitch); this.q.setFromEuler(_e);
     this.obj.position.copy(this.pos); this.obj.quaternion.copy(this.q);
@@ -342,7 +346,7 @@ export class Flight {
     } else {
       const fl = Math.hypot(_f.x, _f.z) || 1, back = P.chase[0] * this.zoom, hi = P.chase[1] * Math.pow(this.zoom, 0.8);
       _v.set(this.pos.x - _f.x / fl * back, this.pos.y + hi - _f.y * back * 0.5, this.pos.z - _f.z / fl * back);
-      if (this.state === 'down') _v.copy(this.at).add(_u.set(-30, 22, -30)); // watching the wreck burn
+      if (this.state === 'down') _v.copy(this.at).add(_u.set(this.downAt ? -16 : -30, this.downAt ? 12 : 22, this.downAt ? -16 : -30)); // watching the wreck burn (or the hero getting up)
       if (this.snap) cam.position.copy(_v); else cam.position.lerp(_v, 1 - Math.exp(-dt * 6));
       cam.up.set(0, 1, 0);
       cam.lookAt(this.state === 'down' ? this.at : _u.copy(this.pos).addScaledVector(_f, 12));
@@ -415,7 +419,7 @@ export class Flight {
   crash(k, why) {
     if (this.state !== 'fly') return;
     const g = this.g, f = g.fire, x = this.pos.x, y = Math.max(1, this.pos.y), z = this.pos.z;
-    this.state = 'down'; this.t = 0; this.obj.visible = false; this.at.set(x, y, z); this.caught = null; this.hull = 0; this.lock = null; this.inB = -1; this.dropInside();
+    this.state = 'down'; this.t = 0; this.obj.visible = false; this.at.set(x, y, z); this.caught = null; this.hull = 0; this.lock = null; this.inB = -1; this.dropInside(); this.downAt = false; this.clearShots();
     if (this.duel) this.duel.end('', false);
     if (this.g.audio) this.g.audio.engine(null);
     if (this.P.hero) { f.dustCloud(x, z, 6, Math.min(20, y + 4)); sfx('thud', x, y, z, { gain: 1 }); this.tip((why || 'You were knocked out of the sky!') + ' Back up in a moment'); return; } // knocked down, no fireball
@@ -426,10 +430,55 @@ export class Flight {
   }
   // hurt: the hull down by n (at nothing it goes down, why the reason), told once in a while
   damage(n, why) {
-    if (this.state !== 'fly') return;
+    if (this.state !== 'fly' && this.state !== 'tossed') return;
     this.hull -= n; LAB.stats.taken += n; if (this.hull <= 0) { this.crash(-1, why); return; }
     if ((this.hurtT || 0) < this.t2) { this.hurtT = this.t2 + 1.5; this.tip(why + (this.P.hero ? ' Health ' : ' Hull ') + Math.round(this.hull / (this.hullMax || 100) * 100) + '%'); sfx('crash', this.pos.x, this.pos.y, this.pos.z, { gain: 0.4, rate: 1.3 }); }
   }
+  // the hero thrown (a villain's grab, heroduel.js): tumbling along, through whatever is in the way, down into the street,
+  // then up again where they fell
+  hurl(vx, vy, vz, why) {
+    if (this.state !== 'fly') return;
+    this.state = 'tossed'; this.vel = new THREE.Vector3(vx, vy, vz); this.lock = null; this.speed = Math.hypot(vx, vz); this.act = { kind: 'dive', t: 0, T: 1e9 }; this.obj.visible = this.view === 'chase'; this.t = 0;
+    if (why) this.tip(why);
+  }
+  tossStep(dt) {
+    const V = this.vel, g = this.g, px = this.pos.x, py = this.pos.y, pz = this.pos.z; V.y -= 22 * dt; this.t += dt;
+    this.pos.addScaledVector(V, dt); this.yaw = Math.atan2(-V.z, V.x); this.roll += dt * 7; this.pitch = Math.atan2(V.y, Math.hypot(V.x, V.z)) * 0.5;
+    this.plough(px, py, pz);
+    const gy = Math.max(2.4, g.people.groundY(this.pos.x, this.pos.z) + 2.4);
+    if (this.pos.y <= gy || this.t > 6) { // down in the street
+      this.pos.y = gy; const x = this.pos.x, z = this.pos.z;
+      g.disasters.decals.add('crack', x, z, 8, 8); g.fire.dustCloud(x, z, 5, 5); g.fire.burst(x, 0.5, z, 10, 1.6); sfx('thud', x, gy, z, { gain: 1.2, rate: 0.7 }); g.shake = Math.max(g.shake || 0, 0.5);
+      LAB.stats.scared += g.people.scare(x, z, 14, 0.9); this.dropInside(); this.inB = -1;
+      this.state = 'down'; this.t = 0; this.at.set(x, gy, z); this.downAt = true; this.roll = 0; this.act = null;
+    }
+  }
+  getUp() { // back on their feet, flying low, slow, nose up
+    this.state = 'fly'; this.downAt = false; this.pos.copy(this.at); this.pos.y = Math.max(this.pos.y, 2.4) + 0.5; this.speed = this.thr = Math.max(this.P.min, this.P.start * 0.5); this.pitch = 0.4; this.roll = 0; this.yaw += Math.PI; this.obj.visible = this.view === 'chase'; this.caught = null;
+    this.tip('Back up! Press Lock on to go after them'); if (this.g.audio) this.g.audio.engine(this.P.sound, 0.3);
+  }
+  // shots at a hero flying in: a villain locked on from 30 to 220 m away throws something every couple of seconds, aimed
+  // a little ahead; the stick weaves the hero out of its way (homeIn); one that lands hurts and knocks them about
+  shoot(v) {
+    const S = SHOT[v.name] || SHOT.Tyrant, g = this.g, m = new THREE.Mesh(S.r > 1 ? SHOT_BOX : SHOT_GEO, new THREE.MeshBasicMaterial({ color: S.col, transparent: !!S.glow, opacity: S.glow ? 0.9 : 1 }));
+    if (S.r <= 1) m.scale.setScalar(S.r); m.position.set(v.x, (v.y || 0) + 3, v.z); g.disasters.ctx.scene.add(m);
+    _f.set(1, 0, 0).applyQuaternion(this.q); const lead = 0.5, tx = this.pos.x + _f.x * this.speed * lead, ty = this.pos.y + _f.y * this.speed * lead, tz = this.pos.z + _f.z * this.speed * lead;
+    const d = Math.hypot(tx - m.position.x, ty - m.position.y, tz - m.position.z) || 1, sp = 72;
+    this.shots.push({ o: m, v: new THREE.Vector3((tx - m.position.x) / d * sp, (ty - m.position.y) / d * sp, (tz - m.position.z) / d * sp), t: 0, by: v.name, glow: !!S.glow });
+    sfx(S.glow ? 'zap' : 'whoosh', v.x, v.y, v.z, { gain: 0.8 });
+    if (!this.saidShot) { this.saidShot = true; this.tip(v.name + ' is throwing things at you! Drag left or right to weave'); }
+  }
+  shotStep(dt) {
+    const g = this.g;
+    for (const s of this.shots) {
+      s.t += dt; s.o.position.addScaledVector(s.v, dt); s.o.rotation.x += dt * 6; s.o.rotation.z += dt * 4;
+      if (s.glow && Math.random() < 0.5) g.fire.burst(s.o.position.x, s.o.position.y, s.o.position.z, 1, 0.7);
+      if (this.state === 'fly' && s.o.position.distanceTo(this.pos) < 3.6) { s.done = true; g.fire.burst(this.pos.x, this.pos.y + 1, this.pos.z, 10, 1.6); this.damage(LAB.villainHit(8), s.by + ' hit you!'); this.roll += (Math.random() < 0.5 ? -1 : 1) * 1.2; this.pitch -= 0.3; g.shake = Math.max(g.shake || 0, 0.35); }
+      else if (s.t > 3.5 || s.o.position.y < 0) s.done = true;
+    }
+    if (this.shots.some(s => s.done)) { for (const s of this.shots) if (s.done) { g.disasters.ctx.scene.remove(s.o); s.o.material.dispose(); } this.shots = this.shots.filter(s => !s.done); }
+  }
+  clearShots() { if (this.shots) for (const s of this.shots) { this.g.disasters.ctx.scene.remove(s.o); s.o.material.dispose(); } this.shots = []; }
   // a hero goes straight through buildings (Sean): in through one wall in a spray of glass and brick, out through the far
   // one, and the building comes down behind them, leaning the way they went; a low one may go up in a fireball first (a
   // tall tower never does: it only falls, in its dust). Checked every 2 m along the way since the last frame, so a fast
@@ -584,6 +633,7 @@ export class Flight {
       if (v.gone || v.beaten) continue;
       const d = Math.hypot(v.x - this.pos.x, (v.y || 0) + HIP - this.pos.y, v.z - this.pos.z); this.note(v.name, d);
       if (this.P.hero && !v.tossed && !v.gripped && d < 12 && (v.hitT || 0) < this.t2) { v.hitT = this.t2 + 2.5; this.g.shake = Math.max(this.g.shake || 0, 0.3); this.damage(LAB.villainHit(6), v.name + ' hit you!'); }
+      if (this.P.hero && v === this.lock && !this.duel && !v.tossed && !v.gripped && d > 30 && d < 220) { if ((v.shotT = (v.shotT ?? 1.2) - h) <= 0) { v.shotT = Math.max(1, 2.6 - 0.06 * LAB.villain); this.shoot(v); } } // throwing things at a hero flying in
     }
   }
   // Lock on (a hero): the nearest villain still up, and the hero flies straight at them (homeIn); pressed again, the lock let go
@@ -605,6 +655,8 @@ export class Flight {
     this.pitch += (Math.atan2(dy, Math.hypot(dx, dz)) * 0.8 - this.pitch) * Math.min(1, dt * 4);
     this.speed += (Math.min(P.max * 1.6, d * 1.6 + 14) - this.speed) * Math.min(1, dt * 2.5);
     const px = this.pos.x, py = this.pos.y, pz = this.pos.z, s = Math.min(d - 6, this.speed * dt); this.pos.x += dx / d * s; this.pos.y += dy / d * s; this.pos.z += dz / d * s;
+    const K = this.keys; let ix = this.ix; if (K.has('arrowleft') || K.has('a')) ix = -1; if (K.has('arrowright') || K.has('d')) ix = 1; // the stick weaves them side to side (the villain's shots)
+    if (Math.abs(ix) > 0.05 && d > 12) { const hd = Math.hypot(dx, dz) || 1; this.pos.x += dz / hd * ix * 22 * dt; this.pos.z -= dx / hd * ix * 22 * dt; }
     if (this.pos.y < 2.4) this.pos.y = 2.4;
     this.plough(px, py, pz); // straight through everything in the way, as when flown by hand (Sean)
     return true;
