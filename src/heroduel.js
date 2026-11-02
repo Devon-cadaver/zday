@@ -70,7 +70,7 @@ export class Duel {
     this.F = F; this.v = v; this.g = F.g; this.phase = 'spots'; this.t = 0; this.live = []; this.spawned = 0; this.total = 6; this.next = 0.35;
     this.pow = (F.P.punch || 1) * LAB.heroPow(); this.life = 1.05 * (F.P.slow || 1) * LAB.spotLife(); LAB.stats.fights++; // how hard this hero hits; how long a spot lasts (Tempo slows time); both by the lab's levels
     v.heroWin = true; // the player's own fight: win it and they are beaten (not the odds the heroes get on their own)
-    this.hpMax = Math.max(v.hp, v.hpMax || 0); this.second = !!v.second; this.windT = 1.6; this.dodge = null; // villains fight back (Sean): a wind-up every so often (a dodge circle, or a grab), and a second wind under half health
+    this.hpMax = Math.max(v.hp, v.hpMax || 0); this.second = !!v.second; this.windT = 1.6; this.dodge = null; this.punchT = 0; this.dash = false; // villains fight back (Sean): a wind-up every so often (a dodge circle, or a grab), and a second wind under half health
     v.gripped = true; v.pinned = 'reel'; v.flinch = 0; v.downT = 0; if (v.dropHeld) v.dropHeld(); // held where it is, reeling
     if (!document.getElementById('zd-duel-css')) { const s = document.createElement('style'); s.id = 'zd-duel-css'; s.textContent = CSS; document.head.appendChild(s); }
     const el = this.el = document.createElement('div'); el.id = 'zd-duel';
@@ -94,7 +94,7 @@ export class Duel {
     const [sx, sy] = this.screen(), x = Math.max(40, Math.min(innerWidth - 84, sx + (Math.random() - 0.5) * 150)), y = Math.max(140, Math.min(innerHeight - 230, sy + (Math.random() - 0.5) * 170));
     const b = document.createElement('div'); b.className = 'spot' + (this.life > 1.2 ? ' slow' : ''); b.style.left = x + 'px'; b.style.top = y + 'px'; this.el.appendChild(b);
     const s = { b, life: this.life, dead: false }; this.live.push(s);
-    b.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); if (s.dead) return; s.dead = true; b.classList.add('pop'); setTimeout(() => b.remove(), 200); this.hit(26); sfx('crash', this.v.x, 2, this.v.z, { gain: 0.5, rate: 1.4 }); });
+    b.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); if (s.dead) return; s.dead = true; b.classList.add('pop'); setTimeout(() => b.remove(), 200); this.hit(26); if (!this.v.react) this.react((this.spotN = (this.spotN || 0) + 1) % 2 ? 'hitHeadL' : 'hitHeadR'); this.punchT = Math.max(this.punchT, 0.2); sfx('crash', this.v.x, 2, this.v.z, { gain: 0.5, rate: 1.4 }); });
   }
   // the buttons along the bottom: [label, what it does, class]
   button(...list) {
@@ -128,7 +128,7 @@ export class Duel {
   // keyframed moves (clips.js): the hero's clip, the villain's reaction, a moment's hit stop when a blow lands
   play(name) { this.F.clip = { clip: CLIPS[name], t: 0 }; }
   react(name, hold = 0) { const v = this.v, c = { clip: CLIPS[name], t: 0, hold, play(r) { return playClip(r, this.clip, this.t) || this.t < this.clip.keys[this.clip.keys.length - 1].t + this.hold; } }; v.react = c; this.reacts = this.reacts || []; this.reacts.push(c); }
-  stop(s = 0.07) { this.g.hitStop = Math.max(this.g.hitStop || 0, s); }
+  stop(s = 0.07) { this.g.hitStop = Math.max(this.g.hitStop || 0, s); this.punchT = 0.35; }
   // the villain winds up (a flash, a sound): a dodge circle to one side of them, tapped in time the hero sidesteps and the
   // swing misses; too late and it lands: a hit, and the weak spots up at the time are lost
   windUp() {
@@ -218,14 +218,14 @@ export class Duel {
   // hurled out, away from the camera so it is seen to go: it tumbles across the town and crashes down (toss), hurt
   throwIt() {
     const v = this.v, c = this.F.ctx.camera, dx = this.F.pos.x - c.position.x, dz = this.F.pos.z - c.position.z, l = Math.hypot(dx, dz) || 1;
-    v.gripped = false; toss(v, dx / l * 34, 11, dz / l * 34); this.hit(80); sfx('whoosh', v.x, v.y, v.z, { gain: 1 });
+    v.gripped = false; toss(v, dx / l * 34, 11, dz / l * 34); this.hit(80); this.punchT = 0.35; sfx('whoosh', v.x, v.y, v.z, { gain: 1 });
     if (this.ring) this.ring.remove();
     this.thrown('💥 THROWN! NOW GO AFTER ' + v.name.toUpperCase() + '!');
     return true;
   }
   // after a move: FLY AT THEM, for 5 s
   thrown(text) {
-    this.phase = 'thrown'; this.t = 0; this.F.act = null; if (!(this.F.clip && this.F.clip.clip === CLIPS.land)) this.play('settle'); this.title(text);
+    this.phase = 'thrown'; this.t = 0; this.dash = false; this.F.act = null; if (!(this.F.clip && this.F.clip.clip === CLIPS.land)) this.play('settle'); this.title(text);
     this.button(['🚀 FLY AT THEM!', () => { const F = this.F, v = this.v; this.end('', false); F.lockOn(v, true); }]);
   }
   _thrown() {
@@ -241,17 +241,17 @@ export class Duel {
     this['go_' + m]();
   }
   // ---------- the flying kick: in close, a foot in the chest, and off they go
-  go_kick() { this.phase = 'kick'; this.t = 0; this.kicked = false; this.F.act = null; this.play('kick'); sfx('whoosh', this.F.pos.x, this.F.pos.y, this.F.pos.z, { gain: 0.8, rate: 1.3 }); }
+  go_kick() { this.phase = 'kick'; this.t = 0; this.kicked = false; this.F.act = null; this.play('kick'); this.dash = true; sfx('whoosh', this.F.pos.x, this.F.pos.y, this.F.pos.z, { gain: 0.8, rate: 1.3 }); }
   _kick(h) {
     const F = this.F, v = this.v, dx = v.x - F.pos.x, dz = v.z - F.pos.z, d = Math.hypot(dx, dz) || 1;
     if (this.t < 0.22) { if (d > 2.6) { F.pos.x += dx / d * h * 14; F.pos.z += dz / d * h * 14; } return true; } // the lunge in, the knee up
-    if (!this.kicked) { this.kicked = true; this.react('hitBody', 2); this.stop(0.06); v.gripped = false; toss(v, dx / d * 32, 8, dz / d * 32); this.hit(45); sfx('crash', v.x, v.y + 2, v.z, { gain: 0.9, rate: 0.9 }); this.g.shake = Math.max(this.g.shake || 0, 0.4); }
+    if (!this.kicked) { this.kicked = true; this.dash = false; this.react('hitBody', 2); this.stop(0.06); v.gripped = false; toss(v, dx / d * 32, 8, dz / d * 32); this.hit(45); sfx('crash', v.x, v.y + 2, v.z, { gain: 0.9, rate: 0.9 }); this.g.shake = Math.max(this.g.shake || 0, 0.4); }
     if (this.t > 0.6) this.thrown('💥 KICKED ACROSS TOWN! GO AFTER ' + v.name.toUpperCase() + '!');
     return true;
   }
   // ---------- the laser: from Nova's eyes, from the others' hands; it pushes them back, burning, then blasts them away
   go_laser() {
-    this.phase = 'laser'; this.t = 0; this.tick = 0; this.F.act = { kind: 'laser', t: 0, T: 1.4 };
+    this.phase = 'laser'; this.t = 0; this.tick = 0; this.F.act = { kind: 'laser', t: 0, T: 1.4 }; this.react('hitBody', 1.2);
     if (!RAY) RAY = new THREE.CylinderGeometry(1, 1, 1, 10, 1, true).translate(0, 0.5, 0);
     const c = BEAM[this.F.P.hero] || BEAM.Nova, mat = (col, o) => new THREE.MeshBasicMaterial({ color: new THREE.Color(col[0], col[1], col[2]), transparent: true, opacity: o, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
     this.beam = [new THREE.Mesh(RAY, mat(c, 0.55)), new THREE.Mesh(RAY, mat([4, 3.6, 3.2], 0.95))];
@@ -312,12 +312,12 @@ export class Duel {
       return true; }
     if (s === 'rise') { const k = Math.min(1, this.t / 0.45); F.pos.y = this.hy0 + (this.top + 2.5 - this.hy0) * ease(k); F.pos.x += (v.x + dx0 / d0 * 2.2 - F.pos.x) * Math.min(1, h * 6); F.pos.z += (v.z + dz0 / d0 * 2.2 - F.pos.z) * Math.min(1, h * 6);
       if (k >= 1) { this.sub = 'wind'; this.t = 0; F.act = null; this.play('windup'); this.title('\uD83D\uDCA5 WIND UP...'); } return true; }
-    if (s === 'wind') { F.pos.y = this.top + 2.5 + Math.sin(this.t * 6) * 0.1; if (this.t >= 0.32) { this.sub = 'dash'; this.t = 0; this.play('dash'); this.hit(45); this.react('hitBody', 3); this.stop(0.07);
+    if (s === 'wind') { F.pos.y = this.top + 2.5 + Math.sin(this.t * 6) * 0.1; if (this.t >= 0.32) { this.sub = 'dash'; this.t = 0; this.play('dash'); this.dash = true; this.hit(45); this.react('hitBody', 3); this.stop(0.07);
         v.gripped = false; v.pinned = null; toss(v, -dx0 / d0 * 30, -16, -dz0 / d0 * 30); sfx('crash', v.x, v.y + 2, v.z, { gain: 1, rate: 0.8 }); this.g.fire.burst(v.x, v.y + 2, v.z, 12, 2); this.g.shake = Math.max(this.g.shake || 0, 0.45); this.title('\uD83D\uDCA5 DOWN THEY GO!'); } return true; }
     if (s === 'dash') { // flying down after them, right on their heels, a streak behind, until they hit the street
       const dx = F.pos.x - v.x, dz = F.pos.z - v.z, d = Math.hypot(dx, dz) || 1, gy = this.groundAt(v.x, v.z);
       if (v.tossed && this.t < 2.5 && (v.y || 0) > gy + 0.5) { F.pos.x += (v.x + dx / d * 1.4 - F.pos.x) * Math.min(1, h * 10); F.pos.z += (v.z + dz / d * 1.4 - F.pos.z) * Math.min(1, h * 10); F.pos.y += ((v.y || 0) + 2.8 - F.pos.y) * Math.min(1, h * 10); F.yaw = Math.atan2(-(v.z - F.pos.z), v.x - F.pos.x); if (Math.random() < 0.7) this.g.fire.burst(F.pos.x - Math.cos(F.yaw) * 0.6, F.pos.y + 0.6, F.pos.z + Math.sin(F.yaw) * 0.6, 1, 0.6); return true; }
-      F.clip = null; F.act = { kind: 'hammer', t: 0, T: 0.35 }; F.pos.set(v.x + dx / d * 3, gy + HIP + 0.3, v.z + dz / d * 3);
+      F.clip = null; this.dash = false; F.act = { kind: 'hammer', t: 0, T: 0.35 }; F.pos.set(v.x + dx / d * 3, gy + HIP + 0.3, v.z + dz / d * 3);
       this.g.disasters.decals.add('crack', v.x, v.z, 8, 8); this.g.fire.dustCloud(v.x, v.z, 3, 3); this.g.fire.burst(v.x, gy + 1, v.z, 12, 1.8); sfx('thud', v.x, gy, v.z, { gain: 1.2, rate: 0.7 }); this.g.shake = Math.max(this.g.shake || 0, 0.4); this.hit(10); v.react = null;
       return this.thrown('\uD83D\uDCA5 PUNCHED INTO THE STREET! GO AFTER ' + v.name.toUpperCase() + '!'); }
     return true;
@@ -380,9 +380,9 @@ export class Duel {
     const v = this.v, F = this.F, vy = (v.y || 0);
     if (this.sub === 'up') { const u = Math.min(1, this.t / 0.6); F.pos.y = this.hy0 + (vy + 16 - this.hy0) * ease(u); F.pos.x += (v.x - F.pos.x) * Math.min(1, h * 5); F.pos.z += (v.z - F.pos.z) * Math.min(1, h * 5); if (u >= 1) { this.sub = 'hold'; this.t = 0; F.act = null; this.play('elbowUp'); this.circle('hold', 'HOLD'); } return true; }
     if (this.sub === 'hold') { if (this.holding) this.k = Math.min(1, this.k + h / 1.4); this.place(this.ring2); this.ring2.style.setProperty('--k', this.k.toFixed(3)); this.ring2.textContent = this.holding || this.k > 0 ? Math.round(this.k * 100) + '%' : 'HOLD'; this.barI.style.width = (this.k * 100) + '%'; F.pos.y = vy + 16 + Math.sin(this.t * 2) * 0.4;
-      if (this.let || this.t > 5) { this.dropCircle(); this.sub = 'down'; this.t = 0; this.vy = -(30 + 50 * this.k); this.play('elbowDrop'); } return true; }
+      if (this.let || this.t > 5) { this.dropCircle(); this.sub = 'down'; this.t = 0; this.vy = -(30 + 50 * this.k); this.play('elbowDrop'); this.dash = true; } return true; }
     this.vy -= 90 * h; F.pos.y += this.vy * h;
-    if (F.pos.y <= vy + HIP + 1) { const p = this.k, x = v.x, z = v.z, Ds = this.g.disasters; F.pos.y = vy + HIP + 1; this.play('land'); this.react('crushed', 1.2 + p); this.stop(0.08);
+    if (F.pos.y <= vy + HIP + 1) { const p = this.k, x = v.x, z = v.z, Ds = this.g.disasters; F.pos.y = vy + HIP + 1; this.play('land'); this.dash = false; this.react('crushed', 1.2 + p); this.stop(0.08);
       Ds.decals.add('crack', x, z, 6 + 10 * p, 6 + 10 * p); this.g.fire.dustCloud(x, z, 3 + 3 * p, 3 + 3 * p); this.g.fire.burst(x, vy + 1, z, 12 + Math.round(14 * p), 1.8 + 1.6 * p); sfx(p > 0.6 ? 'boom' : 'thud', x, vy, z, { gain: 1 + 0.5 * p, rate: 0.7 }); Ds.shake(0.5 + 0.7 * p); Ds.brawl.stunts.ring(x, vy + 0.5, z, 8 + 10 * p, 0.4 + 0.3 * p, new THREE.Color(1.6, 1.3, 1.0), 0.7);
       v.gripped = false; v.pinned = null; toss(v, (Math.random() - 0.5) * 6, 2, (Math.random() - 0.5) * 6); v.busyT = 1.5 + p; v.downT = 1.5 + p; this.hit(30 + 60 * p);
       return this.thrown(p > 0.6 ? '💥 CRUSHED! GO AFTER ' + v.name.toUpperCase() + '!' : '💥 ELBOW DROPPED! GO AFTER ' + v.name.toUpperCase() + '!'); }
@@ -435,7 +435,7 @@ export class Duel {
     }
     if (s === 'down') { // straight down, faster and faster, the hero diving after them
       this.vy -= 120 * h; v.y += this.vy * h; F.pos.y = Math.max(v.y + 10, F.pos.y + this.vy * 0.85 * h);
-      if (this.t > 0.3 && !this.diving) { this.diving = true; this.play('dash'); }
+      if (this.t > 0.3 && !this.diving) { this.diving = true; this.play('dash'); this.dash = true; }
       if (Math.random() < 0.6) this.g.fire.burst(v.x, v.y + 3, v.z, 3, 1.4);
       if (v.y <= this.gy) this.impact();
     }
@@ -473,7 +473,7 @@ export class Duel {
     const C = R * 0.65; traffic.near(x, z, C, (c) => { if (c.gone || c.mission || c.mode === 4 || c.mode === 5) return; const dx = c.x - x, dz = c.z - z, d = Math.hypot(dx, dz) || 1, q = Math.max(0, 1 - d / C); c.soft = true; traffic.fling(c, dx / d * (8 + 18 * q), 4 + 8 * q, dz / d * (8 + 18 * q)); });
     people.around(x, z, R * 0.7, (j) => { if (!people.hittable(j)) return; const dx = people.x[j] - x, dz = people.z[j] - z, d = Math.hypot(dx, dz) || 1; people.move(j, dx / d, dz / d, 4); people.panic(j, x, z, -1); });
     this.hit(40 + 110 * p + (this.top - gy) * 0.25);
-    const dx = F.pos.x - x, dz = F.pos.z - z, d = Math.hypot(dx, dz) || 1; F.pos.set(x + dx / d * 5, gy + HIP + 0.4, z + dz / d * 5); this.play('land'); v.react = null; // the hero lands beside the crater
+    const dx = F.pos.x - x, dz = F.pos.z - z, d = Math.hypot(dx, dz) || 1; F.pos.set(x + dx / d * 5, gy + HIP + 0.4, z + dz / d * 5); this.play('land'); this.dash = false; v.react = null; // the hero lands beside the crater
     this.thrown(p > 0.7 ? '💥 A HUGE CRATER! GO AFTER ' + v.name.toUpperCase() + '!' : '💥 SMASHED INTO THE STREET! GO AFTER ' + v.name.toUpperCase() + '!');
   }
   free(why) { const v = this.v; v.gripped = false; toss(v, (Math.random() - 0.5) * 20, 6, (Math.random() - 0.5) * 20); this.F.damage(LAB.villainHit(10), v.name + ' ' + why); return this.end('', false); }

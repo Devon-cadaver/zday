@@ -21,6 +21,7 @@ import { Duel } from './heroduel.js';
 import { Interior } from './interior.js';
 import { LAB } from './lab.js';
 import { playClip } from './clips.js';
+import { Streak } from './streak.js';
 
 // speeds in metres a second; turn: how hard it turns at full bank; chase: the camera's distance behind and height above;
 // seat: the cockpit's place (forward, up) in the model
@@ -119,6 +120,7 @@ export class Flight {
     this.kind = PLANES[kind] ? kind : 'stunt'; this.P = PLANES[this.kind];
     this.saved = { far: camera.far, fov: camera.fov, dof: post.opts.dof, see: SEE.on, pos: camera.position.clone(), tg: controls.target.clone() };
     this.obj = planeModel(this.kind, this.P); this.obj.rotation.order = 'YZX'; g.disasters.ctx.scene.add(this.obj);
+    if (this.P.hero) { const c = { Nova: [1.6, 0.5, 1.4], Dragonfly: [0.6, 1.7, 0.7], Tempo: [0.5, 1.2, 1.8] }[this.P.hero] || [1.4, 1.2, 0.8]; this.streak = new Streak(g.disasters.ctx.scene, c); } // the speed streak behind a hero's dashes (streak.js)
     this.zoom = this.zoom || 1; this.ammo = this.P.gun ? this.P.gun.mag : 0; this.reload = 0; this.stickN = 0; this.shots = [];
     const tg = new THREE.BufferGeometry(); tg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(32 * 6), 3)); tg.setDrawRange(0, 0); // the gun's tracers
     this.tracer = new THREE.LineSegments(tg, new THREE.LineBasicMaterial({ color: new THREE.Color(2.2, 1.8, 0.7), transparent: true, opacity: 0.9 })); this.tracer.frustumCulled = false; g.disasters.ctx.scene.add(this.tracer);
@@ -293,7 +295,7 @@ export class Flight {
     const g = this.g, { camera, controls, post } = this.ctx;
     if (this.duel) this.duel.end('', false); this.lock = null; this.dropInside(); this.inB = -1; this.clearShots();
     this.active = false; document.body.classList.remove('zd-flying');
-    const hr = this.obj.userData.hero; g.disasters.ctx.scene.remove(this.obj);
+    const hr = this.obj.userData.hero; g.disasters.ctx.scene.remove(this.obj); if (this.streak) { this.streak.dispose(g.disasters.ctx.scene); this.streak = null; }
     if (hr) { hr.cape.g.dispose(); if (hr.smooth && hr.smooth.mesh) { hr.smooth.mesh.geometry.dispose(); const m = hr.smooth.mesh.material; (Array.isArray(m) ? m : [m]).forEach(x => x && x.dispose()); } } else this.obj.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); // its own shapes and paint (a hero's are shared with the rest: only the cape is its own)
     for (const b of this.bombs) g.disasters.ctx.scene.remove(b.m); this.bombs = [];
     g.disasters.ctx.scene.remove(this.tracer); this.tracer.geometry.dispose(); this.tracer.material.dispose();
@@ -333,6 +335,7 @@ export class Flight {
     const prop = this.obj.userData.prop, burner = this.obj.userData.burner, k = (this.thr - P.min) / (P.max - P.min);
     if (prop) prop.rotation.x += dt * (40 + 50 * k);
     if (this.obj.userData.hero) this.heroPose(this.obj.userData.hero, dt);
+    if (this.streak) this.streak.update(this.pos, this.state === 'tossed' || (!!this.duel && !!this.duel.dash) || (this.state === 'fly' && !this.duel && this.speed > 55), cam, dt);
     if (burner) { burner.scale.set(0.6 + k * 0.9, 1, 1); burner.material.opacity = 0.35 + 0.55 * k; }
     // the camera: behind and above it, easing after it (no roll, so the horizon stays put), or in its seat
     _f.set(1, 0, 0).applyQuaternion(this.q);
@@ -342,9 +345,10 @@ export class Flight {
         let dx = this.pos.x - v.x, dz = this.pos.z - v.z; const l = Math.hypot(dx, dz); if (l < 0.5) { dx = -Math.cos(this.yaw); dz = Math.sin(this.yaw); } else { dx /= l; dz /= l; }
         const sx = -dz, sz = dx, side = (cam.position.x - this.pos.x) * sx + (cam.position.z - this.pos.z) * sz >= 0 ? 1 : -1; D.cam = { dx: sx * side, dz: sz * side }; cam.fov = FOV_ISO; cam.updateProjectionMatrix(); this.ctx.post.opts.dof = true;
       }
-      const mx = (this.pos.x + v.x) / 2, my = (this.pos.y + Math.max(2.4, (v.y || 0) + HIP)) / 2, mz = (this.pos.z + v.z) / 2, dist = ISO_DIST * this.zoom, el = ISO_EL - 0.18, ce = Math.cos(el) * dist; // between them, a little lower than the flying view
+      if (D.punchT > 0) D.punchT = Math.max(0, D.punchT - dt); const pk = 1 - 0.16 * (D.punchT > 0 ? D.punchT / 0.35 : 0); // a punch-in at a contact, easing back out
+      const mx = (this.pos.x + v.x) / 2, my = (this.pos.y + Math.max(2.4, (v.y || 0) + HIP)) / 2, mz = (this.pos.z + v.z) / 2, dist = ISO_DIST * this.zoom * pk, el = ISO_EL - 0.18, ce = Math.cos(el) * dist; // between them, a little lower than the flying view
       _v.set(mx + D.cam.dx * ce, my + Math.sin(el) * dist, mz + D.cam.dz * ce);
-      cam.position.lerp(_v, 1 - Math.exp(-dt * (ph === 'slam' ? 12 : 4))); cam.up.set(0, 1, 0); cam.lookAt(_u.set(mx, my, mz));
+      cam.position.lerp(_v, 1 - Math.exp(-dt * (ph === 'slam' || D.punchT > 0.25 ? 12 : 4))); cam.up.set(0, 1, 0); cam.lookAt(_u.set(mx, my, mz));
     } else if (this.view === 'cockpit' && this.state === 'fly') {
       _v.set(P.seat[0], P.seat[1], 0).applyQuaternion(this.q); cam.position.copy(this.pos).add(_v);
       cam.quaternion.copy(this.q).multiply(SEAT_TURN); cam.up.set(0, 1, 0).applyQuaternion(this.q);
