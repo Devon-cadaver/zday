@@ -25,7 +25,7 @@ Every building is one shell today (merged into the city's big meshes, by vertex 
 
 ## 2. Hero lab (Sandbox)
 
-A panel on the hero cards: hero, level 1 to 20, which skills are on, villain level, and a spawn row (any villain, any disaster, a rogue army unit). A readout while flying: hit points dealt, damage taken, buildings down, people scared, fear. Everything from here on is built against this bench.
+Built (2026-11-01): a Hero lab block in the Sandbox panel under Be a hero: hero level and villain level sliders (1 to 20), the five moves on or off, Spawn Blur, Tyrant, Weaver or all three, and a Readout toggle that adds a line under the hero name while flying: damage dealt and taken, fights won, buildings brought down, people scared, fear. Levels take hold at the next take-off or spawn. Disasters are spawned from the Disasters tab as before. A script (lab-fights.cjs) plays every hero against every villain at levels 1, 10 and 20 and prints a line a fight; run it after any change to the fights. Everything from here on is built against this bench.
 
 ## 3. Combat round 3
 

@@ -11,6 +11,7 @@
 import * as THREE from 'three';
 import { toss } from './brawl.js';
 import { sfx } from './audio.js';
+import { LAB } from './lab.js';
 
 const HIP = 0.94 * 2.2; // the hero is flown by the hips (flight.js)
 const HANDS = [1.24, 1.1]; // the hands held out ahead and together for the spin (flight.js heroPose): ahead of the hips, up from them
@@ -57,7 +58,7 @@ export class Duel {
   // F: the flight (the hero flying), v: the villain caught
   constructor(F, v) {
     this.F = F; this.v = v; this.g = F.g; this.phase = 'spots'; this.t = 0; this.live = []; this.spawned = 0; this.total = 6; this.next = 0.35;
-    this.pow = F.P.punch || 1; this.life = 1.05 * (F.P.slow || 1); // how hard this hero hits; how long a spot lasts (Tempo slows time)
+    this.pow = (F.P.punch || 1) * LAB.heroPow(); this.life = 1.05 * (F.P.slow || 1) * LAB.spotLife(); LAB.stats.fights++; // how hard this hero hits; how long a spot lasts (Tempo slows time); both by the lab's levels
     v.heroWin = true; // the player's own fight: win it and they are beaten (not the odds the heroes get on their own)
     v.gripped = true; v.pinned = 'reel'; v.flinch = 0; v.downT = 0; if (v.dropHeld) v.dropHeld(); // held where it is, reeling
     if (!document.getElementById('zd-duel-css')) { const s = document.createElement('style'); s.id = 'zd-duel-css'; s.textContent = CSS; document.head.appendChild(s); }
@@ -75,7 +76,7 @@ export class Duel {
   title(s) { this.ttl.textContent = s; }
   // where a point is on the screen (the villain's chest by default)
   screen(x = this.v.x, y = (this.v.y || 0) + 2.4, z = this.v.z) { const p = new THREE.Vector3(x, y, z).project(this.F.ctx.camera); return [(p.x + 1) / 2 * innerWidth, (1 - p.y) / 2 * innerHeight]; }
-  hit(n) { const v = this.v; this.g.disasters.brawl.hurt(v, n * this.pow, { name: this.F.P.name }); this.g.fire.burst(v.x, (v.y || 0) + 2.4, v.z, 6, 0.8); this.F.punch = 0.25; v.flinch = 1; }
+  hit(n) { const v = this.v; LAB.stats.dealt += n * this.pow; this.g.disasters.brawl.hurt(v, n * this.pow, { name: this.F.P.name }); this.g.fire.burst(v.x, (v.y || 0) + 2.4, v.z, 6, 0.8); this.F.punch = 0.25; v.flinch = 1; }
   // the street under (x, z), or a roof standing there
   groundAt(x, z) { const city = this.g.city; let y = this.g.people.groundY(x, z); city.buildingsNear(x, z, 0.1, (k, d, b) => { if (d === 0 && !city.dead[k] && b.roofY > y) y = b.roofY; }); return y; }
   spot() {
@@ -94,7 +95,7 @@ export class Duel {
     const v = this.v, F = this.F; this.t += h;
     if (F.state !== 'fly' || v.gone) return this.end('', false);
     this.vhp.textContent = v.name.toUpperCase() + ' ' + Math.max(0, Math.round(v.hp));
-    if (v.beaten || v.hp <= 0) return this.end(v.name + ' is beaten!', true);
+    if (v.beaten || v.hp <= 0) { LAB.stats.won++; return this.end(v.name + ' is beaten!', true); }
     if (v.flinch > 0) v.flinch = Math.max(0, v.flinch - h * 4);
     if (v.pinned === 'reel' || v.pinned === 'dazed') v.yaw = Math.atan2(F.pos.x - v.x, F.pos.z - v.z); // facing the hero
     if (F.act && (F.act.t += h) >= F.act.T) F.act = null;
@@ -104,7 +105,7 @@ export class Duel {
   _spots(h) {
     const v = this.v;
     if ((this.next -= h) <= 0 && this.spawned < this.total) { this.next = 0.45; this.spawned++; this.spot(); }
-    for (const s of this.live) { if (s.dead) continue; s.life -= h; if (s.life <= 0) { s.dead = true; s.b.classList.add('miss'); setTimeout(() => s.b.remove(), 250); this.F.damage(7, v.name + ' hit you!'); this.g.shake = Math.max(this.g.shake || 0, 0.25); } }
+    for (const s of this.live) { if (s.dead) continue; s.life -= h; if (s.life <= 0) { s.dead = true; s.b.classList.add('miss'); setTimeout(() => s.b.remove(), 250); this.F.damage(LAB.villainHit(7), v.name + ' hit you!'); this.g.shake = Math.max(this.g.shake || 0, 0.25); } }
     this.barI.style.width = (this.spawned / this.total * 100) + '%';
     if (this.over) return false; // knocked out by that last miss
     if (this.spawned >= this.total && this.live.every(s => s.dead)) this.daze();
@@ -115,7 +116,7 @@ export class Duel {
     if (this.over) return;
     this.phase = 'dazed'; this.t = 0; this.v.pinned = 'dazed';
     this.title('💫 ' + this.v.name.toUpperCase() + ' IS DAZED!');
-    this.button(['🌀 SPIN & TOSS', () => this.startSpin()], ['🎲 RANDOM MOVE', () => this.random(), 'rnd']);
+    const rnd = MOVES.some(m => LAB.moves[m]), btns = []; if (LAB.moves.spin || !rnd) btns.push(['🌀 SPIN & TOSS', () => this.startSpin()]); if (rnd) btns.push(['🎲 RANDOM MOVE', () => this.random(), 'rnd']); this.button(...btns); // only the moves the lab has on
   }
   _dazed() {
     this.barI.style.width = Math.max(0, 100 - this.t / 4 * 100) + '%';
@@ -154,7 +155,7 @@ export class Duel {
   // RANDOM MOVE: not the one just done; by the neck only with them down on the street
   random() {
     const v = this.v, low = (v.y || 0) - this.g.people.groundY(v.x, v.z) < 4;
-    const pool = MOVES.filter(m => m !== this.F.lastMove && (m !== 'drag' || low)), m = pool[Math.floor(Math.random() * pool.length)];
+    const on = MOVES.filter(m => LAB.moves[m]), pool0 = on.filter(m => m !== this.F.lastMove && (m !== 'drag' || low)), pool = pool0.length ? pool0 : on.length ? on : MOVES, m = pool[Math.floor(Math.random() * pool.length)];
     this.F.lastMove = m; this.title(SAY[m]); this.button();
     this['go_' + m]();
   }
@@ -288,7 +289,7 @@ export class Duel {
     const dx = F.pos.x - x, dz = F.pos.z - z, d = Math.hypot(dx, dz) || 1; F.pos.set(x + dx / d * 5, gy + HIP + 0.4, z + dz / d * 5); // the hero lands beside the crater
     this.thrown(p > 0.7 ? '💥 A HUGE CRATER! GO AFTER ' + v.name.toUpperCase() + '!' : '💥 SMASHED INTO THE STREET! GO AFTER ' + v.name.toUpperCase() + '!');
   }
-  free(why) { const v = this.v; v.gripped = false; toss(v, (Math.random() - 0.5) * 20, 6, (Math.random() - 0.5) * 20); this.F.damage(10, v.name + ' ' + why); return this.end('', false); }
+  free(why) { const v = this.v; v.gripped = false; toss(v, (Math.random() - 0.5) * 20, 6, (Math.random() - 0.5) * 20); this.F.damage(LAB.villainHit(10), v.name + ' ' + why); return this.end('', false); }
   // over: the villain let go (if still held, it drops), a drag in hand dropped, the overlay gone, the hero flying again
   end(why, won) {
     if (this.over) return false; this.over = true;

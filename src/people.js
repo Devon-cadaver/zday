@@ -938,8 +938,8 @@ export class People {
   }
 
   // panic civilians around a point (crash, pop)
-  scare(x, z, R, p = 0.8) {
-    this.around(x, z, R, (j) => { if (this.r() < p) this.panic(j, x, z, -1); });
+  scare(x, z, R, p = 0.8) { // how many ran
+    let n = 0; this.around(x, z, R, (j) => { if (this.r() < p) { this.panic(j, x, z, -1); n++; } }); return n;
   }
 
   // ---------- simulation

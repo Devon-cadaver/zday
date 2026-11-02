@@ -19,6 +19,7 @@ import { heroRig } from './heroes.js';
 import { relax, detail } from './villains.js';
 import { Duel } from './heroduel.js';
 import { Interior } from './interior.js';
+import { LAB } from './lab.js';
 
 // speeds in metres a second; turn: how hard it turns at full bank; chase: the camera's distance behind and height above;
 // seat: the cockpit's place (forward, up) in the model
@@ -84,7 +85,7 @@ const CSS = `
 #zd-fly{position:fixed;left:0;top:0;right:0;bottom:0;touch-action:none}
 #zd-fly .stick{position:absolute;width:84px;height:84px;margin:-42px 0 0 -42px;border-radius:50%;border:2px solid rgba(255,255,255,.35);display:none;pointer-events:none}
 #zd-fly .knob{position:absolute;left:50%;top:50%;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;background:rgba(255,255,255,.45)}
-#zd-fly .hud{position:absolute;left:50%;top:calc(10px + env(safe-area-inset-top));transform:translateX(-50%);background:rgba(20,14,30,.6);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:9px;padding:6px 11px;font:700 12px/1 system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:.04em;white-space:pre;text-align:center;line-height:1.35;pointer-events:none;font-variant-numeric:tabular-nums}
+#zd-fly .hud{position:absolute;left:50%;top:calc(10px + env(safe-area-inset-top));transform:translateX(-50%);background:rgba(20,14,30,.6);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:9px;padding:6px 11px;font:700 12px/1 system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:.04em;white-space:pre;text-align:center;line-height:1.35;pointer-events:none;font-variant-numeric:tabular-nums;max-width:calc(100vw - 28px);white-space:pre-wrap;box-sizing:border-box}
 #zd-fly .hz,#zd-fly .ret{position:absolute;left:50%;top:50%;pointer-events:none;display:none}
 #zd-fly .hz{width:56vw;height:0;border-top:2px solid rgba(160,255,190,.55)}
 #zd-fly .ret{width:22px;height:22px;margin:-11px 0 0 -11px;border:2px solid rgba(160,255,190,.8);border-radius:50%}
@@ -120,7 +121,7 @@ export class Flight {
     camera.far = 4000; // past the fog anyway; a nearer far plane keeps the depth sharp with the near one so close
     this.loads = LOADS[this.kind] || []; this.load = 0; this.bombs = []; this.coolT = 0; this.seedT = 0;
     try { this.invert = localStorage.getItem(INVERT) === '1'; } catch (e) { this.invert = false; }
-    this.ui(); this.active = true; controls.enabled = false; post.opts.dof = false; g.setFollow(-1);
+    this.ui(); this.active = true; controls.enabled = false; post.opts.dof = false; g.setFollow(-1); LAB.reset();
     document.body.classList.add('zd-flying');
     this.spawn(); this.setView(this.view);
     if (this.P.hero) { // villains to fight: three of them in the middle of town if there are none about
@@ -134,7 +135,7 @@ export class Flight {
     this.pos.set(cx + Math.cos(a) * R, 95, cz + Math.sin(a) * R);
     this.yaw = Math.atan2(-(cz - this.pos.z), cx - this.pos.x); this.pitch = 0; this.roll = 0;
     this.speed = this.thr = this.P.start; this.ix = this.iy = 0; this.state = 'fly'; this.t = 0; this.obj.visible = this.view === 'chase'; this.snap = true;
-    this.hull = 100; this.caught = null; this.thrown = []; this.seedTw = null; this.lock = null; this.punch = 0; this.act = null; this.inB = -1;
+    this.hullMax = this.P.hero ? LAB.heroHealth() : 100; this.hull = this.hullMax; this.caught = null; this.thrown = []; this.seedTw = null; this.lock = null; this.punch = 0; this.act = null; this.inB = -1; // a hero's health by the lab's level
     if (this.P.hero) this.pos.y = 60;
   }
   ui() {
@@ -348,9 +349,9 @@ export class Flight {
     // what the pilot reads
     if ((this.hudT = (this.hudT || 0) - dt) <= 0) {
       this.hudT = 0.15;
-      const th = this.threat, hull = Math.max(0, Math.round(this.hull)), L = this.lock;
+      const th = this.threat, hull = Math.max(0, Math.round(this.hull / (this.hullMax || 100) * 100)), L = this.lock;
       this.hud.textContent = P.name.toUpperCase() + ' · ' + Math.round(this.speed * KMH) + ' km/h · ' + Math.max(0, Math.round(this.pos.y)) + ' m · ' + (P.hero ? 'health ' : 'hull ') + hull + '%' + (this.P.gun ? ' · gun ' + (this.reload > 0 ? 'reloading' : this.ammo) : '') +
-        (this.duel ? '\nFIGHTING ' + this.duel.v.name.toUpperCase() : L ? '\nLOCKED ON ' + L.name.toUpperCase() + ' ' + Math.round(Math.hypot(L.x - this.pos.x, L.z - this.pos.z)) + ' m' : th && th.d < 600 ? '\n' + th.name.toUpperCase() + ' ' + Math.max(0, Math.round(th.d)) + ' m' : '');
+        (this.duel ? '\nFIGHTING ' + this.duel.v.name.toUpperCase() : L ? '\nLOCKED ON ' + L.name.toUpperCase() + ' ' + Math.round(Math.hypot(L.x - this.pos.x, L.z - this.pos.z)) + ' m' : th && th.d < 600 ? '\n' + th.name.toUpperCase() + ' ' + Math.max(0, Math.round(th.d)) + ' m' : '') + (LAB.on && P.hero ? '\n' + LAB.line() : '');
       this.hud.style.color = hull < 35 ? '#ff8a7a' : th && th.d < 60 ? '#ffd27a' : '#fff';
       if (this.state === 'fly' && this.hull < 60) g.fire.spray(this.pos.x - _f.x * 3, this.pos.z - _f.z * 3, this.pos.y, this.hull < 30 ? 4 : 2, 1, 2.2); // smoke off a hurt plane
       if (g.audio) g.audio.engine(this.state === 'fly' ? this.P.sound : null, k);
@@ -421,8 +422,8 @@ export class Flight {
   // hurt: the hull down by n (at nothing it goes down, why the reason), told once in a while
   damage(n, why) {
     if (this.state !== 'fly') return;
-    this.hull -= n; if (this.hull <= 0) { this.crash(-1, why); return; }
-    if ((this.hurtT || 0) < this.t2) { this.hurtT = this.t2 + 1.5; this.tip(why + (this.P.hero ? ' Health ' : ' Hull ') + Math.round(this.hull) + '%'); sfx('crash', this.pos.x, this.pos.y, this.pos.z, { gain: 0.4, rate: 1.3 }); }
+    this.hull -= n; LAB.stats.taken += n; if (this.hull <= 0) { this.crash(-1, why); return; }
+    if ((this.hurtT || 0) < this.t2) { this.hurtT = this.t2 + 1.5; this.tip(why + (this.P.hero ? ' Health ' : ' Hull ') + Math.round(this.hull / (this.hullMax || 100) * 100) + '%'); sfx('crash', this.pos.x, this.pos.y, this.pos.z, { gain: 0.4, rate: 1.3 }); }
   }
   // a hero goes straight through buildings (Sean): in through one wall in a spray of glass and brick, out through the far
   // one, and the building comes down behind them, leaning the way they went; a low one may go up in a fireball first (a
@@ -447,7 +448,7 @@ export class Flight {
     this.dropInside(); this.inside = new Interior(g.disasters, k, x, y, z, fx, fz); this.inside.step(x, y, z, fx, fz); // its floors and furniture, from here on (interior.js)
     sfx('crash', x, y, z, { gain: 0.9 }); sfx('glass', x, y, z, { gain: 0.6 });
     this.speed *= 0.85; this.punch = 0.4; g.shake = Math.max(g.shake || 0, 0.35);
-    g.people.scare(x, z, 25, 0.8);
+    LAB.stats.scared += g.people.scare(x, z, 25, 0.8);
   }
   burstOut(k, x, y, z) {
     const g = this.g, D = g.disasters, b = g.city.buildings[k]; if (g.city.dead[k]) return;
@@ -459,9 +460,9 @@ export class Flight {
       for (let i = 0; i < 6; i++) g.fire.burst(cx + (Math.random() - 0.5) * w * 0.7, b.baseY + hgt * (0.2 + Math.random() * 0.6), cz + (Math.random() - 0.5) * d * 0.7, 16, 2.6 + Math.random());
       for (let i = 0; i < 24; i++) { const a = Math.random() * 6.28, s = 0.4 + Math.random() * 1.0, v = 10 + Math.random() * 14; D.debris.add(cx, b.baseY + hgt * (0.3 + Math.random() * 0.5), cz, s, s * 0.6, s, Math.random() < 0.6 ? col : 0x3a3430, 'fly', { v: [Math.cos(a) * v, 4 + Math.random() * 10, Math.sin(a) * v] }); }
       sfx('boomBig', cx, b.baseY + hgt * 0.5, cz, { gain: 0.9 }); g.shake = Math.max(g.shake, 0.9);
-      g.people.scare(cx, cz, 60, 1);
+      LAB.stats.scared += g.people.scare(cx, cz, 60, 1);
     }
-    const shell = this.inside && this.inside.k === k ? this.inside.take() : null; this.inside = null;
+    const shell = this.inside && this.inside.k === k ? this.inside.take() : null; this.inside = null; LAB.stats.buildings++;
     D.destroyBuilding(k, 'collapse', { dir: Math.atan2(-fx, fz), spare: true, noCrush: true, shell }); // leaning over the way the hero went, floors and all
   }
   // the inside of a building the hero never came out of (knocked down in it, landed): it comes down anyway
@@ -577,7 +578,7 @@ export class Flight {
     for (const v of e.who) {
       if (v.gone || v.beaten) continue;
       const d = Math.hypot(v.x - this.pos.x, (v.y || 0) + HIP - this.pos.y, v.z - this.pos.z); this.note(v.name, d);
-      if (this.P.hero && !v.tossed && !v.gripped && d < 12 && (v.hitT || 0) < this.t2) { v.hitT = this.t2 + 2.5; this.g.shake = Math.max(this.g.shake || 0, 0.3); this.damage(6, v.name + ' hit you!'); }
+      if (this.P.hero && !v.tossed && !v.gripped && d < 12 && (v.hitT || 0) < this.t2) { v.hitT = this.t2 + 2.5; this.g.shake = Math.max(this.g.shake || 0, 0.3); this.damage(LAB.villainHit(6), v.name + ' hit you!'); }
     }
   }
   // Lock on (a hero): the nearest villain still up, and the hero flies straight at them (homeIn); pressed again, the lock let go

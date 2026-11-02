@@ -16,6 +16,7 @@ import { Folk } from './folk.js';
 import { SEE } from './see.js';
 import { DisasterTV } from './tv.js';
 import { THUMB } from './thumbs.js';
+import { LAB } from './lab.js';
 
 const CSS = `
 #zd-top{position:fixed;left:0;right:0;top:0;display:flex;gap:6px;align-items:center;justify-content:center;flex-wrap:wrap;
@@ -219,6 +220,7 @@ body.zd-menu-on.zd-main #zd-side .zd-side-btn{background:rgba(12,18,34,.75);bord
 #zd-dis .g.two > .zd-btn{flex:0 0 calc((100% - 6px) / 2)}
 #zd-dis .zd-btn{padding:11px 4px;min-width:0;font-size:11px;letter-spacing:.03em;text-transform:none}
 #zd-dis .zd-btn.sel{border-color:#a6ff4d;color:#a6ff4d}
+#zd-dis .lab label{display:flex;align-items:center;gap:8px;font-size:11px;color:#f6ead2;margin:0 2px 8px}#zd-dis .lab label b{min-width:18px;text-align:right;color:#a6ff4d}#zd-dis .lab input[type=range]{flex:1 1 auto;min-width:0;touch-action:pan-x;accent-color:#ff4fa3}#zd-dis .lab .g{margin-bottom:6px}#zd-dis .lab .hint{font-size:10px;opacity:.6;text-align:center;margin:2px 0 6px} /* the hero lab (lab.js) */
 #zd-dis .g.cards > .zd-btn{display:flex;flex-direction:column;align-items:stretch;gap:5px;padding:4px 4px 7px;line-height:1.15} /* the disasters: a picture over the name */
 #zd-dis .zd-btn .th{display:block;position:relative;padding-top:56.25%;border-radius:7px;overflow:hidden;background:#111}
 #zd-dis .zd-btn .th svg{position:absolute;left:0;top:0;width:100%;height:100%;display:block}
@@ -1133,6 +1135,11 @@ class Sandbox {
       '<div class="h">Help</div><div class="g two"><button class="zd-btn auto" type="button" data-auto>Auto responders: On</button><button class="zd-btn hero" type="button" data-hero>Hero signal \u262E</button></div>' +
       '<div class="h">Fly a plane</div><div class="g cards">' + [['stunt', 'Stunt plane'], ['jet', 'F-16 fighter'], ['a10', 'A-10 Warthog'], ['seeder', 'Cloud seeder'], ['b2', 'B-2 bomber'], ['b52', 'B-52 bomber']].map(([k, n]) => '<button class="zd-btn fly" type="button" data-fly="' + k + '"><span class="th">' + THUMB[k] + '</span><span class="nm">' + n + '</span></button>').join('') + '</div>' +
       '<div class="h">Be a hero</div><div class="g cards">' + [['nova', 'Nova'], ['dragonfly', 'Dragonfly'], ['tempo', 'Tempo']].map(([k, n]) => '<button class="zd-btn fly" type="button" data-fly="' + k + '"><span class="th">' + THUMB[k] + '</span><span class="nm">' + n + '</span></button>').join('') + '</div>' + // flown like the planes, villains to fight (flight.js, heroduel.js)
+      '<div class="h">Hero lab</div><div class="lab">' + // levels, moves, a villain to spawn, the readout (lab.js)
+        ['hero', 'villain'].map(w => '<label>' + (w === 'hero' ? 'Hero' : 'Villain') + ' level <b data-lv="' + w + '">' + LAB[w] + '</b><input type="range" min="1" max="20" value="' + LAB[w] + '" data-lab="' + w + '"></label>').join('') +
+        '<div class="g">' + [['spin', 'Spin & toss'], ['kick', 'Kick'], ['laser', 'Laser'], ['drag', 'Neck drag'], ['slam', 'Sky slam']].map(([k, n]) => '<button class="zd-btn' + (LAB.moves[k] ? ' sel' : '') + '" type="button" data-move="' + k + '">' + n + '</button>').join('') + '</div>' +
+        '<div class="g">' + [['blur', 'Spawn Blur'], ['tyrant', 'Spawn Tyrant'], ['weaver', 'Spawn Weaver']].map(([k, n]) => '<button class="zd-btn" type="button" data-spawn="' + k + '">' + n + '</button>').join('') + '<button class="zd-btn" type="button" data-spawn="">All three</button><button class="zd-btn' + (LAB.on ? ' sel' : '') + '" type="button" data-labon>Readout: ' + (LAB.on ? 'On' : 'Off') + '</button></div>' +
+        '<div class="hint">Levels take hold when a hero takes off or a villain is spawned. The readout shows under the hero\'s name</div></div>' +
       '<div class="h">The band</div><div class="g"><button class="zd-btn fly" type="button" data-band style="flex-basis:100%"><span class="th">' + THUMB.band + '</span><span class="nm">Play as the band: tap to the beat</span></button></div>' + // rhythm.js
       '<div class="h">Be the disaster</div><div class="g"><button class="zd-btn fly" type="button" data-take style="flex-basis:100%">Take over a unit (saucer, walker, worm, kaiju, tornado)</button></div>' +
       '<div class="h">On the ground</div><div class="g two cards">' + [['tank', 'Tank'], ['cop', 'Police officer']].map(([k, n]) => '<button class="zd-btn fly" type="button" data-drive="' + k + '"><span class="th">' + THUMB[k] + '</span><span class="nm">' + n + '</span></button>').join('') + '</div></div>' +
@@ -1148,6 +1155,10 @@ class Sandbox {
     const autoBtn = d.querySelector('[data-auto]');
     autoBtn.onclick = () => { this.auto.setOn(!this.auto.on); autoBtn.textContent = 'Auto responders: ' + (this.auto.on ? 'On' : 'Off'); autoBtn.classList.toggle('off', !this.auto.on); g.toast(this.auto.on ? 'Responders will answer every disaster and rebuild afterwards' : 'Responders off: nobody comes to help', 3500); };
     d.querySelectorAll('[data-fly]').forEach(b => { b.onclick = () => { this.pending = null; this.close(); if (g.flight) g.flight.start(b.dataset.fly); }; }); // up in a plane (flight.js)
+    d.querySelectorAll('[data-lab]').forEach(r => { r.onpointerdown = (e) => e.stopPropagation(); r.oninput = () => { LAB[r.dataset.lab] = +r.value; d.querySelector('[data-lv="' + r.dataset.lab + '"]').textContent = r.value; LAB.save(); }; }); // the hero lab (lab.js)
+    d.querySelectorAll('[data-move]').forEach(b => { b.onclick = () => { LAB.moves[b.dataset.move] = !LAB.moves[b.dataset.move]; b.classList.toggle('sel', LAB.moves[b.dataset.move]); LAB.save(); }; });
+    d.querySelectorAll('[data-spawn]').forEach(b => { b.onclick = () => { const tg = g.controls.target, k = b.dataset.spawn; this.pending = null; this.close(); g.disasters.start('villains', tg.x, tg.z, k ? { only: k } : {}); g.toast((k ? k[0].toUpperCase() + k.slice(1) : 'Blur, Tyrant and Weaver') + ' at level ' + LAB.villain + (g.flight && g.flight.active ? '' : '. Take off as a hero and press Lock on')); if (this.clock < 0) this.clock = 0; }; });
+    d.querySelector('[data-labon]').onclick = (e) => { LAB.on = !LAB.on; e.currentTarget.textContent = 'Readout: ' + (LAB.on ? 'On' : 'Off'); e.currentTarget.classList.toggle('sel', LAB.on); LAB.save(); };
     d.querySelector('[data-take]').onclick = () => { this.pending = null; this.close(); if (g.takeover) g.takeover.pick(); }; // a disaster's own unit, yours (takeover.js)
     d.querySelector('[data-band]').onclick = () => { this.pending = null; this.close(); if (g.bandGame) g.bandGame.start(); }; // the band, played (rhythm.js)
     d.querySelectorAll('[data-drive]').forEach(b => { b.onclick = () => { this.pending = null; this.close(); if (g.drive) g.drive.start(b.dataset.drive); }; }); // on the ground (drive.js)
