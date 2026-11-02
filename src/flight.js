@@ -583,8 +583,7 @@ export class Flight {
     if (!v || v.gone || v.beaten) { const B = this.g.city.bounds; this.lock = null; this.g.disasters.start('villains', (B.x0 + B.x1) / 2, (B.z0 + B.z1) / 2); this.tip('More villains are coming! Press Lock on again'); return; } // all beaten: three more
     this.lock = v; this.tip('Locked on ' + v.name + '! Flying straight at them'); sfx('whoosh', this.pos.x, this.pos.y, this.pos.z, { gain: 0.9 });
   }
-  // locked on: straight at the villain, faster the further, up over the roofs in the way but through one close to them;
-  // close enough and the fight is on (heroduel.js)
+  // locked on: straight at the villain, faster the further, through every building in the way; close enough and the fight is on (heroduel.js)
   homeIn(dt) {
     const v = this.lock, P = this.P;
     if (!v || v.gone || v.beaten) { this.lock = null; return false; }
@@ -595,10 +594,8 @@ export class Flight {
     this.pitch += (Math.atan2(dy, Math.hypot(dx, dz)) * 0.8 - this.pitch) * Math.min(1, dt * 4);
     this.speed += (Math.min(P.max * 1.6, d * 1.6 + 14) - this.speed) * Math.min(1, dt * 2.5);
     const px = this.pos.x, py = this.pos.y, pz = this.pos.z, s = Math.min(d - 6, this.speed * dt); this.pos.x += dx / d * s; this.pos.y += dy / d * s; this.pos.z += dz / d * s;
-    let top = -1; this.g.city.buildingsNear(this.pos.x, this.pos.z, 2, (k, dd, b) => { if (this.pos.y < b.roofY + 2.4 && b.roofY > top) top = b.roofY; });
-    if (top >= 0 && d > 14) this.pos.y = top + 2.4; // over the roofs on the way (straight through every one flattened 43 buildings in one crossing of the big city), through the last one
     if (this.pos.y < 2.4) this.pos.y = 2.4;
-    this.plough(px, py, pz);
+    this.plough(px, py, pz); // straight through everything in the way, as when flown by hand (Sean)
     return true;
   }
   // in a fight: hanging in the air a step from the villain, at their height, facing them (they are held there); while
