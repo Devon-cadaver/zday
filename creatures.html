@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>My Little Disaster · alien options</title>
+<style>
+html,body{margin:0;min-height:100%;background:#0d0a16;color:#f6ead2;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+#gl{position:fixed;inset:0;width:100%;height:100%;z-index:2;pointer-events:none}
+main{max-width:720px;margin:0 auto;padding:calc(14px + env(safe-area-inset-top)) 12px 40px;box-sizing:border-box}
+h1{margin:0 0 2px;font:900 22px Impact,'Arial Black',sans-serif;letter-spacing:.03em;color:#a6ff4d}
+p{margin:0 0 10px;font-size:13px;opacity:.8}
+h2{margin:18px 0 8px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#d8c49e}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.card{cursor:pointer;border-radius:10px;background:#1b1530;border:1px solid rgba(255,255,255,.12);overflow:hidden}
+.card.big{grid-column:1/-1}
+.view{aspect-ratio:1/1;background:#1b1530}
+.card.big .view{aspect-ratio:1/.8}
+.lbl{padding:6px 8px 8px;font-size:12px;line-height:1.25}
+.lbl b{display:block;font-size:13px;color:#ffe2a0}
+.now .lbl b{color:#a6ff4d}
+a{color:#ffc233}
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<main>
+  <h1>ALIEN OPTIONS</h1>
+  <p>Tap any one to see it bigger. Nothing here is in the game yet, except the first. <a href="./">Back to the game</a></p>
+  <h2>Ground units</h2><div class="grid" id="ground"></div>
+  <h2>Alien dogs, running</h2><div class="grid" id="dogs"></div>
+</main>
+<script type="module" src="/src/creatures.js"></script>
+</body>
+</html>

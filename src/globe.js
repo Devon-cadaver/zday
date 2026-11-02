@@ -18,6 +18,8 @@ import { MATERIALS } from './city.js';
 import { damageOf, craters, addCrater, sendMeteor } from './world.js';
 import { sideButton } from './ui.js';
 import { Sky } from './sky.js';
+import { HS, rigFor } from './herogame.js';
+import { detail } from './villains.js';
 
 const R = 10;
 // the places' character on the map: what each one wants to be next to
@@ -144,6 +146,21 @@ export class Globe {
     const b = sideButton('zd-globe', 'The world'); b.textContent = '🌍'; b.style.fontSize = '19px';
     b.onclick = (e) => { e.stopPropagation(); if (this.up) this.up(); else this.open(); }; // up through the clouds
     this.btn = b;
+  }
+  // the menu (Sean): up to three of your heroes floating in space, in the outfits they last wore, watching over the planet. Placed against the camera at the planet's edge, so a drag leaves them where they are and a zoom sends them off the screen
+  watchers() {
+    const ids = HS.team('hero').slice(0, 3), key = JSON.stringify([ids, ids.map(id => HS.outfit(HS.name(id)))]); if (key === this.watchKey) return; this.watchKey = key;
+    for (const w of this.watch || []) this.scene.remove(w.r.root);
+    const SPOTS = [[-9.2, 6.6, 0], [9.0, -0.8, 1], [-7.6, -8.6, 2]];
+    this.watch = ids.map((id, i) => { const nm = HS.name(id), r = rigFor(nm, HS.outfit(nm)), [a, b, pose] = SPOTS[i]; r.root.scale.setScalar(2.5); this.scene.add(r.root);
+      for (const q of r.arms) { if (pose === 0) { q.sh.rotation.set(0.2, 0, q.sx * 0.5); q.el.rotation.set(-0.35, 0, 0); } else if (pose === 1) { q.sh.rotation.set(-0.5, 0, -q.sx * 0.35); q.el.rotation.set(-1.75, 0, 0); } else { q.sh.rotation.set(0.15, 0, q.sx * 0.75); q.el.rotation.set(-1.7, 0, 0); } }
+      r.legs.forEach((L, k) => { L.hip.rotation.x = k ? -0.15 : 0.3; L.knee.rotation.x = k ? 0.3 : 0.65; });
+      return { r, a, b, ph: i * 2.1 }; });
+  }
+  watchStep(dt) {
+    if (!this.watch || !this.watch.length) return; const on = this.state === 'menu' && !this.rise; if (!on) { for (const w of this.watch) w.r.root.visible = false; return; }
+    const c = this.cam.position, cl = c.length() || 1, zx = c.x / cl, zy = c.y / cl, zz = c.z / cl; let rx = zz, rz = -zx; const rl = Math.hypot(rx, rz) || 1; rx /= rl; rz /= rl; const ux = -zy * rz, uy = zz * rx - zx * rz, uz = zy * rx;
+    for (const w of this.watch) { const r = w.r, s = Math.sin(this.t * 0.6 + w.ph), a = w.a, b = w.b + s * 0.35, k = 13; r.root.visible = true; r.root.position.set(rx * a + ux * b + zx * k, uy * b + zy * k, rz * a + uz * b + zz * k); r.root.lookAt(0, 0, 0); r.root.rotateZ(Math.sin(this.t * 0.4 + w.ph) * 0.06); if (r.root.userData.tick) r.root.userData.tick(dt); else if (r.cape) r.cape.update(dt, 0.12, 0.35); detail(r, null, true); }
   }
   // the planet, built the first time it is opened
   build() {
@@ -391,6 +408,7 @@ export class Globe {
   backdrop() {
     if (!this.built) this.build();
     const was = this.active;
+    this.watchers();
     this.active = true; this.state = 'menu'; this.status = null; this.arrive = null; this.fly = this.rise = this.turn = null; this.armed = false;
     this.uiEl.style.display = 'none'; this.backBtn.style.display = 'none'; this.metBtn.style.display = 'none';
     this.here.visible = false; this.showRoad(true, null); this.relabel(); // the menu: the trail of the towns played in either mode
@@ -462,6 +480,7 @@ export class Globe {
   }
   frame(dt) {
     this.t += dt;
+    this.watchStep(dt);
     this.clouds.rotation.y += dt * 0.012;
     this.here.material.opacity = (0.55 + 0.45 * Math.sin(this.t * 3)) * (this.rise ? Math.max(0, Math.min(1, this.rise.t / this.rise.dur * 2 - 0.6)) : 1);
     for (const S of this.smoke) { const k = (this.t * 0.25 + S.ph) % 1; S.s.position.copy(S.base).addScaledVector(S.nrm, 0.1 + k * 1.4 * S.k); S.s.scale.setScalar((0.25 + k * 0.9) * (0.5 + S.k)); S.s.material.opacity = (1 - k) * 0.7; }
