@@ -311,8 +311,8 @@ class Villain {
 }
 
 // a villain on its own for the roster: Blur and Tyrant hands on hips, Weaver crouched with his six arms out
-export function villainModel(name) {
-  const r = rig({ ...(name === 'Tyrant' ? { eyes: true } : name === 'Weaver' ? { arms: 6, capeLen: 1.05 } : {}), mats: vmats(name) }); relax(r);
+export function villainModel(name, of) { // of: an outfit (the roster's robot leader: Tyrant's frame in the ring's grey)
+  const r = of ? villainRig(name, of) : rig({ ...(name === 'Tyrant' ? { eyes: true } : name === 'Weaver' ? { arms: 6, capeLen: 1.05 } : {}), mats: vmats(name) }); relax(r);
   if (name === 'Weaver') {
     r.hips.position.y = 0.6; r.torso.rotation.x = 0.55; r.head.rotation.x = -0.5; r.legs[0].hip.rotation.set(-1.2, 0, -0.35); r.legs[1].hip.rotation.set(-1.2, 0, 0.35);
     for (const L of r.legs) L.knee.rotation.x = 2.0;

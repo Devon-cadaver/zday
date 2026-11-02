@@ -334,7 +334,7 @@ export const ZTYPES = [
     look: (L) => rot(L, { shirt: dull(L.shirt, 0.55), pants: dull(L.pants, 0.55), skin: C('#9cff52'), flags: ((L.flags || 0) & ~FLAG.ITEM) | FLAG.GLOW, blood: 0.25 }) },
 ];
 // the robot leader's army (base.js, 11d): a drone, a trooper and a brute, in steel and gunmetal; w 0, so no town's zombies roll them
-const ROBOT = (L, o) => ({ ...L, shirt: C('#4a5560'), pants: C('#2b3036'), skin: C('#b8c2cc'), hat: 0, flags: (L.flags || 0) & ~FLAG.ITEM, blood: 0, ...o });
+const ROBOT = (L, o) => ({ ...L, shirt: C('#4a5560'), pants: C('#2b3036'), skin: C('#b8c2cc'), accent: C('#5a6a7a'), accent2: C('#2b3036'), hat: 0, flags: (L.flags || 0) & ~FLAG.ITEM, blood: 0, ...o });
 ZTYPES.push(
   { ...ZTYPES[1], id: 'drone', name: 'Robot drone', robot: true, w: 0, hp: 1, scale: 0.85, look: (L) => ROBOT(L, { skin: C('#c9d3dc'), shirt: C('#5a6a7a') }) },
   { ...ZTYPES[0], id: 'trooper', name: 'Robot trooper', robot: true, w: 0, hp: 2, chase: 2.6, lunge: 3.8, scale: 1, look: (L) => ROBOT(L) },
