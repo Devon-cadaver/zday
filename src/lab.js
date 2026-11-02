@@ -5,7 +5,7 @@
 // nothing outside the Sandbox changes. Kept in localStorage (zday_lab) so the bench is as you left it.
 const KEY = 'zday_lab';
 export const LAB = {
-  on: false, hero: 1, villain: 1, moves: { spin: true, kick: true, laser: true, drag: true, slam: true },
+  on: false, hero: 1, villain: 1, moves: { spin: true, kick: true, laser: true, drag: true, slam: true, jab: true, upper: true, pound: true, fling: true, hammer: true, elbow: true },
   stats: { dealt: 0, taken: 0, fights: 0, won: 0, buildings: 0, scared: 0, hurt: 0 },
   // the hero's level: more health, harder hits
   heroHealth() { return 100 + 10 * (this.hero - 1); },

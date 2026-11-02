@@ -57,6 +57,8 @@ Villains fight back:
 - A second wind: at half health the villain changes (faster, a new attack, a shield that only a ranged power breaks).
 - Villain levels: the same villain at level 5 has more health, winds up faster, grabs more.
 
+Built (2026-11-01, 3c): jab combo, uppercut, ground pound, throw into a building (drag to aim), hammer throw and elbow drop, all from the dazed state; a row of round chips under SPIN & TOSS and RANDOM MOVE picks any move outright, and Random Move draws from all ten. Tag team waits for teammates (item 7).
+
 Hand to hand (all from the dazed state, chosen on buttons or a wheel, each unlocked by skill):
 - Jab combo: tap to a rhythm (like the band game), three hits then a knock-back
 - Uppercut: launches them, then a follow-up in the air (links into the sky slam)
