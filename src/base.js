@@ -119,8 +119,9 @@ export class HomeBase {
     for (const st of stations) { const m = new THREE.Mesh(new THREE.CircleGeometry(1.1, 24).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.9, 0.7, 0.3), transparent: true, opacity: 0.35 })); m.position.set(st.x, 0.08, st.z); room.add(m); st.mark = m; st.ax = cx + st.x; st.az = cz + st.z; st.floor = key; }
     return { g: room, w, d, cx, cz, st: stations, key };
   }
-  start() {
-    const g = this.g, { camera, controls, post } = this.ctx, S = g.disasters.ctx.scene; if (!this.placed) this.place();
+  // o.level: the horde of the level going on outside; the door takes her back to it, and the ring and the attacks wait
+  start(o = {}) {
+    this.level = o.level || null; const g = this.g, { camera, controls, post } = this.ctx, S = g.disasters.ctx.scene; if (!this.placed) this.place();
     for (const p of [g.flight, g.drive, g.takeover, g.bandGame, g.fightTest, g.horde]) if (p && p.active) p.stop(true); if (g.takeover && g.takeover.picking) g.takeover.endPick();
     this.active = true; controls.enabled = false; g.setFollow(-1); document.body.classList.add('zd-flying'); this.savedDof = post.opts.dof; post.opts.dof = true; this.ext.visible = false; this.floorY = HALL.y;
     const O = OFFICE, Bm = BASEMENT;
@@ -140,8 +141,8 @@ export class HomeBase {
     this.actEl = el.querySelector('.act'); this.actEl.querySelector('button').onclick = (e) => { e.stopPropagation(); if (this.nearS) this.open(this.nearS.id); };
     this.rowEl = el.querySelector('.row4'); this.drawRow();
     el.addEventListener('pointerdown', (e) => { if (e.target.closest('button') || e.target.closest('.panel')) return; e.preventDefault(); if (e.clientX < innerWidth * 0.45 && this.stickId == null) { try { el.setPointerCapture(e.pointerId); } catch (x) { /* fine */ } this.stickOn(e); return; } _m.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); _ray.setFromCamera(_m, camera); _pl.constant = -this.floorY; if (_ray.ray.intersectPlane(_pl, _hit)) { const c = this.cur; this.autoOpen = null; this.goal = [Math.max(c.cx - c.w / 2 + 0.8, Math.min(c.cx + c.w / 2 - 0.8, _hit.x)), Math.max(c.cz - c.d / 2 + 0.8, Math.min(c.cz + c.d / 2 - 0.8, _hit.z))]; } });
-    this.onKey = (e) => { if (e.key === 'Escape') { if (this.panel) this.close(); else this.stop(); } }; addEventListener('keydown', this.onKey);
-    this.threatEl = el.querySelector('.threat'); this.showThreat(); if (this.threatFull()) this.alarm(); else g.toast('Home base. Walk up to a station, or tap a button below to go to one', 3500);
+    this.onKey = (e) => { if (e.key === 'Escape') { if (this.panel) this.close(); else if (this.level) this.open('door'); else this.stop(); } }; addEventListener('keydown', this.onKey);
+    this.threatEl = el.querySelector('.threat'); this.showThreat(); if (this.level) g.toast('The fight goes on outside. Change your outfit and powers; Outside takes you back', 4000); else if (this.threatFull()) this.alarm(); else g.toast('Home base. Walk up to a station, or tap a button below to go to one', 3500);
   }
   // the row of four below: the office's stations, the basement's console and the way up; a tap walks her there and opens it on arrival
   drawRow() { if (!this.rowEl) return; const office = this.cur && this.cur.key === 'office', items = office ? [['costume', '\uD83D\uDC55 Wardrobe'], ['computer', '\uD83D\uDCBB Computer'], ['blueprints', '\uD83D\uDCD0 Blueprints'], ['door', '\uD83D\uDEAA Outside']] : [['ring', '\uD83E\uDD16 Robot'], ['elevator', '\uD83D\uDED7 Office'], ['blueprints', '\uD83D\uDCD0 Blueprints'], ['door', '\uD83D\uDEAA Outside']]; this.rowEl.innerHTML = items.map(([id, t]) => '<button type="button" data-go="' + id + '">' + t + '</button>').join(''); this.rowEl.querySelectorAll('[data-go]').forEach(b => { b.onclick = (e) => { e.stopPropagation(); this.goTo(b.dataset.go); }; }); }
@@ -171,7 +172,7 @@ export class HomeBase {
   // ---------- the stations' panels
   close() { if (this.panel) { this.panel.remove(); this.panel = null; } if (this.actEl) this.actEl.classList.toggle('show', !!this.nearS); }
   open(id) {
-    this.close(); if (id === 'door') { if (this.threatFull()) this.attackOut(); else this.stop(); return; } if (id === 'elevator') { this.goFloor(this.cur.key === 'office' ? 'basement' : 'office'); return; } const p = this.panel = document.createElement('div'); p.className = 'panel'; this.el.appendChild(p); this.actEl.classList.remove('show');
+    this.close(); if (id === 'door') { if (this.level) { const H = this.level; this.level = null; this.stop(true); H.back(); return; } if (this.threatFull()) this.attackOut(); else this.stop(); return; } if (id === 'elevator') { this.goFloor(this.cur.key === 'office' ? 'basement' : 'office'); return; } const p = this.panel = document.createElement('div'); p.className = 'panel'; this.el.appendChild(p); this.actEl.classList.remove('show');
     const sw = (key, list, cur) => '<div class="row">' + list.map(c => '<button type="button" class="sw' + (c === cur ? ' on' : '') + '" data-' + key + '="' + c + '" style="background:' + c + '"></button>').join('') + '</div>';
     const draw = () => {
       if (id === 'costume') { const O = HS.outfit(HS.curName('hero')) || {}; p.innerHTML = '<button type="button" class="x">✕</button><h3>Wardrobe</h3><div class="h">Suit</div>' + sw('suit', SUITS, O.suit || '#ff3fcf') + '<div class="h">Cape</div>' + sw('cape', SUITS, O.cape || '#ff3fcf') + '<div class="h">Boots and gloves</div>' + sw('dark', DARKS, O.dark || '#1a1a1a') + '<p>Worn everywhere: the tower, the levels, the ring.</p>';
@@ -204,5 +205,5 @@ export class HomeBase {
   // his army at the town's gate by the base: eighty robots (figures.js ROBOT_TYPES) dropped round her on the street at the east edge, the horde's level rules; won, the threat is gone and 300 XP
   attackOut() { const g = this.g, B = g.city.bounds; this.attackT = null; this.stop(true); g.toast('ROBOTS AT THE GATES!', 3000); g.horde.start({ n: 80, level: true, types: ROBOT_TYPES, label: 'ROBOTS', at: { x: B.x1 - 40, z: (B.z0 + B.z1) / 2 }, onEnd: (won, H) => { H.stop(true); const D = HS.load(); if (won) { D.hero.threat = 0; D.hero.xp += 300; } HS.save(); g.toast(won ? 'The robots are scrap: base threat reset, +300 XP' : 'The robots overran the street; they will be back', 4000); setTimeout(() => { if (!g.horde.active && !g.fightTest.active) this.start(); }, 1800); } }); }
   // the ring: the fight test's engine in this room, the robot in Tyrant's frame at the level and with the moves set at the console
-  fight() { const g = this.g, R = { ...this.cfg.robot }; if (this.cur.key !== 'basement') this.goFloor('basement', true); this.stop(true, true); g.fightTest.start({ ring: { x: this.ringAt.x, z: this.ringAt.z, y: this.floorY, r: 14 }, robot: R }); }
+  fight() { const g = this.g, R = { ...this.cfg.robot }; if (this.level) { g.toast('Not now: the town needs you outside', 2500); return; } if (this.cur.key !== 'basement') this.goFloor('basement', true); this.stop(true, true); g.fightTest.start({ ring: { x: this.ringAt.x, z: this.ringAt.z, y: this.floorY, r: 14 }, robot: R }); }
 }

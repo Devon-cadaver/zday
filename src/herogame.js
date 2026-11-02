@@ -160,7 +160,7 @@ export class HeroGame {
     const hunted = false, rivals = hero ? [] : ['nova', 'dragonfly', 'tempo'].filter(id => HS.load().chars[id].side === 'hero').slice(0, Math.min(3, 1 + Math.floor(s.idx / 3))).map(id => HS.name(id)); // only the heroes still heroes
     for (const n of vs) { const e = D.start('villains', cx + (Math.random() - 0.5) * 160, cz + (Math.random() - 0.5) * 160, { only: n, quiet: true }); if (e) evs.push(e); }
     if (rivals.length) { const e = D.start('villains', cx, cz, { rivals, quiet: true }); if (e) { evs.push(e); this.rivalEv = e; } }
-    F.heroGame = true; F.start(s.flyer); const k = 1 + 0.12 * this.count('speed'); if (k > 1) F.P = { ...F.P, max: F.P.max * k, start: F.P.start * k }; F.onStopped = () => {};
+    F.heroGame = true; F.start(s.flyer); const k = 1 + 0.12 * this.count('speed'); if (k > 1) F.P = { ...F.P, max: F.P.max * k, start: F.P.start * k }; F.onStopped = () => {}; F.hovering = true; F.speed = F.thr = 0; F.pos.set(cx, 70, cz); F.pitch = 0; // Sean: every level starts floating over the town
     const need = hero ? 0 : 8 + 4 * s.idx; this.round = { evs, allies, need, t: 0, downs: 0, wasDown: false, hero, hunted, rivals, key, ended: false, nothing: !evs.length };
     this.rep = document.createElement('div'); this.rep.id = 'zd-rep'; document.body.appendChild(this.rep);
     const town = PLACES[key].name, seen = s.towns[key]; F.tip(hero ? (hunted ? 'You have gone too far. The other heroes are coming for you!' : seen && seen.fear > 200 ? 'The people of ' + town + ' remember you. They run' : s.rep >= 60 ? 'The people of ' + town + ' cheer as you fly in. Use your powers and Lock on' : 'Defend ' + town + '. Use your powers and Lock on') : 'Bring down ' + need + ' buildings in ' + town + ' and beat the heroes who come');
@@ -170,8 +170,8 @@ export class HeroGame {
   alienLevel(key) {
     const g = this.g, s = this.s, P = g.people, D = g.disasters, B = g.city.bounds, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2, n = 200, pool = []; LAB.reset();
     for (let j = 0; j < P.active && pool.length < n; j++) { if (P.kind[j] === 0 && P.isCivilian(j) && P.lvl[j] === -1 && Math.hypot(P.x[j] - cx, P.z[j] - cz) > 60 && P.hide(j)) pool.push(j); }
-    const e = D.start('aliens', cx, cz, { life: 99999 }); this.round = { evs: e ? [e] : [], need: 0, t: 0, downs: 0, hero: true, key, ended: false, zombie: true, n, noun: ' aliens' };
-    g.horde.start({ n, pool, level: true, types: ALIEN_TYPES, label: 'ALIENS', verb: ' DOWN', onEnd: (won, H) => { this.round.horde = H; this.finish(won, won ? null : 'The invasion took you down'); } });
+    const e = D.start('aliens', cx, cz, { life: 99999, noSquads: true, tripods: 0, n: 6 }); if (e) e.launchT = 0.5; this.round = { evs: e ? [e] : [], need: 0, t: 0, downs: 0, hero: true, key, ended: false, zombie: true, n, noun: ' aliens' };
+    g.horde.start({ n, pool, level: true, fleet: e, types: ALIEN_TYPES, label: 'ALIENS', verb: ' DOWN', onEnd: (won, H) => { this.round.horde = H; this.finish(won, won ? null : 'The invasion took you down'); } });
     this.rep = document.createElement('div'); this.rep.id = 'zd-rep'; document.body.appendChild(this.rep);
     g.toast ? g.toast('Defend ' + PLACES[key].name + ': ' + n + ' alien soldiers in the streets, the fleet overhead') : 0;
   }
@@ -224,7 +224,7 @@ export class HeroGame {
   finish(won, why) {
     const R = this.round, s = this.s, S = LAB.stats, F = this.g.flight, g = this.g; R.ended = true; const fear = LAB.fear(); if (this.rep) { this.rep.remove(); this.rep = null; }
     if (R.zombie) {
-      const H = R.horde || g.horde, xp = won ? 300 + (R.boss ? 300 : H.kills) + (H.bitten < 10 ? 100 : 0) : 20 + Math.round(H.kills / 4); if (H.active) H.stop(true); if (H.flying) { H.flying = false; if (H.el) H.el.remove(); if (g.flight.active) g.flight.stop(true); }
+      const H = R.horde || g.horde, xp = won ? 300 + (R.boss ? 300 : H.kills) + (H.bitten < 10 ? 100 : 0) : 20 + Math.round(H.kills / 4); if (g.base && g.base.active) { g.base.level = null; g.base.stop(true); } if (H.active) H.stop(true); if (H.flying) { H.flying = false; if (H.el) H.el.remove(); if (g.flight.active) g.flight.stop(true); }
       for (const e of R.evs) if (e.alive) endDisaster(e); g.flight.heroGame = false; if (this.labWas) Object.assign(LAB, this.labWas, { spotK: 1, toughK: 1 });
       const lv0 = this.level, was = s.rep, fear2 = LAB.fear(); s.xp += xp; if (won) s.threat = Math.min(100, (s.threat || 0) + 20); const up = this.level - lv0; if (won) s.idx = Math.min(PATH.length - 1, s.idx + 1); s.towns[R.key] = { won: (s.towns[R.key] && s.towns[R.key].won) || won, fear: Math.round(fear2) }; s.rep = Math.max(0, Math.min(100, s.rep + (won ? 6 : 0) - fear2 / 30)); const cross = this.cross(s); HS.save(); this.round = null; g.heroGo = false;
       this.hub('<b>' + (won ? 'TOWN SAVED' : (why || 'NOT THIS TIME')) + '</b> · +' + xp + ' XP' + (up ? ' · <b>LEVEL UP!</b> A skill point to spend' : '') + '<br>' + (R.boss ? 'Hit ' + H.bitten.toFixed(0) + ' times' : (R.noun.trim() + ' down ' + H.kills + ' · hit ') + H.bitten + ' times') + ' · ' + Math.round(H.time) + ' s · reputation ' + Math.round(was) + ' to ' + Math.round(s.rep) + cross); return;

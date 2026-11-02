@@ -190,6 +190,7 @@ function frameBody() {
   game.compassStep(dt);
   if (fl) pilot.frame(dt, tg); // the plane or what is driven, and the camera behind it or in its seat
   if (game.minimap) game.minimap.update(dt);
+  if (game.horde && game.horde.flying) game.horde.bg(dt); // the level goes on while she is up or in the base
   if (game.camBlend) { const B = game.camBlend; B.t += dt; const u = Math.min(1, B.t / B.T), k = u * u * (3 - 2 * u); camera.position.lerpVectors(B.pos, camera.position, k); camera.quaternion.slerpQuaternions(B.quat, camera.quaternion, k); if (B.fov != null) { if (B.fovTo == null) B.fovTo = camera.fov; camera.fov = B.fov + (B.fovTo - B.fov) * k; camera.updateProjectionMatrix(); } if (u >= 1) game.camBlend = null; } // a view handed from one pilot to another (a take-off, a landing) eased across instead of cut
   outskirts.update(time, scene, sun, disasters.lightK, disasters.sunK);
   sun.position.copy(tg).addScaledVector(daylight.sunDir, 700); // the sun (or the moon) where the day and night cycle has it

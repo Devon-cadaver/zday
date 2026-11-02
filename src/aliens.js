@@ -71,7 +71,7 @@ export class Invasion {
     this.mother = saucerMesh(true); this.mother.scale.setScalar(7.5); this.mother.position.set(cx, this.my, cz);
     scene.add(this.mother);
     this.saucers = []; this.toLaunch = opts.n ?? 5; this.launchT = 9;
-    this.tripods = []; this.toDrop = opts.tripods ?? 2; this.dropT = 16; // walking machines lowered into the streets
+    this.tripods = []; this.noSquads = !!opts.noSquads; this.toDrop = opts.tripods ?? 2; this.dropT = 16; // walking machines lowered into the streets
     this.lasers = []; this.stats = { down: 0, abducted: 0, aliens: 0 };
     D.emit({ type: 'warn', hazard: 'aliens', x: cx, z: cz, r: 160, exact: true, text: 'UFOs over the city! Alien saucers are abducting people and tripods are coming down. Send soldiers and police to fight them' });
   }
@@ -210,7 +210,7 @@ export class Invasion {
     } else if (s.act === 'drop') {
       s.y += (16 - s.y) * Math.min(1, h * 0.9);
       s.beam.visible = s.t > 1.5 && s.t < 3.5;
-      if (s.t > 2.4 && !s.n) { s.n = 1; const got = people.spawnAliens(s.x, s.z, 4); this.stats.aliens += got.length; D.emit({ type: 'aliendrop', x: s.x, z: s.z, n: got.length }); }
+      if (s.t > 2.4 && !s.n && !this.noSquads) { s.n = 1; const got = people.spawnAliens(s.x, s.z, 4); this.stats.aliens += got.length; D.emit({ type: 'aliendrop', x: s.x, z: s.z, n: got.length }); }
       if (s.t > 4.5) { s.beam.visible = false; this.pickTarget(s); s.state = 'cruise'; }
     }
   }
