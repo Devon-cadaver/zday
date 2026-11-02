@@ -340,10 +340,10 @@ ZTYPES.push(
   { ...ZTYPES[0], id: 'trooper', name: 'Robot trooper', robot: true, w: 0, hp: 2, chase: 2.6, lunge: 3.8, scale: 1, look: (L) => ROBOT(L) },
   { ...ZTYPES[3], id: 'brute', name: 'Robot brute', robot: true, w: 0, hp: 4, scale: 1.2, torso: 1.6, pop: false, look: (L) => ROBOT(L, { skin: C('#8f97a3'), shirt: C('#3a3f47'), pants: C('#20242a') }) });
 // the invasion's soldiers (herogame.js level 1), in the same way
-const ALIEN = (L, o) => ({ ...L, ...ALIEN_LOOK(), blood: 0, bones: 0, ...o });
+const ALIEN = (L, o) => ({ ...L, ...ALIEN_LOOK(), shirt: C('#dfe7f0'), pants: C('#b4bfcc'), skin: C('#7fe04f'), accent: C('#7fe04f'), accent2: C('#7fe04f'), blood: 0, bones: 0, ...o }); // silver suits, bright green heads: nobody's zombie
 ZTYPES.push(
   { ...ZTYPES[1], id: 'grunt', name: 'Alien grunt', alien: true, w: 0, hp: 1, anim: 7, tilt: 0, scale: 0.88, torso: 0.85, look: (L) => ALIEN(L) },
-  { ...ZTYPES[0], id: 'soldier', name: 'Alien soldier', alien: true, w: 0, hp: 2, anim: 7, tilt: 0, chase: 2.6, lunge: 3.8, scale: 1, torso: 0.95, look: (L) => ALIEN(L, { shirt: C('#5a6a7a'), pants: C('#3a4450') }) });
+  { ...ZTYPES[0], id: 'soldier', name: 'Alien soldier', alien: true, w: 0, hp: 2, anim: 7, tilt: 0, chase: 2.6, lunge: 3.8, scale: 1, torso: 0.95, look: (L) => ALIEN(L, { shirt: C('#9fb0c4'), pants: C('#7a8a9c') }) });
 export const ALIEN_TYPES = ZTYPES.map((z, i) => (z.alien ? i : -1)).filter((i) => i >= 0);
 export const ROBOT_TYPES = ZTYPES.map((z, i) => (z.robot ? i : -1)).filter((i) => i >= 0);
 export const RADIOACTIVE = ZTYPES.length - 1;

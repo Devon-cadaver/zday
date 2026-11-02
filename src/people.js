@@ -1698,7 +1698,7 @@ export class People {
       }
       if (Z.scream && civNear > 0) { this.inc[i] -= 0.4; if (this.inc[i] <= 0) { this.scream(i); return; } }
       if (bi >= 0) this.bt[i] = -1;
-      else if (this.bt[i] < 0 && this.r() < 0.7) this.bt[i] = this.pileTarget(zx, zz);
+      else if (this.bt[i] < 0 && this.r() < 0.7 && !this.heroOnly) this.bt[i] = this.pileTarget(zx, zz); // a level's enemies do not go and pile on a building, out of the fight and out of the count
       else if (this.bt[i] >= 0 && this.bRoof[this.bt[i]] === 0 && !this.bBreach[this.bt[i]]) this.bt[i] = -1;
     }
     const tg = this.target[i];

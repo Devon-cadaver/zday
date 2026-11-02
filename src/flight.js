@@ -104,7 +104,7 @@ const CSS = `
 #zd-fly .tip{position:absolute;left:50%;bottom:calc(130px + env(safe-area-inset-bottom));transform:translateX(-50%);color:#fff;font:600 12px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif;text-align:center;text-shadow:0 1px 3px #000;pointer-events:none;transition:opacity .6s;width:80vw}
 #zd-flybar{position:fixed;left:50%;bottom:calc(8px + env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;width:min(calc(100vw - 16px),460px);z-index:31}
 #zd-flybar .row{display:flex;gap:6px}
-#zd-flybar .zd-btn{flex:1 1 0;min-width:0;padding:12px 4px;font-size:11px;color:#fff;background:linear-gradient(#8a3bff,#5216c2);border-color:rgba(255,255,255,.3)}
+#zd-flybar .zd-btn{flex:1 1 0;min-width:0;padding:14px 4px;font-size:11px;color:#fff;background:linear-gradient(#8a3bff,#5216c2);border-color:rgba(255,255,255,.3)}
 #zd-flybar .zd-btn.exit{background:linear-gradient(#ff5a8a,#c2165a)}
 #zd-flybar .zd-btn.load{flex:2 1 0;background:linear-gradient(#3a2a6a,#241848)}
 #zd-flybar .zd-btn.drop{background:linear-gradient(#ffb02e,#e05a10);font-size:13px;letter-spacing:.1em}
@@ -171,6 +171,10 @@ export class Flight {
     bar.querySelector('[data-f="slow"]').onclick = () => this.throttle(-1);
     bar.querySelector('[data-f="fast"]').onclick = () => this.throttle(1);
     bar.querySelector('[data-f="exit"]').onclick = () => { if (this.fromHorde) this.landHorde(false); else if (this.fromBase) this.landBase(); else this.stop(); };
+    if (this.inLevel && !this.fromHorde) { // Destroy's bar: Fly, Lock on, and leaving takes two taps
+      const r1 = bar.querySelectorAll('.row')[1], ex = bar.querySelector('[data-f="exit"]'); for (const k of ['view', 'slow', 'fast', 'inv']) bar.querySelector('[data-f="' + k + '"]').style.display = 'none';
+      const fb = this.flyBtn = document.createElement('button'); fb.type = 'button'; fb.className = 'zd-btn lock'; fb.innerHTML = '\u2708 FLY'; fb.onclick = () => { if (this.hovering) this.unhover(); else { this.hovering = true; this.lock = null; } }; r1.insertBefore(fb, ex); r1.insertBefore(this.lockBtn, ex); ex.innerHTML = 'QUIT'; let armed = 0; ex.onclick = () => { if (performance.now() - armed < 2500) this.stop(); else { armed = performance.now(); ex.innerHTML = 'SURE?'; setTimeout(() => { if (ex.isConnected) ex.innerHTML = 'QUIT'; }, 2500); } };
+    }
     if (this.fromHorde) { // the level's row of four (Sean): Fly, Land, Lock on, Base; the powers and the smash above
       const r0 = bar.querySelector('.row'), r1 = bar.querySelectorAll('.row')[1], ex = bar.querySelector('[data-f="exit"]'), mk = (t, c, f) => { const q = document.createElement('button'); q.type = 'button'; q.className = 'zd-btn ' + c; q.innerHTML = t; q.onclick = f; return q; };
       for (const k of ['view', 'slow', 'fast', 'inv']) bar.querySelector('[data-f="' + k + '"]').style.display = 'none';
@@ -347,8 +351,8 @@ export class Flight {
       }
     }
     if (run) this.t2 = (this.t2 || 0) + dt; // the clock the hurt and hit timers go by
-    if (run && this.punch > 0) this.punch -= dt;
-    else if (run && this.state === 'fly') this.fly(dt);
+    if (run && this.punch > 0) this.punch -= dt; // only the pose: she never stops in the air for it (Sean: no pause at a wall)
+    if (run && this.state === 'fly') this.fly(dt);
     else if (run && this.state === 'tossed') this.tossStep(dt);
     else if (run && this.state === 'down' && (this.t += dt) > (this.downAt ? 1.4 : 2.6)) { if (this.downAt) this.getUp(); else { this.spawn(); this.setView(this.view); } }
     if (run && this.shots.length) this.shotStep(dt);
@@ -535,7 +539,7 @@ export class Flight {
     g.fire.dustCloud(x, z, 4, Math.min(b.top - b.baseY, y + 5));
     this.dropInside(); this.inside = new Interior(g.disasters, k, x, y, z, fx, fz); this.inside.step(x, y, z, fx, fz); // its floors and furniture, from here on (interior.js)
     sfx('crash', x, y, z, { gain: 0.9 }); sfx('glass', x, y, z, { gain: 0.6 });
-    this.speed *= 0.85; this.punch = 0.4; g.shake = Math.max(g.shake || 0, 0.35);
+    this.punch = 0.4; g.shake = Math.max(g.shake || 0, 0.2);
     LAB.stats.scared += g.people.scare(x, z, 25, 0.8);
   }
   burstOut(k, x, y, z) {

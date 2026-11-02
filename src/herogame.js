@@ -63,7 +63,7 @@ const CSS = `
 #zd-hub button.b.off{opacity:.45}
 #zd-hub .bar{height:10px;border-radius:5px;background:rgba(0,0,0,.4);overflow:hidden;margin:4px 0}
 #zd-hub .bar i{display:block;height:100%}
-#zd-hub .sw{width:34px;height:34px;border-radius:50%;border:2px solid rgba(255,255,255,.35);cursor:pointer;padding:0}
+#zd-hub .sw{width:44px;height:44px;border-radius:50%;border:2px solid rgba(255,255,255,.35);cursor:pointer;padding:0}
 #zd-hub .sw.on{border:3px solid #fff;box-shadow:0 0 8px #fff}
 #zd-hub .lab{font-size:11px;opacity:.75;margin:8px 0 4px;letter-spacing:.06em;text-transform:uppercase}
 #zd-hub canvas{display:block;width:150px;height:210px;flex:0 0 150px}
@@ -74,7 +74,7 @@ const CSS = `
 #zd-hub .card span{display:block;opacity:.8}
 #zd-hub .card.on{border-color:#a6ff4d;box-shadow:0 0 10px rgba(166,255,77,.4)}
 #zd-hub .branch{font-weight:800;margin:10px 0 4px;color:#ffd27a}
-#zd-rep{position:fixed;left:12px;top:calc(40px + env(safe-area-inset-top));z-index:29;width:120px;padding:5px 7px;border-radius:8px;background:rgba(20,12,30,.72);color:#fff;font:800 11px system-ui,sans-serif;pointer-events:none}
+#zd-rep{position:fixed;left:12px;top:calc(206px + env(safe-area-inset-top));z-index:29;width:120px;padding:5px 7px;border-radius:8px;background:rgba(20,12,30,.72);color:#fff;font:800 11px system-ui,sans-serif;pointer-events:none}
 #zd-rep .bar{height:6px;border-radius:3px;background:rgba(255,255,255,.2);overflow:hidden;margin-top:3px}
 #zd-rep .bar i{display:block;height:100%;background:linear-gradient(90deg,#ff4040,#ffd27a,#6cff8a)}
 `;
@@ -160,8 +160,8 @@ export class HeroGame {
     const hunted = false, rivals = hero ? [] : ['nova', 'dragonfly', 'tempo'].filter(id => HS.load().chars[id].side === 'hero').slice(0, Math.min(3, 1 + Math.floor(s.idx / 3))).map(id => HS.name(id)); // only the heroes still heroes
     for (const n of vs) { const e = D.start('villains', cx + (Math.random() - 0.5) * 160, cz + (Math.random() - 0.5) * 160, { only: n, quiet: true }); if (e) evs.push(e); }
     if (rivals.length) { const e = D.start('villains', cx, cz, { rivals, quiet: true }); if (e) { evs.push(e); this.rivalEv = e; } }
-    F.heroGame = true; F.start(s.flyer); const k = 1 + 0.12 * this.count('speed'); if (k > 1) F.P = { ...F.P, max: F.P.max * k, start: F.P.start * k }; F.onStopped = () => {}; F.hovering = true; F.speed = F.thr = 0; F.pos.set(cx, 70, cz); F.pitch = 0; // Sean: every level starts floating over the town
-    const need = hero ? 0 : 8 + 4 * s.idx; this.round = { evs, allies, need, t: 0, downs: 0, wasDown: false, hero, hunted, rivals, key, ended: false, nothing: !evs.length };
+    F.heroGame = true; F.inLevel = true; F.start(s.flyer); const k = 1 + 0.12 * this.count('speed'); if (k > 1) F.P = { ...F.P, max: F.P.max * k, start: F.P.start * k }; F.onStopped = () => {}; F.hovering = true; F.speed = F.thr = 0; F.pos.set(cx, 70, cz); F.pitch = 0; // Sean: every level starts floating over the town
+    const need = hero ? 0 : Math.min(25 + 15 * s.idx, Math.floor(g.city.buildings.length * 0.6)); this.round = { evs, allies, need, t: 0, downs: 0, wasDown: false, hero, hunted, rivals, key, ended: false, nothing: !evs.length };
     this.rep = document.createElement('div'); this.rep.id = 'zd-rep'; document.body.appendChild(this.rep);
     const town = PLACES[key].name, seen = s.towns[key]; F.tip(hero ? (hunted ? 'You have gone too far. The other heroes are coming for you!' : seen && seen.fear > 200 ? 'The people of ' + town + ' remember you. They run' : s.rep >= 60 ? 'The people of ' + town + ' cheer as you fly in. Use your powers and Lock on' : 'Defend ' + town + '. Use your powers and Lock on') : 'Bring down ' + need + ' buildings in ' + town + ' and beat the heroes who come');
     if (hero && (s.rep < 35 || (seen && seen.fear > 200))) g.people.scare(cx, cz, 400, 0.5);
@@ -206,6 +206,7 @@ export class HeroGame {
     this.rep = document.createElement('div'); this.rep.id = 'zd-rep'; document.body.appendChild(this.rep);
     g.toast ? g.toast('Defend ' + PLACES[key].name + ': a riot of ' + e.members.length + '. Knock them flat and they go home') : 0;
   }
+  zombieNight() { return false; } // Sean's levels are played in the daylight: the zombies' night made everything too dark to see
   placeNow() { try { return new URLSearchParams(location.search).get('place') || null; } catch (e) { return null; } }
   update() {
     const R = this.round; if (!R || R.ended) return; const F = this.g.flight, S = LAB.stats; R.t += 1 / 60;
@@ -214,7 +215,7 @@ export class HeroGame {
     const fear = LAB.fear(), rep = R.hero ? Math.max(0, Math.min(100, this.s.rep - fear / 30)) : 0;
     this.rep.innerHTML = R.hero ? REP(rep) + (live ? ' · ' + live + ' to stop' : '') + '<div class="bar"><i style="width:' + rep + '%"></i></div>' : S.buildings + '/' + R.need + ' buildings<div class="bar"><i style="width:' + Math.min(100, S.buildings / R.need * 100) + '%"></i></div>';
     const down = F.state === 'down' && !F.downAt; if (down && !R.wasDown) R.downs++; R.wasDown = down;
-    if (F.fighting) return; // on foot, in the fight (flight.js fightFoe)
+    this.rep.style.display = F.fighting ? 'none' : ''; if (F.fighting) return; // on foot, in the fight (flight.js fightFoe); the bars say it
     if (!F.active) return this.finish(false, 'You left the town');
     if (R.downs >= 3) return this.finish(false, 'Knocked out of the sky three times');
     if (R.t > 1 && (R.hero ? live === 0 : S.buildings >= R.need && live === 0)) this.finish(true);
@@ -236,7 +237,7 @@ export class HeroGame {
     const lv0 = this.level; s.xp += xp; if (won) s.threat = Math.min(100, (s.threat || 0) + (R.zombie ? 20 : 25)); const up = this.level - lv0; if (won) s.idx = Math.min(PATH.length - 1, s.idx + 1); { const cross = this.cross(s); if (cross) lines.push(cross.replace('<br>', '')); } HS.save();
     if (F.active) F.stop(true);
     for (const e of R.allies || []) if (e.alive) endDisaster(e);
-    F.heroGame = false; Object.assign(LAB, this.labWas, { spotK: 1, toughK: 1 });
+    F.heroGame = false; F.inLevel = false; Object.assign(LAB, this.labWas, { spotK: 1, toughK: 1 });
     for (const e of R.evs) { if (!e.alive) continue; if (e.type === 'villains') { for (const w of e.who) if (!w.gone) { w.state = 'gone'; w.rig.root.visible = false; } } else endDisaster(e); } // what is left of the trouble goes with you
     const head = won ? (R.hero ? 'TOWN SAVED' : 'TOWN WRECKED') : (why || 'NOT THIS TIME');
     this.hub('<b>' + head + '</b> · +' + xp + ' XP' + (up ? ' · <b>LEVEL UP!</b> A skill point to spend' : '') + '<br>Buildings down ' + S.buildings + ' · people scared ' + S.scared + ' · hurt ' + S.hurt + ' · saved ' + S.saved + ' · fear ' + Math.round(fear) + (lines.length ? '<br>' + lines.join('<br>') : ''));

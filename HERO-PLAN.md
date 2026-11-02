@@ -51,7 +51,7 @@ Build order (one thing at a time, each tested in the Sandbox and pushed). The ch
   - [x] 12a. Pick 1 of your 3 at the start of Defend or Destroy (each levels apart); a hero who falls moves to Destroy, a villain who does too well to Defend. Levels 1 aliens, 2 zombies, 3 the worm, 4 the kaiju on both sides. Defend: on foot and in the air with the kit, the worm and kaiju as giant fights. Destroy: flown, the disaster on your side, the heroes coming for you.
   - [x] 12b. The old circle duel gone: Lock on brings you down into the fight engine against that villain or hero, in the street where they are, and back into the air after, everywhere (Destroy, Defend's villains, the Sandbox's flying heroes).
   - [x] 12b2. Levels start floating over the town: Fly, Land, Lock on, or Base. The fight goes on while you are up or in the base, where you change outfit and powers and go back out. Alien soldiers that look like aliens, dropped by the saucers.
-  - [ ] 12c. Agents play the whole game through and report what breaks or drags.
+  - [x] 12c. Agents play the whole game through and report what breaks or drags: first round done and tuned (no stop at walls, stragglers, the giants, Destroy's goal, the HUD). Run again as the game changes.
   - [ ] 12d. The weather levels, with their own play style, after these.
 
 Also done on the way: the stuck zoom on a phone fixed; the plan page at plan.html.
