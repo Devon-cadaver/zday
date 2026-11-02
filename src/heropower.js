@@ -5,10 +5,11 @@
 import * as THREE from 'three';
 import { sfx } from './audio.js';
 import { LAB } from './lab.js';
+import { loadKit, MELEES } from './kit.js';
 
 export const POWER = {
   freeze: { name: 'Freeze', icon: '❄', col: [0.5, 1.8, 3.0], snd: 'glass' }, fire: { name: 'Fire', icon: '🔥', col: [3.2, 1.2, 0.3], snd: 'whoomph' }, lightning: { name: 'Lightning', icon: '⚡', col: [1.8, 2.4, 4], snd: 'zap' }, sonic: { name: 'Sonic clap', icon: '🔊', col: [1.2, 1.6, 2.2], snd: 'boom', ring: 1 },
-  gravity: { name: 'Gravity pulse', icon: '🪐', col: [1.2, 0.9, 2.0], snd: 'warp', ring: 1 }, wind: { name: 'Wind blast', icon: '🌬', col: [1.4, 1.5, 1.5], snd: 'whoomph', ring: 1 }, shield: { name: 'Shield', icon: '🛡', col: [0.6, 1.4, 2.4], snd: 'chime', ring: 1 }, tk: { name: 'Telekinesis', icon: '🧠', col: [1.4, 0.8, 2.2], snd: 'warp' },
+  gravity: { name: 'Gravity pulse', icon: '🪐', col: [1.2, 0.9, 2.0], snd: 'warp', ring: 1 }, laser: { name: 'Laser', icon: '🔴', col: [2.4, 0.3, 1.5], snd: 'laser' }, kick: { name: 'Flying kick', icon: '🦶', col: [1.8, 1.3, 0.5], snd: 'crash', ring: 1 }, gust: { name: 'Gust', icon: '🌬', col: [1.4, 1.5, 1.5], snd: 'whoomph', ring: 1 }, wind: { name: 'Wind blast', icon: '🌬', col: [1.4, 1.5, 1.5], snd: 'whoomph', ring: 1 }, shield: { name: 'Shield', icon: '🛡', col: [0.6, 1.4, 2.4], snd: 'chime', ring: 1 }, tk: { name: 'Telekinesis', icon: '🧠', col: [1.4, 0.8, 2.2], snd: 'warp' },
 };
 // what beats what (HERO-PLAN's table): 3 a big bite, 2 a fair one, anything else 0.5
 export const WEAK = {
@@ -16,6 +17,8 @@ export const WEAK = {
   blackhole: { gravity: 3, tk: 2 }, rift: { tk: 3, lightning: 2 }, aliens: { lightning: 3, gravity: 2 }, worm: { sonic: 3, lightning: 2, freeze: 2 }, kaiju: { lightning: 3, fire: 2 }, spill: { sonic: 3, lightning: 2, wind: 2 }, riot: { sonic: 3, wind: 2 }, nuclear: { shield: 3, tk: 3 }, meltdown: { shield: 3, freeze: 2 },
   solar: { shield: 3 }, coldwave: { fire: 3, shield: 2 }, plant: { fire: 3, freeze: 2 },
 };
+const MELEE_ON = { kaiju: 2, worm: 2, riot: 2, aliens: 2, plant: 2, meteor: 1, tornado: 1, rift: 1, blackhole: 0.5 }, LASER_ON = { aliens: 3, kaiju: 2, worm: 2, rift: 2, plant: 2, meteor: 2, blackhole: 1, tornado: 1 };
+for (const t in WEAK) { WEAK[t].gust = WEAK[t].wind || 0.5; WEAK[t].kick = MELEE_ON[t] || 0.5; WEAK[t].ram = MELEE_ON[t] || 0.5; WEAK[t].laser = LASER_ON[t] || 0.5; }
 const NAME = { tornado: 'tornado', haboob: 'dust storm', flood: 'flood', tsunami: 'tsunami', quake: 'earthquake', sinkhole: 'sinkhole', volcano: 'volcano', meteor: 'meteor', blackhole: 'black hole', rift: 'rift', aliens: 'invasion', worm: 'giant worm', kaiju: 'kaiju', spill: 'outbreak', riot: 'riot', nuclear: 'nuclear attack', meltdown: 'meltdown', solar: 'solar storm', coldwave: 'cold wave', plant: 'killer plant' };
 const REACH = 320, WHOLE = { haboob: 1, flood: 1, tsunami: 1, solar: 1, coldwave: 1, meltdown: 1, aliens: 1 };
 const where = (e) => (e.tw ? e.tw : e.x != null ? e : null);
@@ -27,7 +30,7 @@ export function finish(e) {
 }
 export class HeroPower {
   constructor(F) { this.F = F; this.i = 0; this.cool = 0; this.fx = []; this.geo = new THREE.CylinderGeometry(1, 1, 1, 8, 1, true).translate(0, 0.5, 0); this.up = new THREE.Vector3(0, 1, 0); this.d = new THREE.Vector3(); }
-  list() { const on = Object.keys(POWER).filter(k => LAB.moves[k]); return on.length ? on : Object.keys(POWER); }
+  list() { if (this.F.heroGame) { const k = loadKit(); return [k.stun, k.knock]; } const on = Object.keys(POWER).filter(k => LAB.moves[k]); return on.length ? on : Object.keys(POWER); } // the hero game: the kit's two
   get id() { const L = this.list(); return L[this.i % L.length]; }
   cycle() { this.i = (this.i + 1) % this.list().length; this.show(); }
   show() { const P = POWER[this.id]; if (this.F.powerBtn) this.F.powerBtn.textContent = P.icon + ' ' + P.name; }
@@ -53,7 +56,9 @@ export class HeroPower {
     const ax = F.pos.x, ay = F.pos.y + 1.2, az = F.pos.z; this.d.set(x - ax, y - ay, z - az); const len = this.d.length() || 1; m.position.set(ax, ay, az); m.quaternion.setFromUnitVectors(this.up, this.d.normalize()); m.scale.set(id === 'lightning' ? 0.35 : 0.8, len, id === 'lightning' ? 0.35 : 0.8); this.fx.push({ m, t: 0 });
     if (id === 'fire') g.fire.burst(x, y, z, 12, 2); else if (id === 'freeze') g.fire.spray(x, z, y, 8, 4, 1); else if (id === 'lightning') { g.fire.burst(x, y, z, 8, 1.4); D.flash(0.15); } else g.fire.spray(x, z, y, 6, 4, 1);
   }
-  step(h) { this.cool = Math.max(0, this.cool - h); if (this.fx.length) { for (const f of this.fx) { f.t += h; f.m.material.opacity = Math.max(0, 0.8 * (1 - f.t / 0.35)); if (f.t > 0.35) { f.done = true; f.m.parent.remove(f.m); f.m.material.dispose(); } } this.fx = this.fx.filter(f => !f.done); } }
+  // flown through a disaster's heart at speed: a blow of the melee slot's (the hammer fists hit hardest), once a second
+  ram(h) { const F = this.F; this.ramT = Math.max(0, (this.ramT || 0) - h); if (this.ramT > 0 || F.state !== 'fly' || F.duel || !F.heroGame || F.speed < 22) return; const e = this.target(); if (!e) return; const w = where(e), d = w && w.x != null ? Math.hypot(w.x - F.pos.x, w.z - F.pos.z) : 9e8; if (d > 14 || F.pos.y > ((w.y || 0) + 40)) return; this.ramT = 1; const k = WEAK[e.type].ram || 0.5, m = loadKit().melee, pw = m === 'hammer' ? 1.4 : m === 'flurry' ? 0.8 : 1; e.heroHp = (e.heroHp ?? 100) - k * 6 * pw; F.punch = 0.4; F.g.disasters.flash(0.08); sfx('crash', F.pos.x, F.pos.y, F.pos.z, { gain: 0.9, rate: 0.9 }); F.g.disasters.brawl.stunts.ring(F.pos.x, F.pos.y, F.pos.z, 8, 0.3, new THREE.Color(1.8, 1.4, 0.6), 0.8); if (e.type === 'kaiju' && e.damage) e.damage(k * 15 * pw); if (e.heroHp <= 0) { finish(e); LAB.stats.stopped = (LAB.stats.stopped || 0) + 1; F.g.disasters.flash(0.2); F.tip('You rammed the ' + NAME[e.type] + ' down!'); if (F.onStopped) F.onStopped(e); return; } F.tip((k >= 2 ? 'RAMMED the ' : 'Rammed the ') + NAME[e.type] + ' with ' + MELEES[m].name + '! ' + Math.round(e.heroHp) + '% left'); }
+  step(h) { this.ram(h); this.cool = Math.max(0, this.cool - h); if (this.fx.length) { for (const f of this.fx) { f.t += h; f.m.material.opacity = Math.max(0, 0.8 * (1 - f.t / 0.35)); if (f.t > 0.35) { f.done = true; f.m.parent.remove(f.m); f.m.material.dispose(); } } this.fx = this.fx.filter(f => !f.done); } }
   dispose() { for (const f of this.fx) { f.m.parent.remove(f.m); f.m.material.dispose(); } this.fx = []; this.geo.dispose(); }
 }
 

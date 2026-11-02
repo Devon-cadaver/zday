@@ -1584,6 +1584,8 @@ export class People {
     const mob = this.mobs[this.bt[i]];
     if (!mob || !mob.alive) { this.st[i] = S.IDLE; this.bt[i] = -1; this.startReturn(i); return; }
     if (this.t1[i] > 0) { this.t1[i] -= h; return; } // an officer has hold of them
+    const H = this.heroTg; // a hero on foot in the riot (horde.js): the mob goes for her and shoves
+    if (H && H.riot) { const dx = H.x - this.x[i], dz = H.z - this.z[i], d = Math.hypot(dx, dz) || 0.001; if (d < 40) { this.hx[i] = dx / d; this.hz[i] = dz / d; if (d < 1.3) { this.t1[i] = 1.4; H.bites++; return; } if (!this.move(i, dx / d, dz / d, 2.2 * h) && this.randomCardinal(i, 1.5)) this.move(i, this.hx[i], this.hz[i], 1.2 * h); return; } }
     const jx = Math.sin(this.time * 1.7 + i) * 1.5, jz = Math.cos(this.time * 1.3 + i * 0.7) * 1.5;
     const tx = mob.x + this.tx[i] + jx, tz = mob.z + this.tz[i] + jz;
     const dx = tx - this.x[i], dz = tz - this.z[i], d = Math.hypot(dx, dz);
@@ -1916,6 +1918,8 @@ export class People {
   }
 
   hide(j) { const s = this.st[j]; if (s === S.DEAD || s === S.EVAC) return false; if (s === S.PILE || s === S.CLIMB) { const k = this.bt[j]; if (k >= 0) this.bPile[k] = Math.max(0, this.bPile[k] - 1); } if (s === S.INSIDE) { const k = this.bt[j]; if (k >= 0) this.bIn[k] = Math.max(0, this.bIn[k] - 1); } this.st[j] = S.EVAC; this.lvl[j] = -1; this.inf[j] = 0; this.target[j] = -1; this.bt[j] = -1; this.dirty[j] = 1; return true; }
+  // a rioter knocked flat and calmed: they come to, and go home (never hurt)
+  calm(j) { if (this.st[j] !== S.RIOT && this.st[j] !== S.EXT) return false; const m = this.mobs[this.bt[j]]; this.st[j] = S.FLEE; this.bt[j] = -1; this.target[j] = -1; this.inf[j] = 0; this.lvl[j] = -1; this.fx[j] = 0; this.t1[j] = 0; this.y[j] = this.groundY(this.x[j], this.z[j]); this.dirty[j] = 1; if (m) m.calmed = (m.calmed || 0) + 1; return true; }
   vanish(j) { const s = this.st[j]; if (s !== S.ZOMBIE && s !== S.FALLING && s !== S.TURNING) return false; this.st[j] = S.EVAC; this.lvl[j] = -1; this.inf[j] = 0; this.target[j] = -1; this.bt[j] = -1; this.dirty[j] = 1; return true; }
   bite(i, j, Z) {
     this.st[j] = S.GRABBED; this.t1[j] = Z.biteT; this.target[j] = i;
