@@ -14,9 +14,10 @@ export const LAB = {
   villainHp() { return 1 + 0.1 * (this.villain - 1); },
   villainHit(n) { return n * (1 + 0.05 * (this.villain - 1)); },
   spotLife() { return 1 - 0.015 * (this.villain - 1); },
+  // the readout, in two short lines (a phone's HUD is narrow)
   fear() { const s = this.stats; return Math.round(s.scared + s.buildings * 20 + s.hurt * 50); },
   reset() { const s = this.stats; for (const k in s) s[k] = 0; },
-  line() { const s = this.stats; return 'LAB L' + this.hero + ' v L' + this.villain + ' · dealt ' + Math.round(s.dealt) + ' · taken ' + Math.round(s.taken) + ' · won ' + s.won + '/' + s.fights + ' · bldgs ' + s.buildings + ' · scared ' + s.scared + ' · fear ' + this.fear(); },
+  line() { const s = this.stats; return 'LAB L' + this.hero + ' v L' + this.villain + ' · dealt ' + Math.round(s.dealt) + ' · taken ' + Math.round(s.taken) + ' · won ' + s.won + '/' + s.fights + String.fromCharCode(10) + 'buildings ' + s.buildings + ' · scared ' + s.scared + ' · fear ' + this.fear();  },
   load() { try { const o = JSON.parse(localStorage.getItem(KEY) || 'null'); if (o) { this.on = !!o.on; this.hero = clampL(o.hero); this.villain = clampL(o.villain); if (o.moves) for (const k in this.moves) if (k in o.moves) this.moves[k] = !!o.moves[k]; } } catch (e) { /* no storage */ } return this; },
   save() { try { localStorage.setItem(KEY, JSON.stringify({ on: this.on, hero: this.hero, villain: this.villain, moves: this.moves })); } catch (e) { /* no storage */ } },
 };

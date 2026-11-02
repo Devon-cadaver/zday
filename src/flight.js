@@ -85,7 +85,7 @@ const CSS = `
 #zd-fly{position:fixed;left:0;top:0;right:0;bottom:0;touch-action:none}
 #zd-fly .stick{position:absolute;width:84px;height:84px;margin:-42px 0 0 -42px;border-radius:50%;border:2px solid rgba(255,255,255,.35);display:none;pointer-events:none}
 #zd-fly .knob{position:absolute;left:50%;top:50%;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;background:rgba(255,255,255,.45)}
-#zd-fly .hud{position:absolute;left:50%;top:calc(10px + env(safe-area-inset-top));transform:translateX(-50%);background:rgba(20,14,30,.6);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:9px;padding:6px 11px;font:700 12px/1 system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:.04em;white-space:pre;text-align:center;line-height:1.35;pointer-events:none;font-variant-numeric:tabular-nums;max-width:calc(100vw - 28px);white-space:pre-wrap;box-sizing:border-box}
+#zd-fly .hud{position:absolute;left:50%;top:calc(10px + env(safe-area-inset-top));transform:translateX(-50%);background:rgba(20,14,30,.6);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:9px;padding:6px 11px;font:700 12px/1 system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:.04em;white-space:pre;text-align:center;line-height:1.35;pointer-events:none;font-variant-numeric:tabular-nums;max-width:calc(100vw - 28px);box-sizing:border-box}
 #zd-fly .hz,#zd-fly .ret{position:absolute;left:50%;top:50%;pointer-events:none;display:none}
 #zd-fly .hz{width:56vw;height:0;border-top:2px solid rgba(160,255,190,.55)}
 #zd-fly .ret{width:22px;height:22px;margin:-11px 0 0 -11px;border:2px solid rgba(160,255,190,.8);border-radius:50%}
@@ -353,6 +353,7 @@ export class Flight {
       this.hud.textContent = P.name.toUpperCase() + ' · ' + Math.round(this.speed * KMH) + ' km/h · ' + Math.max(0, Math.round(this.pos.y)) + ' m · ' + (P.hero ? 'health ' : 'hull ') + hull + '%' + (this.P.gun ? ' · gun ' + (this.reload > 0 ? 'reloading' : this.ammo) : '') +
         (this.duel ? '\nFIGHTING ' + this.duel.v.name.toUpperCase() : L ? '\nLOCKED ON ' + L.name.toUpperCase() + ' ' + Math.round(Math.hypot(L.x - this.pos.x, L.z - this.pos.z)) + ' m' : th && th.d < 600 ? '\n' + th.name.toUpperCase() + ' ' + Math.max(0, Math.round(th.d)) + ' m' : '') + (LAB.on && P.hero ? '\n' + LAB.line() : '');
       this.hud.style.color = hull < 35 ? '#ff8a7a' : th && th.d < 60 ? '#ffd27a' : '#fff';
+      document.body.style.setProperty('--zd-hud-end', Math.round(this.hud.getBoundingClientRect().bottom + 6) + 'px'); // the fight's panel sits under the HUD, however tall it is (the lab's lines)
       if (this.state === 'fly' && this.hull < 60) g.fire.spray(this.pos.x - _f.x * 3, this.pos.z - _f.z * 3, this.pos.y, this.hull < 30 ? 4 : 2, 1, 2.2); // smoke off a hurt plane
       if (g.audio) g.audio.engine(this.state === 'fly' ? this.P.sound : null, k);
       if (this.dropBtn) { this.dropBtn.textContent = this.seedT > 0 ? 'Seeding' : 'Drop'; this.dropBtn.classList.toggle('wait', this.coolT > 0 || this.seedT > 0 || this.state !== 'fly'); }

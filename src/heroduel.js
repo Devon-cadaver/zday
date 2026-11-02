@@ -32,7 +32,7 @@ function holder(F) {
 
 const CSS = `
 #zd-duel{position:fixed;left:0;top:0;right:0;bottom:0;z-index:29;touch-action:none}
-#zd-duel .pan{position:absolute;left:50%;top:calc(66px + env(safe-area-inset-top));transform:translateX(-50%);width:min(86vw,360px);text-align:center;color:#fff;font:800 13px/1.2 system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:.04em;text-shadow:0 1px 3px #000;pointer-events:none}
+#zd-duel .pan{position:absolute;left:50%;top:var(--zd-hud-end,calc(66px + env(safe-area-inset-top)));transform:translateX(-50%);width:min(86vw,360px);text-align:center;color:#fff;font:800 13px/1.2 system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:.04em;text-shadow:0 1px 3px #000;pointer-events:none}
 #zd-duel .bar{height:8px;margin-top:6px;border-radius:4px;background:rgba(0,0,0,.45);overflow:hidden}
 #zd-duel .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#ff5ad5,#ffd27a)}
 #zd-duel .vhp{margin-top:6px;font-size:11px;font-weight:700;opacity:.9}
