@@ -16,7 +16,7 @@ import { buildVehicle } from './vehicles.js';
 import { sfx } from './audio.js';
 import { SEE } from './see.js';
 import { heroRig } from './heroes.js';
-import { relax, detail, villainRig } from './villains.js';
+import { relax, detail, villainRig , S } from './villains.js';
 import { Duel } from './heroduel.js';
 import { Interior } from './interior.js';
 import { LAB } from './lab.js';
@@ -51,7 +51,7 @@ const LOADS = { stunt: ['seed', 'small', 'big', 'napalm', 'nuke'], jet: ['small'
 const LOAD = { seed: { name: 'Storm seeding', wait: 8 }, small: { name: 'Small bomb', wait: 0.35, R: 12, s: 0.7, kaiju: 40 }, big: { name: 'Big bomb', wait: 1.2, R: 26, s: 1.3, kaiju: 120 }, napalm: { name: 'Napalm', wait: 2.5, s: 1.1, kaiju: 70 }, carpet: { name: 'Carpet bombs', wait: 3, R: 12, s: 0.7, kaiju: 40, stick: 8 }, nuke: { name: 'Nuke', wait: 10, R: 200, s: 2.4 } }; // kaiju: what a hit does to it, on top of the blast
 const SEED_REACH = 160; // a seeding run passing this close to a tornado weakens it (closer, more)
 const _f = new THREE.Vector3(), _u = new THREE.Vector3(), _v = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler(0, 0, 0, 'YZX');
-const HIP = 0.94 * 2.2; // a hero's hips above the feet (the rig's 0.94 at its scale): the hero is flown by the hips
+const HIP = 0.94 * S; // a hero's hips above the feet (the rig's 0.94 at its scale): the hero is flown by the hips
 const SEAT_TURN = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2); // a camera looks down -z; the planes point along +x
 const SHOT = { Blur: { col: 0x6fb8ff, r: 0.7, glow: true }, Tyrant: { col: 0x3a3430, r: 1.1 }, Weaver: { col: 0xf4f1ea, r: 0.8 } }; // what each villain throws at a hero flying in
 const SHOT_GEO = new THREE.SphereGeometry(1, 10, 8), SHOT_BOX = new THREE.BoxGeometry(1.6, 1.2, 1.4);
@@ -290,6 +290,14 @@ export class Flight {
     } else { const to = w === 'rain' ? 'storm' : 'rain'; D.weather.set(to); this.tip(to === 'storm' ? 'The clouds boil up into a thunderstorm' : 'The seeded clouds start to rain'); }
   }
   throttle(d) { const P = this.P; this.thr = Math.max(P.min, Math.min(P.max, this.thr + d * (P.max - P.min) / 5)); }
+  // the town's view: a building between the camera and the hero (within 70 m, up to its roof) swings the view round in 0.3 rad steps
+  // until she is seen, and back when it is clear (Sean: the camera moves to show the player, as in the fight test)
+  swing(dt, at, b0) {
+    if (this.azOff == null) { this.azOff = 0; this.azTo = 0; } if ((this.nearT = (this.nearT || 0) - dt) <= 0) { this.nearT = 0.5; const c = this.g.city, L = this.nearB = []; if (c && c.buildings) c.buildings.forEach((b, k) => { if (!c.dead[k] && Math.abs((b.x0 + b.x1) / 2 - this.pos.x) < 70 && Math.abs((b.z0 + b.z1) / 2 - this.pos.z) < 70) L.push(b); }); }
+    if (this.hidden(at(b0 + this.azTo))) { let best = null; for (let k = 1; k <= 8 && best == null; k++) for (const sg of [1, -1]) { const a = this.azTo + sg * k * 0.3; if (!this.hidden(at(b0 + a))) { best = a; break; } } if (best != null) this.azTo = best; } else if (Math.abs(this.azTo) > 0.01 && !this.hidden(at(b0))) this.azTo = 0;
+    this.azOff += (this.azTo - this.azOff) * Math.min(1, dt * 2.2);
+  }
+  hidden(c) { const hx = this.pos.x, hy = this.pos.y, hz = this.pos.z; for (const b of this.nearB || []) { for (let i = 1; i < 14; i++) { const t = i / 14, x = c.x + (hx - c.x) * t, z = c.z + (hz - c.z) * t, y = c.y + (hy - c.y) * t; if (x > b.x0 - 0.5 && x < b.x1 + 0.5 && z > b.z0 - 0.5 && z < b.z1 + 0.5 && y < b.roofY) return true; } } return false; }
   // the views: chase (behind the plane), cockpit, and iso (the town's own lens, high and far, following the hero across the
   // miniature town: Sean). Heroes start in iso
   nextView() { return this.view === 'chase' ? 'cockpit' : this.view === 'cockpit' ? 'iso' : 'chase'; }
@@ -368,8 +376,8 @@ export class Flight {
       cam.quaternion.copy(this.q).multiply(SEAT_TURN); cam.up.set(0, 1, 0).applyQuaternion(this.q);
     } else if (this.view === 'iso' && this.state !== 'down') { // the town's lens, behind and well above the hero's heading, aimed a little ahead of them
       this.ctx.post.opts.dof = this.pos.y < 30; // high up, the whole town stays sharp to steer by
-      const fl = Math.hypot(_f.x, _f.z) || 1, dist = ISO_DIST * 1.35 * this.zoom, ce = Math.cos(ISO_EL) * dist;
-      _v.set(this.pos.x - _f.x / fl * ce, this.pos.y + Math.sin(ISO_EL) * dist, this.pos.z - _f.z / fl * ce);
+      const fl = Math.hypot(_f.x, _f.z) || 1, dist = ISO_DIST * 1.35 * this.zoom, ce = Math.cos(ISO_EL) * dist, cy = this.pos.y + Math.sin(ISO_EL) * dist, b0 = Math.atan2(-_f.x / fl, -_f.z / fl);
+      this.swing(dt, (a) => _u.set(this.pos.x + Math.sin(a) * ce, cy, this.pos.z + Math.cos(a) * ce), b0); _v.set(this.pos.x + Math.sin(b0 + this.azOff) * ce, cy, this.pos.z + Math.cos(b0 + this.azOff) * ce);
       if (this.snap) cam.position.copy(_v); else cam.position.lerp(_v, 1 - Math.exp(-dt * 3)); cam.up.set(0, 1, 0);
       cam.lookAt(_u.set(this.pos.x + _f.x / fl * 8, this.pos.y, this.pos.z + _f.z / fl * 8));
     } else {

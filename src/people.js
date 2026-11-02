@@ -1671,7 +1671,7 @@ export class People {
     if (this.t1[i] > 0) { this.t1[i] -= h; if (this.t1[i] <= 0 && this.fx[i] === 2) this.fx[i] = 0; return; }
     const H = this.heroTg; // a hero fighting on foot (horde.js): every zombie near goes for her, and bites when it reaches her
     if (H && this.fx[i] === 3 && this.wt[i] > 0) { this.bt[i] = -1; this.wt[i] -= h; } // blocked a moment ago: wandering round it, never off to pile at a door
-    else if (H) { const dx = H.x - this.x[i], dz = H.z - this.z[i], d = Math.hypot(dx, dz) || 0.001; if (d < H.R) { this.hx[i] = dx / d; this.hz[i] = dz / d; this.target[i] = -1; this.bt[i] = -1; if (d < Z.biteR + 0.7) { this.t1[i] = Z.biteT + Z.recover; H.bites++; return; } const v = (d < Z.lungeR ? Z.lunge : Z.chase) * h; if (!this.move(i, dx / d, dz / d, v)) { this.randomCardinal(i, 3); this.wt[i] = 1.5 + this.r() * 2; this.fx[i] = 3; } return; } } // blocked by a wall: round it at a run, a moment at a time
+    else if (H) { const dx = H.x - this.x[i], dz = H.z - this.z[i], d = Math.hypot(dx, dz) || 0.001; if (d < H.R) { this.hx[i] = dx / d; this.hz[i] = dz / d; this.target[i] = -1; this.bt[i] = -1; if (d < Z.biteR + 0.4) { this.t1[i] = Z.biteT + Z.recover; H.bites++; return; } const v = (d < Z.lungeR ? Z.lunge : Z.chase) * h; if (!this.move(i, dx / d, dz / d, v)) { this.randomCardinal(i, 3); this.wt[i] = 1.5 + this.r() * 2; this.fx[i] = 3; } return; } } // blocked by a wall: round it at a run, a moment at a time
     if ((this.think[i] -= h) <= 0) {
       this.think[i] = 0.3 + this.r() * 0.2;
       const zx = this.x[i], zz = this.z[i];

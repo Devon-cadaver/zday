@@ -6,7 +6,7 @@ const CSS = `
 .zd-side-btn{width:40px;height:40px;border-radius:20px;border:1px solid rgba(255,236,200,.18);background:rgba(28,20,12,.72);color:#f6ead2;padding:0;cursor:pointer;
   font-size:16px;line-height:1;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);touch-action:manipulation}
 .zd-side-btn:active{transform:translateY(1px)}
-#zd-pause{order:-2}#zd-compass{order:-1}#zd-sound{order:1}#zd-music{order:2}#zd-radiob{order:3}#zd-see{order:4}#zd-globe{order:5}
+#zd-side>#zd-sound,#zd-side>#zd-music,#zd-side>#zd-radiob{display:none}body.zd-menu-on.zd-main #zd-side>#zd-sound,body.zd-menu-on.zd-main #zd-side>#zd-music,body.zd-menu-on.zd-main #zd-side>#zd-radiob{display:inline-block}#zd-paused .row{pointer-events:auto;display:flex;gap:10px;justify-content:center;margin-top:10px}#zd-paused .row .zd-side-btn{width:44px;height:44px;pointer-events:auto}#zd-paused small{display:block;font:600 11px system-ui,sans-serif;opacity:.75;margin-top:8px}#zd-pause{order:-2}#zd-compass{order:-1}#zd-sound{order:1}#zd-music{order:2}#zd-radiob{order:3}#zd-see{order:4}#zd-globe{order:5}
 body.zd-panel #zd-side{display:none}
 body.zd-menu-on #zd-side{display:none}
 body.zd-menu-on #zd-menu #zd-side{display:flex;position:static;transform:none;flex-direction:row}

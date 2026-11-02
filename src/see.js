@@ -9,7 +9,7 @@
 import * as THREE from 'three';
 import { sideButton } from './ui.js';
 
-let mine = true; try { mine = localStorage.getItem('zday_see') !== 'off'; } catch (e) { /* no storage */ }
+let mine = false; // off for good, its button gone (Sean); the user flag is kept so nothing else changes
 export const SEE = { on: true, far: 430, user: mine }; // on, and from how far out (modes set it; window.__z.see for comparisons); user: the player's own switch (the eye button)
 const U = { uSeeA: { value: new THREE.Vector3() }, uSeeB: { value: new THREE.Vector3() }, uSee: { value: new THREE.Vector2(0, 0) } };
 

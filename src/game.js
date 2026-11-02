@@ -244,8 +244,8 @@ body.zd-menu-on #zd-compass,body.zd-panel #zd-compass{display:none}
 #zd-pause.on{border-color:#ffc233;color:#ffc233}
 body.zd-menu-on #zd-pause,body.zd-panel #zd-pause{display:none}
 body.zd-globe-on #zd-compass,body.zd-globe-on #zd-pause{display:none}
-#zd-paused{position:fixed;left:0;right:0;margin:0 auto;width:max-content;top:calc(50% - 20px);z-index:29;padding:8px 16px;border-radius:12px;background:rgba(18,14,10,.78);border:1px solid rgba(255,194,51,.45);
-  color:#ffc233;font:800 14px/1.2 system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:.2em;pointer-events:none}
+#zd-paused{position:fixed;left:0;right:0;margin:0 auto;width:max-content;top:calc(50% - 40px);z-index:31;pointer-events:auto;padding:8px 16px;border-radius:12px;background:rgba(18,14,10,.78);border:1px solid rgba(255,194,51,.45);
+  color:#ffc233;font:800 14px/1.2 system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:.2em}
 #zd-paused[hidden]{display:none}
 #zd-flash{position:fixed;left:0;right:0;margin:0 auto;width:max-content;max-width:min(calc(100vw - 32px),380px);z-index:4;text-align:center;pointer-events:none;transition:opacity .5s;opacity:0}
 #zd-flash.on{opacity:1}
@@ -686,7 +686,7 @@ export class Game {
     sideAdd(cp); this.rose = cp.querySelector('.rose'); this.roseA = 999;
     // pause: the world and the round clock stop (the camera still moves); a tap goes on
     const pz = this.pauseBtn = document.createElement('button'); pz.type = 'button'; pz.id = 'zd-pause'; pz.title = 'Pause'; pz.setAttribute('aria-label', 'Pause');
-    const ps = this.pausedEl = document.createElement('div'); ps.id = 'zd-paused'; ps.hidden = true; ps.textContent = 'PAUSED';
+    const ps = this.pausedEl = document.createElement('div'); ps.id = 'zd-paused'; ps.hidden = true; ps.innerHTML = 'PAUSED<div class="row"></div><small>Sound, music and the radio</small>'; ps.addEventListener('click', (e) => e.stopPropagation());
     pz.onclick = () => this.setPaused(!this.paused); sideAdd(pz); document.body.append(ps); this.setPaused(false);
     const barH = () => document.documentElement.style.setProperty('--zd-bar-h', this.bar.offsetHeight + 'px');
     if (window.ResizeObserver) new ResizeObserver(barH).observe(this.bar); else setInterval(barH, 500);
@@ -734,6 +734,7 @@ export class Game {
 
   setPaused(on) {
     this.paused = on; this.pausedEl.hidden = !on; this.pauseBtn.classList.toggle('on', on);
+    const row = this.pausedEl.querySelector('.row'), side = document.getElementById('zd-side'); for (const id of ['zd-sound', 'zd-music', 'zd-radiob']) { const b = document.getElementById(id); if (b) (on ? row : side).appendChild(b); } // the sound buttons sit in the pause menu (Sean), back on the side (hidden there, shown on the main menu) when play goes on
     this.pauseBtn.innerHTML = on ? svg('<path d="M7 5v14l12-7z"/>') : svg('<rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/>');
     this.pauseBtn.title = on ? 'Carry on' : 'Pause';
   }

@@ -20,7 +20,7 @@ import { heroesWin } from './heroes.js';
 import { fightPose } from './melee.js';
 import { clothMat } from './cloth.js';
 
-const S = 2.2; // a villain stands a bit over twice as tall as a person, so you can pick them out from above
+export const S = 0.92; // a villain or a hero stands the height of a person (Sean; it was 2.2, twice a person, to be picked out from above)
 const NEAR = 330; // closer than this to the camera, a figure has its smooth body
 const G = 9.8, HANDS = 4.9; // gravity; hands raised overhead, metres above the feet
 const DRIVE = 0, REST = 2, EXT = 4, AIR = 5; // car modes (traffic.js)

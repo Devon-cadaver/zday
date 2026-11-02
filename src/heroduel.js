@@ -14,10 +14,10 @@ import { sfx } from './audio.js';
 import { LAB } from './lab.js';
 import { CLIPS, playClip } from './clips.js';
 import { heroRig } from './heroes.js';
-import { detail } from './villains.js';
+import { detail , S } from './villains.js';
 import { HS } from './herogame.js';
 
-const HIP = 0.94 * 2.2; // the hero is flown by the hips (flight.js)
+const HIP = 0.94 * S; // the hero is flown by the hips (flight.js)
 const HANDS = [1.24, 1.1]; // the hands held out ahead and together for the spin (flight.js heroPose): ahead of the hips, up from them
 const BEAM = { Nova: [3.2, 0.45, 2.4], Dragonfly: [0.7, 3.2, 0.9], Tempo: [0.5, 2.6, 3.4] }; // each hero's laser, lit past white so it glows
 const MOVES = ['kick', 'drag', 'laser', 'slam', 'jab', 'upper', 'pound', 'fling', 'hammer', 'elbow', 'tag', 'freeze', 'fire', 'lightning', 'sonic', 'gravity', 'wind', 'shield', 'tk'];

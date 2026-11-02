@@ -16,7 +16,7 @@ import { Sirens } from './sirens.js';
 import { Searchlights } from './searchlights.js';
 import { Audio } from './audio.js';
 import { CURVE, curveFrame } from './curve.js';
-import { seeFrame, SEE, seeButton } from './see.js';
+import { seeFrame, SEE } from './see.js';
 import { Band } from './band.js';
 import { BandGame } from './rhythm.js';
 import { Rail } from './rail.js';
@@ -230,7 +230,7 @@ game.moveWorld = moveWorld;
 game.audio = new Audio(camera, controls); // sound: switched on by the first tap
 game.radio = new Radio(game.audio); // the announcer
 if (!game.menu.hidden) { game.audio.music.setMenu(true); game.audio.ufo(game.menuPanel === 'main'); } // the theme on the menus; the saucer humming
-seeButton((on) => game.toast('See through buildings: ' + (on ? 'on' : 'off'))); // the eye: walls between you and the action fade, or not
+// the see-through eye button is gone (Sean): see.js stays off
 if (game.menu.hidden) game.radio.begin(game.modeName === 'be' && game.mode ? game.mode.kind : null);
 const globe = game.globe = new Globe(renderer); let globeWas = false; // the world from orbit: the big city and the towns
 globe.known = (key) => game.profile.beaten(key); // the towns won in show their names
