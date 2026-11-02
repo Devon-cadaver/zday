@@ -1134,7 +1134,7 @@ export function buildCity(tex, opts = {}) {
       im.computeBoundingSphere(); group.add(im); meshes.push(im); idx.im = im;
       if (cast && shadowGeo) { const sh = new THREE.InstancedMesh(shadowGeo, mat, idx.length); sh.instanceMatrix = im.instanceMatrix; sh.count = idx.length; sh.castShadow = true; sh.layers.set(1); sh.boundingSphere = im.boundingSphere; group.add(sh); }
     }
-    return { meshes, at: (k) => [at[k][0].im, at[k][1]] };
+    return { meshes, mats, at: (k) => [at[k][0].im, at[k][1]] };
   };
   const crownT = instTiled(crownGeometry(), std({ vertexColors: true, roughness: 1 }), crowns, (c) => {
     e.set(0, r() * Math.PI * 2, 0); q.setFromEuler(e);
@@ -1184,6 +1184,12 @@ export function buildCity(tex, opts = {}) {
   const SG = 20, streetGrid = new Map();
   const sgAdd = (x, z, item) => { const key = Math.floor(x / SG) + ',' + Math.floor(z / SG); let a = streetGrid.get(key); if (!a) streetGrid.set(key, (a = [])); a.push(item); };
   crowns.forEach((c, k) => { if (c.b < 0) sgAdd(c.x, c.z, { kind: 'tree', x: c.x, z: c.z, y: c.y, s: c.s, ims: [crownT.at(k)], col: c.col, alive: true }); });
+  // every crown (street and lot) by place, for the on-foot fights' camera: the ones between it and the hero shrink out of its way (horde.js)
+  const CG = 24, crownGrid = new Map(), cm = new THREE.Matrix4(), cs = new THREE.Vector3();
+  crowns.forEach((c, k) => { const key = Math.floor(c.x / CG) + ',' + Math.floor(c.z / CG); let a = crownGrid.get(key); if (!a) crownGrid.set(key, (a = [])); a.push({ x: c.x, y: c.y, z: c.z, s: c.s, im: crownT.at(k), m0: crownT.mats[k], k: 1 }); });
+  const crownsNear = (x, z, R) => { const out = []; for (let gx = Math.floor((x - R) / CG); gx <= Math.floor((x + R) / CG); gx++) for (let gz = Math.floor((z - R) / CG); gz <= Math.floor((z + R) / CG); gz++) { const a = crownGrid.get(gx + ',' + gz); if (a) for (const it of a) if (Math.hypot(it.x - x, it.z - z) <= R) out.push(it); } return out; };
+  // a crown at a fraction k of its size (1: as built); one already taken by a disaster or hidden with its building is left alone
+  const crownShow = (it, k) => { const [im, i] = it.im; if (k >= 1) { if (it.k < 1) im.setMatrixAt(i, it.m0); } else { if (it.k >= 1) { im.getMatrixAt(i, cm); if (cm.elements[0] === 0 && cm.elements[5] === 0) return; } im.setMatrixAt(i, cm.copy(it.m0).scale(cs.set(k, k, k))); } it.k = k; im.instanceMatrix.needsUpdate = true; };
   // pair trunks with the crown at the same spot
   { const byPos = new Map(); for (const a of streetGrid.values()) for (const it of a) byPos.set(it.x.toFixed(2) + ',' + it.z.toFixed(2), it);
     trunks.forEach((t, k) => { if (t.b >= 0) return; const it = byPos.get(t.x.toFixed(2) + ',' + t.z.toFixed(2)); if (it) it.ims.push(trunkT.at(k)); }); }
@@ -1351,7 +1357,7 @@ export function buildCity(tex, opts = {}) {
 
   return {
     buildings, char, uncharAll, lamps, mats,
-    dead, buildingsNear, hideBuilding, liftBuilding, extractBuilding, warpBuilding, addRubble, clearRubble, restoreBuilding, takeStreetNear, restoreAll,
+    dead, buildingsNear, hideBuilding, liftBuilding, extractBuilding, warpBuilding, addRubble, clearRubble, restoreBuilding, takeStreetNear, restoreAll, crownsNear, crownShow,
     lod: (far) => { if (crownNear) for (const im of crownT.meshes) im.geometry = far ? crownFar : crownNear; }, // zoomed out: the tree crowns in fewer facets
     group, sx, sz, NB, parked, crowds, walkBlocks, open, layout, nid, roofPoint, rail, scramble, hooks,
     bounds: { x0: sx[0], x1: sx[NB], z0: sz[0], z1: sz[NB] },

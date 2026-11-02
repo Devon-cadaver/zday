@@ -38,6 +38,7 @@ Build order (one thing at a time, each tested in the Sandbox and pushed). The ch
   - [x] 10c. More powers, melee, stuns and knockbacks to pick from (Sean). Knockbacks charge: the longer the hold, the more power it costs and the further they fly (the laser keeps firing as they fly back; a kick held before it lands sends them way back).
   - [x] 10d. The moves against every disaster: in flight the kit's two powers on the bar, each with its own bite per disaster, and ramming a disaster's heart at speed is a melee blow; the riot is fought on foot (rioters knocked flat and calmed). A tornado, kaiju or worm fought on foot with the kit: not yet.
   - [x] 10e. Team moves: a TEAM meter filled by fighting, a teammate called in (the fight test: a cross that flings the villain to your feet; the horde: a pass through the crowd), earned in the tower by the Tag team skill. More team moves and a second teammate: not yet.
+  - [x] 10f. The on-foot view (Sean: too close, buildings and trees in the way): the camera steeper and further back, further still between fights, pulled in short of a wall, tree crowns in its way shrunk out of it, a glowing ghost of the hero through whatever hides her. Trying: hold to block, the block button now GRAB (seize and toss, the feet, the neck of a dazed one, a heavy out of reach); no power for a dash: a glide just off the ground.
 
 Also done on the way: the stuck zoom on a phone fixed; the plan page at plan.html.
 
