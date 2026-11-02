@@ -12,11 +12,11 @@ Build order (one thing at a time, each tested in the Sandbox and pushed). The ch
 
 - [x] 1. Floors inside the buildings you smash through
 - [x] 2. Hero lab in the Sandbox: hero and villain levels, moves on or off, spawn any villain, the readout, the bench script
-- [ ] 3. Combat round 3
+- [ ] 3. Combat round 3 (3f left)
   - [x] 3a. Fights in the town's iso view (and an iso flying view, the heroes' default)
   - [x] 3b. Villains fight back: dodge circles, grabs, the hero thrown, a second wind, shots at a hero flying in
   - [x] 3c. Six more hand-to-hand moves and the move chips
-  - [ ] 3d. Ranged powers: freeze, fire, lightning, sonic clap, gravity pulse, wind blast, shield, telekinesis
+  - [x] 3d. Ranged powers: freeze, fire, lightning, sonic clap, gravity pulse, wind blast, shield, telekinesis (in the fights; against disasters in item 4)
   - [ ] 3e. The combat animation pass: a clip system, more joints, choreographed moves, villain reactions, hit stop, camera punch-ins
     - [x] 3e.1 the clip system, the chest, wrists and ankles, the uppercut and the jab combo done properly (the fight camera side on)
     - [x] 3e.2 the rest of the moves choreographed (kick, sky slam, ground pound, throw, hammer throw, elbow drop, a settle after every move)

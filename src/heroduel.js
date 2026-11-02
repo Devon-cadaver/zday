@@ -17,13 +17,15 @@ import { CLIPS, playClip } from './clips.js';
 const HIP = 0.94 * 2.2; // the hero is flown by the hips (flight.js)
 const HANDS = [1.24, 1.1]; // the hands held out ahead and together for the spin (flight.js heroPose): ahead of the hips, up from them
 const BEAM = { Nova: [3.2, 0.45, 2.4], Dragonfly: [0.7, 3.2, 0.9], Tempo: [0.5, 2.6, 3.4] }; // each hero's laser, lit past white so it glows
-const MOVES = ['kick', 'drag', 'laser', 'slam', 'jab', 'upper', 'pound', 'fling', 'hammer', 'elbow'];
-const SAY = { kick: '🦵 FLYING KICK!', drag: '✊ BY THE NECK!', laser: '🔴 LASER BLAST!', slam: '🚀 SKY SLAM!', jab: '👊 JAB COMBO! TAP THE BEAT!', upper: '🥊 UPPERCUT!', pound: '💥 GROUND POUND! HOLD!', fling: '🏢 THROW THEM! DRAG TO AIM', hammer: '🔨 HAMMER THROW! CIRCLE YOUR FINGER', elbow: '⬇ ELBOW DROP! HOLD!' };
-const ICON = { spin: '🌀', kick: '🦵', drag: '✊', laser: '🔴', slam: '🚀', jab: '👊', upper: '🥊', pound: '💥', fling: '🏢', hammer: '🔨', elbow: '⬇' };
+const MOVES = ['kick', 'drag', 'laser', 'slam', 'jab', 'upper', 'pound', 'fling', 'hammer', 'elbow', 'freeze', 'fire', 'lightning', 'sonic', 'gravity', 'wind', 'shield', 'tk'];
+const POWERS = ['freeze', 'fire', 'lightning', 'sonic', 'gravity', 'wind', 'shield', 'tk']; // the ranged powers (3d): used from the dazed state like the laser
+const SAY = { kick: '🦵 FLYING KICK!', drag: '✊ BY THE NECK!', laser: '🔴 LASER BLAST!', slam: '🚀 SKY SLAM!', freeze: '❄ FREEZE!', fire: '🔥 FIRE BLAST!', lightning: '⚡ LIGHTNING!', sonic: '🔊 SONIC CLAP!', gravity: '🪐 GRAVITY PULSE!', wind: '🌬 WIND BLAST!', shield: '🛡 SHIELD!', tk: '🧠 TELEKINESIS! HOLD!', jab: '👊 JAB COMBO! TAP THE BEAT!', upper: '🥊 UPPERCUT!', pound: '💥 GROUND POUND! HOLD!', fling: '🏢 THROW THEM! DRAG TO AIM', hammer: '🔨 HAMMER THROW! CIRCLE YOUR FINGER', elbow: '⬇ ELBOW DROP! HOLD!' };
+const ICON = { freeze: '❄', fire: '🔥', lightning: '⚡', sonic: '🔊', gravity: '🪐', wind: '🌬', shield: '🛡', tk: '🧠', spin: '🌀', kick: '🦵', drag: '✊', laser: '🔴', slam: '🚀', jab: '👊', upper: '🥊', pound: '💥', fling: '🏢', hammer: '🔨', elbow: '⬇' };
 const ease = (u) => 1 - (1 - u) * (1 - u);
 const _r = new THREE.Vector3(), _w = new THREE.Vector3();
 const _a = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
 let RAY = null; // the laser's shape, made once
+let ICE = null, BUBBLE = null, BOLT = null; // the freeze's block, the shield's bubble, the lightning's line: made once
 function stretch(m, ax, ay, az, bx, by, bz, r) { _a.set(bx - ax, by - ay, bz - az); const L = _a.length() || 0.01; m.position.set(ax, ay, az); m.quaternion.setFromUnitVectors(_up, _a.multiplyScalar(1 / L)); m.scale.set(r, L, r); }
 // the hero as brawl.js sees a fighter, for its drag: placed by the feet, facing by its own yaw (sin, cos)
 function holder(F) {
@@ -388,6 +390,96 @@ export class Duel {
       return this.thrown(p > 0.6 ? '💥 CRUSHED! GO AFTER ' + v.name.toUpperCase() + '!' : '💥 ELBOW DROPPED! GO AFTER ' + v.name.toUpperCase() + '!'); }
     return true;
   }
+  // ---------- the ranged powers (3d)
+  beams(col) { if (!RAY) RAY = new THREE.CylinderGeometry(1, 1, 1, 10, 1, true).translate(0, 0.5, 0); const mat = (c, o) => new THREE.MeshBasicMaterial({ color: new THREE.Color(c[0], c[1], c[2]), transparent: true, opacity: o, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }); this.beam = [new THREE.Mesh(RAY, mat(col, 0.5)), new THREE.Mesh(RAY, mat([3.5, 3.8, 4], 0.9))]; for (const m of this.beam) { m.frustumCulled = false; m.renderOrder = 7; this.g.disasters.ctx.scene.add(m); } }
+  hands() { const F = this.F, fx = Math.cos(F.yaw), fz = -Math.sin(F.yaw); return [F.pos.x + fx * 1.5, F.pos.y + 1.15, F.pos.z + fz * 1.5, fx, fz]; }
+  // freeze: an icy beam, then a block of ice round them, then it shatters
+  go_freeze() { this.phase = 'freeze'; this.t = 0; this.tick = 0; this.F.act = { kind: 'laser', t: 0, T: 1.2 }; this.beams([0.5, 1.8, 3.0]); sfx('whoosh', this.F.pos.x, this.F.pos.y, this.F.pos.z, { gain: 0.9, rate: 1.4 }); }
+  _freeze(h) {
+    const v = this.v, [ax, ay, az] = this.hands(), bx = v.x, by = (v.y || 0) + 2.9, bz = v.z, dx = bx - ax, dz = bz - az, d = Math.hypot(dx, dz) || 1;
+    if (this.beam) { stretch(this.beam[0], ax, ay, az, bx, by, bz, 0.4 + Math.sin(this.t * 30) * 0.08); stretch(this.beam[1], ax, ay, az, bx, by, bz, 0.12); if (Math.random() < 0.6) this.g.fire.spray(v.x, v.z, (v.y || 0) + 1 + Math.random() * 3, 1, 1.2, 0.5); }
+    if (this.t >= 1.0 && !this.ice) { this.dropBeam(); if (!ICE) ICE = new THREE.BoxGeometry(2.6, 5.0, 2.6); this.ice = new THREE.Mesh(ICE, new THREE.MeshStandardMaterial({ color: '#bfe8ff', transparent: true, opacity: 0.55, roughness: 0.15, metalness: 0.05 })); this.ice.position.set(v.x, (v.y || 0) + 2.4, v.z); this.g.disasters.ctx.scene.add(this.ice); this.hit(30); this.stop(0.06); v.pinned = 'reel'; v.flinch = 0; sfx('glass', v.x, v.y + 2, v.z, { gain: 0.8, rate: 0.6 }); this.title('\u2744 FROZEN SOLID!'); }
+    if (this.ice) { this.ice.position.set(v.x, (v.y || 0) + 2.4, v.z); this.ice.rotation.y += h * 0.2; }
+    if (this.t >= 2.4) { this.dropIce(); for (let i = 0; i < 18; i++) { const s = 0.3 + Math.random() * 0.6; this.g.disasters.debris.add(v.x + (Math.random() - 0.5) * 2, (v.y || 0) + Math.random() * 4.5, v.z + (Math.random() - 0.5) * 2, s, s * 0.5, s, 0xdff6ff, 'fly', { v: [(Math.random() - 0.5) * 14, 2 + Math.random() * 8, (Math.random() - 0.5) * 14] }); } sfx('glassBig', v.x, v.y + 2, v.z, { gain: 1 }); this.hit(25); v.gripped = false; v.downT = 2; toss(v, dx / d * 14, 6, dz / d * 14); return this.thrown('\uD83D\uDCA5 SHATTERED THE ICE! GO AFTER ' + v.name.toUpperCase() + '!'); }
+    return true;
+  }
+  dropIce() { if (!this.ice) return; this.g.disasters.ctx.scene.remove(this.ice); this.ice.material.dispose(); this.ice = null; }
+  // fire: a stream of flame from the hands, the villain alight, then driven off
+  go_fire() { this.phase = 'fire'; this.t = 0; this.tick = 0; this.F.act = { kind: 'laser', t: 0, T: 1.7 }; this.react('hitBody', 1.6); sfx('whoomph', this.F.pos.x, this.F.pos.y, this.F.pos.z, { gain: 0.9 }); }
+  _fire(h) {
+    const v = this.v, f = this.g.fire, [ax, ay, az] = this.hands(), bx = v.x, by = (v.y || 0) + 2.4, bz = v.z, dx = bx - ax, dz = bz - az, d = Math.hypot(dx, dz) || 1;
+    f.jet(ax, ay, az, bx, by, bz, 3, 1.0); if (Math.random() < 0.7) f.burst(v.x + (Math.random() - 0.5) * 1.5, (v.y || 0) + 1 + Math.random() * 3, v.z + (Math.random() - 0.5) * 1.5, 3, 1.2); if (Math.random() < 0.4) f.spray(v.x, v.z, (v.y || 0) + 4, 2, 1, 1.4);
+    v.x += dx / d * h * 1.5; v.z += dz / d * h * 1.5; v.flinch = 1;
+    if ((this.tick -= h) <= 0) { this.tick = 0.25; this.hit(9); }
+    if (this.t >= 1.6) { v.gripped = false; toss(v, dx / d * 24, 7, dz / d * 24); this.hit(12); sfx('boom', v.x, v.y + 2, v.z, { gain: 0.5 }); return this.thrown('\uD83D\uDD25 BURNED AND BLASTED BACK! GO AFTER ' + v.name.toUpperCase() + '!'); }
+    return true;
+  }
+  // lightning: the hands go up, a jagged bolt from them to the villain, who jolts and drops
+  go_lightning() { this.phase = 'lightning'; this.t = 0; this.F.act = null; this.play('hammerUp'); }
+  _lightning(h) {
+    const v = this.v, F = this.F, S = this.g.disasters.ctx.scene;
+    if (this.t >= 0.35 && !this.boltM) { if (!BOLT) BOLT = new THREE.LineBasicMaterial({ color: new THREE.Color(1.8, 2.4, 4), transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }); const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(12 * 3), 3)); this.boltM = new THREE.Line(g, BOLT); this.boltM.frustumCulled = false; S.add(this.boltM);
+      this.hit(50); this.react('hitUp', 1.5); this.stop(0.09); v.flinch = 1; sfx('zap', v.x, v.y + 2, v.z, { gain: 1 }); sfx('thunder', v.x, v.y, v.z, { gain: 0.5, rate: 1.4 }); this.g.fire.burst(v.x, (v.y || 0) + 2.4, v.z, 10, 1.6); this.g.disasters.flash(0.25); this.title('\u26A1 STRUCK!'); }
+    if (this.boltM) { const P = this.boltM.geometry.attributes.position.array, ax = F.pos.x, ay = F.pos.y + 3.2, az = F.pos.z, bx = v.x, by = (v.y || 0) + 2.6, bz = v.z; for (let i = 0; i < 12; i++) { const u = i / 11, j = i === 0 || i === 11 ? 0 : 1; P[i * 3] = ax + (bx - ax) * u + (Math.random() - 0.5) * 1.4 * j; P[i * 3 + 1] = ay + (by - ay) * u + (Math.random() - 0.5) * 1.2 * j; P[i * 3 + 2] = az + (bz - az) * u + (Math.random() - 0.5) * 1.4 * j; } this.boltM.geometry.attributes.position.needsUpdate = true; this.boltM.visible = Math.random() < 0.85; }
+    if (this.t >= 0.95) { this.dropBolt(); v.gripped = false; v.downT = 2; toss(v, (Math.random() - 0.5) * 6, 8, (Math.random() - 0.5) * 6); return this.thrown('\u26A1 STRUCK BY LIGHTNING! GO AFTER ' + v.name.toUpperCase() + '!'); }
+    return true;
+  }
+  dropBolt() { if (!this.boltM) return; this.g.disasters.ctx.scene.remove(this.boltM); this.boltM.geometry.dispose(); this.boltM = null; }
+  // sonic clap: a ring of sound that blows the villain back, breaks windows and scatters the crowd
+  go_sonic() { this.phase = 'sonic'; this.t = 0; this.clapped = false; this.F.act = null; this.play('hammerDown'); }
+  _sonic(h) {
+    const v = this.v, F = this.F, Ds = this.g.disasters, { people, traffic, city } = Ds.ctx, x = F.pos.x, z = F.pos.z;
+    if (this.t >= 0.12 && !this.clapped) { this.clapped = true; Ds.brawl.stunts.ring(x, F.pos.y + 1.2, z, 22, 0.6, new THREE.Color(1.2, 1.6, 2.2), 0.8); sfx('boom', x, F.pos.y, z, { gain: 1, rate: 1.6 }); Ds.shake(0.6); this.stop(0.06);
+      LAB.stats.scared += people.scare(x, z, 60, 1); city.buildingsNear(x, z, 24, (k, d, b) => { if (!city.dead[k]) Ds.blowWindows(k, (b.x0 + b.x1) / 2 - x, (b.z0 + b.z1) / 2 - z, d < 12 ? 1 : 0.5); });
+      traffic.near(x, z, 18, (c) => { if (c.gone || c.mission || c.mode === 4 || c.mode === 5) return; const dx = c.x - x, dz = c.z - z, d = Math.hypot(dx, dz) || 1; c.soft = true; traffic.fling(c, dx / d * 7, 3, dz / d * 7); });
+      const dx = v.x - x, dz = v.z - z, d = Math.hypot(dx, dz) || 1; this.hit(30); this.react('blownBack', 1.5); v.gripped = false; toss(v, dx / d * 26, 6, dz / d * 26); }
+    if (this.t >= 0.7) return this.thrown('\uD83D\uDD0A CLAPPED ACROSS THE STREET! GO AFTER ' + v.name.toUpperCase() + '!');
+    return true;
+  }
+  // gravity pulse: the cars round about lifted up over the hero, then hurled at the villain
+  go_gravity() { const F = this.F, Ds = this.g.disasters, { traffic } = Ds.ctx; this.phase = 'gravity'; this.t = 0; this.F.act = null; this.play('hammerUp'); this.cars = []; traffic.near(F.pos.x, F.pos.z, 34, (c) => { if (this.cars.length >= 4 || c.gone || c.mission || c.mode === 4 || c.mode === 5) return; if (traffic.grab(c)) { c.soft = true; this.cars.push(c); } }); if (!this.cars.length) { for (let i = 0; i < 24; i++) { const a = Math.random() * 6.28, r = 6 + Math.random() * 10; Ds.debris.add(F.pos.x + Math.cos(a) * r, 0.5, F.pos.z + Math.sin(a) * r, 0.5 + Math.random(), 0.4, 0.5 + Math.random(), 0x6a6660, 'fly', { v: [-Math.cos(a) * 6, 10 + Math.random() * 6, -Math.sin(a) * 6] }); } } sfx('warp', F.pos.x, F.pos.y, F.pos.z, { gain: 0.8 }); }
+  _gravity(h) {
+    const v = this.v, F = this.F, Ds = this.g.disasters, { traffic } = Ds.ctx;
+    if (this.t < 0.9) { this.cars.forEach((c, i) => { const a = i / Math.max(1, this.cars.length) * 6.28 + this.t * 3, tx = F.pos.x + Math.cos(a) * 4, ty = F.pos.y + 6 + Math.sin(this.t * 4 + i) * 0.5, tz = F.pos.z + Math.sin(a) * 4; c.x += (tx - c.x) * Math.min(1, h * 4); c.y = (c.y || 0) + (ty - (c.y || 0)) * Math.min(1, h * 4); c.z += (tz - c.z) * Math.min(1, h * 4); }); if (Math.random() < 0.5) Ds.brawl.stunts.ring(F.pos.x, F.pos.y + 1, F.pos.z, 6 + Math.random() * 6, 0.3, new THREE.Color(1.2, 0.9, 2.0), 0.4); return true; }
+    if (!this.hurledCars) { this.hurledCars = true; const n = this.cars.length; for (const c of this.cars) { const dx = v.x - c.x, dy = (v.y || 0) + 2 - (c.y || 0), dz = v.z - c.z, d = Math.hypot(dx, dz) || 1; traffic.fling(c, dx / d * 30, dy * 1.5 + 4, dz / d * 30); } this.cars = [];
+      this.hit(n ? 15 + 12 * n : 30); this.react('hitBody', 1.5); this.stop(0.08); this.g.fire.burst(v.x, (v.y || 0) + 2, v.z, 14, 2); sfx('crash', v.x, v.y + 2, v.z, { gain: 1 }); Ds.shake(0.5); const dx = v.x - F.pos.x, dz = v.z - F.pos.z, d = Math.hypot(dx, dz) || 1; v.gripped = false; toss(v, dx / d * 22, 7, dz / d * 22); }
+    if (this.t >= 1.5) return this.thrown('\uD83E\uDE90 HURLED THE STREET AT THEM! GO AFTER ' + v.name.toUpperCase() + '!');
+    return true;
+  }
+  // wind blast: a gust that bowls the villain down the street with the dust
+  go_wind() { this.phase = 'wind'; this.t = 0; this.gusted = false; this.F.act = { kind: 'laser', t: 0, T: 1.0 }; sfx('whoomph', this.F.pos.x, this.F.pos.y, this.F.pos.z, { gain: 1, rate: 0.7 }); }
+  _wind(h) {
+    const v = this.v, F = this.F, Ds = this.g.disasters, { people, traffic } = Ds.ctx, [ax, ay, az, fx, fz] = this.hands();
+    for (let i = 0; i < 2; i++) { const r = 2 + Math.random() * 24; this.g.fire.spray(ax + fx * r + (Math.random() - 0.5) * 4, az + fz * r + (Math.random() - 0.5) * 4, 0.5 + Math.random() * 3, 1, 1.5, 1.2); }
+    if (this.t >= 0.4 && !this.gusted) { this.gusted = true; const dx = v.x - F.pos.x, dz = v.z - F.pos.z, d = Math.hypot(dx, dz) || 1; this.hit(20); this.react('blownBack', 1.5); v.gripped = false; toss(v, dx / d * 42, 10, dz / d * 42); Ds.shake(0.3);
+      LAB.stats.scared += people.scare(F.pos.x + fx * 14, F.pos.z + fz * 14, 22, 1); traffic.near(F.pos.x + fx * 12, F.pos.z + fz * 12, 14, (c) => { if (c.gone || c.mission || c.mode === 4 || c.mode === 5) return; c.soft = true; traffic.fling(c, fx * 9, 3, fz * 9); }); }
+    if (this.t >= 1.0) return this.thrown('\uD83C\uDF2C BLOWN DOWN THE STREET! GO AFTER ' + v.name.toUpperCase() + '!');
+    return true;
+  }
+  // shield: a bubble round the hero for three seconds; the villain throws itself at it and bounces off, the hero mends a little
+  go_shield() { const F = this.F; this.phase = 'shield'; this.t = 0; this.bounceT = 0.5; this.F.act = { kind: 'crouch', t: 0, T: 1e9 }; if (!BUBBLE) BUBBLE = new THREE.SphereGeometry(3.4, 20, 14); this.bubble = new THREE.Mesh(BUBBLE, new THREE.MeshBasicMaterial({ color: new THREE.Color(0.6, 1.4, 2.4), transparent: true, opacity: 0.28, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide })); this.bubble.frustumCulled = false; this.g.disasters.ctx.scene.add(this.bubble); this.v.pinned = null; this.v.gripped = true; sfx('chime', F.pos.x, F.pos.y, F.pos.z, { gain: 0.8 }); }
+  _shield(h) {
+    const v = this.v, F = this.F; this.bubble.position.set(F.pos.x, F.pos.y + 1, F.pos.z); this.bubble.scale.setScalar(1 + Math.sin(this.t * 6) * 0.03); this.barI.style.width = Math.max(0, 100 - this.t / 3 * 100) + '%';
+    const dx = v.x - F.pos.x, dz = v.z - F.pos.z, d = Math.hypot(dx, dz) || 1;
+    if ((this.bounceT -= h) <= 0) { this.bounceT = 0.8; v.x = F.pos.x + dx / d * 3.6; v.z = F.pos.z + dz / d * 3.6; v.flinch = 1; this.hit(12); this.react('hitBody', 0.5); sfx('thud', v.x, v.y + 2, v.z, { gain: 0.8, rate: 1.3 }); this.g.disasters.brawl.stunts.ring(F.pos.x + dx / d * 3.4, F.pos.y + 1.5, F.pos.z + dz / d * 3.4, 3, 0.3, new THREE.Color(0.8, 1.6, 2.4), 0.8); F.hull = Math.min(F.hullMax || 100, F.hull + 6); this.title('\uD83D\uDEE1 BOUNCED OFF! Health ' + Math.round(F.hull / (F.hullMax || 100) * 100) + '%'); }
+    else { v.x += (F.pos.x + dx / d * 5 - v.x) * Math.min(1, h * 3); v.z += (F.pos.z + dz / d * 5 - v.z) * Math.min(1, h * 3); }
+    if (this.t >= 3) { this.dropBubble(); F.act = null; v.pinned = 'reel'; this.phase = 'spots'; this.spawned = Math.max(this.spawned, this.total - 3); this.windT = this.windGap() + 1; this.title('\uD83C\uDFAF WEAK SPOTS! TAP THEM!'); }
+    return true;
+  }
+  dropBubble() { if (!this.bubble) return; this.g.disasters.ctx.scene.remove(this.bubble); this.bubble.material.dispose(); this.bubble = null; }
+  // telekinesis: the villain lifted into the air with a raised hand; hold the circle to take them higher, let go to slam them down
+  go_tk() { const v = this.v, F = this.F; this.phase = 'tk'; this.sub = 'lift'; this.t = 0; this.k = 0; this.gy = this.groundAt(v.x, v.z); this.y0 = v.y || 0; v.pinned = 'air'; F.act = null; this.play('hammerUp'); this.circle('hold', 'HOLD'); sfx('warp', v.x, v.y, v.z, { gain: 0.7, rate: 1.3 }); }
+  _tk(h) {
+    const v = this.v, F = this.F;
+    if (this.sub === 'lift') { if (this.holding) this.k = Math.min(1, this.k + h / 1.6); if (this.ring2) { this.place(this.ring2); this.ring2.style.setProperty('--k', this.k.toFixed(3)); this.ring2.textContent = this.holding || this.k > 0 ? Math.round(this.k * 100) + '%' : 'HOLD'; } this.barI.style.width = (this.k * 100) + '%';
+      v.y += (this.y0 + 4 + 14 * this.k - v.y) * Math.min(1, h * 3); v.yaw += h * (1 + 4 * this.k); if (Math.random() < 0.3) this.g.disasters.brawl.stunts.ring(v.x, v.y + 2, v.z, 2 + 2 * this.k, 0.3, new THREE.Color(1.4, 0.8, 2.2), 0.5);
+      if (this.let || this.t > 5) { this.dropCircle(); this.sub = 'down'; this.t = 0; this.vy = -(30 + 60 * this.k); this.play('hammerDown'); } return true; }
+    this.vy -= 100 * h; v.y += this.vy * h;
+    if (v.y <= this.gy) { const p = this.k, x = v.x, z = v.z, Ds = this.g.disasters; v.y = this.gy; Ds.decals.add('crack', x, z, 6 + 10 * p, 6 + 10 * p); this.g.fire.dustCloud(x, z, 3 + 4 * p, 3 + 3 * p); this.g.fire.burst(x, this.gy + 1, z, 10 + Math.round(14 * p), 1.8 + 1.6 * p); sfx(p > 0.6 ? 'boom' : 'thud', x, this.gy, z, { gain: 1 + 0.5 * p, rate: 0.7 }); Ds.shake(0.5 + 0.7 * p); Ds.brawl.stunts.ring(x, this.gy + 0.5, z, 8 + 10 * p, 0.4 + 0.3 * p, new THREE.Color(1.4, 1.0, 2.0), 0.7);
+      this.react('crushed', 1.2 + p); this.stop(0.08); v.gripped = false; v.pinned = null; toss(v, (Math.random() - 0.5) * 6, 2, (Math.random() - 0.5) * 6); v.busyT = 1.5 + p; v.downT = 1.5 + p; this.hit(35 + 45 * p);
+      return this.thrown('\uD83E\uDDE0 SLAMMED DOWN BY THOUGHT! GO AFTER ' + v.name.toUpperCase() + '!'); }
+    return true;
+  }
   go_slam() {
     const v = this.v; this.phase = 'slam'; this.sub = 'charge'; this.t = 0; this.k = 0; this.gy = this.groundAt(v.x, v.z); this.diving = false;
     this.F.act = null; this.play('coil');
@@ -481,7 +573,7 @@ export class Duel {
   end(why, won) {
     if (this.over) return false; this.over = true;
     const v = this.v, B = this.g.disasters.brawl;
-    this.dropBeam(); if (this.dodge) { this.dodge.el.remove(); this.dodge = null; } if (this.chipEl) { this.chipEl.remove(); this.chipEl = null; } if (this.aimEl) { this.aimEl.remove(); this.aimEl = null; }
+    this.dropBeam(); this.dropIce(); this.dropBolt(); this.dropBubble(); if (this.cars) { for (const c of this.cars) { c.soft = true; this.g.disasters.ctx.traffic.fling(c, 0, 1, 0); } this.cars = null; } if (this.dodge) { this.dodge.el.remove(); this.dodge = null; } if (this.chipEl) { this.chipEl.remove(); this.chipEl = null; } if (this.aimEl) { this.aimEl.remove(); this.aimEl = null; }
     if (this.S) { const i = B.drags.indexOf(this.S); if (i >= 0) { B.drags.splice(i, 1); v.gripped = false; if (!v.tossed && !v.gone) toss(v, this.S.dx * 10, 4, this.S.dz * 10); } this.S = null; }
     v.pinned = null; v.flinch = 0; v.react = null; this.F.clip = null;
     if (v.gripped) { v.gripped = false; if (!v.tossed && !v.gone) toss(v, 0, 2, 0); } // dropped, falls to the ground
