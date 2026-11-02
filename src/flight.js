@@ -24,6 +24,7 @@ import { playClip } from './clips.js';
 import { Streak } from './streak.js';
 import { Getaway } from './getaway.js';
 import { Army } from './army.js';
+import { HeroPower } from './heropower.js';
 
 // speeds in metres a second; turn: how hard it turns at full bank; chase: the camera's distance behind and height above;
 // seat: the cockpit's place (forward, up) in the model
@@ -105,6 +106,7 @@ const CSS = `
 #zd-flybar .zd-btn.load{flex:2 1 0;background:linear-gradient(#3a2a6a,#241848)}
 #zd-flybar .zd-btn.drop{background:linear-gradient(#ffb02e,#e05a10);font-size:13px;letter-spacing:.1em}
 #zd-flybar .zd-btn.drop.wait{opacity:.45}
+#zd-flybar .zd-btn.use{background:linear-gradient(#ffc04a,#d0700a);min-width:58px}
 #zd-flybar .zd-btn.lock{flex:1 1 0;background:linear-gradient(#ff5ad5,#a0168a);font-size:13px;letter-spacing:.08em}
 #zd-flybar .zd-btn.lock.on{background:linear-gradient(#ffd27a,#e08a10)}
 body.zd-flying #zd-bar,body.zd-flying #zd-dis,body.zd-flying #zd-followchip,body.zd-flying #zd-globe,body.zd-flying #zd-top{display:none!important} /* the numbers at the top too: the readout sits there */
@@ -155,10 +157,11 @@ export class Flight {
     R.parentNode.insertBefore(ov, R.nextSibling); // over the town, under the numbers and buttons
     this.hud = ov.querySelector('.hud'); this.hz = ov.querySelector('.hz'); this.stick = ov.querySelector('.stick'); this.knob = ov.querySelector('.knob'); this.tipEl = ov.querySelector('.tip');
     const bar = this.bar = document.createElement('div'); bar.id = 'zd-flybar';
-    bar.innerHTML = (this.P.hero ? '<div class="row"><button type="button" class="zd-btn lock" data-f="lock">\uD83C\uDFAF Lock on</button></div>' : '<div class="row"><button type="button" class="zd-btn load" data-f="load"></button><button type="button" class="zd-btn drop" data-f="drop">Drop</button></div>') +
+    bar.innerHTML = (this.P.hero ? '<div class="row"><button type="button" class="zd-btn" data-f="power"></button><button type="button" class="zd-btn use" data-f="use">Use</button><button type="button" class="zd-btn lock" data-f="lock">\uD83C\uDFAF Lock on</button></div>' : '<div class="row"><button type="button" class="zd-btn load" data-f="load"></button><button type="button" class="zd-btn drop" data-f="drop">Drop</button></div>') +
       '<div class="row"><button type="button" class="zd-btn" data-f="view"></button><button type="button" class="zd-btn" data-f="slow">Slower</button><button type="button" class="zd-btn" data-f="fast">Faster</button><button type="button" class="zd-btn" data-f="inv"></button><button type="button" class="zd-btn exit" data-f="exit">Land</button></div>';
     document.body.appendChild(bar); this.viewBtn = bar.querySelector('[data-f="view"]'); this.loadBtn = bar.querySelector('[data-f="load"]'); this.dropBtn = bar.querySelector('[data-f="drop"]'); this.invBtn = bar.querySelector('[data-f="inv"]');
     this.lockBtn = bar.querySelector('[data-f="lock"]'); this.invBtn.onclick = () => this.setInvert(!this.invert);
+    this.powerBtn = bar.querySelector('[data-f="power"]'); if (this.powerBtn) { this.power = new HeroPower(this); this.powerBtn.onclick = () => this.power.cycle(); bar.querySelector('[data-f="use"]').onclick = () => this.power.use(); this.power.show(); } // powers against disasters (heropower.js)
     if (this.lockBtn) this.lockBtn.onclick = () => this.lockOn(); else { this.loadBtn.onclick = () => this.cycle(); this.dropBtn.onclick = () => this.drop(); this.cycle(0); }
     this.setInvert(this.invert, true);
     bar.querySelector('[data-f="view"]').onclick = () => this.setView(this.nextView());
@@ -190,6 +193,7 @@ export class Flight {
       if (down && (k === 'control' || k === '-')) this.throttle(-1);
       if (down && !e.repeat && k === ' ') { if (this.P.hero) this.lockOn(); else this.drop(); }
       if (down && !e.repeat && k === 'q' && this.loads.length) this.cycle();
+      if (down && !e.repeat && this.power) { if (k === 'q') this.power.cycle(); if (k === 'e') this.power.use(); }
       if (down && !e.repeat && k === 'i') this.setInvert(!this.invert);
       if (down && k === 'z') this.setZoom(this.zoom * 0.88); if (down && k === 'x') this.setZoom(this.zoom / 0.88);
       if (down) this.keys.add(k); else this.keys.delete(k);
@@ -296,7 +300,7 @@ export class Flight {
   stop(quiet = false) {
     if (!this.active) return;
     const g = this.g, { camera, controls, post } = this.ctx;
-    if (this.duel) this.duel.end('', false); this.lock = null; this.dropInside(); this.inB = -1; this.clearShots(); if (this.army) { this.army.dispose(); this.army = null; } if (this.getaways) { for (const G of this.getaways) G.finish(); this.getaways = []; }
+    if (this.duel) this.duel.end('', false); this.lock = null; this.dropInside(); this.inB = -1; this.clearShots(); if (this.power) { this.power.dispose(); this.power = null; this.powerBtn = null; } if (this.army) { this.army.dispose(); this.army = null; } if (this.getaways) { for (const G of this.getaways) G.finish(); this.getaways = []; }
     this.active = false; document.body.classList.remove('zd-flying');
     const hr = this.obj.userData.hero; g.disasters.ctx.scene.remove(this.obj); if (this.streak) { this.streak.dispose(g.disasters.ctx.scene); this.streak = null; }
     if (hr) { hr.cape.g.dispose(); if (hr.smooth && hr.smooth.mesh) { hr.smooth.mesh.geometry.dispose(); const m = hr.smooth.mesh.material; (Array.isArray(m) ? m : [m]).forEach(x => x && x.dispose()); } } else this.obj.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); // its own shapes and paint (a hero's are shared with the rest: only the cape is its own)
@@ -333,6 +337,7 @@ export class Flight {
     else if (run && this.state === 'down' && (this.t += dt) > (this.downAt ? 1.4 : 2.6)) { if (this.downAt) this.getUp(); else { this.spawn(); this.setView(this.view); } }
     if (run && this.shots.length) this.shotStep(dt);
     if (run && this.army) this.army.step(dt);
+    if (run && this.power) this.power.step(dt);
     if (run && this.getaways && this.getaways.length) { for (const G of this.getaways) G.step(dt); this.getaways = this.getaways.filter(G => !G.done); }
     // the plane where it is
     _e.set(this.roll, this.yaw, this.pitch); this.q.setFromEuler(_e);

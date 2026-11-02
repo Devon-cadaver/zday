@@ -26,7 +26,7 @@ Build order (one thing at a time, each tested in the Sandbox and pushed). The ch
   - [x] 3f. From the street-fight inspiration
     - [x] 3f.1 a second villain joins the fight, a breakable mask, the beaten carried off by a ship
     - [x] 3f.2 the rogue army: jets and helicopters firing on everyone, soldiers to save, saving them turns the army
-- [ ] 4. Powers against disasters, one disaster at a time
+- [x] 4. Powers against disasters: Power and Use on the hero's bar, every disaster has a meter and what beats it
 - [ ] 5. The collateral meter: damage, fear, reputation, towns that remember you
 - [ ] 6. Outfits for the three
 - [ ] 7. Progression: XP, the skill tree, the campaign across the globe, the home tower
