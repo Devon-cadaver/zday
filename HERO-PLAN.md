@@ -55,6 +55,8 @@ Build order (one thing at a time, each tested in the Sandbox and pushed). The ch
   - [x] 12b4. Locked on a saucer or tripod, in close like against a villain: tap to punch; GRAB, then Spin Toss or Smash Down, floating.
   - [x] 12b5. Radio station: choose the songs, repeat one, cinematic music with action music in the fights.
   - [x] 12b6. Globe stays sharp when zoomed in; Main Menu in the pause menu.
+  - [x] 12b7. Worm and kaiju: hovering camera behind her, on the monster. Lock on and grab the worm to ride it, punch and laser; it bucks her off.
+  - [ ] 12b8. Something similar on the kaiju.
   - [x] 12c. Agents play the whole game through and report what breaks or drags: first round done and tuned (no stop at walls, stragglers, the giants, Destroy's goal, the HUD). Run again as the game changes.
   - [ ] 12d. The weather levels, with their own play style, after these.
 
