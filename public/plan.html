@@ -1,5 +1,5 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Hero plan</title>
-<style>body{margin:0;padding:16px;background:#160a26;color:#f4eee4;font:16px/1.5 system-ui,-apple-system,sans-serif;max-width:720px;margin:0 auto}h1{font-size:24px;line-height:1.2;color:#ffd6ef}h2{font-size:19px;margin-top:28px;color:#ff4fa3}p,li{margin:6px 0}table{border-collapse:collapse;width:100%;font-size:14px}th,td{border:1px solid rgba(255,255,255,.2);padding:6px 8px;vertical-align:top;text-align:left}th{background:rgba(255,79,163,.2)}code{background:rgba(255,255,255,.1);padding:1px 4px;border-radius:3px}</style></head><body>
+<style>body{margin:0;padding:16px;background:#160a26;color:#f4eee4;font:16px/1.5 system-ui,-apple-system,sans-serif;max-width:720px;margin:0 auto}h1{font-size:24px;line-height:1.2;color:#ffd6ef}h2{font-size:19px;margin-top:28px;color:#ff4fa3}p,li{margin:6px 0}table{border-collapse:collapse;width:100%;font-size:14px}th,td{border:1px solid rgba(255,255,255,.2);padding:6px 8px;vertical-align:top;text-align:left}th{background:rgba(255,79,163,.2)}code{background:rgba(255,255,255,.1);padding:1px 4px;border-radius:3px}ul.check{list-style:none;padding-left:0}ul.check li{display:flex;gap:10px;align-items:flex-start;margin:7px 0}ul.check li.c1{margin-left:26px}ul.check li.c2{margin-left:52px}ul.check .box{flex:0 0 auto;width:20px;height:20px;border:2px solid #ff4fa3;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#0b0712}ul.check li.done .box{background:#a6ff4d;border-color:#a6ff4d}ul.check li.done{opacity:.8}</style></head><body>
 <h1>The hero game: plan (Sean, 2026-11-01)</h1>
 <p>The pivot: the main game becomes a super hero game. You start with a few powers, fly from city to city round the globe defending them from disasters, earn XP, grow stronger, unlock skills that change how you fight, dress your team of three, and build the team's home tower. Save a town carelessly and the town fears you; wreck too much and you become the villain, hunted by heroes. The Sandbox is the test bench for every move.</p>
 <p>The four menu buttons stay, with new meanings (Sean, 2026-11-01):</p>
@@ -9,17 +9,27 @@
 <li>Sandbox: testing and random fun (the hero lab lives here).</li>
 <li>Watch: set-up scenarios to sit back and watch, and bet on the outcome from the heroes and disasters involved.</li>
 </ul>
-<p>Build order (one thing at a time, each tested in the Sandbox and pushed):</p>
-<ol>
-<li>Floors inside the buildings you smash through (quick, and Sean asked)</li>
-<li>Hero lab in the Sandbox: pick a hero, set the level and skills, spawn any enemy or disaster, see damage and fear numbers</li>
-<li>Combat round 3: villains fight back; more hand to hand moves; more ranged powers</li>
-<li>Powers against disasters, one disaster at a time</li>
-<li>The collateral meter: damage, fear, reputation</li>
-<li>Outfits for the three</li>
-<li>Progression: XP, the skill tree, the campaign across the globe, the home tower</li>
-<li>Becoming the villain: hero fights against you</li>
-</ol>
+<p>Build order (one thing at a time, each tested in the Sandbox and pushed). The checklist, kept up to date:</p>
+<ul class="check">
+<li class="c0 done"><span class="box">&#10003;</span><span>1. Floors inside the buildings you smash through</span></li>
+<li class="c0 done"><span class="box">&#10003;</span><span>2. Hero lab in the Sandbox: hero and villain levels, moves on or off, spawn any villain, the readout, the bench script</span></li>
+<li class="c0"><span class="box"></span><span>3. Combat round 3</span></li>
+<li class="c1 done"><span class="box">&#10003;</span><span>3a. Fights in the town's iso view (and an iso flying view, the heroes' default)</span></li>
+<li class="c1 done"><span class="box">&#10003;</span><span>3b. Villains fight back: dodge circles, grabs, the hero thrown, a second wind, shots at a hero flying in</span></li>
+<li class="c1 done"><span class="box">&#10003;</span><span>3c. Six more hand-to-hand moves and the move chips</span></li>
+<li class="c1"><span class="box"></span><span>3d. Ranged powers: freeze, fire, lightning, sonic clap, gravity pulse, wind blast, shield, telekinesis</span></li>
+<li class="c1"><span class="box"></span><span>3e. The combat animation pass: a clip system, more joints, choreographed moves, villain reactions, hit stop, camera punch-ins</span></li>
+<li class="c2"><span class="box"></span><span>3e.1 the clip system, the chest, wrists and ankles, the uppercut and the jab combo done properly</span></li>
+<li class="c2"><span class="box"></span><span>3e.2 the rest of the moves choreographed</span></li>
+<li class="c2"><span class="box"></span><span>3e.3 villain reactions for every hit, speed streaks, camera punch-ins</span></li>
+<li class="c1"><span class="box"></span><span>3f. From the street-fight inspiration: two villains at once, a breakable mask, villains retreating, the rogue army</span></li>
+<li class="c0"><span class="box"></span><span>4. Powers against disasters, one disaster at a time</span></li>
+<li class="c0"><span class="box"></span><span>5. The collateral meter: damage, fear, reputation, towns that remember you</span></li>
+<li class="c0"><span class="box"></span><span>6. Outfits for the three</span></li>
+<li class="c0"><span class="box"></span><span>7. Progression: XP, the skill tree, the campaign across the globe, the home tower</span></li>
+<li class="c0"><span class="box"></span><span>8. Becoming the villain: hero fights against you</span></li>
+</ul>
+<p>Also done on the way: the stuck zoom on a phone fixed; the plan page at plan.html.</p>
 <h2>1. Floors inside smashed buildings</h2>
 <p>Every building is one shell today (merged into the city's big meshes, by vertex range), which is what keeps the frame rate up. Floors for every building would mean tens of thousands more triangles and would show nowhere. So floors only exist in a building the hero is inside:</p>
 <ul>

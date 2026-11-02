@@ -8,16 +8,27 @@ The four menu buttons stay, with new meanings (Sean, 2026-11-01):
 - Sandbox: testing and random fun (the hero lab lives here).
 - Watch: set-up scenarios to sit back and watch, and bet on the outcome from the heroes and disasters involved.
 
-Build order (one thing at a time, each tested in the Sandbox and pushed):
+Build order (one thing at a time, each tested in the Sandbox and pushed). The checklist, kept up to date:
 
-1. Floors inside the buildings you smash through (quick, and Sean asked)
-2. Hero lab in the Sandbox: pick a hero, set the level and skills, spawn any enemy or disaster, see damage and fear numbers
-3. Combat round 3: villains fight back; more hand to hand moves; more ranged powers
-4. Powers against disasters, one disaster at a time
-5. The collateral meter: damage, fear, reputation
-6. Outfits for the three
-7. Progression: XP, the skill tree, the campaign across the globe, the home tower
-8. Becoming the villain: hero fights against you
+- [x] 1. Floors inside the buildings you smash through
+- [x] 2. Hero lab in the Sandbox: hero and villain levels, moves on or off, spawn any villain, the readout, the bench script
+- [ ] 3. Combat round 3
+  - [x] 3a. Fights in the town's iso view (and an iso flying view, the heroes' default)
+  - [x] 3b. Villains fight back: dodge circles, grabs, the hero thrown, a second wind, shots at a hero flying in
+  - [x] 3c. Six more hand-to-hand moves and the move chips
+  - [ ] 3d. Ranged powers: freeze, fire, lightning, sonic clap, gravity pulse, wind blast, shield, telekinesis
+  - [ ] 3e. The combat animation pass: a clip system, more joints, choreographed moves, villain reactions, hit stop, camera punch-ins
+    - [ ] 3e.1 the clip system, the chest, wrists and ankles, the uppercut and the jab combo done properly
+    - [ ] 3e.2 the rest of the moves choreographed
+    - [ ] 3e.3 villain reactions for every hit, speed streaks, camera punch-ins
+  - [ ] 3f. From the street-fight inspiration: two villains at once, a breakable mask, villains retreating, the rogue army
+- [ ] 4. Powers against disasters, one disaster at a time
+- [ ] 5. The collateral meter: damage, fear, reputation, towns that remember you
+- [ ] 6. Outfits for the three
+- [ ] 7. Progression: XP, the skill tree, the campaign across the globe, the home tower
+- [ ] 8. Becoming the villain: hero fights against you
+
+Also done on the way: the stuck zoom on a phone fixed; the plan page at plan.html.
 
 ## 1. Floors inside smashed buildings
 
