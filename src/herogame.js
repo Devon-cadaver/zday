@@ -13,7 +13,7 @@ import { POWER, finish as endDisaster } from './heropower.js';
 
 
 const KEY = 'zday_hero';
-const fresh = (side) => ({ xp: 0, rep: side === 'hero' ? 70 : 0, skills: {}, idx: 0, towns: {}, flyer: side === 'hero' ? 'nova' : 'tyrant', trophies: [] });
+const fresh = (side) => ({ xp: 0, rep: side === 'hero' ? 70 : 0, skills: {}, idx: 0, towns: {}, flyer: side === 'hero' ? 'nova' : 'tyrant', trophies: [], threat: 0 }); // threat: the base's, filled by wins (base.js 11d)
 export const HS = {
   d: null,
   load() { if (this.d) return this.d; let o = null; try { o = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { /* no storage */ } this.d = { hero: { ...fresh('hero'), ...(o && o.hero) }, villain: { ...fresh('villain'), ...(o && o.villain) }, outfits: (o && o.outfits) || {} }; return this.d; },
@@ -165,12 +165,12 @@ export class HeroGame {
   }
   finish(won, why) {
     const R = this.round, s = this.s, S = LAB.stats, F = this.g.flight, g = this.g; R.ended = true; const fear = LAB.fear(); if (this.rep) { this.rep.remove(); this.rep = null; }
-    if (R.zombie) { const H = R.horde || g.horde, xp = won ? 300 + H.kills + (H.bitten < 10 ? 100 : 0) : 20 + Math.round(H.kills / 4); if (H.active) H.stop(true); if (H.flying) { H.flying = false; if (g.flight.active) g.flight.stop(true); } const lv0 = this.level; s.xp += xp; const up = this.level - lv0; if (won) s.idx = Math.min(PATH.length - 1, s.idx + 1); s.towns[R.key] = { won: (s.towns[R.key] && s.towns[R.key].won) || won, fear: 0 }; if (won) s.rep = Math.min(100, s.rep + 6); HS.save(); this.round = null; g.heroGo = false; this.hub('<b>' + (won ? 'TOWN SAVED' : (why || 'NOT THIS TIME')) + '</b> · +' + xp + ' XP' + (up ? ' · <b>LEVEL UP!</b> A skill point to spend' : '') + '<br>' + (R.riot ? 'Rioters calmed ' + H.kills + ' · shoved ' : 'Zombies dusted ' + H.kills + ' · bitten ') + H.bitten + ' times · ' + Math.round(H.time) + ' s'); return; }
+    if (R.zombie) { const H = R.horde || g.horde, xp = won ? 300 + H.kills + (H.bitten < 10 ? 100 : 0) : 20 + Math.round(H.kills / 4); if (H.active) H.stop(true); if (H.flying) { H.flying = false; if (g.flight.active) g.flight.stop(true); } const lv0 = this.level; s.xp += xp; if (won) s.threat = Math.min(100, (s.threat || 0) + (R.zombie ? 20 : 25)); const up = this.level - lv0; if (won) s.idx = Math.min(PATH.length - 1, s.idx + 1); s.towns[R.key] = { won: (s.towns[R.key] && s.towns[R.key].won) || won, fear: 0 }; if (won) s.rep = Math.min(100, s.rep + 6); HS.save(); this.round = null; g.heroGo = false; this.hub('<b>' + (won ? 'TOWN SAVED' : (why || 'NOT THIS TIME')) + '</b> · +' + xp + ' XP' + (up ? ' · <b>LEVEL UP!</b> A skill point to spend' : '') + '<br>' + (R.riot ? 'Rioters calmed ' + H.kills + ' · shoved ' : 'Zombies dusted ' + H.kills + ' · bitten ') + H.bitten + ' times · ' + Math.round(H.time) + ' s'); return; }
     F.onStopped = null; for (const e of R.evs) if (e.type === 'villains') for (const w of e.who) { if (w.beaten && !s.trophies.includes(w.name)) s.trophies.push(w.name); }
     let xp = 0, lines = [];
     if (R.hero) { const was = s.rep; xp = won ? Math.max(50, 200 + 100 * s.idx + (S.stopped || 0) * 60 + S.won * 80 + S.saved * 30 - Math.round(fear / 4)) : 25; const gain = won ? 6 : 0; s.rep = Math.max(0, Math.min(100, s.rep + gain - fear / 30)); if (R.hunted && !won) { s.rep = Math.min(100, s.rep + 15); xp = 0; lines.push('The heroes beat you. You wake in the tower, and it is a lesson'); } lines.push('Reputation ' + Math.round(was) + ' to ' + Math.round(s.rep) + ': ' + REP(s.rep)); s.towns[R.key] = { won: (s.towns[R.key] && s.towns[R.key].won) || won, fear: Math.round(fear) }; if (R.hunted && won) lines.push('You beat the heroes. This town now lives in fear of you'); }
     else { xp = won ? 200 + 100 * s.idx + S.buildings * 15 + S.won * 100 : 10 + S.buildings * 5; s.towns[R.key] = { won: (s.towns[R.key] && s.towns[R.key].won) || won, fear: Math.round(fear) }; }
-    const lv0 = this.level; s.xp += xp; const up = this.level - lv0; if (won) s.idx = Math.min(PATH.length - 1, s.idx + 1); HS.save();
+    const lv0 = this.level; s.xp += xp; if (won) s.threat = Math.min(100, (s.threat || 0) + (R.zombie ? 20 : 25)); const up = this.level - lv0; if (won) s.idx = Math.min(PATH.length - 1, s.idx + 1); HS.save();
     if (F.active) F.stop(true);
     F.heroGame = false; Object.assign(LAB, this.labWas, { spotK: 1, toughK: 1 });
     for (const e of R.evs) { if (!e.alive) continue; if (e.type === 'villains') { for (const w of e.who) if (!w.gone) { w.state = 'gone'; w.rig.root.visible = false; } } else endDisaster(e); } // what is left of the trouble goes with you

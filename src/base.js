@@ -9,6 +9,7 @@ import { Body, C } from './fighttest.js';
 import { HS } from './herogame.js';
 import { loadKit, saveKit, STUNS, KNOCKS, MELEES } from './kit.js';
 import { sfx } from './audio.js';
+import { ROBOT_TYPES } from './figures.js';
 
 const KEY = 'zday_base';
 // ten bases after Sean's sheet (2026-11-02): five for a hero, five for a villain, each a build over the same helpers (box, cyl, cone,
@@ -66,6 +67,11 @@ const EL = 0.95, AZ = Math.atan2(0.6, 0.8), _a = new THREE.Vector3(), _ray = new
 const CSSB = `body.zd-flying #zd-bar,body.zd-flying #zd-dis,body.zd-flying #zd-followchip,body.zd-flying #zd-globe,body.zd-flying #zd-top{display:none!important}
 #zd-base{position:fixed;inset:0;z-index:30;touch-action:none;font-family:system-ui,sans-serif;color:#fff;user-select:none}
 #zd-base .hint{position:absolute;left:12px;right:12px;top:calc(14px + env(safe-area-inset-top));text-align:center;font:700 13px/1.4 system-ui,sans-serif;text-shadow:0 1px 3px #000;opacity:.9;transition:opacity .4s}
+#zd-base .threat{position:absolute;left:50%;transform:translateX(-50%);top:calc(64px + env(safe-area-inset-top));width:200px;font:800 10px/1 system-ui,sans-serif;letter-spacing:.08em;text-align:center;text-shadow:0 1px 3px #000}
+#zd-base .threat i{display:block;height:8px;margin-top:5px;border-radius:5px;background:rgba(0,0,0,.45);overflow:hidden}
+#zd-base .threat s{display:block;height:100%;width:0;background:linear-gradient(90deg,#ffd27a,#ff5a5a);transition:width .4s}
+#zd-base .threat.full{color:#ff8a7a;animation:zd-threat 1s infinite alternate}
+@keyframes zd-threat{from{opacity:.7}to{opacity:1}}
 #zd-base .act{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(24px + env(safe-area-inset-bottom));display:none}
 #zd-base .act.show{display:block}
 #zd-base .stick{position:absolute;right:18px;bottom:calc(22px + env(safe-area-inset-bottom));width:118px;height:118px;border-radius:50%;background:rgba(255,255,255,.08);box-shadow:0 0 0 2px rgba(255,255,255,.18) inset;touch-action:none}
@@ -116,15 +122,15 @@ export class HomeBase {
     for (const s of st) { const m = new THREE.Mesh(new THREE.CircleGeometry(1.1, 24).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.9, 0.7, 0.3), transparent: true, opacity: 0.35 })); m.position.set(s.x, 0.08, s.z); room.add(m); s.mark = m; }
     this.h = new Body(heroRig('Nova', HS.outfit('Nova')), 100); S.add(this.h.r.root); this.h.x = hx; this.h.z = hz + d / 2 - 3; this.h.y = y; this.floorY = y; this.h.yaw = Math.PI; this.goal = null; this.nearS = null; this.panel = null;
     camera.fov = innerWidth < innerHeight ? 28 : 18; camera.up.set(0, 1, 0); camera.updateProjectionMatrix(); this.look = new THREE.Vector3(this.h.x, y + 1, this.h.z); this.place2(1);
-    const el = this.el = document.createElement('div'); el.id = 'zd-base'; el.innerHTML = '<div class="hint">HOME BASE &middot; tap the floor to walk &middot; the wardrobe, the computer, the ring, the blueprints, the door &middot; TAKE OFF to fly round the hall</div><div class="act"><button type="button"></button></div><div class="fly"><button type="button" data-fly>\u2708 TAKE OFF</button></div><div class="stick"><i></i></div>'; document.body.appendChild(el);
+    const el = this.el = document.createElement('div'); el.id = 'zd-base'; el.innerHTML = '<div class="hint">HOME BASE &middot; tap the floor to walk &middot; the wardrobe, the computer, the ring, the blueprints, the door &middot; TAKE OFF to fly round the hall</div><div class="threat"><b>BASE THREAT</b><i><s></s></i></div><div class="act"><button type="button"></button></div><div class="fly"><button type="button" data-fly>\u2708 TAKE OFF</button></div><div class="stick"><i></i></div>'; document.body.appendChild(el);
     // the joystick (Sean, for whoever would rather not tap): the knob's offset from the pad's centre, up to 40 px, is her walking direction on the screen
     const pad = el.querySelector('.stick'), knob = pad.querySelector('i'); const stickAt = (e) => { const r = pad.getBoundingClientRect(); let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2); const l = Math.hypot(dx, dy); if (l > 40) { dx *= 40 / l; dy *= 40 / l; } this.stick = [dx / 40, dy / 40]; knob.style.transform = 'translate(' + dx + 'px,' + dy + 'px)'; }; pad.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); try { pad.setPointerCapture(e.pointerId); } catch (x) { /* fine */ } this.goal = null; stickAt(e); }); pad.addEventListener('pointermove', (e) => { if (this.stick) stickAt(e); }); for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) pad.addEventListener(ev, () => { this.stick = null; knob.style.transform = ''; }); el.querySelector('[data-fly]').onclick = (e) => { e.stopPropagation(); this.takeOff(); };
     this.actEl = el.querySelector('.act'); this.actEl.querySelector('button').onclick = (e) => { e.stopPropagation(); if (this.nearS) this.open(this.nearS.id); };
     el.addEventListener('pointerdown', (e) => { if (e.target.closest('button') || e.target.closest('.panel') || e.target.closest('.stick')) return; e.preventDefault(); _m.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); _ray.setFromCamera(_m, camera); _pl.constant = -this.floorY; if (_ray.ray.intersectPlane(_pl, _hit)) { this.goal = [Math.max(hx - w / 2 + 0.8, Math.min(hx + w / 2 - 0.8, _hit.x)), Math.max(hz - d / 2 + 0.8, Math.min(hz + d / 2 - 0.8, _hit.z))]; } });
     this.onKey = (e) => { if (e.key === 'Escape') { if (this.panel) this.close(); else this.stop(); } }; addEventListener('keydown', this.onKey);
-    g.toast('Home base. Tap the floor to walk; walk up to a station', 3500);
+    this.threatEl = el.querySelector('.threat'); this.showThreat(); if (this.threatFull()) this.alarm(); else g.toast('Home base. Tap the floor to walk; walk up to a station', 3500);
   }
-  stop(quiet, keepRoom) { if (!this.active) return; const g = this.g, { camera, controls, post } = this.ctx, S = g.disasters.ctx.scene; this.active = false; if (!keepRoom) post.opts.dof = this.savedDof; this.close(); if (this.el) this.el.remove(); removeEventListener('keydown', this.onKey); if (this.h) S.remove(this.h.r.root); if (!keepRoom) { if (this.room) S.remove(this.room); this.room = null; this.ext.visible = true; } document.body.classList.remove('zd-flying'); g.focusAt = null;
+  stop(quiet, keepRoom) { if (!this.active) return; clearTimeout(this.attackT); this.attackT = null; const g = this.g, { camera, controls, post } = this.ctx, S = g.disasters.ctx.scene; this.active = false; if (!keepRoom) post.opts.dof = this.savedDof; this.close(); if (this.el) this.el.remove(); removeEventListener('keydown', this.onKey); if (this.h) S.remove(this.h.r.root); if (!keepRoom) { if (this.room) S.remove(this.room); this.room = null; this.ext.visible = true; } document.body.classList.remove('zd-flying'); g.focusAt = null;
     if (!quiet) { const d = this.S.d / 2; controls.target.set(this.x, this.y + 9, this.z); camera.fov = 45; camera.updateProjectionMatrix(); camera.position.set(this.x + 42, this.y + 40, this.z + d + 58); camera.lookAt(controls.target); controls.enabled = true; controls.update(); g.toast('Outside the base. Open Disasters to unleash one; Home Base to go back in', 3500); } }
   // each frame: walk to the tap, stand at a station, the steady camera over the room
   frame(dt, tg) {
@@ -137,13 +143,14 @@ export class HomeBase {
       for (const s of this.stations) s.mark.material.opacity = s === best ? 0.7 : 0.3;
       h.pose(dt, h.y, true);
     }
+    if ((this.threatT = (this.threatT || 0) - dt) <= 0) { this.threatT = 1; this.showThreat(); }
     this.place2(dt); g.focusAt = _a.copy(this.look); tg.set(this.look.x, 0, this.look.z); this.focus = this.ctx.camera.position.distanceTo(g.focusAt);
   }
   place2(dt) { const h = this.h, cam = this.ctx.camera, D = 28, ce = Math.cos(EL) * D; this.look.lerp(_a.set(h.x, h.y + 1, h.z), Math.min(1, dt * 6)); cam.position.set(this.look.x + Math.sin(AZ) * ce, this.look.y + Math.sin(EL) * D, this.look.z + Math.cos(AZ) * ce); cam.lookAt(this.look); }
   // ---------- the stations' panels
   close() { if (this.panel) { this.panel.remove(); this.panel = null; } if (this.actEl) this.actEl.classList.toggle('show', !!this.nearS); }
   open(id) {
-    this.close(); if (id === 'door') { this.stop(); return; } const p = this.panel = document.createElement('div'); p.className = 'panel'; this.el.appendChild(p); this.actEl.classList.remove('show');
+    this.close(); if (id === 'door') { if (this.threatFull()) this.attackOut(); else this.stop(); return; } const p = this.panel = document.createElement('div'); p.className = 'panel'; this.el.appendChild(p); this.actEl.classList.remove('show');
     const sw = (key, list, cur) => '<div class="row">' + list.map(c => '<button type="button" class="sw' + (c === cur ? ' on' : '') + '" data-' + key + '="' + c + '" style="background:' + c + '"></button>').join('') + '</div>';
     const draw = () => {
       if (id === 'costume') { const O = HS.outfit('Nova') || {}; p.innerHTML = '<button type="button" class="x">✕</button><h3>Wardrobe</h3><div class="h">Suit</div>' + sw('suit', SUITS, O.suit || '#ff3fcf') + '<div class="h">Cape</div>' + sw('cape', SUITS, O.cape || '#ff3fcf') + '<div class="h">Boots and gloves</div>' + sw('dark', DARKS, O.dark || '#1a1a1a') + '<p>Worn everywhere: the tower, the levels, the ring.</p>';
@@ -164,6 +171,16 @@ export class HomeBase {
   // ---------- into the air inside the hall and back (Sean: practice flying in there): the flight pilot from where she stands, Land puts her back on the floor
   takeOff() { const g = this.g, F = g.flight, h = this.h, S = g.disasters.ctx.scene; if (!this.active || this.panel) return; this.flying = true; this.active = false; S.remove(h.r.root); this.el.style.display = 'none'; F.heroGame = true; F.fromBase = this; F.start(HS.load().hero.flyer || 'nova'); F.pos.set(h.x, h.y + 1.5, h.z); F.yaw = Math.atan2(-Math.cos(h.yaw), Math.sin(h.yaw)); F.pitch = 0.6; F.speed = 14; F.thr = 14; sfx('whoosh', h.x, h.y, h.z, { gain: 0.9, rate: 0.9 }); }
   land(x, z) { const g = this.g, h = this.h, S = g.disasters.ctx.scene, { camera, controls, post } = this.ctx, { w, d } = HALL; this.flying = false; this.active = true; h.x = Math.max(this.hx - w / 2 + 1, Math.min(this.hx + w / 2 - 1, x)); h.z = Math.max(this.hz - d / 2 + 1, Math.min(this.hz + d / 2 - 1, z)); h.y = this.floorY; h.vx = h.vz = 0; this.goal = null; S.add(h.r.root); this.el.style.display = ''; controls.enabled = false; g.setFollow(-1); document.body.classList.add('zd-flying'); post.opts.dof = true; camera.fov = innerWidth < innerHeight ? 28 : 18; camera.up.set(0, 1, 0); camera.updateProjectionMatrix(); this.look.set(h.x, h.y + 1, h.z); this.place2(1); }
+  // ---------- 11d: the base's threat and the attacks (Sean: a meter filled by fights won and disasters beaten; full, a base attack can happen)
+  threat() { return HS.load().hero.threat || 0; }
+  threatFull() { return this.threat() >= 100; }
+  showThreat() { if (!this.threatEl) return; const t = this.threat(); this.threatEl.querySelector('s').style.width = t + '%'; this.threatEl.querySelector('b').textContent = t >= 100 ? 'BASE THREAT: ATTACK COMING' : 'BASE THREAT ' + t + '%'; this.threatEl.classList.toggle('full', t >= 100); }
+  // the meter full as she comes in: the alarm, then one of the two attacks a few seconds on
+  alarm() { const g = this.g; g.toast('ALARM: robots closing on the base!', 3000); sfx('crash', this.h.x, this.h.y, this.h.z, { gain: 0.8, rate: 1.4 }); clearTimeout(this.attackT); this.attackT = setTimeout(() => { if (!this.active || this.panel) { this.attackT = null; return; } if (Math.random() < 0.5) this.attackIn(); else this.attackOut(); }, 3500); }
+  // the leader breaks into the hall: the ring fight against him at level 5 with every move; won, the threat is gone and 400 XP
+  attackIn() { const g = this.g; this.attackT = null; g.toast('THE ROBOT LEADER IS IN THE HALL', 3000); this.stop(true, true); g.fightTest.start({ ring: { x: this.ringAt.x, z: this.ringAt.z, y: this.floorY, r: 14 }, robot: { level: 5, jab: true, grab: true, charge: true, laser: true }, attack: true }); }
+  // his army at the town's gate by the base: eighty robots (figures.js ROBOT_TYPES) dropped round her on the street at the east edge, the horde's level rules; won, the threat is gone and 300 XP
+  attackOut() { const g = this.g, B = g.city.bounds; this.attackT = null; this.stop(true); g.toast('ROBOTS AT THE GATES!', 3000); g.horde.start({ n: 80, level: true, types: ROBOT_TYPES, label: 'ROBOTS', at: { x: B.x1 - 40, z: (B.z0 + B.z1) / 2 }, onEnd: (won, H) => { H.stop(true); const D = HS.load(); if (won) { D.hero.threat = 0; D.hero.xp += 300; } HS.save(); g.toast(won ? 'The robots are scrap: base threat reset, +300 XP' : 'The robots overran the street; they will be back', 4000); setTimeout(() => { if (!g.horde.active && !g.fightTest.active) this.start(); }, 1800); } }); }
   // the ring: the fight test's engine in this room, the robot in Tyrant's frame at the level and with the moves set at the console
   fight() { const g = this.g, R = { ...this.cfg.robot }; this.stop(true, true); g.fightTest.start({ ring: { x: this.ringAt.x, z: this.ringAt.z, y: this.floorY, r: 14 }, robot: R }); }
 }

@@ -1585,7 +1585,7 @@ export class People {
     if (!mob || !mob.alive) { this.st[i] = S.IDLE; this.bt[i] = -1; this.startReturn(i); return; }
     if (this.t1[i] > 0) { this.t1[i] -= h; return; } // an officer has hold of them
     const H = this.heroTg; // a hero on foot in the riot (horde.js): the mob goes for her and shoves
-    if (H && H.riot) { const dx = H.x - this.x[i], dz = H.z - this.z[i], d = Math.hypot(dx, dz) || 0.001; if (d < 40) { this.hx[i] = dx / d; this.hz[i] = dz / d; if (d < 1.3) { this.t1[i] = 1.4; H.bites++; return; } if (!this.move(i, dx / d, dz / d, 2.2 * h) && this.randomCardinal(i, 1.5)) this.move(i, this.hx[i], this.hz[i], 1.2 * h); return; } }
+    if (H && H.riot) { const dx = H.x - this.x[i], dz = H.z - this.z[i], d = Math.hypot(dx, dz) || 0.001; if (d < 40) { this.hx[i] = dx / d; this.hz[i] = dz / d; if (d < 1.3) { if (H.air) { this.t1[i] = 0.4; return; } this.t1[i] = 1.4; H.bites++; return; } if (!this.move(i, dx / d, dz / d, 2.2 * h) && this.randomCardinal(i, 1.5)) this.move(i, this.hx[i], this.hz[i], 1.2 * h); return; } }
     const jx = Math.sin(this.time * 1.7 + i) * 1.5, jz = Math.cos(this.time * 1.3 + i * 0.7) * 1.5;
     const tx = mob.x + this.tx[i] + jx, tz = mob.z + this.tz[i] + jz;
     const dx = tx - this.x[i], dz = tz - this.z[i], d = Math.hypot(dx, dz);
@@ -1673,7 +1673,7 @@ export class People {
     if (this.t1[i] > 0) { this.t1[i] -= h; if (this.t1[i] <= 0 && this.fx[i] === 2) this.fx[i] = 0; return; }
     const H = this.heroTg; // a hero fighting on foot (horde.js): every zombie near goes for her, and bites when it reaches her
     if (H && this.fx[i] === 3 && this.wt[i] > 0) { this.bt[i] = -1; this.wt[i] -= h; } // blocked a moment ago: wandering round it, never off to pile at a door
-    else if (H) { const dx = H.x - this.x[i], dz = H.z - this.z[i], d = Math.hypot(dx, dz) || 0.001; if (d < H.R) { this.hx[i] = dx / d; this.hz[i] = dz / d; this.target[i] = -1; this.bt[i] = -1; if (d < Z.biteR + 0.4) { this.t1[i] = Z.biteT + Z.recover; H.bites++; return; } const v = (d < Z.lungeR ? Z.lunge : Z.chase) * h; if (!this.move(i, dx / d, dz / d, v)) { this.randomCardinal(i, 3); this.wt[i] = 1.5 + this.r() * 2; this.fx[i] = 3; } return; } } // blocked by a wall: round it at a run, a moment at a time
+    else if (H) { const dx = H.x - this.x[i], dz = H.z - this.z[i], d = Math.hypot(dx, dz) || 0.001; if (d < H.R) { this.hx[i] = dx / d; this.hz[i] = dz / d; this.target[i] = -1; this.bt[i] = -1; if (d < Z.biteR + 0.4) { if (H.air) { this.t1[i] = 0.4; return; } this.t1[i] = Z.biteT + Z.recover; H.bites++; return; } /* in the air (a finisher, a glide): no bite from the ground (Sean), they wait under her */ const v = (d < Z.lungeR ? Z.lunge : Z.chase) * h; if (!this.move(i, dx / d, dz / d, v)) { this.randomCardinal(i, 3); this.wt[i] = 1.5 + this.r() * 2; this.fx[i] = 3; } return; } } // blocked by a wall: round it at a run, a moment at a time
     if ((this.think[i] -= h) <= 0) {
       this.think[i] = 0.3 + this.r() * 0.2;
       const zx = this.x[i], zz = this.z[i];

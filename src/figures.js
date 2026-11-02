@@ -333,6 +333,13 @@ export const ZTYPES = [
   { id: 'radioactive', name: 'Radioactive', w: 0, ...WALK, chase: 1.6, lunge: 3.2, lungeR: 3.2, sight: 15, notice: 7, biteR: 1.2, hp: 2, rad: true,
     look: (L) => rot(L, { shirt: dull(L.shirt, 0.55), pants: dull(L.pants, 0.55), skin: C('#9cff52'), flags: ((L.flags || 0) & ~FLAG.ITEM) | FLAG.GLOW, blood: 0.25 }) },
 ];
+// the robot leader's army (base.js, 11d): a drone, a trooper and a brute, in steel and gunmetal; w 0, so no town's zombies roll them
+const ROBOT = (L, o) => ({ ...L, shirt: C('#4a5560'), pants: C('#2b3036'), skin: C('#b8c2cc'), hat: 0, flags: (L.flags || 0) & ~FLAG.ITEM, blood: 0, ...o });
+ZTYPES.push(
+  { ...ZTYPES[1], id: 'drone', name: 'Robot drone', robot: true, w: 0, hp: 1, scale: 0.85, look: (L) => ROBOT(L, { skin: C('#c9d3dc'), shirt: C('#5a6a7a') }) },
+  { ...ZTYPES[0], id: 'trooper', name: 'Robot trooper', robot: true, w: 0, hp: 2, chase: 2.6, lunge: 3.8, scale: 1, look: (L) => ROBOT(L) },
+  { ...ZTYPES[3], id: 'brute', name: 'Robot brute', robot: true, w: 0, hp: 4, scale: 1.2, torso: 1.6, pop: false, look: (L) => ROBOT(L, { skin: C('#8f97a3'), shirt: C('#3a3f47'), pants: C('#20242a') }) });
+export const ROBOT_TYPES = ZTYPES.map((z, i) => (z.robot ? i : -1)).filter((i) => i >= 0);
 export const RADIOACTIVE = ZTYPES.length - 1;
 export function rollZombieType(r) {
   let t = r(); for (let k = 0; k < ZTYPES.length; k++) { if ((t -= ZTYPES[k].w) <= 0) return k; }
