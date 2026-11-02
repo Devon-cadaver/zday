@@ -33,7 +33,7 @@ Build order (one thing at a time, each tested in the Sandbox and pushed). The ch
 - [x] 8. Becoming the villain: at Villain reputation the other heroes hunt you; Destroy starts you as a villain (the mirrored fight, where they tap your weak spots: not yet)
 - [ ] 9. Watch: scenarios to sit back and bet on, from the heroes and disasters involved
 - [ ] 10. Sean's test pass, then the adjustments
-  - [ ] 10a. Nail one fight (Sean, after the first test: hard to follow, not reactive). Fight test in the Sandbox, Nova vs Tyrant, control option 1 (tap, swipe, hold). If it feels off: option 2 (swipe direction), 3 (Punch-Out style), 4 (buttons and joystick). What works replaces the circle fights
+  - [ ] 10a. Nail one fight (Sean, after the first test: hard to follow, not reactive). Fight test in the Sandbox, Nova vs Tyrant, control option 1 (tap, swipe, hold). If it feels off: option 2 (swipe direction), 3 (Punch-Out style), 4 (buttons and joystick). What works replaces the circle fights. Option 1 chosen so far, with spin and toss, the feet grab with overhead smashes, and an energy bar for freeze and lightning; to come: the other powers, a choice of two per hero, then replacing the circle fights
 
 Also done on the way: the stuck zoom on a phone fixed; the plan page at plan.html.
 
