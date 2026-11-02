@@ -40,6 +40,10 @@ Build order (one thing at a time, each tested in the Sandbox and pushed). The ch
   - [x] 10e. Team moves: a TEAM meter filled by fighting, a teammate called in (the fight test: a cross that flings the villain to your feet; the horde: a pass through the crowd), earned in the tower by the Tag team skill. More team moves and a second teammate: not yet.
   - [x] 10f. The on-foot view (Sean: too close, buildings and trees in the way): the camera steeper and further back, further still between fights, pulled in short of a wall, tree crowns in its way shrunk out of it, a glowing ghost of the hero through whatever hides her. Trying: hold to block, the block button now GRAB (seize and toss, the feet, the neck of a dazed one, a heavy out of reach); no power for a dash: a glide just off the ground.
   - [x] 10g. The neck drag after Sean's reference (the Smallville drag): the camera low behind, riding along; the ground ploughed up in chunks and dust, lamps and trees torn out; taps on the way punch the one dragged, each adding to the fling.
+- 11. The open world and the base (Sean, 2026-11-02).
+  - [x] 11a. The zombie level from the air: TAKE OFF from the street fight, fly round, lock on a zombie within a block and come down to fight it, LAND anywhere, or SMASH LAND (straight down, a shockwave on the street); the kit's spells from the air.
+  - [ ] 11b. Ragdoll cars and trees: shockwaves and fighting throw them about; a special move to pick up cars, trees and buildings and toss them.
+  - [ ] 11c. The Sandbox as a Home Base: inside, a costume area, a computer for skills and powers, a practice ring against a personal robot whose level and powers you set at a computer by the ring; Go outside to the town to spawn disasters and practise.
 
 Also done on the way: the stuck zoom on a phone fixed; the plan page at plan.html.
 

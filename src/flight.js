@@ -171,7 +171,8 @@ export class Flight {
     bar.querySelector('[data-f="view"]').onclick = () => this.setView(this.nextView());
     bar.querySelector('[data-f="slow"]').onclick = () => this.throttle(-1);
     bar.querySelector('[data-f="fast"]').onclick = () => this.throttle(1);
-    bar.querySelector('[data-f="exit"]').onclick = () => this.stop();
+    bar.querySelector('[data-f="exit"]').onclick = () => { if (this.fromHorde) this.landHorde(false); else this.stop(); };
+    if (this.fromHorde) { const sb = document.createElement('button'); sb.type = 'button'; sb.className = 'zd-btn exit'; sb.textContent = '\u270A SMASH LAND'; sb.onclick = () => this.landHorde(true); bar.querySelector('[data-f="exit"]').after(sb); } // up from the street fight: the grab button's place in the air
     // the finger as a stick: how far it has gone from where it came down
     let id = null, ox = 0, oy = 0;
     ov.addEventListener('pointerdown', (e) => { if (id !== null) return; id = e.pointerId; ox = e.clientX; oy = e.clientY; this.stick.style.display = 'block'; this.stick.style.left = ox + 'px'; this.stick.style.top = oy + 'px'; this.knob.style.transform = ''; try { ov.setPointerCapture(id); } catch (er) { /* fine */ } e.preventDefault(); });
@@ -312,7 +313,7 @@ export class Flight {
   stop(quiet = false) {
     if (!this.active) return;
     const g = this.g, { camera, controls, post } = this.ctx;
-    if (this.duel) this.duel.end('', false); this.lock = null; this.dropInside(); this.inB = -1; this.clearShots(); if (this.power) { this.power.dispose(); this.power = null; this.powerBtn = null; } if (this.army) { this.army.dispose(); this.army = null; } if (this.getaways) { for (const G of this.getaways) G.finish(); this.getaways = []; }
+    this.fromHorde = null; this.smashing = false; if (this.duel) this.duel.end('', false); this.lock = null; this.dropInside(); this.inB = -1; this.clearShots(); if (this.power) { this.power.dispose(); this.power = null; this.powerBtn = null; } if (this.army) { this.army.dispose(); this.army = null; } if (this.getaways) { for (const G of this.getaways) G.finish(); this.getaways = []; }
     this.active = false; document.body.classList.remove('zd-flying');
     const hr = this.obj.userData.hero; g.disasters.ctx.scene.remove(this.obj); if (this.streak) { this.streak.dispose(g.disasters.ctx.scene); this.streak = null; }
     if (hr) { hr.cape.g.dispose(); if (hr.smooth && hr.smooth.mesh) { hr.smooth.mesh.geometry.dispose(); const m = hr.smooth.mesh.material; (Array.isArray(m) ? m : [m]).forEach(x => x && x.dispose()); } } else this.obj.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); // its own shapes and paint (a hero's are shared with the rest: only the cape is its own)
@@ -414,6 +415,7 @@ export class Flight {
       g.shake = Math.max(g.shake || 0, 0.8); if (C.t > 2.4) this.crash(-1, this.P.hero ? 'The tornado threw you out of the sky!' : 'The tornado tore your plane apart!');
       return;
     }
+    if (this.smashing) { const gy = this.g.people.groundY(this.pos.x, this.pos.z); this.pos.y -= 70 * dt; this.pitch = -1.4; this.speed = 0; this.obj.position.copy(this.pos); if (this.pos.y <= gy + 1.2) { this.smashing = false; this.landHorde(true, true); } return; } // the smash landing: straight down at 70 m/s
     if (this.lock && this.homeIn(dt)) return;
     let ix = this.ix, iy = this.iy;
     if (K.has('arrowleft') || K.has('a')) ix = -1; if (K.has('arrowright') || K.has('d')) ix = 1;
@@ -678,16 +680,20 @@ export class Flight {
   lockOn(v, again = false) {
     if (this.state !== 'fly' || this.duel) return;
     if (this.lock && !again) { this.lock = null; this.tip('Lock let go: flying free'); return; }
+    if (this.fromHorde && !v) { const H = this.fromHorde, P = this.g.people; let bj = -1, bd = 90 * 90; for (const j of H.ids) { if (!H.isT(j)) continue; const d2 = (P.x[j] - this.pos.x) ** 2 + (P.z[j] - this.pos.z) ** 2; if (d2 < bd) { bd = d2; bj = j; } } if (bj < 0) { this.tip('No zombie within a block'); return; } this.lock = { zombie: bj, name: 'a zombie', get x() { return P.x[bj]; }, get z() { return P.z[bj]; }, get y() { return P.y[bj]; }, get gone() { return !H.isT(bj); } }; this.tip('Locked on a zombie! Straight at it, down to fight; or SMASH LAND'); sfx('whoosh', this.pos.x, this.pos.y, this.pos.z, { gain: 0.9 }); return; } // up from the street fight: the nearest zombie within a block
     if (!v) { let bd = 1e9; for (const e of this.g.disasters.list) if (e.alive && e.type === 'villains') for (const w of e.who) { if (w.gone || w.beaten) continue; const d = Math.hypot(w.x - this.pos.x, w.z - this.pos.z); if (d < bd) { bd = d; v = w; } } }
     if (!v || v.gone || v.beaten) { const B = this.g.city.bounds; this.lock = null; this.g.disasters.start('villains', (B.x0 + B.x1) / 2, (B.z0 + B.z1) / 2); this.tip('More villains are coming! Press Lock on again'); return; } // all beaten: three more
     this.lock = v; this.tip('Locked on ' + v.name + '! Flying straight at them'); sfx('whoosh', this.pos.x, this.pos.y, this.pos.z, { gain: 0.9 });
   }
+  // back down into the street fight she took off from (horde.js land): a plain landing where she is, or the smash: straight down first, a shockwave where she lands
+  landHorde(smash, now) { const H = this.fromHorde; if (!H || this.state !== 'fly') return; if (smash && !now) { this.smashing = true; this.lock = null; this.speed = 0; this.tip('SMASH LANDING!'); return; } this.fromHorde = null; const x = this.pos.x, z = this.pos.z; this.stop(true); H.land(x, z, smash); }
   // locked on: straight at the villain, faster the further, through every building in the way; close enough and the fight is on (heroduel.js)
   homeIn(dt) {
     const v = this.lock, P = this.P;
     if (!v || v.gone || v.beaten) { this.lock = null; return false; }
     const ty = Math.max(2.4, (v.y || 0) + HIP), dx = v.x - this.pos.x, dy = ty - this.pos.y, dz = v.z - this.pos.z, d = Math.hypot(dx, dy, dz) || 0.01;
-    if (d < 6.5) { if (this.inB >= 0) { this.burstOut(this.inB, this.pos.x, this.pos.y, this.pos.z); this.inB = -1; } this.speed = 0; this.duel = new Duel(this, v); this.obj.visible = true; SEE.on = this.saved.see; return true; } // reached them inside a building: it comes down round the fight
+    if (v.zombie != null) { if (d < 7) { this.landHorde(false); return true; } }
+    else if (d < 6.5) { if (this.inB >= 0) { this.burstOut(this.inB, this.pos.x, this.pos.y, this.pos.z); this.inB = -1; } this.speed = 0; this.duel = new Duel(this, v); this.obj.visible = true; SEE.on = this.saved.see; return true; } // reached them inside a building: it comes down round the fight
     let a = Math.atan2(-dz, dx) - this.yaw; a = Math.atan2(Math.sin(a), Math.cos(a));
     this.yaw += a * Math.min(1, dt * 5); this.roll += (Math.max(-1, Math.min(1, -a * 2)) - this.roll) * Math.min(1, dt * 3);
     this.pitch += (Math.atan2(dy, Math.hypot(dx, dz)) * 0.8 - this.pitch) * Math.min(1, dt * 4);
