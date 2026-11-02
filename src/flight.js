@@ -18,6 +18,7 @@ import { SEE } from './see.js';
 import { heroRig } from './heroes.js';
 import { relax, detail } from './villains.js';
 import { Duel } from './heroduel.js';
+import { Interior } from './interior.js';
 
 // speeds in metres a second; turn: how hard it turns at full bank; chase: the camera's distance behind and height above;
 // seat: the cockpit's place (forward, up) in the model
@@ -281,7 +282,7 @@ export class Flight {
   stop(quiet = false) {
     if (!this.active) return;
     const g = this.g, { camera, controls, post } = this.ctx;
-    if (this.duel) this.duel.end('', false); this.lock = null;
+    if (this.duel) this.duel.end('', false); this.lock = null; this.dropInside(); this.inB = -1;
     this.active = false; document.body.classList.remove('zd-flying');
     const hr = this.obj.userData.hero; g.disasters.ctx.scene.remove(this.obj);
     if (hr) { hr.cape.g.dispose(); if (hr.smooth && hr.smooth.mesh) { hr.smooth.mesh.geometry.dispose(); const m = hr.smooth.mesh.material; (Array.isArray(m) ? m : [m]).forEach(x => x && x.dispose()); } } else this.obj.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); // its own shapes and paint (a hero's are shared with the rest: only the cape is its own)
@@ -408,7 +409,7 @@ export class Flight {
   crash(k, why) {
     if (this.state !== 'fly') return;
     const g = this.g, f = g.fire, x = this.pos.x, y = Math.max(1, this.pos.y), z = this.pos.z;
-    this.state = 'down'; this.t = 0; this.obj.visible = false; this.at.set(x, y, z); this.caught = null; this.hull = 0; this.lock = null; this.inB = -1;
+    this.state = 'down'; this.t = 0; this.obj.visible = false; this.at.set(x, y, z); this.caught = null; this.hull = 0; this.lock = null; this.inB = -1; this.dropInside();
     if (this.duel) this.duel.end('', false);
     if (this.g.audio) this.g.audio.engine(null);
     if (this.P.hero) { f.dustCloud(x, z, 6, Math.min(20, y + 4)); sfx('thud', x, y, z, { gain: 1 }); this.tip((why || 'You were knocked out of the sky!') + ' Back up in a moment'); return; } // knocked down, no fireball
@@ -432,7 +433,7 @@ export class Flight {
     for (let i = 1; i <= n; i++) {
       const sx = px + (x - px) * i / n, sy = py + (y - py) * i / n, sz = pz + (z - pz) * i / n;
       let inK = -1; city.buildingsNear(sx, sz, 0.6, (k, d, b) => { if (inK < 0 && sy < b.roofY + 0.8) inK = k; });
-      if (inK === this.inB) continue;
+      if (inK === this.inB) { if (inK >= 0 && this.inside) this.inside.step(sx, sy, sz, Math.cos(this.yaw), -Math.sin(this.yaw)); continue; }
       if (this.inB >= 0) this.burstOut(this.inB, sx, sy, sz);
       if (inK >= 0) this.burstIn(inK, sx, sy, sz);
       this.inB = inK;
@@ -443,6 +444,7 @@ export class Flight {
     const g = this.g, b = g.city.buildings[k], fx = Math.cos(this.yaw), fz = -Math.sin(this.yaw), col = wallHex(b);
     for (let i = 0; i < 18; i++) { const s = 0.3 + Math.random() * 0.7, v = 4 + Math.random() * 8, r = Math.random(); g.disasters.debris.add(x, y + (Math.random() - 0.5) * 3, z, s, s * 0.6, s, r < 0.5 ? col : r < 0.75 ? 0xeefcff : 0x8a8478, 'fly', { v: [-fx * v + (Math.random() - 0.5) * 7, 1 + Math.random() * 5, -fz * v + (Math.random() - 0.5) * 7] }); } // back out of the hole, toward the camera
     g.fire.dustCloud(x, z, 4, Math.min(b.top - b.baseY, y + 5));
+    this.dropInside(); this.inside = new Interior(g.disasters, k, x, y, z, fx, fz); this.inside.step(x, y, z, fx, fz); // its floors and furniture, from here on (interior.js)
     sfx('crash', x, y, z, { gain: 0.9 }); sfx('glass', x, y, z, { gain: 0.6 });
     this.speed *= 0.85; this.punch = 0.4; g.shake = Math.max(g.shake || 0, 0.35);
     g.people.scare(x, z, 25, 0.8);
@@ -459,8 +461,11 @@ export class Flight {
       sfx('boomBig', cx, b.baseY + hgt * 0.5, cz, { gain: 0.9 }); g.shake = Math.max(g.shake, 0.9);
       g.people.scare(cx, cz, 60, 1);
     }
-    D.destroyBuilding(k, 'collapse', { dir: Math.atan2(-fx, fz), spare: true, noCrush: true }); // leaning over the way the hero went
+    const shell = this.inside && this.inside.k === k ? this.inside.take() : null; this.inside = null;
+    D.destroyBuilding(k, 'collapse', { dir: Math.atan2(-fx, fz), spare: true, noCrush: true, shell }); // leaning over the way the hero went, floors and all
   }
+  // the inside of a building the hero never came out of (knocked down in it, landed): it comes down anyway
+  dropInside() { const I = this.inside; this.inside = null; if (I && I.alive && !this.g.city.dead[I.k]) this.g.disasters.destroyBuilding(I.k, 'collapse', { spare: true, noCrush: true, shell: I.take() }); }
   // the gun (the fighters): whatever is ahead and in range - the kaiju, a saucer, a walker, a dust devil - it fires at by
   // itself, a magazine at a time, then reloads
   gunStep(h) {

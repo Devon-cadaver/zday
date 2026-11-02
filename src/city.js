@@ -1206,8 +1206,8 @@ export function buildCity(tex, opts = {}) {
       }
     }
   };
-  const hideBuilding = (k) => {
-    if (dead[k]) return false; dead[k] = 1;
+  const hideBuilding = (k, keep = false) => { // keep: lifted out, not dead (a hero inside it, interior.js); it still stands for everyone else until it falls
+    if (dead[k]) return false; if (!keep) dead[k] = 1;
     const b = buildings[k], [cx, cz] = center(b);
     for (const rg of b.ranges) {
       const m = meshes[rg.key]; if (!m || rg.v1 <= rg.v0) continue;
@@ -1245,6 +1245,8 @@ export function buildCity(tex, opts = {}) {
     g.userData.disposeGeo = true;
     return g;
   };
+  // a building lifted out of the city mesh into its own copy, still alive: the copy stands in for it until it falls
+  const liftBuilding = (k) => { const g = extractBuilding(k); hideBuilding(k, true); return g; };
   // rubble: low heaps of blocks in the building's colours
   const RUB = 6000;
   const rubble = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), std({ roughness: 1 }), RUB);
@@ -1349,7 +1351,7 @@ export function buildCity(tex, opts = {}) {
 
   return {
     buildings, char, uncharAll, lamps, mats,
-    dead, buildingsNear, hideBuilding, extractBuilding, warpBuilding, addRubble, clearRubble, restoreBuilding, takeStreetNear, restoreAll,
+    dead, buildingsNear, hideBuilding, liftBuilding, extractBuilding, warpBuilding, addRubble, clearRubble, restoreBuilding, takeStreetNear, restoreAll,
     lod: (far) => { if (crownNear) for (const im of crownT.meshes) im.geometry = far ? crownFar : crownNear; }, // zoomed out: the tree crowns in fewer facets
     group, sx, sz, NB, parked, crowds, walkBlocks, open, layout, nid, roofPoint, rail, scramble, hooks,
     bounds: { x0: sx[0], x1: sx[NB], z0: sz[0], z1: sz[NB] },

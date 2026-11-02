@@ -228,8 +228,8 @@ export class Disasters {
     const hgt = b.top - b.baseY, wc = b.wallCol, hex = new THREE.Color(wc[0], wc[1], wc[2]).getHex();
     people.clearBuilding(k, how === 'tear' ? 'tear' : opts.spare ? 'spare' : 'crush'); // spare: everyone gets out first
     fire.gone(k);
-    if (opts.vanish) { people.clearBuilding(k, 'crush'); fire.gone(k); city.hideBuilding(k); this.stats.buildings++; this.emit({ type: 'collapse', k, how, x: cx, z: cz }); return true; } // vaporised: no shell, no debris
-    const shell = city.extractBuilding(k); city.hideBuilding(k);
+    if (opts.vanish) { if (this.lifted && this.lifted.k === k) { const gg = this.lifted.take(); this.ctx.scene.remove(gg); gg.traverse(m => { if (m.geometry) m.geometry.dispose(); }); } people.clearBuilding(k, 'crush'); fire.gone(k); city.hideBuilding(k); this.stats.buildings++; this.emit({ type: 'collapse', k, how, x: cx, z: cz }); return true; } // vaporised: no shell, no debris
+    const shell = opts.shell || (this.lifted && this.lifted.k === k ? this.lifted.take() : city.extractBuilding(k)); city.hideBuilding(k); // a hero inside it (interior.js): its copy, floors and all, is what falls
     const dbr = this.debris; let fall = null; // the way it is tipped as it goes down (debris 'sink' leans its top toward (-sin, cos))
     if (how === 'tear') {
       dbr.addObject(shell, 'lift', { vort: opts.vort, dur: 1.4 + Math.min(1.6, hgt * 0.03), h: hgt });
