@@ -52,6 +52,7 @@ function kit() {
 // each villain's own dark colour, suit and cape (the heroes wear neon), so each can be told apart from above
 const LOOK = { Blur: ['#7a1229', '#560a1b'], Tyrant: ['#4d1672', '#340c4f'], Weaver: ['#155a33', '#0d3d22'] };
 const VM = {};
+let MASK = null;
 function vmats(name) {
   if (VM[name]) return VM[name];
   const m = kit(), L = LOOK[name]; if (!L) return m;
@@ -261,6 +262,9 @@ class Villain {
   constructor(V, o) {
     this.V = V; this.D = V.D; this.x = o.x; this.z = o.z; this.y = o.y ?? 0; this.yaw = Math.random() * 6.28; this.t = Math.random() * 5; this.speed = 0; this.player = false; this.hp = 780 * LAB.villainHp(); this.hpMax = this.hp; this.trapped = 0; this.side = 'villain'; this.busyT = 0;
     this.rig = rig({ ...(o.rig || {}), mats: vmats(o.name) }); V.scene.add(this.rig.root);
+    const mk = this.mask = new THREE.Group(), kk = kit(); if (!MASK) MASK = new THREE.MeshStandardMaterial({ color: '#3a3f47', roughness: 0.45, metalness: 0.6 }); // the breathing mask a hero can break (heroduel.js)
+    const box = (sx, sy, sz, x, y, z) => { const b = new THREE.Mesh(kk.box, MASK); b.scale.set(sx, sy, sz); b.position.set(x, y, z); mk.add(b); };
+    box(0.1, 0.07, 0.035, 0, -0.05, 0.11); box(0.03, 0.03, 0.05, -0.035, -0.055, 0.125); box(0.03, 0.03, 0.05, 0.035, -0.055, 0.125); box(0.2, 0.014, 0.02, 0, -0.03, 0.04); this.rig.head.add(mk);
   }
   face(dx, dz, h, k = 8) { if (Math.hypot(dx, dz) < 1e-4) return; let d = Math.atan2(dx, dz) - this.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); this.yaw += d * Math.min(1, h * k); }
   place() { const r = this.rig.root; r.position.set(this.x, this.y, this.z); r.rotation.y = this.yaw; }

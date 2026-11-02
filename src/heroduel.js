@@ -42,6 +42,7 @@ const CSS = `
 #zd-duel .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#ff5ad5,#ffd27a)}
 #zd-duel .vhp{margin-top:6px;font-size:11px;font-weight:700;opacity:.9}
 #zd-duel .spot{position:absolute;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;border:3px solid #fff;background:radial-gradient(circle,rgba(255,240,140,.95),rgba(255,120,60,.55) 60%,rgba(255,80,40,0) 72%);box-shadow:0 0 16px 4px rgba(255,200,80,.85);animation:zdSpot 1.05s linear forwards}
+#zd-duel .spot.mask{width:68px;height:68px;margin:-34px 0 0 -34px;border-color:#ffe9a0;background:radial-gradient(circle,rgba(255,255,255,.98),rgba(255,210,90,.75) 55%,rgba(255,190,60,0) 74%);box-shadow:0 0 22px 8px rgba(255,220,120,.9)}
 #zd-duel .spot.pop{animation:zdPop .2s ease-out forwards}
 #zd-duel .spot.miss{animation:zdMiss .25s ease-out forwards}
 @keyframes zdSpot{from{transform:scale(1.25)}to{transform:scale(.55);opacity:.55}}
@@ -89,14 +90,15 @@ export class Duel {
   title(s) { this.ttl.textContent = s; }
   // where a point is on the screen (the villain's chest by default)
   screen(x = this.v.x, y = (this.v.y || 0) + 2.4, z = this.v.z) { const p = new THREE.Vector3(x, y, z).project(this.F.ctx.camera); return [(p.x + 1) / 2 * innerWidth, (1 - p.y) / 2 * innerHeight]; }
-  hit(n) { const v = this.v; LAB.stats.dealt += n * this.pow; this.g.disasters.brawl.hurt(v, n * this.pow, { name: this.F.P.name }); this.g.fire.burst(v.x, (v.y || 0) + 2.4, v.z, 6, 0.8); this.F.punch = 0.25; v.flinch = 1; }
+  hit(n) { const v = this.v, pw = n * this.pow * (v.overload > 0 ? 1.5 : 1); LAB.stats.dealt += pw; this.g.disasters.brawl.hurt(v, pw, { name: this.F.P.name }); this.g.fire.burst(v.x, (v.y || 0) + 2.4, v.z, 6, 0.8); this.F.punch = 0.25; v.flinch = 1; }
   // the street under (x, z), or a roof standing there
   groundAt(x, z) { const city = this.g.city; let y = this.g.people.groundY(x, z); city.buildingsNear(x, z, 0.1, (k, d, b) => { if (d === 0 && !city.dead[k] && b.roofY > y) y = b.roofY; }); return y; }
   spot() {
     const [sx, sy] = this.screen(), x = Math.max(40, Math.min(innerWidth - 84, sx + (Math.random() - 0.5) * 150)), y = Math.max(140, Math.min(innerHeight - 230, sy + (Math.random() - 0.5) * 170));
-    const b = document.createElement('div'); b.className = 'spot' + (this.life > 1.2 ? ' slow' : ''); b.style.left = x + 'px'; b.style.top = y + 'px'; this.el.appendChild(b);
-    const s = { b, life: this.life, dead: false }; this.live.push(s);
-    b.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); if (s.dead) return; s.dead = true; b.classList.add('pop'); setTimeout(() => b.remove(), 200); this.hit(26); if (!this.v.react) this.react((this.spotN = (this.spotN || 0) + 1) % 2 ? 'hitHeadL' : 'hitHeadR'); this.punchT = Math.max(this.punchT, 0.2); sfx('crash', this.v.x, 2, this.v.z, { gain: 0.5, rate: 1.4 }); });
+    const v0 = this.v, mk = !!v0.mask && !v0.maskBroken && !this.maskUp && v0.hp < this.hpMax * 0.85; if (mk) this.maskUp = true; // once a round, once they are hurt: a gold spot on the mask
+    const b = document.createElement('div'); b.className = 'spot' + (this.life > 1.2 ? ' slow' : '') + (mk ? ' mask' : ''); const [hx, hy] = this.screen(v0.x, (v0.y || 0) + 3.7, v0.z); b.style.left = (mk ? Math.max(40, Math.min(innerWidth - 84, hx)) : x) + 'px'; b.style.top = (mk ? Math.max(140, Math.min(innerHeight - 230, hy)) : y) + 'px'; this.el.appendChild(b);
+    const s = { b, life: this.life * (mk ? 1.2 : 1), dead: false }; this.live.push(s);
+    b.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); if (s.dead) return; s.dead = true; b.classList.add('pop'); setTimeout(() => b.remove(), 200); if (mk) this.breakMask(); this.hit(26); if (!this.v.react) this.react((this.spotN = (this.spotN || 0) + 1) % 2 ? 'hitHeadL' : 'hitHeadR'); this.punchT = Math.max(this.punchT, 0.2); sfx('crash', this.v.x, 2, this.v.z, { gain: 0.5, rate: 1.4 }); });
   }
   // the buttons along the bottom: [label, what it does, class]
   button(...list) {
@@ -108,7 +110,9 @@ export class Duel {
     const v = this.v, F = this.F; this.t += h;
     if (F.state !== 'fly' || v.gone) return this.end('', false);
     this.vhp.textContent = v.name.toUpperCase() + ' ' + Math.max(0, Math.round(v.hp));
-    if (v.beaten || v.hp <= 0) { LAB.stats.won++; return this.end(v.name + ' is beaten!', true); }
+    if (v.beaten || v.hp <= 0) { LAB.stats.won++; const r = this.end(v.name + ' is beaten! A ship is coming for them', true); if (v.beaten && !v.gone) F.getaway(v); return r; }
+    if (v.overload > 0) { v.overload -= h; if (v.overload <= 0 && v.pinned === 'dazed' && this.phase === 'spots') v.pinned = 'reel'; }
+    this.partnerStep(h); if (this.over) return false;
     if (v.flinch > 0) v.flinch = Math.max(0, v.flinch - h * 4);
     if (this.reacts) { for (const c of this.reacts) c.t += h; this.reacts = this.reacts.filter(c => c === v.react); }
     if (!this.second && v.hp < this.hpMax * 0.5) this.secondWind();
@@ -120,7 +124,7 @@ export class Duel {
   _spots(h) {
     const v = this.v;
     if ((this.next -= h) <= 0 && this.spawned < this.total) { this.next = 0.45; this.spawned++; this.spot(); }
-    if (this.dodge) { if (!this.dodgeStep(h)) return false; } else if ((this.windT -= h) <= 0 && this.spawned < this.total) { if (!this.noGrab && Math.random() < 0.12 + 0.015 * LAB.villain + (this.second ? 0.12 : 0)) return this.grab(); this.noGrab = Math.max(0, (this.noGrab || 0) - 1); this.windUp(); }
+    if (this.dodge) { if (!this.dodgeStep(h)) return false; } else if (!(v.overload > 0) && (this.windT -= h) <= 0 && this.spawned < this.total) { if (!this.noGrab && Math.random() < 0.12 + 0.015 * LAB.villain + (this.second ? 0.12 : 0)) return this.grab(); this.noGrab = Math.max(0, (this.noGrab || 0) - 1); this.windUp(); }
     for (const s of this.live) { if (s.dead) continue; s.life -= h; if (s.life <= 0) { s.dead = true; s.b.classList.add('miss'); setTimeout(() => s.b.remove(), 250); this.F.damage(LAB.villainHit(7), v.name + ' hit you!'); this.g.shake = Math.max(this.g.shake || 0, 0.25); } }
     this.barI.style.width = (this.spawned / this.total * 100) + '%';
     if (this.over) return false; // knocked out by that last miss
@@ -131,6 +135,36 @@ export class Duel {
   play(name) { this.F.clip = { clip: CLIPS[name], t: 0 }; }
   react(name, hold = 0) { const v = this.v, c = { clip: CLIPS[name], t: 0, hold, play(r) { return playClip(r, this.clip, this.t) || this.t < this.clip.keys[this.clip.keys.length - 1].t + this.hold; } }; v.react = c; this.reacts = this.reacts || []; this.reacts.push(c); }
   stop(s = 0.07) { this.g.hitStop = Math.max(this.g.hitStop || 0, s); this.punchT = 0.35; }
+  // the mask broken: the noise and light of this world pour in: dazed, no wind-ups, every blow x1.5 for 6 s
+  breakMask() {
+    const v = this.v; v.maskBroken = true; v.overload = 6; if (v.mask) v.mask.visible = false; if (this.phase === 'spots') v.pinned = 'dazed'; if (this.dodge) { this.dodge.el.remove(); this.dodge = null; }
+    for (let i = 0; i < 10; i++) { const s = 0.15 + Math.random() * 0.3; this.g.disasters.debris.add(v.x, (v.y || 0) + 3.5, v.z, s, s * 0.6, s, 0x3a3f47, 'fly', { v: [(Math.random() - 0.5) * 12, 2 + Math.random() * 6, (Math.random() - 0.5) * 12] }); }
+    sfx('glass', v.x, v.y + 3, v.z, { gain: 1, rate: 1.2 }); this.react('hitUp', 0.5); this.stop(0.1); this.hit(40); this.g.disasters.flash(0.15);
+    this.title('\uD83D\uDCA5 MASK BROKEN! ' + v.name.toUpperCase() + ' IS OVERWHELMED!');
+  }
+  // a second villain joins in (the street-fight idea): now and then, while you fight one, another comes at you: a warning, a
+  // dodge circle; dodged, they go flying past and take a knock; missed, it lands, and a second one lands you across the street
+  partnerStep(h) {
+    const R = this.rush, F = this.F, v = this.v;
+    if (!R) {
+      if ((this.phase !== 'spots' && this.phase !== 'dazed') || this.dodge || v.overload > 0) return;
+      if ((this.rushT = (this.rushT ?? 6 + Math.random() * 4) - h) > 0) return;
+      let p = null, bd = 400; for (const e of this.g.disasters.list) if (e.alive && e.type === 'villains') for (const w of e.who) { if (w === v || w.gone || w.beaten || w.leaving || w.tossed || w.gripped || w.player || w.overload > 0) continue; const d = Math.hypot(w.x - F.pos.x, w.z - F.pos.z); if (d < bd) { bd = d; p = w; } }
+      if (!p) { this.rushT = 4; return; }
+      if (p.dropHeld) p.dropHeld(); p.gripped = true; p.pinned = 'reel'; p.flinch = 0; this.rush = { p, t: 0, x0: p.x, y0: p.y || 0, z0: p.z, el: null, done: false }; const was = this.ttl.textContent; this.title('\u26A0 ' + p.name.toUpperCase() + ' IS COMING!'); setTimeout(() => { if (!this.over && this.ttl.textContent.includes('IS COMING')) this.title(was); }, 1100); sfx('whoosh', p.x, p.y, p.z, { gain: 1, rate: 0.8 }); return;
+    }
+    R.t += h; const p = R.p, bx = F.pos.x - Math.cos(F.yaw) * 6, bz = F.pos.z + Math.sin(F.yaw) * 6, u = Math.min(1, R.t / 1.1), e = u * u, T = 1.1 * (F.P.slow || 1);
+    p.x = R.x0 + (bx - R.x0) * e; p.z = R.z0 + (bz - R.z0) * e; p.y = R.y0 + (F.pos.y - HIP - R.y0) * e; p.yaw = Math.atan2(F.pos.x - p.x, F.pos.z - p.z);
+    if (R.t >= 0.25 && !R.el) { const [sx, sy] = this.screen(p.x, (p.y || 0) + 2.4, p.z), el = R.el = document.createElement('div'); el.className = 'dodge'; el.textContent = '\u26A0'; el.style.left = Math.max(50, Math.min(innerWidth - 100, sx)) + 'px'; el.style.top = Math.max(150, Math.min(innerHeight - 240, sy)) + 'px'; el.style.animationDuration = (T - 0.25).toFixed(2) + 's'; this.el.appendChild(el); el.addEventListener('pointerdown', (ev) => { ev.preventDefault(); ev.stopPropagation(); if (R.done) return; R.done = true; this.rushEnd(true); }); }
+    if (R.t >= T && !R.done) { R.done = true; this.rushEnd(false); }
+  }
+  rushEnd(dodged) {
+    const R = this.rush, p = R.p, F = this.F, B = this.g.disasters.brawl; this.rush = null; if (R.el) R.el.remove(); this.rushT = 7 + Math.random() * 5; p.pinned = null; p.gripped = false;
+    const dx = F.pos.x - p.x, dz = F.pos.z - p.z, d = Math.hypot(dx, dz) || 1;
+    if (dodged) { const rx = Math.sin(F.yaw), rz = Math.cos(F.yaw); F.pos.x += rx * 1.4; F.pos.z += rz * 1.4; toss(p, dx / d * 30, 5, dz / d * 30); B.hurt(p, 15, { name: F.P.name }); sfx('whoosh', p.x, p.y, p.z, { gain: 1 }); this.title('\uD83D\uDCA8 DODGED ' + p.name.toUpperCase() + '!'); return; }
+    toss(p, dx / d * 14, 4, dz / d * 14); this.rushHits = (this.rushHits || 0) + 1; F.damage(LAB.villainHit(12), p.name + ' hit you from behind!'); this.g.shake = Math.max(this.g.shake || 0, 0.5); sfx('thud', F.pos.x, F.pos.y, F.pos.z, { gain: 1.2, rate: 0.7 }); this.g.fire.burst(F.pos.x, F.pos.y + 1, F.pos.z, 8, 1.2);
+    if (this.rushHits >= 2 && F.state === 'fly') { this.rushHits = 0; F.damage(LAB.villainHit(10), p.name + ' threw you!'); if (F.state === 'fly') { F.hurl(dx / d * 34, 9, dz / d * 34, p.name + ' threw you across the street!'); this.end('', false); } }
+  }
   // the villain winds up (a flash, a sound): a dodge circle to one side of them, tapped in time the hero sidesteps and the
   // swing misses; too late and it lands: a hit, and the weak spots up at the time are lost
   windUp() {
@@ -573,6 +607,7 @@ export class Duel {
   end(why, won) {
     if (this.over) return false; this.over = true;
     const v = this.v, B = this.g.disasters.brawl;
+    if (this.rush) { const p = this.rush.p; if (this.rush.el) this.rush.el.remove(); p.pinned = null; p.gripped = false; if (!p.tossed && !p.gone) toss(p, 0, 2, 0); this.rush = null; }
     this.dropBeam(); this.dropIce(); this.dropBolt(); this.dropBubble(); if (this.cars) { for (const c of this.cars) { c.soft = true; this.g.disasters.ctx.traffic.fling(c, 0, 1, 0); } this.cars = null; } if (this.dodge) { this.dodge.el.remove(); this.dodge = null; } if (this.chipEl) { this.chipEl.remove(); this.chipEl = null; } if (this.aimEl) { this.aimEl.remove(); this.aimEl = null; }
     if (this.S) { const i = B.drags.indexOf(this.S); if (i >= 0) { B.drags.splice(i, 1); v.gripped = false; if (!v.tossed && !v.gone) toss(v, this.S.dx * 10, 4, this.S.dz * 10); } this.S = null; }
     v.pinned = null; v.flinch = 0; v.react = null; this.F.clip = null;

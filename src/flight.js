@@ -22,6 +22,7 @@ import { Interior } from './interior.js';
 import { LAB } from './lab.js';
 import { playClip } from './clips.js';
 import { Streak } from './streak.js';
+import { Getaway } from './getaway.js';
 
 // speeds in metres a second; turn: how hard it turns at full bank; chase: the camera's distance behind and height above;
 // seat: the cockpit's place (forward, up) in the model
@@ -293,7 +294,7 @@ export class Flight {
   stop(quiet = false) {
     if (!this.active) return;
     const g = this.g, { camera, controls, post } = this.ctx;
-    if (this.duel) this.duel.end('', false); this.lock = null; this.dropInside(); this.inB = -1; this.clearShots();
+    if (this.duel) this.duel.end('', false); this.lock = null; this.dropInside(); this.inB = -1; this.clearShots(); if (this.getaways) { for (const G of this.getaways) G.finish(); this.getaways = []; }
     this.active = false; document.body.classList.remove('zd-flying');
     const hr = this.obj.userData.hero; g.disasters.ctx.scene.remove(this.obj); if (this.streak) { this.streak.dispose(g.disasters.ctx.scene); this.streak = null; }
     if (hr) { hr.cape.g.dispose(); if (hr.smooth && hr.smooth.mesh) { hr.smooth.mesh.geometry.dispose(); const m = hr.smooth.mesh.material; (Array.isArray(m) ? m : [m]).forEach(x => x && x.dispose()); } } else this.obj.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); // its own shapes and paint (a hero's are shared with the rest: only the cape is its own)
@@ -329,6 +330,7 @@ export class Flight {
     else if (run && this.state === 'tossed') this.tossStep(dt);
     else if (run && this.state === 'down' && (this.t += dt) > (this.downAt ? 1.4 : 2.6)) { if (this.downAt) this.getUp(); else { this.spawn(); this.setView(this.view); } }
     if (run && this.shots.length) this.shotStep(dt);
+    if (run && this.getaways && this.getaways.length) { for (const G of this.getaways) G.step(dt); this.getaways = this.getaways.filter(G => !G.done); }
     // the plane where it is
     _e.set(this.roll, this.yaw, this.pitch); this.q.setFromEuler(_e);
     this.obj.position.copy(this.pos); this.obj.quaternion.copy(this.q);
@@ -493,6 +495,7 @@ export class Flight {
     if (this.shots.some(s => s.done)) { for (const s of this.shots) if (s.done) { g.disasters.ctx.scene.remove(s.o); s.o.material.dispose(); } this.shots = this.shots.filter(s => !s.done); }
   }
   clearShots() { if (this.shots) for (const s of this.shots) { this.g.disasters.ctx.scene.remove(s.o); s.o.material.dispose(); } this.shots = []; }
+  getaway(v) { (this.getaways = this.getaways || []).push(new Getaway(this.g.disasters.ctx.scene, v)); }
   // a hero goes straight through buildings (Sean): in through one wall in a spray of glass and brick, out through the far
   // one, and the building comes down behind them, leaning the way they went; a low one may go up in a fireball first (a
   // tall tower never does: it only falls, in its dust). Checked every 2 m along the way since the last frame, so a fast

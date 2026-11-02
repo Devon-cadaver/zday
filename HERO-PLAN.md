@@ -23,7 +23,9 @@ Build order (one thing at a time, each tested in the Sandbox and pushed). The ch
     - [x] 3e.3 villain reactions for every hit, speed streaks, camera punch-ins
     - [x] 3e.4 Nova first: a matte woven suit with seams, dark gloves and boots with cuffs, shoulder pads, a collar, a buckle, a face (Sean to judge how far to take it)
     - [x] 3e.5 the same for Dragonfly, Tempo and the villains (cloth, cuffs, pads, collars, faces)
-  - [ ] 3f. From the street-fight inspiration: two villains at once, a breakable mask, villains retreating, the rogue army
+  - [ ] 3f. From the street-fight inspiration
+    - [x] 3f.1 a second villain joins the fight, a breakable mask, the beaten carried off by a ship
+    - [ ] 3f.2 the rogue army: jets and helicopters firing on everyone, soldiers to save, saving them turns the army
 - [ ] 4. Powers against disasters, one disaster at a time
 - [ ] 5. The collateral meter: damage, fear, reputation, towns that remember you
 - [ ] 6. Outfits for the three
