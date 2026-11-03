@@ -738,6 +738,8 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 
 - Blueprints' little screen (Sean, 2026-11-02): bpView, a small renderer of its own in the panel showing baseBuilding of the current choices, slowly turning, sticking to the top as the panel scrolls, rebuilt on every tap; stopped and let go when the panel closes (bpStop).
 
+- BASE flies her there (Sean, 2026-11-02; it used to cut straight in). horde.toBase lets go of what she holds or rides and calls flight.baseGo; baseRun, inside arcade: up over the roofs, at 1.6 times her top speed to a point 40 m in front of the base, then down to the door, the camera turned to look the way she is going; baseArrive: a quick fade and base.start. The button reads STOP meanwhile; BASE again, a real drag, Lock on or Land stop it. A knock out of the sky ends it. The fight goes on while she flies and she can be shot. Test: run-test.cjs.
+
 ## Next
 - The hero game (Sean, 2026-11-01): see HERO-PLAN.md for the whole plan and build order. Next up: floors inside smashed buildings, then the Sandbox hero lab.
 
