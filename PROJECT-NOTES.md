@@ -830,6 +830,13 @@ Sean sent a 17 second solo dev clip: seven things that make a sword hit feel goo
 - Death: zero health holds the blow 0.18 s; `C.dazed` a slump; a finished fighter lands in `C.ko` with a bounce (`koT`) and lies still 1.5 s (2 s after the sky) instead of 0.5 before the result. Finishers still end the fight, as Sean designed.
 Poses learned from its frames: `punch()` makes jabs and crosses three clear poses: a coil away (COIL_T 0.09 more before the blow), a deep lunge (lead knee bent, back leg long, `lungeOf`), held HOLD_T 0.07. `FOE_JAB` the same with no coil. CLIPS itself is unchanged, so flying blows keep theirs. Camera nearer for bigger figures: 23 m street, 22 plaza (was 30, 26), side margin 3.6 (was 5).
 
+## The neck drag rebuilt, and a hand that can hold (2026-11-03; fighttest.js)
+Sean: one hand on the enemy's neck, the other punching, while they fly through the air; the arms only pointed out, and tapping moved no arm at all.
+- `reachArm(arm, T)`: two bone IK from the joints' own lengths, sends a hand to a place in the world. `Body.ik` is a list of { arm, at(out) }, solved in `pose` after the clip and before the smooth body is swept. `go` clears it. This is the grip the Pose Lab will use.
+- `gripStep(d, f, ...)`, the same for the player (`drag`) and the foe (`vdrag`): d flies level (`C.drag`), f hangs off the hand at `DRAG_LEAN` so they make a V (flat and stacked looked wrong; do not put them back on top of each other). One hand on the neck, f's own hand clawing at it, legs going (`fl`). They rise and dip together on `dragBase`; under 0.2 the heels tear up the ground. Whoever grips is posed after whoever is gripped, so the hand goes to this frame's neck.
+- The free fist: drawn back over the shoulder, into the face at 0.08 s (`pT`, `pk`, chest turning with `tw`), on its own every 0.6 s or on a tap; the hit lands on that frame (`gripHit`). Auto punches count toward the fling too, which only ever makes the last throw bigger.
+- Plough by the clock (`plowDue`, every 0.07 s): it was per frame, so a faster screen threw more rock, and it buried them. Chunks smaller and lower. d.vx, d.vz set for the cape, which lay flat over the body at no speed. Camera in the drag off to the side (was behind the one dragged, who then filled the screen).
+
 ## Private preview link
 - https://claude.ai/artifact/Jemm5Sxje8y9XvJxcFNPwN (private, Sean only). Page source: artifact/zday-city.html.
 - To update: `npx vite build --base ./`, then publish artifact/zday-city.html with files {"assets/<bundle>.js": "dist/assets/<bundle>.js"} and change the script src in the page to the new bundle name (the hash changes each build).
