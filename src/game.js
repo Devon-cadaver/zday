@@ -443,7 +443,7 @@ export class Game {
   }
   // leaving this place for another built in this page: the mode stops and the old city is let go
   leaveWorld() {
-    this.endMode();
+    this.endMode(); if (this.base) this.base.placed = false; // a new town: the base stands anew at its edge
     this.pendingFires = []; this.simT = 0; this.acc = 0; this.seen = {}; this.zoomTo = 0; this.flash = 0; this.shake = 0; this.focusAt = null;
     this.people = this.traffic = this.fire = this.city = this.daylight = this.helis = this.disasters = this.band = this.rail = null;
   }

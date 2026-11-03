@@ -137,13 +137,14 @@ export class HeroGame {
       '<div>Reputation: <b>' + rep + '</b> (' + Math.round(s.rep) + ')</div>' + repBar(s) + '<div style="opacity:.7;font-size:11px">' + (hero ? 'Fall under 15 and you become a villain' : 'Climb to 60 and you become a hero') + '</div>' +
       '<h2>Who fights</h2><div class="two"><canvas></canvas><div class="cards">' + cardsHtml(this.side, s.flyer) + '</div></div>' +
       '<h2>Level ' + (s.idx + 1) + ': ' + levelName(s) + '</h2><div><b>' + esc(P.name) + '</b> · town ' + (s.idx + 1) + ' of ' + PATH.length + (hunted ? ' · <span style="color:#ff8a7a">the heroes are hunting you</span>' : '') + '</div><div style="opacity:.75;font-size:12px">' + esc(P.blurb || '') + '</div><button type="button" class="go" data-go2>' + (hero ? 'FLY TO DEFEND IT' : 'FLY IN AND WRECK IT') + '</button>' +
-      '<button type="button" class="b" data-station style="width:100%;margin-top:12px">\u{1F3B6} Radio station</button><div class="lab" style="margin-top:12px">Testing: jump to a level</div><div class="row">' + WAVES.slice(0, 5).map((w, i) => '<button type="button" class="b' + (s.idx === i ? ' on' : '') + '" data-jump="' + i + '">' + (i + 1) + ' ' + w[0] + '</button>').join('') + '</div>' +
+      '<button type="button" class="b" data-walkin style="width:100%;margin-top:12px">' + (hero ? '\u{1F3F0} Walk into the tower' : '\u{1F480} Walk into the lair') + '</button><button type="button" class="b" data-station style="width:100%;margin-top:8px">\u{1F3B6} Radio station</button><div class="lab" style="margin-top:12px">Testing: jump to a level</div><div class="row">' + WAVES.slice(0, 5).map((w, i) => '<button type="button" class="b' + (s.idx === i ? ' on' : '') + '" data-jump="' + i + '">' + (i + 1) + ' ' + w[0] + '</button>').join('') + '</div>' +
       '<h2>Skills · ' + this.points + ' point' + (this.points === 1 ? '' : 's') + ' to spend</h2>' + skills +
       (s.trophies.length ? '<h2>Trophy wall</h2><div>' + s.trophies.map(esc).join(', ') + '</div>' : '') +
       '<h2>' + (hero ? 'The tower' : 'The lair') + ': ' + Math.min(lv, 12) + ' floor' + (lv > 1 ? 's' : '') + '</h2><svg width="160" height="' + (Math.min(lv, 12) * 22 + 20) + '">' + floors + '</svg>' +
       '<button type="button" class="b" data-out style="width:100%;margin-top:14px">Back to the menu</button></div>';
     const $ = (q) => this.el.querySelector(q);
     $('[data-go2]').onclick = () => this.start();
+    { const q = this.el.querySelector('[data-walkin]'); if (q) q.onclick = () => { this.closeHub(); this.g.base.start({ hub: this }); }; }
     { const q = this.el.querySelector('[data-station]'); if (q) q.onclick = () => { if (this.g.audio) openStation(this.g.audio.music); }; }
     this.el.querySelectorAll('[data-jump]').forEach(b => { b.onclick = () => { s.idx = +b.dataset.jump; HS.save(); this.msg = ''; this.draw(); }; }); // Sean, testing the fights: straight to any of the first four
     $('[data-out]').onclick = () => { this.closeHub(); this.g.toMenu ? this.g.toMenu() : location.reload(); };

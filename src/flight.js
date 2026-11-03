@@ -186,7 +186,7 @@ export class Flight {
     if (this.fromHorde) { // the level's row of four (Sean): Fly, Land, Lock on, Base; the powers and the smash above
       const r0 = bar.querySelector('.row'), r1 = bar.querySelectorAll('.row')[1], ex = bar.querySelector('[data-f="exit"]'), mk = (t, c, f) => { const q = document.createElement('button'); q.type = 'button'; q.className = 'zd-btn ' + c; q.innerHTML = t; q.onclick = f; return q; };
       for (const k of ['view', 'slow', 'fast', 'inv']) bar.querySelector('[data-f="' + k + '"]').style.display = 'none';
-      this.flyBtn = mk('\u2708 FLY', 'lock', () => { if (this.hovering) this.unhover(); else { this.hovering = true; this.lock = null; } }); r1.insertBefore(this.flyBtn, ex); this.addUpDown(r1, ex); ex.innerHTML = '\u2B07 LAND'; r1.appendChild(this.lockBtn); r1.appendChild(this.baseBtn = mk('\uD83C\uDFE0 BASE', 'exit', () => { const H = this.fromHorde; if (H) H.toBase(); }));
+      this.flyBtn = mk('\u2708 FLY', 'lock', () => { if (this.hovering) this.unhover(); else { this.hovering = true; this.lock = null; } }); r1.insertBefore(this.flyBtn, ex); this.addUpDown(r1, ex); ex.innerHTML = '\u2B07 LAND'; r1.appendChild(this.lockBtn); r1.appendChild(this.baseBtn = mk(this.g.mode && this.g.mode.side === 'villain' ? '\uD83D\uDC80 LAIR' : '\uD83C\uDFE0 BASE', 'exit', () => { const H = this.fromHorde; if (H) H.toBase(); }));
       this.smashBtn = mk('\u270A SMASH LAND', 'exit', () => { const H = this.fromHorde; if (H && H.airGrab()) return; this.landHorde(true); }); r0.appendChild(this.smashBtn);
     } // up from the street fight: the grab button's place in the air
     // the finger as a stick: how far it has gone from where it came down

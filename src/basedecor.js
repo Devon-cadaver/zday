@@ -1,6 +1,7 @@
 // What the player chooses for the inside of the base (Sean): floor, walls, carpet, round table, desk, fireplace and its fire: each a colour (black always among them), a look, and a design: none, skulls, spikes or crosses.
 // buildDecor makes it all as one group of the room's, thrown away and made again on each choice.
 import * as THREE from 'three';
+import { lairDecor } from './lairroom.js';
 
 export const BLACK = '#050506';
 export const ITEMS = { floor: { name: 'Floor', looks: ['Plain', 'Tiles', 'Wood', 'Marble', 'Slabs'], at: [0, 1] }, walls: { name: 'Walls', looks: ['Plain', 'Panels', 'Brick', 'Stone', 'Stripes'], at: [-3, -5] }, carpet: { name: 'Carpet', looks: ['Plain', 'Border', 'Diamonds', 'Stripes', 'Rings'], at: [1.5, 3.2] }, table: { name: 'Round table', looks: ['Classic', 'Stone', 'Steel', 'Six sides'], at: [3.5, 2.2] }, desk: { name: 'Desk', looks: ['Plain', 'Console', 'Heavy'], at: [6.3, -6] }, fire: { name: 'Fireplace', looks: ['Hearth', 'Castle', 'Modern'], at: [-1.9, -6] } };
@@ -8,7 +9,11 @@ export const DESIGNS = [['none', 'None'], ['skulls', 'Skulls'], ['spikes', 'Spik
 export const COLOURS = [BLACK, '#2b2b30', '#6a6068', '#e8e2d6', '#ffffff', '#d4a84b', '#7a5a3a', '#4a2f1c', '#8a1c2a', '#d01d3a', '#ff3fcf', '#7a3cff', '#1a4a8a', '#29e3ff', '#3c5a3f', '#3dff5c'];
 export const FLAMES = [BLACK, '#ff7a20', '#ffd24a', '#ff2a2a', '#2a8cff', '#3dff5c', '#7a3cff', '#ff3fcf', '#ffffff'];
 const DEF = { floor: { c: '#6a6068', look: 0, deco: 'none' }, walls: { c: '#d9cfc0', look: 0, deco: 'none' }, carpet: { c: '#6d1f2a', look: 1, deco: 'none' }, table: { c: '#5a3a22', look: 0, deco: 'none' }, desk: { c: '#2b2b30', look: 0, deco: 'none' }, fire: { c: '#6a5f58', look: 0, deco: 'none', flame: '#ff7a20' } };
-export function insideOf(cfg) { const q = cfg.inside = cfg.inside || {}; for (const k in DEF) q[k] = { ...DEF[k], ...(q[k] || {}) }; return q; }
+// the lair's: the same list, the round table a throne, the fireplace braziers; dark to begin with
+const LAIR = { floor: { c: '#2b2b30', look: 4, deco: 'skulls' }, walls: { c: '#2b2b30', look: 3, deco: 'spikes' }, carpet: { c: '#8a1c2a', look: 1, deco: 'skulls' }, table: { c: '#2b2b30', look: 0, deco: 'none' }, desk: { c: BLACK, look: 1, deco: 'skulls' }, fire: { c: '#2b2b30', look: 1, deco: 'none', flame: '#3dff5c' } };
+const LAIR_ITEMS = { floor: ITEMS.floor, walls: ITEMS.walls, carpet: { ...ITEMS.carpet, at: [0, 3] }, table: { name: 'Throne', looks: ['Giant skull', 'Iron blades', 'Bone'], at: [0, -3.6] }, desk: { ...ITEMS.desk, at: [5.4, -5] }, fire: { name: 'Braziers', looks: ['Iron bowl', 'Skull', 'Tall spikes'], at: [1.4, -1] } };
+export const itemsFor = (cfg) => (cfg.lair ? LAIR_ITEMS : ITEMS);
+export function insideOf(cfg) { const q = cfg.inside = cfg.inside || {}, D = cfg.lair ? LAIR : DEF; for (const k in D) q[k] = { ...D[k], ...(q[k] || {}) }; return q; }
 
 const lum = (c) => { const q = new THREE.Color(c); return 0.3 * q.r + 0.59 * q.g + 0.11 * q.b; };
 const altOf = (c) => '#' + (lum(c) < 0.12 ? new THREE.Color(c).lerp(new THREE.Color('#ffffff'), 0.2) : new THREE.Color(c).lerp(new THREE.Color('#000000'), 0.3)).getHexString();
@@ -26,7 +31,7 @@ function carpetTex(o, rect) { const c = o.c, a = altOf(c), t = trimOf(c); return
 // the same in the round, standing on things
 function piece(kind, s, c) { const g = new THREE.Group(), dark = lum(c) < 0.2; if (kind === 'skulls') { const bone = std('#e6dfc8', { roughness: 0.9 }), hole = std('#0a0806'), head = new THREE.Mesh(new THREE.SphereGeometry(s * 0.5, 12, 9), bone); head.position.y = s * 0.55; head.castShadow = true; const jaw = new THREE.Mesh(new THREE.BoxGeometry(s * 0.55, s * 0.26, s * 0.5), bone); jaw.position.set(0, s * 0.14, s * 0.06); g.add(head, jaw); for (const sx of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(s * 0.13, 8, 6), hole), eb = sx * s * 0.19; e.position.set(eb * 0.71 + s * 0.3, s * 0.56, s * 0.3 - eb * 0.71); g.add(e); } const nose = new THREE.Mesh(new THREE.BoxGeometry(s * 0.09, s * 0.12, s * 0.09), hole); nose.position.set(s * 0.33, s * 0.34, s * 0.33); g.add(nose); } else if (kind === 'spikes') { const m = std(dark ? '#c5ccd6' : '#26262c', { metalness: 0.8, roughness: 0.3 }), q = new THREE.Mesh(new THREE.ConeGeometry(s * 0.26, s * 1.3, 7), m); q.position.y = s * 0.65; q.castShadow = true; g.add(q); } else if (kind === 'crosses') { const m = std(trimOf(c), { metalness: 0.6, roughness: 0.4 }), a = new THREE.Mesh(new THREE.BoxGeometry(s * 0.2, s * 1.3, s * 0.2), m), b = new THREE.Mesh(new THREE.BoxGeometry(s * 0.8, s * 0.2, s * 0.2), m); a.position.y = s * 0.65; b.position.y = s * 0.9; b.rotation.y = Math.PI / 4; a.castShadow = true; g.add(a, b); } return g; }
 
-export function buildDecor(key, w, d, cfg) {
+export function buildDecor(key, w, d, cfg, lv = 1) {
   const I = insideOf(cfg), G = new THREE.Group(), flames = [], add = (m, x, y, z, ry = 0, sh = false) => { m.position.set(x, y, z); m.rotation.y = ry; m.castShadow = sh; m.receiveShadow = true; G.add(m); return m; }, box = (bw, bh, bd, x, y, z, m, sh = true) => add(new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), m), x, y, z, 0, sh), cyl = (r0, r1, h, x, y, z, m, n = 24) => add(new THREE.Mesh(new THREE.CylinderGeometry(r0, r1, h, n), m), x, y, z, 0, true), put = (kind, s, c, x, y, z) => { if (kind === 'none') return; const q = piece(kind, s, c); q.position.set(x, y, z); G.add(q); };
   // the floor and walls
   const flat = (geo, tex, x, y, z) => add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85 })), x, y, z); flat(new THREE.PlaneGeometry(w - 0.6, d - 0.6).rotateX(-Math.PI / 2), floorTex(I.floor, (w - 0.6) / 5, (d - 0.6) / 5), 0, 0.065, 0);
@@ -34,9 +39,10 @@ export function buildDecor(key, w, d, cfg) {
   if (W.deco !== 'none') { const pm = std(altOf(W.c)); for (const [x, z] of [[-w / 2 + 0.5, -d / 2 + 0.5], [w / 2 - 0.5, -d / 2 + 0.5], [-w / 2 + 0.5, d / 2 - 0.5], [w / 2 - 0.5, d / 2 - 0.5]]) { const h = z < 0 ? 5 : 1.3; box(0.6, h, 0.6, x, h / 2, z, pm); put(W.deco, 0.6, W.c, x, h, z); } const n = Math.max(2, Math.floor(w / 5)); for (let i = 0; i < n; i++) { const x = (i - (n - 1) / 2) * (w - 3) / Math.max(1, n - 1); box(0.5, 0.12, 0.4, x, 4.1, -d / 2 + 0.4, pm); put(W.deco, 0.42, W.c, x, 4.16, -d / 2 + 0.42); } }
   // the carpets
   const rug = (rw, rd, x, z) => add(new THREE.Mesh(new THREE.PlaneGeometry(rw, rd).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: carpetTex(I.carpet, true), roughness: 1 })), x, 0.078, z);
-  if (key === 'office') { rug(2.3, 5.5, 0, 3.6); rug(4.6, 2.2, -1.9, -4.3); add(new THREE.Mesh(new THREE.CircleGeometry(3.5, 40).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: carpetTex(I.carpet, false), roughness: 1 })), 3.5, 0.086, 2.2); } else rug(7, 3, 0, 12.2);
+  if (cfg.lair && key === 'office') rug(2.6, 10.8, 0, 2.5); else if (key === 'office') { rug(2.3, 5.5, 0, 3.6); rug(4.6, 2.2, -1.9, -4.3); add(new THREE.Mesh(new THREE.CircleGeometry(3.5, 40).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: carpetTex(I.carpet, false), roughness: 1 })), 3.5, 0.086, 2.2); } else rug(7, 3, 0, 12.2);
   // the desk
   const desk = (x, z, dw) => { const D = I.desk, m = std(D.c, { roughness: 0.55, metalness: 0.15 }), a = std(altOf(D.c)); if (D.look === 0) box(dw, 0.9, 1.1, x, 0.45, z, m); else if (D.look === 1) { box(dw, 0.55, 1.1, x, 0.28, z, m); const t = box(dw, 0.12, 1.0, x, 0.72, z - 0.06, a); t.rotation.x = 0.3; for (let i = 0; i < Math.floor(dw * 2.5); i++) box(0.12, 0.04, 0.12, x - dw / 2 + 0.3 + i * 0.4, 0.82, z + 0.15, glow(i % 3 ? '#29e3ff' : '#ff4a4a', 1.2), false); } else { box(dw + 0.3, 0.16, 1.3, x, 0.84, z, m); for (const sx of [-1, 1]) box(0.5, 0.76, 1.0, x + sx * (dw / 2 - 0.2), 0.38, z, a); box(dw - 0.9, 0.5, 0.1, x, 0.4, z - 0.2, a); } for (const sx of [-1, 1]) put(D.deco, 0.36, D.c, x + sx * (dw / 2 - 0.12), 0.9, z + 0.32); };
+  if (cfg.lair && key === 'office') { desk(5.4, -6.4, 2.2); lairDecor({ add, box, cyl, put, flames, I, alt: altOf, G }, lv); G.userData.flames = flames; return G; }
   if (key === 'office') desk(6.3, -6.1, 2.2); else desk(0, -16.2, 9);
   if (key === 'office') {
     // the round table: its top at the same height in every look, for the cups and those sat at it

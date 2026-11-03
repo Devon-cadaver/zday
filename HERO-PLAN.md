@@ -58,6 +58,8 @@ Build order (one thing at a time, each tested in the Sandbox and pushed). The ch
   - [x] 12b4d. Decorate inside the base: looks, colours (black in every list) and skulls, spikes or crosses for the floor, walls, carpet, table, desk, fireplace, and the fire's colour.
   - [x] 12b4e. Names of your own: four scroll wheels and Randomize, in the Wardrobe and on the pick screens.
   - [x] 12b4f. Wardrobe: headgear (31 kinds) with its colour, and the belt's colour.
+  - [x] 12b4g. The villains' lair: throne room with a skull throne that grows, spikes, chains, cages, a doom globe, a caught hero; the pit; its own wardrobe, plans and colours; 12 evil headgear pieces. Walk in from the Lair page.
+  - [ ] 12b4h. A LAIR button inside a Destroy level.
   - [x] 12b5. Radio station: choose the songs, repeat one, cinematic music with action music in the fights.
   - [x] 12b6. Globe stays sharp when zoomed in; Main Menu in the pause menu.
   - [x] 12b7. Worm and kaiju: hovering camera behind her, on the monster. Lock on and grab the worm to ride it, punch and laser; it bucks her off.
