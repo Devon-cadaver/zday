@@ -20,7 +20,7 @@ import { SEE } from './see.js';
 import { DisasterTV } from './tv.js';
 import { THUMB } from './thumbs.js';
 import { LAB } from './lab.js';
-import { HeroGame, HS, pickScreen } from './herogame.js';
+import { HeroGame, HS, pickScreen, legend } from './herogame.js';
 import { loadKit, saveKit, STUNS, KNOCKS, MELEES } from './kit.js';
 
 const CSS = `
@@ -143,8 +143,8 @@ body.zd-flying #zd-toast{left:calc(50% + 28px);max-width:calc(100vw - 180px)}
 #zd-menu .bar{height:8px;border-radius:4px;background:rgba(196,128,255,.18);overflow:hidden;margin:0 0 4px}
 #zd-menu .bar i{display:block;height:100%;background:linear-gradient(90deg,#7be0ff,#a6ff4d)}
 #zd-menu .next{font-size:11px;opacity:.7;margin:0 0 16px}
-#zd-menu .rank.sm{font-size:12px;margin:0 2px 6px}#zd-menu .rank.sm b{font-size:14px}
-#zd-menu .bar.sm{height:6px;margin:0 2px}
+
+
 #zd-menu .btns{display:flex;flex-direction:column;gap:9px}
 #zd-menu .zd-btn{padding:14px 16px;font-size:14px;color:#fff;background:linear-gradient(#8a3bff,#5216c2);border-color:rgba(255,255,255,.3);box-shadow:0 0 12px rgba(138,59,255,.4);text-shadow:0 1px 2px rgba(0,0,0,.35)} /* neon buttons, white writing */
 #zd-menu .zd-btn.main{background:linear-gradient(#ff4fa3,#b3123f);border-color:rgba(255,255,255,.4);box-shadow:0 0 14px rgba(255,79,163,.5)}
@@ -186,13 +186,13 @@ body.zd-flying #zd-toast{left:calc(50% + 28px);max-width:calc(100vw - 180px)}
 #zd-menufx{position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:5} /* under the menu (6): the beam passes behind the ship */
 #zd-menuflash{position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:8}
 #zd-menu .ufo .rim{position:absolute;top:83%;padding:4px 10px;min-width:0;font-size:9.5px;letter-spacing:.08em;border-radius:10px;background:rgba(10,14,26,.9);border:1px solid rgba(95,220,255,.55);color:#bff4ff;box-shadow:0 0 8px rgba(95,220,255,.35)}
-#zd-menu .ufo .rim.l{left:27%}#zd-menu .ufo .rim.r{right:27%}
+#zd-menu .ufo .rim.r{right:27%}
 #zd-menu .ufo .rim::after{content:'';position:absolute;left:-10px;right:-10px;top:-12px;bottom:-12px} /* a bigger place to tap than the little label */
 @media (orientation:landscape) and (max-height:480px){#zd-menu .box.saucer{max-width:330px}#zd-menu .box.saucer .xp,#zd-menu .box.saucer .foot{display:none}} /* a phone on its side: the saucer smaller, the XP and the footer left off so it fits */
 #zd-menu .box.saucer .xp{margin:6px 10px 0;padding:8px 14px 9px;background:linear-gradient(180deg,rgba(14,20,36,.92),rgba(6,9,18,.94));border:1px solid rgba(95,220,255,.6);box-shadow:0 0 12px rgba(60,180,255,.3),inset 0 0 10px rgba(60,180,255,.12);
   clip-path:polygon(10px 0,calc(100% - 10px) 0,100% 10px,100% calc(100% - 10px),calc(100% - 10px) 100%,10px 100%,0 calc(100% - 10px),0 10px)} /* notched corners */
-#zd-menu .box.saucer .xp .rank{margin:0 0 6px;color:#e8f6ff}#zd-menu .box.saucer .xp .rank b{color:#5fe0ff}#zd-menu .box.saucer .xp .bar{margin:0;background:rgba(95,220,255,.15)}
-#zd-menu .box.saucer .xp .bar i{background:linear-gradient(90deg,#2ecc71,#7dff9a);box-shadow:0 0 8px #3ee86a}
+#zd-menu .lg-top{display:flex;justify-content:space-between;align-items:baseline;gap:6px;font-size:10.5px;color:#cfe3f5;white-space:nowrap;margin:0 0 8px}#zd-menu .lg-top b{display:block;font-size:14px}#zd-menu .lg-top .h b{color:#5aa8ff}#zd-menu .lg-top .v{text-align:right}#zd-menu .lg-top .v b{color:#ff5a6a}#zd-menu .lg-top .t{font-size:12px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#fff}
+#zd-menu .lg-bar{position:relative;height:8px;margin:0 7px;border-radius:4px;background:linear-gradient(90deg,#17427e,#4a2a78 50%,#7e1a2c)}#zd-menu .lg-bar i{position:absolute;top:0;bottom:0;background:var(--c);opacity:.85}#zd-menu .lg-bar::after{content:'';position:absolute;left:50%;top:-2px;bottom:-2px;width:2px;margin-left:-1px;background:rgba(255,255,255,.55)}#zd-menu .lg-bar u{position:absolute;z-index:1;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:#fff;border:3px solid var(--c);box-sizing:border-box;box-shadow:0 0 8px var(--c)}#zd-menu .lg-name{margin:8px 0 0;text-align:center;font-size:14px;font-weight:900;letter-spacing:.03em}
 #zd-menu .box.saucer .foot{margin-top:6px}
 body.zd-menu-on.zd-main #zd-side{display:flex;position:fixed} /* the main menu: the sound buttons float out in space */
 body.zd-menu-on.zd-main #zd-side > *{animation:zdFloat 4s ease-in-out infinite}body.zd-menu-on.zd-main #zd-side > :nth-child(2n){animation-delay:-1.3s}body.zd-menu-on.zd-main #zd-side > :nth-child(3n){animation-delay:-2.6s}
@@ -571,15 +571,16 @@ export class Game {
     if (panel === 'travel') { // the places in the world: the big city and the towns
       const here = placeKey();
       body = top('Travel') + '<div class="btns">' + Object.keys(PLACES).map(k => '<button class="zd-btn' + (k === here ? ' main' : '') + '" type="button" data-place="' + k + '">' + PLACES[k].name + (k === here ? ' · you are here' : '') + '<div style="font-size:11px;opacity:0.7;margin-top:2px">' + PLACES[k].blurb + '</div></button>').join('') + '</div>';
-    } else if (panel === 'main') { // over the globe: the four ways to play on the deck of a flying saucer (Sean), the level under it
+    } else if (panel === 'main') { // over the globe: the four ways to play on the deck of a flying saucer (Sean), Legend under it
+      const L = legend(), at = Math.round((50 + 50 * L.lean) * 10) / 10, hue = 'hsl(' + Math.round(285 + 70 * L.lean) + ',100%,70%)'; // blue through purple to red
       body = '<div class="ufo">' + SAUCER + '<div class="modes">' + wedgeBtn(0, 'data-play="hero"', MICON.commander + '<b>Defend</b>') +
         wedgeBtn(1, 'data-play="villain"', MICON.be + '<b>Destroy</b>') +
         wedgeBtn(2, 'data-play="sandbox"', MICON.sandbox + '<b>Sandbox</b>') +
         wedgeBtn(3, 'data-play="tv"', MICON.tv + '<b>Watch</b>') + '</div>' + // just the names (Sean: the level shows below)
-        '<button class="zd-btn rim l" type="button" data-go="unlocks">Units' + (pr.bank >= 3000 && UPGRADES.some(u => pr.canBuy(u.id)) ? ' \u2022' : '') + '</button><button class="zd-btn rim r" type="button" data-go="roster">Roster</button><button class="orbfire" type="button" aria-label="Fire"></button></div>' +
-        '<div class="xp"><div class="rank sm"><span>Commander level <b>' + lvl + '</b></span><span>' + pr.xp.toLocaleString() + (next ? ' / ' + next.toLocaleString() : '') + ' XP</span></div>' +
-        '<div class="bar sm"><i style="width:' + Math.round(pr.progress * 100) + '%"></i></div></div>' +
-        '<div class="foot">' + pr.data.rounds + ' rounds played · best score ' + pr.data.best.toLocaleString() + ' · ' + pr.data.stars + ' stars' + (pr.ok ? '' : ' · progress is not being saved on this device') + '</div>';
+        '<button class="zd-btn rim r" type="button" data-go="roster">Roster</button><button class="orbfire" type="button" aria-label="Fire"></button></div>' +
+        '<div class="xp"><div class="lg-top"><span class="h">Hero XP <b>' + L.hero.toLocaleString() + '</b></span><span class="t">Legend</span><span class="v">Villain XP <b>' + L.villain.toLocaleString() + '</b></span></div>' +
+        '<div class="lg-bar" style="--c:' + hue + '"><i style="left:' + Math.min(50, at) + '%;width:' + Math.abs(at - 50) + '%"></i><u style="left:' + at + '%"></u></div><div class="lg-name" style="color:' + hue + '">' + L.title + '</div></div>' +
+        '<div class="foot">Levels won: ' + L.heroWon + ' as heroes · ' + L.villainWon + ' as villains' + (pr.ok ? '' : ' · progress is not being saved on this device') + '</div>';
     } else if (panel === 'roster') { // every model, turning on its plinth (roster.js, loaded only now)
       head = top('Roster');
       body = '<div class="rsec"><div class="tag">Bringing out the models...</div></div>';

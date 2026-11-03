@@ -47,6 +47,8 @@ export const rigFor = (name, of) => (['Nova', 'Dragonfly', 'Tempo'].includes(nam
 if (typeof window !== 'undefined') window.__hs = HS;
 export const levelOf = (xp) => Math.min(20, 1 + Math.floor((Math.sqrt(1 + xp / 50) - 1) / 2)); // 1 at 0, then 400, 1200, 2400... XP
 export const xpFor = (lv) => 50 * ((2 * (lv - 1) + 1) ** 2 - 1);
+// Legend, the menu's bar (Sean): all the heroes' XP pulls one way, all the villains' the other. A fighter counts for the side they stand on now, so one who crosses over swings it. The 2000 is the cushion: a first win does not throw it to one end. A Sandbox test still running counts as what it saved over (testWas)
+export const legend = () => { const L = { hero: 0, villain: 0, heroWon: 0, villainWon: 0 }; for (const c of Object.values(HS.load().chars)) { const s = c.testWas ? JSON.parse(c.testWas) : c; L[s.side] += s.xp; L[s.side + 'Won'] += s.idx; } const lean = L.lean = (L.villain - L.hero) / (L.villain + L.hero + 2000); L.title = lean <= -0.6 ? 'Champion of the City' : lean <= -0.25 ? 'Trusted Hero' : lean < 0.25 ? 'Wild Card' : lean < 0.6 ? 'Troublemaker' : 'Public Enemy'; return L; };
 // the skill tree: four branches, each in order; a point a level. move: a move or power it opens; stat: what it raises
 export const TREE = {
   Strength: [{ id: 'jab', name: 'Jab combo', move: 'jab' }, { id: 'upper', name: 'Uppercut', move: 'upper' }, { id: 'pound', name: 'Ground pound', move: 'pound' }, { id: 'fling', name: 'Throw into a building', move: 'fling' }, { id: 'hammer', name: 'Hammer throw', move: 'hammer' }, { id: 'elbow', name: 'Elbow drop', move: 'elbow' }, { id: 'slam', name: 'Sky slam', move: 'slam' }],

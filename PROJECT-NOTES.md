@@ -813,6 +813,12 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 - Taps: next blow at 85% of the last; a tap in the first half of the wind-up is dropped; jabs end at 0.3 not 0.24. KB 0.65 on knock and push, kick 10 + 22k, hero flung 13 not 18, a held beam lets go at 13 m. Far away it mostly walks up (charge 30%, not 65%).
 - To revert: git revert the commit, or KB, gap and fightPace one at a time.
 
+## Legend, the menu's bar (2026-11-03; herogame.js legend(), game.js showMenu)
+- Replaces Commander level under the saucer. That bar read profile.js XP, which only the old Commander and Be The Disaster modes feed (no main menu button), so Defend and Destroy never moved it.
+- `legend()` in herogame.js sums each fighter's XP (`zday_hero`) by the side they stand on now, so one who crosses over swings it. lean = (villain - hero) / (villain + hero + 2000), the 2000 a cushion so a first win does not throw it to one end. Titles: Champion of the City (lean up to -0.6), Trusted Hero (up to -0.25), Wild Card, Troublemaker (from 0.25), Public Enemy (from 0.6). A Sandbox test still running (`testWas`) counts as what it saved over.
+- Look: marker on a blue to purple to red track, filled from the middle; color hsl(285 + 70 * lean). The line under it is levels won per side (sum of `idx`), in place of rounds, best score and stars.
+- Units came off the deck (its upgrades were only for old Commander; the panel, profile.js and commander.js are still there, reachable by ?mode=commander). Roster stays where it was, so the rim has one button on the right. Hidden with the rest of the XP panel on a phone on its side.
+
 ## Private preview link
 - https://claude.ai/artifact/Jemm5Sxje8y9XvJxcFNPwN (private, Sean only). Page source: artifact/zday-city.html.
 - To update: `npx vite build --base ./`, then publish artifact/zday-city.html with files {"assets/<bundle>.js": "dist/assets/<bundle>.js"} and change the script src in the page to the new bundle name (the hash changes each build).
