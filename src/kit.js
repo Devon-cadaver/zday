@@ -37,3 +37,10 @@ export const SLOTS = { stun: STUNS, knock: KNOCKS, melee: MELEES };
 const DEF = { stun: 'freeze', knock: 'laser', melee: 'combo' };
 export function loadKit() { let o = null; try { o = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { /* no storage */ } const k = { ...DEF, ...(o || {}) }; for (const s in SLOTS) if (!SLOTS[s][k[s]]) k[s] = DEF[s]; return k; }
 export function saveKit(k) { try { localStorage.setItem(KEY, JSON.stringify(k)); } catch (e) { /* no storage */ } }
+
+// how fast a street fight runs (Sean: too fast to follow); Slower unless changed in the pause menu. Crowds on foot keep their own speed
+export const FIGHT_SPEEDS = { Normal: 1, Slower: 0.8, Slowest: 0.65 };
+let paceName = null;
+export function fightSpeedName() { if (paceName) return paceName; let s = null; try { s = localStorage.getItem('zday_fight_speed'); } catch (e) { /* no storage */ } paceName = FIGHT_SPEEDS[s] ? s : 'Slower'; return paceName; }
+export function cycleFightSpeed() { const L = Object.keys(FIGHT_SPEEDS), n = L[(L.indexOf(fightSpeedName()) + 1) % L.length]; paceName = n; try { localStorage.setItem('zday_fight_speed', n); } catch (e) { /* no storage */ } return n; }
+export function fightPace() { return FIGHT_SPEEDS[fightSpeedName()]; }

@@ -76,6 +76,7 @@ Build order (one thing at a time, each tested in the Sandbox and pushed). The ch
     - [x] Destroy for points in every level (score, chains to x3, goal 100 x the old building count). Weather levels: Storm meter and Unleash (tornado follows you, levee breaks, army blinded, pick the wave's coast, buildings shatter). Heroes and rescue squads do jobs against you; Lock on and the gauge, or 3 power hits, stop them (stormgame.js StormWar).
     - [x] New powers, the first 5 of each list: stuns Shock web, Blinding flash, Sleep dust, Mud trap, Vine snare; knockbacks Shockwave stomp, Fire jet, Water cannon, Boulder throw, Car toss; melee Boxer, Kung fu, Wrestler, Muay Thai, Capoeira.
     - [ ] The other 45 of Sean's 60, if these go well.
+  - [x] Street fights slower and in turns (Sean, 2026-11-03): Fight speed in the pause menu (Normal, Slower, Slowest; Slower by default); the foe waits after its blow and after yours, warns before it comes, and after a few seconds of being pressed takes its turn anyway; a tap only queues once a blow is under way; blows send them about two thirds as far.
 
 Also done on the way: the stuck zoom on a phone fixed; the plan page at plan.html.
 
