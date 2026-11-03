@@ -2,7 +2,7 @@
 // skip, and whether the cinematic music joins in: action music in the fights in place of the chosen songs. Opens over
 // whatever called it (the main menu, the pause menu, the Tower or the Lair). The choices themselves are in music.js.
 let box = null, music = null, tick = 0;
-const CSS = `#zd-stationbox{position:fixed;inset:0;z-index:60;overflow-y:auto;background:rgba(18,12,30,.97);color:#f6ead2;font:14px/1.3 system-ui,-apple-system,sans-serif;padding:calc(14px + env(safe-area-inset-top)) 16px 24px;box-sizing:border-box;touch-action:pan-y}
+const CSS = `#zd-stationbox{position:fixed;inset:0;z-index:70;overflow-y:auto;background:rgba(18,12,30,.97);color:#f6ead2;font:14px/1.3 system-ui,-apple-system,sans-serif;padding:calc(14px + env(safe-area-inset-top)) 16px 24px;box-sizing:border-box;touch-action:pan-y}
 #zd-stationbox[hidden]{display:none}
 #zd-stationbox .in{max-width:420px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
 #zd-stationbox h2{margin:0;font:900 22px Impact,'Arial Black',sans-serif;letter-spacing:.03em;color:#ffc233;text-align:center}
@@ -14,6 +14,7 @@ const CSS = `#zd-stationbox{position:fixed;inset:0;z-index:60;overflow-y:auto;ba
 #zd-stationbox .row>button{flex:1;min-width:0}
 #zd-stationbox .row>button.play{flex:0 0 52px}
 #zd-stationbox .lab{font-weight:700;font-size:12px;letter-spacing:.06em;opacity:.75;margin-top:4px}
+@media (max-height:720px){#zd-stationbox .in{gap:6px}#zd-stationbox button{padding:8px 6px}#zd-stationbox .lab{margin-top:0}}
 #zd-stationbox .done{background:linear-gradient(#ffc233,#d9860e);color:#2a1038;border:0;font-weight:900}`;
 function build() {
   const st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);

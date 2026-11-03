@@ -29,6 +29,7 @@ export class WindGame {
   get needle() { const u = (this.nt % 2); return u < 1 ? u : 2 - u; }
   get zone() { return this.frozen ? 0.5 : 0.15 - 0.05 * this.progress; }
   ui(on) {
+    { const rep = document.getElementById('zd-rep'); if (rep) rep.style.visibility = on ? 'hidden' : ''; } // the gauge says it, and the dots go there
     const F = this.F, r0 = F.bar && F.bar.querySelector('.row'); if (F.tipEl) F.tipEl.style.transform = on ? 'translate(-50%,-44px)' : ''; for (const el of [this.row, this.gauge, this.dots]) if (el) el.remove(); this.row = this.gauge = this.dots = null; if (r0) r0.style.display = on ? 'none' : ''; if (!on || !r0) return;
     const row = this.row = document.createElement('div'); row.className = 'row'; const stop = (q, fn) => { q.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); fn(); }); q.addEventListener('click', (e) => e.stopPropagation()); };
     const mk = (t, flex) => { const q = document.createElement('button'); q.type = 'button'; q.className = 'zd-btn use'; q.style.cssText = 'padding:18px 2px;font-size:14px;touch-action:none;flex:' + flex + ' 1 0'; q.innerHTML = t; row.appendChild(q); return q; };

@@ -86,16 +86,16 @@ const CSSB = `body.zd-flying #zd-bar,body.zd-flying #zd-dis,body.zd-flying #zd-f
 #zd-base .fly button{font:800 13px/1 system-ui,sans-serif;color:#fff;background:linear-gradient(180deg,#5a4a8a,#2b2244);border:0;border-radius:14px;padding:14px 16px;box-shadow:0 4px 14px rgba(0,0,0,.4)}
 #zd-base .act button,#zd-base .panel button{font:800 15px/1 system-ui,sans-serif;color:#fff;background:linear-gradient(180deg,#ff5ad5,#b23cff);border:0;border-radius:14px;padding:14px 22px;box-shadow:0 4px 14px rgba(0,0,0,.4)}
 #zd-base .panel{position:absolute;left:12px;right:12px;bottom:calc(18px + env(safe-area-inset-bottom));max-height:70vh;overflow:auto;background:rgba(18,12,30,.94);border-radius:18px;padding:14px 14px 16px;box-shadow:0 8px 30px rgba(0,0,0,.5)}
-#zd-base .panel h3{margin:0 0 8px;font:800 17px/1.2 system-ui,sans-serif;color:#ffd27a}
-#zd-base .panel .h{font:700 12px/1 system-ui,sans-serif;opacity:.75;margin:10px 0 6px;letter-spacing:.04em;text-transform:uppercase}
-#zd-base .panel .row{display:flex;flex-wrap:wrap;gap:8px}
-#zd-base .panel .row button{min-height:44px;padding:10px 14px;font-size:13px;background:#3a2f55}
+#zd-base .panel h3{margin:4px 44px 8px;text-align:center;font:800 17px/1.2 system-ui,sans-serif;color:#ffd27a}
+#zd-base .panel .h{text-align:center;font:700 12px/1 system-ui,sans-serif;opacity:.75;margin:12px 0 7px;letter-spacing:.04em;text-transform:uppercase}
+#zd-base .panel .row{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+#zd-base .panel .row button{flex:1 1 30%;min-width:0;min-height:44px;padding:10px 6px;font-size:13px;background:#3a2f55}
 #zd-base .panel .row button.on{background:linear-gradient(180deg,#ff5ad5,#b23cff);box-shadow:0 0 0 2px #fff inset}
-#zd-base .panel .sw{width:44px;height:44px;border-radius:10px;padding:0;border:3px solid transparent}
+#zd-base .panel .row button.sw{flex:0 0 44px;width:44px;height:44px;border-radius:10px;padding:0;border:3px solid transparent}
 #zd-base .panel .sw.on{border-color:#fff}
 #zd-base .panel .go{width:100%;margin-top:12px;padding:14px;font-size:16px}
-#zd-base .panel .x{position:absolute;right:10px;top:8px;background:none;box-shadow:none;padding:8px 10px;font-size:18px}
-#zd-base .panel p{margin:4px 0 0;font:500 12px/1.4 system-ui,sans-serif;opacity:.8}`;
+#zd-base .panel .x{position:sticky;float:right;top:0;margin:-4px -4px 0 0;width:44px;height:44px;padding:0;border-radius:22px;background:rgba(255,255,255,.14);box-shadow:none;font-size:18px;z-index:2}
+#zd-base .panel p{text-align:center;margin:8px 0 0;font:500 12px/1.4 system-ui,sans-serif;opacity:.8}`;
 
 export class HomeBase {
   constructor(g, ctx) { this.g = g; this.ctx = ctx; this.active = false; this.near = 1.5; this.focus = 30; this.lod = 0; this.cfg = loadBase(); const st = document.createElement('style'); st.textContent = CSSB; document.head.appendChild(st); }
@@ -140,7 +140,7 @@ export class HomeBase {
     const pad = el.querySelector('.stick'), knob = pad.querySelector('i'); const stickAt = (e) => { const r = pad.getBoundingClientRect(); let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2); const l = Math.hypot(dx, dy); if (l > 40) { dx *= 40 / l; dy *= 40 / l; } this.stick = [dx / 40, dy / 40]; knob.style.transform = 'translate(' + dx + 'px,' + dy + 'px)'; }; this.stickOn = (e) => { pad.style.left = e.clientX + 'px'; pad.style.top = e.clientY + 'px'; pad.style.display = 'block'; this.stickId = e.pointerId; this.goal = null; this.autoOpen = null; stickAt(e); }; el.addEventListener('pointermove', (e) => { if (e.pointerId === this.stickId) stickAt(e); }); for (const ev of ['pointerup', 'pointercancel']) el.addEventListener(ev, (e) => { if (e.pointerId !== this.stickId) return; this.stickId = null; this.stick = null; pad.style.display = 'none'; knob.style.transform = ''; });
     this.actEl = el.querySelector('.act'); this.actEl.querySelector('button').onclick = (e) => { e.stopPropagation(); if (this.nearS) this.open(this.nearS.id); };
     this.rowEl = el.querySelector('.row4'); this.drawRow();
-    el.addEventListener('pointerdown', (e) => { if (e.target.closest('button') || e.target.closest('.panel')) return; e.preventDefault(); if (e.clientX < innerWidth * 0.45 && this.stickId == null) { try { el.setPointerCapture(e.pointerId); } catch (x) { /* fine */ } this.stickOn(e); return; } _m.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); _ray.setFromCamera(_m, camera); _pl.constant = -this.floorY; if (_ray.ray.intersectPlane(_pl, _hit)) { const c = this.cur; this.autoOpen = null; this.goal = [Math.max(c.cx - c.w / 2 + 0.8, Math.min(c.cx + c.w / 2 - 0.8, _hit.x)), Math.max(c.cz - c.d / 2 + 0.8, Math.min(c.cz + c.d / 2 - 0.8, _hit.z))]; } });
+    el.addEventListener('pointerdown', (e) => { if (e.target.closest('button') || e.target.closest('.panel')) return; if (this.panel) { e.preventDefault(); this.close(); return; } e.preventDefault(); if (e.clientX < innerWidth * 0.45 && this.stickId == null) { try { el.setPointerCapture(e.pointerId); } catch (x) { /* fine */ } this.stickOn(e); return; } _m.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); _ray.setFromCamera(_m, camera); _pl.constant = -this.floorY; if (_ray.ray.intersectPlane(_pl, _hit)) { const c = this.cur; this.autoOpen = null; this.goal = [Math.max(c.cx - c.w / 2 + 0.8, Math.min(c.cx + c.w / 2 - 0.8, _hit.x)), Math.max(c.cz - c.d / 2 + 0.8, Math.min(c.cz + c.d / 2 - 0.8, _hit.z))]; } });
     this.onKey = (e) => { if (e.key === 'Escape') { if (this.panel) this.close(); else if (this.level) this.open('door'); else this.stop(); } }; addEventListener('keydown', this.onKey);
     this.threatEl = el.querySelector('.threat'); this.showThreat(); if (this.level) g.toast('The fight goes on outside. Change your outfit and powers; Outside takes you back', 4000); else if (this.threatFull()) this.alarm(); else g.toast('Home base. Walk up to a station, or tap a button below to go to one', 3500);
   }
@@ -170,7 +170,7 @@ export class HomeBase {
   }
   place2(dt) { const h = this.h, cam = this.ctx.camera, D = this.cur && this.cur.key === 'office' ? 22 : 28, ce = Math.cos(EL) * D; this.look.lerp(_a.set(h.x, h.y + 1, h.z), Math.min(1, dt * 6)); cam.position.set(this.look.x + Math.sin(AZ) * ce, this.look.y + Math.sin(EL) * D, this.look.z + Math.cos(AZ) * ce); cam.lookAt(this.look); }
   // ---------- the stations' panels
-  close() { if (this.panel) { this.panel.remove(); this.panel = null; } if (this.actEl) this.actEl.classList.toggle('show', !!this.nearS); }
+  close() { document.body.classList.remove('zd-panel'); if (this.panel) { this.panel.remove(); this.panel = null; } if (this.actEl) this.actEl.classList.toggle('show', !!this.nearS); }
   open(id) {
     this.close(); if (id === 'door') { if (this.level) { const H = this.level; this.level = null; this.stop(true); H.back(); return; } if (this.threatFull()) this.attackOut(); else this.stop(); return; } if (id === 'elevator') { this.goFloor(this.cur.key === 'office' ? 'basement' : 'office'); return; } const p = this.panel = document.createElement('div'); p.className = 'panel'; this.el.appendChild(p); this.actEl.classList.remove('show');
     const sw = (key, list, cur) => '<div class="row">' + list.map(c => '<button type="button" class="sw' + (c === cur ? ' on' : '') + '" data-' + key + '="' + c + '" style="background:' + c + '"></button>').join('') + '</div>';
@@ -183,7 +183,7 @@ export class HomeBase {
         p.querySelectorAll('[data-lv]').forEach(b => { b.onclick = () => { R.level = +b.dataset.lv; saveBase(this.cfg); draw(); }; }); p.querySelectorAll('[data-tog]').forEach(b => { b.onclick = () => { R[b.dataset.tog] = !R[b.dataset.tog]; saveBase(this.cfg); draw(); }; }); p.querySelector('[data-fight]').onclick = () => this.fight(); }
       if (id === 'blueprints') { const c = this.cfg; p.innerHTML = '<button type="button" class="x">✕</button><h3>Blueprints</h3>' + ['hero', 'villain'].map(side => '<div class="h">' + side + ' bases</div><div class="row">' + Object.keys(STYLES).filter(s => STYLES[s].side === side).map(s => '<button type="button" data-style="' + s + '"' + (c.style === s ? ' class="on"' : '') + '>' + STYLES[s].name + '</button>').join('') + '</div>').join('') + '<div class="h">Walls</div>' + sw('wall', SWATCH.wall, c.wall) + '<div class="h">Trim</div>' + sw('trim', SWATCH.trim, c.trim) + '<div class="h">Windows</div>' + sw('win', SWATCH.win, c.win) + '<div class="h">Door</div>' + sw('door', SWATCH.door, c.door) + '<p>Seen from the street when you go outside; the walls in here take the wall colour.</p>';
         p.querySelectorAll('[data-style],[data-wall],[data-trim],[data-win],[data-door]').forEach(b => { b.onclick = () => { const k2 = Object.keys(b.dataset)[0]; c[k2] = b.dataset[k2]; saveBase(c); this.rebuild(); this.retint(); draw(); }; }); }
-      p.querySelector('.x').onclick = () => this.close();
+      document.body.classList.add('zd-panel'); p.querySelector('.x').onclick = () => this.close();
     };
     draw();
   }
