@@ -172,12 +172,17 @@ export class HeroGame {
     const hunted = false, rivals = hero ? [] : ['nova', 'dragonfly', 'tempo'].filter(id => HS.load().chars[id].side === 'hero').slice(0, Math.min(3, 1 + Math.floor(s.idx / 3))).map(id => HS.name(id)); // only the heroes still heroes
     for (const n of vs) { const e = D.start('villains', cx + (Math.random() - 0.5) * 160, cz + (Math.random() - 0.5) * 160, { only: n, quiet: true }); if (e) evs.push(e); }
     if (rivals.length) { const e = D.start('villains', cx, cz, { rivals, quiet: true }); if (e) { evs.push(e); this.rivalEv = e; } }
-    F.heroGame = true; F.inLevel = true; F.start(s.flyer); const k = 1 + 0.12 * this.count('speed'); if (k > 1) F.P = { ...F.P, max: F.P.max * k, start: F.P.start * k }; F.onStopped = () => {}; F.hovering = true; F.speed = F.thr = 0; F.pos.set(cx, 70, cz); F.pitch = 0; // Sean: every level starts floating over the town
+    this.flyUp(cx, cz); // Sean: every level starts floating over the town
     const need = hero ? 0 : Math.min(25 + 15 * s.idx, Math.floor(g.city.buildings.length * 0.6)); this.round = { evs, allies, need, t: 0, downs: 0, wasDown: false, hero, hunted, rivals, key, ended: false, nothing: !evs.length };
     this.rep = document.createElement('div'); this.rep.id = 'zd-rep'; document.body.appendChild(this.rep);
     const town = PLACES[key].name, seen = s.towns[key]; F.tip(hero ? (hunted ? 'You have gone too far. The other heroes are coming for you!' : seen && seen.fear > 200 ? 'The people of ' + town + ' remember you. They run' : s.rep >= 60 ? 'The people of ' + town + ' cheer as you fly in. Use your powers and Lock on' : wave[0] === 'tornado' ? 'Defend ' + town + '. Lock on to go round the tornado against its spin' : 'Defend ' + town + '. Use your powers and Lock on') : 'Bring down ' + need + ' buildings in ' + town + ' and beat the heroes who come');
     if (hero && (s.rep < 35 || (seen && seen.fear > 200))) g.people.scare(cx, cz, 400, 0.5);
   }
+  flyUp(x, z) { const F = this.g.flight, s = this.s; F.owner = this; F.heroGame = true; F.inLevel = true; F.start(s.flyer); const k = 1 + 0.12 * this.count('speed'); if (k > 1) F.P = { ...F.P, max: F.P.max * k, start: F.P.start * k }; F.onStopped = () => {}; F.hovering = true; F.speed = F.thr = 0; F.pos.set(x, 70, z); F.pitch = 0; }
+  // Destroy: at the lair's door, in you go; the level goes on outside, as at the heroes' base (horde.js)
+  baseArrive() { const g = this.g, F = g.flight, R = this.round; F.baseStop(); F.hovering = true; F.speed = F.thr = 0; const fd = document.createElement('div'); fd.style.cssText = 'position:fixed;inset:0;background:#000;opacity:0;transition:opacity .22s;z-index:65;pointer-events:none'; document.body.appendChild(fd); requestAnimationFrame(() => { fd.style.opacity = '1'; }); setTimeout(() => { if (R && R === this.round && !R.ended && F.active) { R.hull = F.hull; F.stop(true); g.base.start({ level: this }); } fd.style.transition = 'opacity .35s'; fd.style.opacity = '0'; setTimeout(() => fd.remove(), 400); }, 240); }
+  // back out of the door: over it, rested a little
+  back() { const g = this.g, F = g.flight, B = g.base, R = this.round; this.s = HS.load()[this.side]; this.flyUp(B.x, B.z + B.S.d / 2 + 8); if (R && R.hull != null) F.hull = Math.min(F.hullMax || 100, R.hull + 30); F.setView(F.view); F.tip('Back outside. Finish the job'); }
   // level 1 (Sean): the invasion: the fleet overhead, its soldiers rained into the streets and fought on foot like the horde; the fleet can be hit from the air
   alienLevel(key) {
     const g = this.g, s = this.s, P = g.people, D = g.disasters, B = g.city.bounds, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2, n = 150, pool = []; LAB.reset();
@@ -222,6 +227,7 @@ export class HeroGame {
   placeNow() { try { return new URLSearchParams(location.search).get('place') || null; } catch (e) { return null; } }
   update() {
     const R = this.round; if (!R || R.ended) return; const F = this.g.flight, S = LAB.stats; R.t += 1 / 60;
+    if (this.g.base && this.g.base.level === this) { if (this.rep) this.rep.style.display = 'none'; return; } // in the lair: nothing ends till you come out
     if (R.zombie) { const H = this.g.horde; if (!H.active && !H.flying) return this.finish(false, 'You left the town'); if (R.riot && R.evs[0] && !R.evs[0].alive && !H.over) { H.finish(true); return; } if (R.boss && (R.boss.heroHp <= 0 || !R.boss.alive) && !H.over) { H.finish(true); return; } this.rep.style.display = 'none'; this.rep.innerHTML = 'Hero · ' + H.left + R.noun + '<div class="bar"><i style="width:' + Math.max(0, 100 - H.left / R.n * 100) + '%"></i></div>'; return; }
     const live = R.evs.filter(e => e.alive && (e.type !== 'villains' || e.who.some(w => !w.gone && !w.beaten))).length;
     const fear = LAB.fear(), rep = R.hero ? Math.max(0, Math.min(100, this.s.rep - fear / 30)) : 0;
