@@ -89,7 +89,7 @@ const CSSB = `body.zd-flying #zd-bar,body.zd-flying #zd-dis,body.zd-flying #zd-f
 #zd-base .act button,#zd-base .panel button{font:800 15px/1 system-ui,sans-serif;color:#fff;background:linear-gradient(180deg,#ff5ad5,#b23cff);border:0;border-radius:14px;padding:14px 22px;box-shadow:0 4px 14px rgba(0,0,0,.4)}
 #zd-base .panel{position:absolute;left:12px;right:12px;bottom:calc(18px + env(safe-area-inset-bottom));max-height:70vh;overflow:auto;background:rgba(18,12,30,.94);border-radius:18px;padding:14px 14px 16px;box-shadow:0 8px 30px rgba(0,0,0,.5)}
 #zd-base .panel .bp{position:sticky;top:0;z-index:1;height:clamp(120px,22vh,180px);margin:0 0 6px;border-radius:12px;overflow:hidden;background:linear-gradient(#7db4d8,#d9c9a8);box-shadow:0 2px 10px rgba(0,0,0,.5)}
-#zd-base .panel.inside{max-height:50vh;padding-top:0}
+#zd-base .panel.inside{max-height:50vh;padding-top:0;scroll-padding-top:74px}
 #zd-base .panel .hd{position:sticky;top:0;z-index:3;display:flex;gap:8px;align-items:center;margin:0 -14px 8px;padding:10px 14px 8px;background:#150e24}
 #zd-base .panel .hd .row.tabs{flex:1 1 auto;margin:0}
 #zd-base .panel .hd .x{position:static;float:none;flex:0 0 44px;margin:0}
