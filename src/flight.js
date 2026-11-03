@@ -727,7 +727,7 @@ export class Flight {
   camView() { return this.fightCam() ? 'iso' : this.view; }
   arcade(dt) {
     const g = this.g, P = this.P, K = this.keys, cv = this.camView(); let ix = this.ix || 0, iy = this.iyRaw || 0; if (K.has('arrowleft') || K.has('a')) ix = -1; if (K.has('arrowright') || K.has('d')) ix = 1; if (K.has('arrowup') || K.has('w')) iy = -1; if (K.has('arrowdown') || K.has('s')) iy = 1;
-    const mag = Math.min(1, Math.hypot(ix, iy)), on = mag > 0.15, close = this.engaged || this.bossClose; if (on && close && !g.flight.spinHold) { this.engaged = null; this.bossClose = false; }
+    const mag = Math.min(1, Math.hypot(ix, iy)), on = mag > 0.15, slamming = this.fromHorde && this.fromHorde.holdPhase === 'smash', close = this.engaged || this.bossClose || slamming; /* a smash moves her itself: her held height must not pull against it */ if (on && (this.engaged || this.bossClose) && !g.flight.spinHold) { this.engaged = null; this.bossClose = false; }
     let want = 0, vert = 0, turn = 0;
     if (on && !(this.fromHorde && this.fromHorde.heldS && this.fromHorde.holdPhase !== 'hold')) { this.hovering = false;
       if (cv === 'iso') { const a = this.azS == null ? 0.7 : this.azS, fx = -Math.sin(a), fz = -Math.cos(a), rx = -fz, rz = fx, dx = fx * -iy + rx * ix, dz = fz * -iy + rz * ix; let da = Math.atan2(-dz, dx) - this.yaw; da = Math.atan2(Math.sin(da), Math.cos(da)); turn = Math.max(-1, Math.min(1, da)); this.yaw += Math.max(-3.6 * dt, Math.min(3.6 * dt, da)); want = P.max * (0.2 + 0.32 * mag); } /* the town is small: about 37 m/s at most, BOOST for more */
