@@ -742,6 +742,10 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 
 - Base walking round 2 (Sean: stuck behind the tree in the corner; the joystick dead on the right of the screen): a drag anywhere walks, a tap anywhere goes there (pressP, 12 px decides). solidOut: head on into a round thing she goes round it, walls are applied after the furniture, and pushing without getting anywhere for 0.6 s next to something lets her squeeze past for 0.5 s, so she cannot be held. Plants out of the corners nearest the camera, the bookcase solid, the table a little further from the wall. walk-test.cjs maps where she can walk.
 
+- Inside the base (Sean, 2026-11-02: more options, black for everything; floor, walls, carpet, round table, desk, fireplace and fire; looks for each; skulls, spikes or crosses): basedecor.js. Blueprints has Outside and Inside tabs. Inside: pick the item and the camera goes to it above a shorter panel, then Look, Design (None, Skulls, Spikes, Crosses) and Colour, and for the fireplace the fire's colour; saved in cfg.inside (insideOf fills in the defaults). Every choice makes the room's decor group again (decorate). Patterns are drawn on canvases in the chosen colour, so black works; floors and carpets take the design as a pattern, walls as posts and shelves, the rest as pieces on them. Black (#050506) added to every colour list, the outside's and the wardrobe's too. deco-test.cjs.
+
+- Names (Sean, 2026-11-02: The Skull Runner, Mr Death Face, The Black Kay): names.js, four scroll wheels (title, colour, name, ending, each may be left out) and Randomize, tens of millions of names, Back to the character's own. In the Wardrobe, and Change the name on the Defend and Destroy pick screens. Saved as chars[id].nick. HS.shown(id) and HS.disp(rigName) are what is displayed (cards, Play, Computer, HUD, fight bars, team-up, crossing over); HS.name stays the character's own, as the rigs and outfits go by it. name-test.cjs.
+
 ## Next
 - The hero game (Sean, 2026-11-01): see HERO-PLAN.md for the whole plan and build order. Next up: floors inside smashed buildings, then the Sandbox hero lab.
 

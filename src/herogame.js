@@ -17,6 +17,7 @@ import { CreatureLayer } from './creaturekit.js';
 
 const KEY = 'zday_hero';
 // Six characters, each levelled apart (Sean): side is where they stand now, and it changes with what they do (a hero who falls goes to Destroy, a villain who does too well to Defend)
+import { nameMaker, nameOf } from './names.js';
 const ROSTER = { nova: ['Nova', 'hero'], dragonfly: ['Dragonfly', 'hero'], tempo: ['Tempo', 'hero'], tyrant: ['Tyrant', 'villain'], blur: ['Blur', 'villain'], weaver: ['Weaver', 'villain'] };
 const fresh = (side, id) => ({ xp: 0, rep: side === 'hero' ? 70 : 0, skills: {}, idx: 0, towns: {}, flyer: id, side, trophies: [], threat: 0 }); // threat: the base's, filled by wins (base.js 11d)
 export const HS = {
@@ -32,6 +33,11 @@ export const HS = {
   team(side) { const c = this.load().chars; return Object.keys(ROSTER).filter(id => c[id].side === side); },
   cur(side) { const d = this.load(), T = this.team(side); return T.includes(d.last[side]) ? d.last[side] : T[0] || d.last[side]; }, // whoever was last picked, or the first still on this side
   name(id) { return ROSTER[id][0]; },
+  // what is shown: the player's own name for them, if they made one (names.js). name() stays the character's own, for the rigs and outfits
+  shown(id) { const c = this.load().chars[id]; return (c && nameOf(c.nick)) || ROSTER[id][0]; },
+  disp(n) { return this.shown(String(n).toLowerCase()) || n; },
+  // the wheels, for this character
+  namer(host, id) { nameMaker(host, ROSTER[id][0], () => this.load().chars[id].nick || null, (n) => { const c = this.load().chars[id]; if (n) c.nick = n; else delete c.nick; this.save(); }); },
   curName(side) { return ROSTER[this.cur(side)][0]; },
 };
 // a character's body, whichever side they stand on now
@@ -90,15 +96,16 @@ function turning(cv, name) {
   return () => { cancelAnimationFrame(P.raf); ren.dispose(); if (ren.forceContextLoss) ren.forceContextLoss(); };
 }
 const repBar = (s) => '<div class="bar" style="height:6px"><i style="width:' + s.rep + '%;background:linear-gradient(90deg,#ff4040,#ffd27a,#6cff8a)"></i></div>';
-const cardsHtml = (side, on) => HS.team(side).map(id => { const c = HS.load().chars[id]; return '<button type="button" class="card' + (id === on ? ' on' : '') + '" data-who="' + id + '"><b>' + HS.name(id) + '</b><span>Level ' + levelOf(c.xp) + ' &middot; ' + REP(c.rep) + '</span>' + repBar(c) + '<span>Next: ' + levelName(c) + '</span></button>'; }).join('');
+const cardsHtml = (side, on) => HS.team(side).map(id => { const c = HS.load().chars[id]; return '<button type="button" class="card' + (id === on ? ' on' : '') + '" data-who="' + id + '"><b>' + HS.shown(id) + '</b><span>Level ' + levelOf(c.xp) + ' &middot; ' + REP(c.rep) + '</span>' + repBar(c) + '<span>Next: ' + levelName(c) + '</span></button>'; }).join('');
 const emptyHtml = (side) => '<div style="margin:14px 0;padding:12px;border-radius:12px;background:rgba(255,255,255,.08)">' + (side === 'hero' ? 'All three heroes have gone bad. Win one back under Destroy: a villain who does too well comes home.' : 'All three villains have turned good. Bring one down under Defend: a hero who falls comes here.') + '</div>';
 // the first screen of Defend and Destroy (Sean): who you play, not what they wear. onGo(id), onBack()
 export function pickScreen(side, onGo, onBack) {
   if (!document.getElementById('zd-hub-css')) { const c = document.createElement('style'); c.id = 'zd-hub-css'; c.textContent = CSS; document.head.appendChild(c); }
   const el = document.createElement('div'); el.id = 'zd-hub'; document.body.appendChild(el); let stop = null, on = HS.cur(side);
   const close = () => { if (stop) stop(); el.remove(); };
-  const draw = () => { if (stop) { stop(); stop = null; } const T = HS.team(side); el.innerHTML = '<div class="wrap"><div class="ttl">' + (side === 'hero' ? 'DEFEND' : 'DESTROY') + '</div><div style="opacity:.8;margin:4px 0 12px">Who do you play? Each levels up on their own</div>' + (T.length ? '<div class="two"><canvas></canvas><div class="cards">' + cardsHtml(side, on) + '</div></div><button type="button" class="go" data-go2>PLAY ' + HS.name(on).toUpperCase() + '</button>' : emptyHtml(side)) + '<button type="button" class="b" data-out style="width:100%;margin-top:14px">Back to the menu</button></div>';
+  const draw = () => { if (stop) { stop(); stop = null; } const T = HS.team(side); el.innerHTML = '<div class="wrap"><div class="ttl">' + (side === 'hero' ? 'DEFEND' : 'DESTROY') + '</div><div style="opacity:.8;margin:4px 0 12px">Who do you play? Each levels up on their own</div>' + (T.length ? '<div class="two"><canvas></canvas><div class="cards">' + cardsHtml(side, on) + '</div></div><button type="button" class="go" data-go2>PLAY ' + HS.shown(on).toUpperCase() + '</button><button type="button" class="b" data-namer style="width:100%;margin-top:8px;min-height:44px">\u270F Change the name</button>' : emptyHtml(side)) + '<button type="button" class="b" data-out style="width:100%;margin-top:14px">Back to the menu</button></div>';
     el.querySelectorAll('[data-who]').forEach(b => { b.onclick = () => { on = b.dataset.who; draw(); }; }); el.querySelector('[data-out]').onclick = () => { close(); onBack(); };
+    if (T.length) el.querySelector('[data-namer]').onclick = () => { const m = document.createElement('div'); m.style.cssText = 'position:fixed;inset:0;z-index:66;display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box;background:rgba(8,5,16,.86)'; m.innerHTML = '<div style="width:min(420px,100%);padding:14px;border-radius:16px;background:#1b1230;box-sizing:border-box"><div data-nm></div><button type="button" class="go" data-done style="margin-top:10px">DONE</button></div>'; el.appendChild(m); HS.namer(m.querySelector('[data-nm]'), on); m.querySelector('[data-done]').onclick = () => { m.remove(); draw(); }; };
     if (T.length) { el.querySelector('[data-go2]').onclick = () => { HS.load().last[side] = on; HS.save(); close(); onGo(on); }; stop = turning(el.querySelector('canvas'), HS.name(on)); } };
   draw();
 }
@@ -225,7 +232,7 @@ export class HeroGame {
     if (R.t > 1 && (R.hero ? live === 0 : S.buildings >= R.need && live === 0)) this.finish(true);
   }
   // over the line: a hero under 15 becomes a villain (now picked under Destroy), a villain at 60 a hero (Defend). Returns the line for the tally
-  cross(s) { const n = HS.name(s.flyer); if (s.side === 'hero' && s.rep < 15) { s.side = 'villain'; s.rep = 14; return '<br><b style="color:#ff8a7a">' + n + ' has gone too far: now a villain. You will find them under Destroy</b>'; } if (s.side === 'villain' && s.rep >= 60) { s.side = 'hero'; s.rep = 60; return '<br><b style="color:#6cff8a">' + n + ' has done too much good: now a hero. You will find them under Defend</b>'; } return ''; }
+  cross(s) { const n = HS.shown(s.flyer); if (s.side === 'hero' && s.rep < 15) { s.side = 'villain'; s.rep = 14; return '<br><b style="color:#ff8a7a">' + n + ' has gone too far: now a villain. You will find them under Destroy</b>'; } if (s.side === 'villain' && s.rep >= 60) { s.side = 'hero'; s.rep = 60; return '<br><b style="color:#6cff8a">' + n + ' has done too much good: now a hero. You will find them under Defend</b>'; } return ''; }
   finish(won, why) {
     const R = this.round, s = this.s, S = LAB.stats, F = this.g.flight, g = this.g; R.ended = true; const fear = LAB.fear(); if (this.rep) { this.rep.remove(); this.rep = null; }
     if (R.zombie) {
