@@ -773,11 +773,11 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 - Sean decided on 2026-10-25 to make the player the hero (emergency commander) instead of dropping zombies. The full plan is DESIGN.md (round, alert levels, units, points, levelling, 5 implementation phases). Sandbox stays at ?mode=sandbox.
 
 ## Destroy's LAIR button (2026-11-03)
-- Destroy's bar (flight.js, `inLevel && !fromHorde`, villain side only: `inLair()`) has LAIR between Lock on and QUIT. `toLair()` uses the heroes' `baseGo`/`baseRun`; it reads STOP while going, and STOP or a drag cancels. The lair's tower is placed on the first tap.
+- The flying levels' bar (flight.js, `inLevel && !fromHorde`; `inLair()` picks the word) has LAIR or BASE between Lock on and QUIT. `toLair()` uses the heroes' `baseGo`/`baseRun`; it reads STOP while going, and STOP or a drag cancels. The lair's tower is placed on the first tap.
 - `herogame.js`: `flyUp(x, z)` is the level's flight setup (also sets `F.owner`, because `g.mode` is not set yet on a level started from a new mode), `baseArrive()` fades and goes in with `base.start({ level: this })`, `back()` flies up 70 m over the door with 30 health back.
 - While `base.level === this`, `update()` returns: the level cannot be won or lost inside, and it is checked again on coming out. The disasters and rivals go on outside. `base.duelBack` now keeps `level`, so a duel in the pit does not lose the level (this was also wrong for heroes).
 - Regression fixed: c665928 (2026-11-02, BASE flies her there) added `if (!this.fromHorde) return` in `arcade()`, so drag and BOOST did nothing in Destroy and in Defend's flying levels (tornado and the mixed ones); only Lock on moved you. Now it returns only if the flight stopped or crashed.
-- Defend's flying levels have no BASE button (Sean asked for Destroy only).
+- Defend's flying levels (tornado and the mixed ones) got the same button as BASE (Sean, 2026-11-03): every level now has its way home.
 
 ## Private preview link
 - https://claude.ai/artifact/Jemm5Sxje8y9XvJxcFNPwN (private, Sean only). Page source: artifact/zday-city.html.

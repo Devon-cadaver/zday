@@ -179,7 +179,7 @@ export class HeroGame {
     if (hero && (s.rep < 35 || (seen && seen.fear > 200))) g.people.scare(cx, cz, 400, 0.5);
   }
   flyUp(x, z) { const F = this.g.flight, s = this.s; F.owner = this; F.heroGame = true; F.inLevel = true; F.start(s.flyer); const k = 1 + 0.12 * this.count('speed'); if (k > 1) F.P = { ...F.P, max: F.P.max * k, start: F.P.start * k }; F.onStopped = () => {}; F.hovering = true; F.speed = F.thr = 0; F.pos.set(x, 70, z); F.pitch = 0; }
-  // Destroy: at the lair's door, in you go; the level goes on outside, as at the heroes' base (horde.js)
+  // a flying level: at the door, in you go; the level goes on outside, as in the horde's levels (horde.js)
   baseArrive() { const g = this.g, F = g.flight, R = this.round; F.baseStop(); F.hovering = true; F.speed = F.thr = 0; const fd = document.createElement('div'); fd.style.cssText = 'position:fixed;inset:0;background:#000;opacity:0;transition:opacity .22s;z-index:65;pointer-events:none'; document.body.appendChild(fd); requestAnimationFrame(() => { fd.style.opacity = '1'; }); setTimeout(() => { if (R && R === this.round && !R.ended && F.active) { R.hull = F.hull; F.stop(true); g.base.start({ level: this }); } fd.style.transition = 'opacity .35s'; fd.style.opacity = '0'; setTimeout(() => fd.remove(), 400); }, 240); }
   // back out of the door: over it, rested a little
   back() { const g = this.g, F = g.flight, B = g.base, R = this.round; this.s = HS.load()[this.side]; this.flyUp(B.x, B.z + B.S.d / 2 + 8); if (R && R.hull != null) F.hull = Math.min(F.hullMax || 100, R.hull + 30); F.setView(F.view); F.tip('Back outside. Finish the job'); }
