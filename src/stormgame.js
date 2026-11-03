@@ -6,6 +6,8 @@ import * as THREE from 'three';
 import { sfx } from './audio.js';
 import { LAB } from './lab.js';
 import { finish } from './heropower.js';
+import { villainRig } from './villains.js';
+import { buildVehicle } from './vehicles.js';
 
 const KINDS = {
   flood: { n: 5, col: [3, 2.3, 0.3], act: '🚌 LIFT IT', noun: 'buses lifted', go: 'Lock on: stranded buses need lifting onto the roofs', how: 'lift the stranded buses' },
@@ -17,14 +19,15 @@ const box = (x, y, z, c) => new THREE.Mesh(new THREE.BoxGeometry(x, y, z), new T
 function busMesh() { const g = new THREE.Group(), b = box(11, 3.4, 3.2, '#e8b52a'); b.position.y = 1.9; const w = box(9.6, 1, 3.3, '#27303a'); w.position.y = 2.6; g.add(b, w); return g; }
 
 export class StormGame {
-  constructor(F, e) {
-    this.F = F; this.e = e; this.K = KINDS[e.type]; this.t = 0; this.done = 0; this.spots = []; this.cur = null; this.row = null; this.nt = 0; this.tweens = []; this.built = []; this.ready = false;
-    if (e.type === 'flood') e.hold = 1e6; else if (e.sw) e.sw.speed *= e.type === 'tsunami' ? 0.3 : 0.45;
+  constructor(F, e, K) {
+    this.F = F; this.e = e; this.K = K || KINDS[e.type]; this.t = 0; this.done = 0; this.spots = []; this.cur = null; this.row = null; this.nt = 0; this.tweens = []; this.built = []; this.ready = false;
+    if (K) { /* Destroy's: it sets its own storm */ } else if (e.type === 'flood') e.hold = 1e6; else if (e.sw) e.sw.speed *= e.type === 'tsunami' ? 0.3 : 0.45;
     F.tip(this.K.go);
   }
   get D() { return this.F.g.disasters; }
   get left() { return this.spots.filter(s => !s.done && !s.lost).length; }
   label() { return this.done + ' of ' + this.spots.length + ' ' + this.K.noun; }
+  pct() { return this.done / (this.spots.length || 1) * 100; }
   // the jobs: a devil moves, the others stay put
   place() {
     const g = this.F.g, e = this.e, P = g.people, B = g.city.bounds, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2, R = Math.min(B.x1 - B.x0, B.z1 - B.z0) * 0.42, n = this.K.n;
@@ -67,3 +70,69 @@ export class StormGame {
   dispose() { const S = this.D.ctx.scene; this.closeUi(); for (const s of this.spots) { if (s.m) S.remove(s.m); if (s.bus) S.remove(s.bus); } for (const w of this.built) S.remove(w); this.built = []; this.spots = []; if (this.geo) this.geo.dispose(); if (this.mat) this.mat.dispose(); }
 }
 export const stormKinds = KINDS;
+
+// ---------- Destroy (Sean): the city for points. Whatever falls scores, faster chains multiply it. Wrecking fills the Storm meter, and in a weather level UNLEASH aims the
+// weather; heroes and rescue squads come to undo it, the Defend jobs in reverse: each one finished weakens the storm, unless Lock on or a power stops them first.
+const WAR = {
+  tornado: { act: 'UNLEASH THE TORNADO', job: 'is calming the tornado', weather: 1 }, flood: { act: 'BREAK THE LEVEE', job: 'is lifting a bus', weather: 1 }, haboob: { act: 'BLIND THE ARMY', job: 'is blowing the dust away', weather: 1 },
+  tsunami: { act: 'CALL THE WAVE', job: 'is raising an ice wall', weather: 1 }, coldwave: { act: 'SHATTER THE TOWN', job: 'is thawing a street', weather: 1 }, none: { act: '', job: 'is rescuing people' },
+};
+const SQUADS = ['ambulance', 'fire_truck', 'police_interceptor'];
+export class StormWar extends StormGame {
+  constructor(F, R) {
+    const type = (R.allies || []).map(e => e.type).find(t => WAR[t]) || 'none', e = (R.allies || []).find(q => q.type === type) || null, W = WAR[type];
+    super(F, e || { type }, { act: '✊ STOP THEM', noun: '', how: '', go: 'Wreck the town for points. Lock on stops the heroes and squads undoing it', col: [0.5, 1.4, 3] });
+    this.war = true; this.R = R; this.type = type; this.W = W; this.e = e; this.score = 0; this.goal = R.need * 100; this.chain = 0; this.chainT = 0; this.mult = 1; this.meter = 0; this.strength = W.weather && e ? 100 : 0; this.jobT = 12; this.followT = 0; this.blindT = 0; this.shatterT = 0; this.sink = 0;
+    const D = this.D; this.p0 = LAB.stats.buildings; this.b0 = D.stats.buildings; this.c0 = D.ctx.traffic.stats.wrecks || 0; if (e && type === 'flood') e.hold = 1e6;
+    const col = new THREE.Color(...this.K.col); this.geo = new THREE.CylinderGeometry(1.4, 1.4, 150, 8, 1, true).translate(0, 75, 0); this.mat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide }); this.ready = true;
+  }
+  place() {}
+  lockOn() { if (!this.left) return false; return super.lockOn(); }
+  label() { return 'SCORE ' + Math.round(this.score) + ' / ' + this.goal + (this.mult > 1 ? ' <b style="color:#ffd27a">x' + this.mult + '</b>' : '') + (this.W.weather ? ' &middot; storm ' + Math.round(this.strength) + '%' : '') + (this.left ? ' &middot; <b style="color:#9fd4ff">' + this.left + ' to stop</b>' : ''); }
+  pct() { return Math.min(100, this.score / (this.goal || 1) * 100); }
+  // the Unleash button, kept on the bar through the flight's restarts
+  meterUi() { const F = this.F; if (!this.W.weather || !F.bar) return; if (!this.mb || !this.mb.isConnected) { const q = this.mb = document.createElement('button'); q.type = 'button'; q.dataset.unleash = '1'; q.className = 'zd-btn'; q.style.cssText = 'position:relative;overflow:hidden;width:100%;padding:11px 2px;margin-bottom:4px;font-size:13px;touch-action:none'; q.innerHTML = '<i style="position:absolute;left:0;top:0;bottom:0;background:rgba(255,190,60,.55)"></i><span style="position:relative"></span>'; q.addEventListener('pointerdown', (ev) => { ev.preventDefault(); ev.stopPropagation(); this.unleash(); }); q.addEventListener('click', (ev) => ev.stopPropagation()); F.bar.insertBefore(q, F.bar.firstChild); this.mf = q.children[0]; this.ms = q.children[1]; } const full = this.meter >= 100; this.mf.style.width = Math.min(100, this.meter) + '%'; const t = full ? '⚡ ' + this.W.act : 'Storm meter ' + Math.floor(this.meter) + '%'; if (this.ms.textContent !== t) this.ms.textContent = t; this.mb.style.boxShadow = full ? '0 0 16px #ffd27a' : ''; }
+  closeAll() { if (this.mb) { this.mb.remove(); this.mb = null; } if (this.coast) { this.coast.remove(); this.coast = null; } }
+  near(n) { const g = this.F.g, c = g.city, p = this.F.pos, L = []; c.buildingsNear(p.x, p.z, 130, (k, d, b) => { if (!c.dead[k]) L.push([Math.hypot((b.x0 + b.x1) / 2 - p.x, (b.z0 + b.z1) / 2 - p.z), k]); }); return L.sort((a, b) => a[0] - b[0]).slice(0, n).map(q => q[1]); }
+  shatter(n) { const D = this.D; for (const k of this.near(n)) D.destroyBuilding(k, 'collapse', { spare: true, noCrush: true }); }
+  restart() { const g = this.F.g, D = this.D, B = g.city.bounds, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2, e = D.start(this.type, cx + (Math.random() - 0.5) * 120, cz + (Math.random() - 0.5) * 120, this.type === 'tornado' ? { life: 99999 } : { life: 99999, quiet: true }); if (e) { this.e = e; (this.R.allies = this.R.allies || []).push(e); if (this.type === 'flood') e.hold = 1e6; } return e; }
+  unleash() {
+    const F = this.F, g = F.g, D = this.D; if (this.meter < 100 || F.state !== 'fly') return; if (this.type === 'tsunami' && !(this.e && this.e.alive && this.e.phase !== 'recede')) { this.pickCoast(); return; } this.meter = 0; this.strength = Math.min(100, this.strength + 25); const fresh = this.broken || !(this.e && this.e.alive); this.broken = false; if (fresh) this.restart(); const e = this.e; if (!e) return; g.shake = Math.max(g.shake || 0, 0.8); D.flash(0.15); sfx('boom', F.pos.x, F.pos.y, F.pos.z, { gain: 1 });
+    if (this.type === 'tornado') { e.tw.size = Math.min(3.2, e.tw.size + 0.35); this.followT = 12; F.tip('The tornado follows you: lead it through the town!'); }
+    else if (this.type === 'flood') { e.maxL = Math.min(5, e.maxL + 1.1); D.weather.set('storm'); F.tip('The levee breaks! Deep water takes the buildings'); }
+    else if (this.type === 'haboob') { this.blindT = 15; if (e.sw) e.sw.speed *= 1.25; this.shatter(3); F.tip('The army is blind in the dust: their shots stop'); }
+    else if (this.type === 'tsunami') { e.sw.speed *= 1.5; F.tip('The wave surges!'); }
+    else if (this.type === 'coldwave') { this.shatterT = 15; this.shatter(5); F.tip('Frozen solid: every building breaks in one hit'); }
+  }
+  pickCoast() { const F = this.F; if (this.coast) return; const r = this.coast = document.createElement('div'); r.style.cssText = 'display:flex;gap:4px;margin-bottom:4px'; [['South', 0], ['North', 1], ['East', 2], ['West', 3]].forEach(([n, i]) => { const q = document.createElement('button'); q.type = 'button'; q.className = 'zd-btn use'; q.dataset.coast = String(i); q.style.cssText = 'flex:1 1 0;padding:14px 0;font-size:13px;touch-action:none'; q.textContent = n; q.addEventListener('pointerdown', (ev) => { ev.preventDefault(); ev.stopPropagation(); this.callWave(i); }); q.addEventListener('click', (ev) => ev.stopPropagation()); r.appendChild(q); }); F.bar.insertBefore(r, F.bar.firstChild); F.tip('Which coast does the wave come from?'); }
+  callWave(side) { const F = this.F, D = this.D, g = F.g, B = g.city.bounds; if (this.coast) { this.coast.remove(); this.coast = null; } this.meter = 0; this.strength = Math.min(100, this.strength + 25); const e = D.start('tsunami', (B.x0 + B.x1) / 2, (B.z0 + B.z1) / 2, { side, quiet: true, warn: 3 }); if (e) { this.e = e; (this.R.allies = this.R.allies || []).push(e); } g.shake = Math.max(g.shake || 0, 0.8); F.tip('Here it comes!'); }
+  // someone comes to undo it
+  newJob() {
+    const F = this.F, g = F.g, P = g.people, S = this.D.ctx.scene, B = g.city.bounds, a = Math.random() * 6.283, r = Math.min(B.x1 - B.x0, B.z1 - B.z0) * (0.2 + Math.random() * 0.25), q = P.snapWalkable((B.x0 + B.x1) / 2 + Math.cos(a) * r, (B.z0 + B.z1) / 2 + Math.sin(a) * r, 60); if (!q) return;
+    const s = { x: q[0], z: q[1], t: 0 }, gy = P.groundY(s.x, s.z), free = g.disasters.list.filter(e => e.alive && e.type === 'villains').flatMap(e => e.who).filter(w => !w.gone && !w.beaten && !w.gripped && !this.spots.some(o => o.who === w && !o.done && !o.lost));
+    if (free.length && Math.random() < 0.6) { const w = free[Math.floor(Math.random() * free.length)]; s.who = w; s.T = 16; w.gripped = true; w.rig.root.visible = false; const rig = villainRig(w.name); rig.root.position.set(s.x, gy + 5, s.z); S.add(rig.root); s.bus = rig.root; F.tip(w.name + ' ' + this.W.job + '! Lock on to stop them'); }
+    else { s.T = 22; const v = buildVehicle(SQUADS[Math.floor(Math.random() * SQUADS.length)]); v.scale.setScalar(1.6); v.position.set(s.x, gy, s.z); v.rotation.y = Math.random() * 6.28; S.add(v); s.bus = v; F.tip('A rescue squad is at work! Stop them, or Lock on'); }
+    s.m = new THREE.Mesh(this.geo, this.mat); s.m.frustumCulled = false; s.m.renderOrder = 6; s.m.position.set(s.x, gy, s.z); S.add(s.m); this.spots.push(s);
+  }
+  drop(s) { const S = this.D.ctx.scene; if (s.m) { S.remove(s.m); s.m = null; } if (s.bus) { S.remove(s.bus); s.bus = null; } if (s.who) { s.who.gripped = false; s.who.rig.root.visible = true; s.who.x = s.x; s.who.z = s.z; } if (this.cur === s) this.closeUi(); }
+  // stopped, by the gauge or by powers
+  job(s) { const F = this.F, g = F.g; if (s.done || s.lost) return; s.done = true; this.drop(s); g.fire.burst(s.x, g.people.groundY(s.x, s.z) + 3, s.z, 14, 2); F.punch = 0.4; g.shake = Math.max(g.shake || 0, 0.4); sfx('crash', s.x, 2, s.z, { gain: 0.9 }); if (s.who) { const lvl = LAB.villain || 1, mx = 180 + 70 * lvl; s.who.fightHp = Math.max(mx * 0.3, (s.who.fightHp ?? mx) - 60); } this.score += s.who ? 500 : 300; this.meter = Math.min(100, this.meter + 20); F.tip(s.who ? s.who.name + ' stopped! +500' : 'Rescue squad stopped! +300'); }
+  hit(s) { s.hits = (s.hits || 0) + 1; if (s.hits >= 3) this.job(s); else this.F.tip((s.who ? s.who.name : 'The squad') + ' hit: ' + (3 - s.hits) + ' more'); }
+  // they got it done
+  undone(s) { const F = this.F; s.lost = true; this.drop(s); if (this.W.weather && this.e && this.e.alive) { this.strength = Math.max(0, this.strength - 25); F.tip((s.who ? s.who.name : 'The squad') + ' weakened your storm! ' + this.strength + '% left'); if (this.strength <= 0) { this.broken = true; finish(this.e); F.tip('Your storm is broken. Fill the meter and bring it back'); } } else { this.score = Math.max(0, this.score - 200); F.tip('They got people out: -200'); } }
+  step(h) {
+    const F = this.F, g = F.g, D = this.D, e = this.e; this.t += h;
+    const db = D.stats.buildings - this.b0, dc = (D.ctx.traffic.stats.wrecks || 0) - this.c0; this.b0 = D.stats.buildings; this.c0 = D.ctx.traffic.stats.wrecks || 0;
+    { const mine = Math.min(db, LAB.stats.buildings - this.p0); this.p0 = LAB.stats.buildings; if (mine > 0) { this.chain += mine; this.chainT = 4; this.mult = Math.min(3, 1 + Math.floor(this.chain / 4)); this.score += 100 * mine * this.mult; } /* yours chain; what the storm brings down scores half, no chain */ if (db > mine) this.score += 50 * (db - mine); } if (db > 0) this.meter = Math.min(100, this.meter + db * 6); if (dc > 0) { this.score += 25 * dc; this.meter = Math.min(100, this.meter + dc * 1.5); }
+    if (this.chainT > 0 && (this.chainT -= h) <= 0) { this.chain = 0; this.mult = 1; }
+    if (this.followT > 0 && e && e.tw) { this.followT -= h; if (this.followT > 0) e.tw.steer(F.pos.x + Math.cos(F.yaw) * 50, F.pos.z - Math.sin(F.yaw) * 50); else e.tw.steerT = null; }
+    if (this.blindT > 0) { this.blindT -= h; const A = F.army; if (A) { A.fireT = Math.max(A.fireT, 2); for (const q of A.helis) q.shot = Math.max(q.shot, 2); } }
+    if (this.shatterT > 0) this.shatterT -= h;
+    if (this.type === 'flood' && e && e.alive && e.level >= 2.5) { const c = g.city; this.sink += h * (e.level - 1.5) * 0.15; while (this.sink > 0.5) { this.sink -= 0.5; let best = -1, bh = 1e9; for (let n = 0; n < 12; n++) { const k = Math.floor(Math.random() * c.buildings.length); if (c.dead[k]) continue; const b = c.buildings[k], hg = b.top - b.baseY; if (hg < bh) { bh = hg; best = k; } } if (best >= 0 && bh <= e.level * 3 + 4) D.destroyBuilding(best, 'collapse', { spare: true, noCrush: true }); } }
+    if ((this.jobT -= h) <= 0 && this.left < 2) { this.jobT = 16; this.newJob(); } else if (this.jobT <= 0) this.jobT = 3;
+    for (const s of this.spots) { if (s.done || s.lost) continue; s.t += h; if (s.who && s.bus) { s.bus.rotation.y += h; } if (s.t >= s.T) this.undone(s); }
+    if (this.cur) { this.nt += h * 1.15; if (this.needle) this.needle.style.left = (this.pos * 100) + '%'; if (Math.hypot(this.cur.x - F.pos.x, this.cur.z - F.pos.z) > 30) this.closeUi(); }
+    this.meterUi();
+  }
+  dispose() { for (const s of this.spots) if (!s.done && !s.lost) { s.lost = true; this.drop(s); } this.closeAll(); super.dispose(); }
+}

@@ -20,7 +20,7 @@ export function levelInfo(side, i) {
     return { code, title, map, wx, foes: 'Enemies: ' + list(bad), how: foot ? 'On foot and in the air: clear them out' : w0 === 'tornado' ? 'Flying: Lock on to unwind it' : WEATHER[w0] ? 'Flying: Lock on to each glowing spot, tap in the green' : 'Flying: stop what is hitting the town' };
   }
   const heroes = ['nova', 'dragonfly', 'tempo'].filter(id => HS.load().chars[id] && HS.load().chars[id].side === 'hero').slice(0, Math.min(3, 1 + Math.floor(i / 3))).map(id => HS.name(id));
-  return { code, title: wave.filter(w => !VILLAINS.includes(w)).map(w => NAME[w] || w).join(' + '), map, wx, foes: 'Enemies: ' + list([...heroes, i >= 2 ? 'the army' : null]), how: 'On your side: ' + list(wave.filter(w => !VILLAINS.includes(w)).map(w => NAME[w] || w)) + '. Goal: bring down ' + (25 + 15 * i) + ' buildings (at most 60% of the town) and beat the heroes' };
+  return { code, title: wave.filter(w => !VILLAINS.includes(w)).map(w => NAME[w] || w).join(' + '), map, wx, foes: 'Enemies: ' + list([...heroes, i >= 2 ? 'the army' : null]), how: 'On your side: ' + list(wave.filter(w => !VILLAINS.includes(w)).map(w => NAME[w] || w)) + '. Goal: score ' + (25 + 15 * i) * 100 + ' points (fewer in a small town) and beat the heroes' };
 }
 export function restoreTests() { const D = HS.load(); for (const c of Object.values(D.chars)) if (c.testWas) { const was = JSON.parse(c.testWas); delete c.testWas; Object.assign(c, was); } HS.save(); }
 function play(g, side, i) {

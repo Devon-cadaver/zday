@@ -233,17 +233,17 @@ export class HeroGame {
     if (R.zombie) { const H = this.g.horde; if (!H.active && !H.flying) return this.finish(false, 'You left the town'); if (R.riot && R.evs[0] && !R.evs[0].alive && !H.over) { H.finish(true); return; } if (R.boss && (R.boss.heroHp <= 0 || !R.boss.alive) && !H.over) { H.finish(true); return; } this.rep.style.display = 'none'; this.rep.innerHTML = 'Hero · ' + H.left + R.noun + '<div class="bar"><i style="width:' + Math.max(0, 100 - H.left / R.n * 100) + '%"></i></div>'; return; }
     const live = R.evs.filter(e => e.alive && (e.type !== 'villains' || e.who.some(w => !w.gone && !w.beaten))).length;
     const fear = LAB.fear(), rep = R.hero ? Math.max(0, Math.min(100, this.s.rep - fear / 30)) : 0;
-    this.rep.innerHTML = R.hero ? REP(rep) + (live ? ' · ' + live + ' to stop' : '') + '<div class="bar"><i style="width:' + rep + '%"></i></div>' : S.buildings + '/' + R.need + ' buildings<div class="bar"><i style="width:' + Math.min(100, S.buildings / R.need * 100) + '%"></i></div>'; if (F.storm && F.storm.e.alive && F.storm.ready) this.rep.innerHTML = F.storm.label() + '<div class="bar"><i style="width:' + (F.storm.done / F.storm.spots.length * 100) + '%"></i></div>';
+    this.rep.innerHTML = R.hero ? REP(rep) + (live ? ' · ' + live + ' to stop' : '') + '<div class="bar"><i style="width:' + rep + '%"></i></div>' : S.buildings + '/' + R.need + ' buildings<div class="bar"><i style="width:' + Math.min(100, S.buildings / R.need * 100) + '%"></i></div>'; if (F.storm && F.storm.ready && (F.storm.war || F.storm.e.alive)) this.rep.innerHTML = F.storm.label() + '<div class="bar"><i style="width:' + F.storm.pct() + '%"></i></div>';
     const down = F.state === 'down' && !F.downAt; if (down && !R.wasDown) R.downs++; R.wasDown = down;
     this.rep.style.display = F.fighting ? 'none' : ''; if (F.fighting) return; // on foot, in the fight (flight.js fightFoe); the bars say it
     if (!F.active) return this.finish(false, 'You left the town');
     if (R.downs >= 3) return this.finish(false, 'Knocked out of the sky three times');
-    if (R.t > 1 && (R.hero ? live === 0 : S.buildings >= R.need && live === 0)) this.finish(true);
+    if (R.t > 1 && (R.hero ? live === 0 : (F.storm && F.storm.war ? F.storm.score >= F.storm.goal : S.buildings >= R.need) && live === 0)) this.finish(true);
   }
   // over the line: a hero under 15 becomes a villain (now picked under Destroy), a villain at 60 a hero (Defend). Returns the line for the tally
   cross(s) { const n = HS.shown(s.flyer); if (s.side === 'hero' && s.rep < 15) { s.side = 'villain'; s.rep = 14; return '<br><b style="color:#ff8a7a">' + n + ' has gone too far: now a villain. You will find them under Destroy</b>'; } if (s.side === 'villain' && s.rep >= 60) { s.side = 'hero'; s.rep = 60; return '<br><b style="color:#6cff8a">' + n + ' has done too much good: now a hero. You will find them under Defend</b>'; } return ''; }
   finish(won, why) {
-    const R = this.round, s = this.s, S = LAB.stats, F = this.g.flight, g = this.g; R.ended = true; if (F.storm) { F.storm.dispose(); F.storm = null; } const fear = LAB.fear(); if (this.rep) { this.rep.remove(); this.rep = null; }
+    const R = this.round, s = this.s, S = LAB.stats, F = this.g.flight, g = this.g; R.ended = true; if (F.storm) { if (F.storm.war) R.score = F.storm.score; F.storm.dispose(); F.storm = null; } const fear = LAB.fear(); if (this.rep) { this.rep.remove(); this.rep = null; }
     if (R.zombie) {
       const H = R.horde || g.horde, xp = won ? 300 + (R.boss ? 300 : H.kills) + (H.bitten < 10 ? 100 : 0) : 20 + Math.round(H.kills / 4); if (g.base && g.base.active) { g.base.level = null; g.base.stop(true); } if (H.active) H.stop(true); if (H.flying) { H.flying = false; if (H.el) H.el.remove(); if (g.flight.active) g.flight.stop(true); }
       for (const e of R.evs) if (e.alive) endDisaster(e); g.flight.heroGame = false; if (this.labWas) Object.assign(LAB, this.labWas, { spotK: 1, toughK: 1 });
@@ -259,7 +259,7 @@ export class HeroGame {
     for (const e of R.allies || []) if (e.alive) endDisaster(e);
     F.heroGame = false; F.inLevel = false; Object.assign(LAB, this.labWas, { spotK: 1, toughK: 1 });
     for (const e of R.evs) { if (!e.alive) continue; if (e.type === 'villains') { for (const w of e.who) if (!w.gone) { w.state = 'gone'; w.rig.root.visible = false; } } else endDisaster(e); } // what is left of the trouble goes with you
-    const head = won ? (R.hero ? 'TOWN SAVED' : 'TOWN WRECKED') : (why || 'NOT THIS TIME');
+    if (R.score != null) lines.unshift('Score ' + Math.round(R.score)); const head = won ? (R.hero ? 'TOWN SAVED' : 'TOWN WRECKED') : (why || 'NOT THIS TIME');
     this.hub('<b>' + head + '</b> · +' + xp + ' XP' + (up ? ' · <b>LEVEL UP!</b> A skill point to spend' : '') + '<br>Buildings down ' + S.buildings + ' · people scared ' + S.scared + ' · hurt ' + S.hurt + ' · saved ' + S.saved + ' · fear ' + Math.round(fear) + (lines.length ? '<br>' + lines.join('<br>') : ''));
     this.round = null;
   }

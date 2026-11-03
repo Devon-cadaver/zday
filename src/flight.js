@@ -26,7 +26,7 @@ import { Army } from './army.js';
 import { HeroPower, POWER } from './heropower.js';
 import { HS } from './herogame.js';
 import { WindGame } from './windgame.js';
-import { StormGame, stormKinds } from './stormgame.js';
+import { StormGame, StormWar, stormKinds } from './stormgame.js';
 
 // speeds in metres a second; turn: how hard it turns at full bank; chase: the camera's distance behind and height above;
 // seat: the cockpit's place (forward, up) in the model
@@ -338,7 +338,7 @@ export class Flight {
   stop(quiet = false) {
     if (!this.active) return;
     const g = this.g, { camera, controls, post } = this.ctx;
-    if (this.storm) this.storm.closeUi(); this.fromHorde = null; this.fromBase = null; this.smashing = null; this.hovering = false; this.flyBtn = null; this.smashBtn = null; this.boosting = false; this.goBase = null; this.baseBtn = null; this.markM = null; this.barH = 0; if (this.inLevel && !this.fromHorde) document.body.classList.remove('zd-flying'); this.holdY = null; this.upDown = 0; this.udEl = null; this.cvWas = null; if (this.ring) { this.ring.clearJunk(); this.ring.ui(false); this.ring = null; } this.engaged = null; this.spinHold = false; this.riding = false; this.bucked = null; this.bossClose = false; this.lock = null; this.dropInside(); this.inB = -1; this.clearShots(); if (this.power) { this.power.dispose(); this.power = null; this.powerBtn = null; } if (this.army) { this.army.dispose(); this.army = null; } if (this.getaways) { for (const G of this.getaways) G.finish(); this.getaways = []; }
+    if (this.storm) { this.storm.closeUi(); if (this.storm.closeAll) this.storm.closeAll(); } this.fromHorde = null; this.fromBase = null; this.smashing = null; this.hovering = false; this.flyBtn = null; this.smashBtn = null; this.boosting = false; this.goBase = null; this.baseBtn = null; this.markM = null; this.barH = 0; if (this.inLevel && !this.fromHorde) document.body.classList.remove('zd-flying'); this.holdY = null; this.upDown = 0; this.udEl = null; this.cvWas = null; if (this.ring) { this.ring.clearJunk(); this.ring.ui(false); this.ring = null; } this.engaged = null; this.spinHold = false; this.riding = false; this.bucked = null; this.bossClose = false; this.lock = null; this.dropInside(); this.inB = -1; this.clearShots(); if (this.power) { this.power.dispose(); this.power = null; this.powerBtn = null; } if (this.army) { this.army.dispose(); this.army = null; } if (this.getaways) { for (const G of this.getaways) G.finish(); this.getaways = []; }
     this.active = false; document.body.classList.remove('zd-flying');
     const hr = this.obj.userData.hero; g.disasters.ctx.scene.remove(this.obj); if (this.streak) { this.streak.dispose(g.disasters.ctx.scene); this.streak = null; }
     if (hr) { hr.cape.g.dispose(); if (hr.smooth && hr.smooth.mesh) { hr.smooth.mesh.geometry.dispose(); const m = hr.smooth.mesh.material; (Array.isArray(m) ? m : [m]).forEach(x => x && x.dispose()); } } else this.obj.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); // its own shapes and paint (a hero's are shared with the rest: only the cape is its own)
@@ -651,6 +651,7 @@ export class Flight {
     const p = this.pos, k = Math.pow(Math.max(0, Math.min(1, p.y / tw.H)), 1.5), ax = tw.x + (tw.vort.lx || 0) * k, az = tw.z + (tw.vort.lz || 0) * k;
     const dx = p.x - ax, dz = p.z - az, d = Math.hypot(dx, dz) || 0.01, r = tw.radiusAt(Math.min(p.y, tw.H)), reach = r * 4 + 70;
     this.note('tornado', d - r);
+    if (this.storm && this.storm.war && this.storm.e && this.storm.e.tw === tw) return; // your own tornado leaves you be
     if (this.storyTornado()) { if (d < r + 12 && p.y < tw.H) { const e = this.g.disasters.list.find(q => q.tw === tw); if (e) { const G = WindGame.thrownFrom(this, e); G.a = Math.atan2(dz, dx); G.th.vx = Math.cos(G.a) * 46; G.th.vz = Math.sin(G.a) * 46; this.ring = G; } } return; }
     if (this.seedT > 0) { if (p.y < tw.H) { tw._seedMin = Math.min(tw._seedMin ?? 1e9, d - r); (this.seedTw || (this.seedTw = new Set())).add(tw); } else this.seedHigh = tw.H; } // only under the cloud base
     if (p.y > tw.H && d < reach) { this.g.shake = Math.max(this.g.shake || 0, 0.3); this.roll += (Math.random() - 0.5) * 0.08; } // the wall cloud over it: rough air
@@ -713,7 +714,7 @@ export class Flight {
   lockOn(v, again = false) {
     if (this.state !== 'fly' || this.riding || this.bucked || this.ring) return;
     this.lockHint = false; if (this.goBase) this.baseStop();
-    if (!this.lock && this.stormFor()) { this.stormFor().lockOn(); return; } if (!v && this.storyTornado()) { this.ring = new WindGame(this, this.storyTornado()); return; }
+    { const SG = this.lock ? null : this.stormFor(); if (SG && SG.lockOn() !== false) return; } if (!v && this.storyTornado()) { this.ring = new WindGame(this, this.storyTornado()); return; }
     if (this.lock && !again) { this.lock = null; this.tip('Lock let go: flying free'); return; }
     if (this.fromBase) { this.tip('Nothing to lock on in the base; Land to come down'); return; }
     if (this.fromHorde && this.fromHorde.o.boss && !v) { const e = this.fromHorde.o.boss; if (e.type === 'worm' || e.type === 'kaiju') { this.bossClose = false; this.lock = { worm: e, name: 'it', get x() { return e.x; }, get z() { return e.z; }, get y() { return e.type === 'kaiju' ? 44 : Math.max(e.y, 6); }, get gone() { return !e.alive; } }; this.tip('Locked on! Straight at it'); sfx('whoosh', this.pos.x, this.pos.y, this.pos.z, { gain: 0.9 }); return; } this.lock = { zombie: -1, name: 'it', get x() { return e.x; }, get z() { return e.z; }, y: 0, get gone() { return !e.alive; } }; this.tip('Locked on! Straight at it, down to fight; or SMASH LAND'); sfx('whoosh', this.pos.x, this.pos.y, this.pos.z, { gain: 0.9 }); return; }
@@ -725,7 +726,7 @@ export class Flight {
   }
   // the level's tornado, on the defending side (windgame.js)
   // the level's flood, dust storm, tsunami or cold wave, on the defending side (stormgame.js)
-  stormFor() { if (!this.heroGame || !this.inLevel || this.fromHorde || !this.owner || this.owner.side !== 'hero') return null; const e = this.g.disasters.list.find(q => q.alive && stormKinds[q.type]); if (!e) return null; if (!this.storm || this.storm.e !== e) { if (this.storm) this.storm.dispose(); this.storm = new StormGame(this, e); } return this.storm; }
+  stormFor() { if (!this.heroGame || !this.inLevel || this.fromHorde || !this.owner) return null; if (this.owner.side === 'villain') { const R = this.owner.round; if (!R || R.ended) return null; if (!this.storm) this.storm = new StormWar(this, R); return this.storm; } if (this.owner.side !== 'hero') return null; const e = this.g.disasters.list.find(q => q.alive && stormKinds[q.type]); if (!e) return null; if (!this.storm || this.storm.e !== e) { if (this.storm) this.storm.dispose(); this.storm = new StormGame(this, e); } return this.storm; }
   storyTornado() { if (!this.heroGame || !this.inLevel || this.fromHorde || !this.g.mode || this.g.mode.side !== 'hero') return null; return this.g.disasters.list.find(e => e.alive && e.type === 'tornado' && e.tw && e.tw.phase !== 'rope') || null; }
   // a story level: the arcade way (Sean). A finger on the screen and she goes that way on the screen, as on foot, faster the further it is pushed; let go and she stops and hovers. Her height looks after itself over the roofs; the arrows on the bar go up and down. Behind and first person, only for getting around: left and right turn, up and down climb and dive (Invert)
   arcadeOn() { return !!(this.P && this.P.hero && this.heroGame && (this.fromHorde || this.inLevel) && !this.fromBase); }

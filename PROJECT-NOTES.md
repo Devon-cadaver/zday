@@ -788,8 +788,11 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 - Zoom (nozoom.js): the second finger down within 450 ms is cancelled in the band and fight screens as well as the second lift; touchend is also listened for on the touched element, in case it left the page. While zoomed, `html.zd-zoomed *{touch-action:pinch-zoom}` lifts the game's touch-action:none, which had stopped the pinch out, and a line at the top of the visible area says so. Not testable off a real iPhone.
 - Pause: top right, 52 px. Compass: above the mini map, hidden with it (minimap.js). Both now children of body, because #zd-side's transform carried position:fixed. The radio line in flight sits right of the compass.
 
-## Weather in Destroy: the plan (not built; Sean to choose)
-- The weather is on your side and yours to aim; you score by wrecking; heroes, army and rescue squads undo it. The mirror of Defend: the same glowing jobs, done by the heroes against you (lifting buses, ice walls, thawing), each one weakening the storm unless you stop them.
+## Destroy for points, weather on your side (2026-11-03; stormgame.js StormWar)
+- All Destroy levels: `F.stormFor()` makes a StormWar. Score: your buildings 100 x chain (x3 at most, 4 per step, 4 s to keep it), the storm's buildings 50, wrecked cars 25, a hero stopped +500, a squad +300 (not multiplied). Win: score >= need x 100 and the heroes beaten.
+- Jobs every 16 s, at most 2: a rival hero (hidden and gripped, a copy of their figure at the spot; 16 s) or a rescue squad vehicle (22 s). Blue beam. Lock on and the gauge, or 3 hits of any power (`closest` kind 'job'). Finished: storm -25%, or -200 points with no weather. At 0 the storm ends; Unleash brings it back.
+- Storm meter: buildings +6, cars +1.5, a job stopped +20. Unleash adds 25% storm. Tornado: size up and it follows you 12 s (your own tornado does not hurt you). Flood: water up (no dam model: a button), over 2.5 m it takes buildings. Dust: 15 s the army does not fire, 3 buildings go. Tsunami: alive, faster; else pick a coast. Cold: 15 s buildings break in one hit, 5 go.
+- Balance untested by a person: goals may be too high (X20 is 31,000).
 
 ## Private preview link
 - https://claude.ai/artifact/Jemm5Sxje8y9XvJxcFNPwN (private, Sean only). Page source: artifact/zday-city.html.
