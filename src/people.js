@@ -872,6 +872,7 @@ export class People {
   }
 
   // hurt or kill. Cars: slow hits knock walkers down, fast hits kill, armour shrugs. Shots: 1 hp.
+  heroFoe(j) { return this.heroOnly && ZSTATE[this.st[j]] === 1; } // one of a level's enemies: machines of its own side leave them be, or the count falls with the player doing nothing
   kill(j, vx = 0, vz = 0, cause = 'car') {
     if (this.heroOnly && ZSTATE[this.st[j]]) return; // a level's enemies fall to the player alone (horde.js), or a level could win itself
     const wasZ = this.st[j] === S.ZOMBIE, counted = this.st[j] === S.FROZEN && this.fx[j] >= 8; // already counted when the ice (or the flash) took them

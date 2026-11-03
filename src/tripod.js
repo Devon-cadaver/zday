@@ -284,7 +284,7 @@ export class Tripod {
     const T = this.tb, { people } = this.D.ctx;
     if (T) {
       T.t += h;
-      if ((T.n -= h) <= 0) { T.n = 0.25; let got = 0; people.around(T.x, T.z, 7, (j) => { if (got < 3 && this.lift.length < 24 && people.lvl[j] === -1 && people.kind[j] !== KIND.ALIEN && people.grab(j)) { this.lift.push(j); got++; } }); }
+      if ((T.n -= h) <= 0) { T.n = 0.25; let got = 0; people.around(T.x, T.z, 7, (j) => { if (got < 3 && this.lift.length < 24 && people.lvl[j] === -1 && people.kind[j] !== KIND.ALIEN && !people.heroFoe(j) && people.grab(j)) { this.lift.push(j); got++; } }); }
       if (T.t > T.dur) this.tb = null;
     }
     const hx = this.x, hy = this.y - 2.5, hz = this.z;

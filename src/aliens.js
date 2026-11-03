@@ -184,7 +184,7 @@ export class Invasion {
         if ((s.n -= h) <= 0) {
           s.n = 0.35;
           let got = 0;
-          people.around(s.x, s.z, 6.5, (j) => { if (got < 2 && s.lift.length < 14 && people.lvl[j] === -1 && people.grab(j)) { s.lift.push(j); got++; } });
+          people.around(s.x, s.z, 6.5, (j) => { if (got < 2 && s.lift.length < 14 && people.lvl[j] === -1 && !people.heroFoe(j) && people.grab(j)) { s.lift.push(j); got++; } });
           if (Math.random() < 0.15) traffic.near(s.x, s.z, 7, (car) => { if (!s.car && !car.mission && !car.gone && (car.mode === 0 || car.mode === 2) && Math.hypot(car.x - s.x, car.z - s.z) < 7 && traffic.grab(car)) s.car = car; });
         }
       }

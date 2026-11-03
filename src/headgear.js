@@ -3,6 +3,22 @@ import * as THREE from 'three';
 
 const std = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.6, ...o }), lit = (c, k = 1.6) => new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(k) });
 const DARK = () => std('#0a0a0c'), GOLD = () => std('#d4a84b', { metalness: 0.7, roughness: 0.3 }), STEEL = () => std('#aeb6c0', { metalness: 0.8, roughness: 0.3 });
+// a carved pumpkin: ribs round it, a sunk dark socket and a glow in each cut, a toothed grin, a stem of n bent pieces, a leaf and a curl of vine. The eyes' colour and the stem's length make the three
+function pumpkin(P, m, eye, n) {
+  const c0 = m.color.clone(), rib = std(c0.clone().lerp(new THREE.Color('#000000'), 0.28), { roughness: 0.75 }), hi = std(c0.clone().lerp(new THREE.Color('#ffd27a'), 0.18), { roughness: 0.55 }), R0 = 0.158, Y = 0.012; P.ball(0.148, 0.128, 0.148, 0, Y, 0, rib);
+  for (let i = 0; i < 12; i++) { const a = i / 12 * 6.2832, q = P.ball(0.05, 0.132, 0.042, Math.sin(a) * 0.107, Y, Math.cos(a) * 0.107, i % 2 ? m : hi); q.rotation.y = a; }
+  const flat = (pts, z, mat, tilt = 0) => { const sh = new THREE.Shape(); pts.forEach((v, i) => (i ? sh.lineTo(v[0], v[1]) : sh.moveTo(v[0], v[1]))); sh.closePath(); const q = P.add(new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: 0.006, bevelEnabled: false }), mat)); q.position.z = z; q.rotation.y = tilt; return q; };
+  const dark = new THREE.MeshBasicMaterial({ color: '#120600' }), glow = new THREE.MeshBasicMaterial({ color: new THREE.Color(eye).multiplyScalar(1.7) }), core = new THREE.MeshBasicMaterial({ color: new THREE.Color(eye).lerp(new THREE.Color('#ffffff'), 0.55).multiplyScalar(1.5) }), z = R0 - 0.006;
+  const tri = (cx, cy, r) => [[cx - r, cy - r * 0.8], [cx + r, cy - r * 0.8], [cx, cy + r]];
+  for (const s of [-1, 1]) { const x = s * 0.056, t = s * 0.16, y = 0.03; flat(tri(x, y, 0.038), z - 0.008, dark, t); flat(tri(x, y - 0.002, 0.028), z - 0.004, glow, t); flat(tri(x, y - 0.006, 0.013), z - 0.001, core, t); }
+  flat(tri(0, -0.012, 0.014), z, dark); flat(tri(0, -0.013, 0.008), z + 0.002, glow);
+  const grin = (k) => { const W = 0.092 * k, B = -0.05 * k - 0.016, H = 0.024 * k, L = [[-W, B + H * 1.25]]; for (let i = 1; i <= 8; i++) { const x = -W + i * W / 4, tooth = i % 2 ? -0.013 * k : 0; L.push([x, B + H * 1.25 - Math.abs(x / W) * -H * 0.25 + tooth]); } L.push([W, B + H * 1.25]); for (let i = 8; i >= 0; i--) { const x = -W + i * W / 4 * 1, tooth = i % 2 ? 0.013 * k : 0; L.push([x * 0.9, B - H * (1 - x * x / (W * W)) + tooth]); } return L; };
+  flat(grin(1), z - 0.012, dark); flat(grin(0.82), z - 0.006, glow);
+  // the top, the stem, a leaf, a curl of vine
+  const st = std('#4a6a2c', { roughness: 0.9 }), st2 = std('#33501f', { roughness: 0.95 }); P.ball(0.05, 0.016, 0.05, 0, 0.135, 0, st2); let x = 0, y = 0.137, z2 = 0, tiltX = 0, tiltZ = 0; for (let i = 0; i < n; i++) { const r = 0.024 - i * 0.0018, l = 0.03, q = P.cyl(r * 0.84, r, l, x, y + l / 2, z2, i % 2 ? st : st2, 7); q.rotation.set(tiltX, 0, tiltZ); x += Math.sin(-tiltZ) * l; z2 += Math.sin(tiltX) * l; y += Math.cos(tiltZ) * l; tiltZ -= 0.28; tiltX += 0.08; }
+  const leaf = P.ball(0.05, 0.006, 0.03, 0.055, 0.138, -0.03, std('#3c6a2a', { flatShading: true, side: THREE.DoubleSide })); leaf.rotation.set(0.3, 0.5, 0.35);
+  const vine = P.add(new THREE.Mesh(new THREE.TorusGeometry(0.03, 0.004, 5, 14, 4.6), st2)); vine.position.set(-0.05, 0.142, 0.025); vine.rotation.set(1.2, 0.2, 0);
+}
 // [id, name, its own colour, build]
 export const HEADGEAR = [
   ['none', 'None', '#ff3fcf', null],
@@ -36,7 +52,9 @@ export const HEADGEAR = [
   ['gasmask', 'Gas mask', '#3a3f3a', (P, m) => { P.shell(0.124, 0.142, 0.13, 0, 0.012, 0, m, { thetaFrom: 1.1, thetaTo: 2.7, open: 0 }); const l = std('#0e1a24', { metalness: 0.5, roughness: 0.1 }), r = STEEL(); for (const s of [-1, 1]) { const q = P.cyl(0.032, 0.032, 0.014, s * 0.046, 0.016, 0.116, l, 14); q.rotation.x = Math.PI / 2; } const c = P.cyl(0.036, 0.046, 0.07, 0, -0.058, 0.14, r, 12); c.rotation.x = Math.PI / 2; }],
   ['space', 'Space helmet', '#d6f0ff', (P, m) => { P.ball(0.18, 0.18, 0.18, 0, 0.01, 0, new THREE.MeshStandardMaterial({ color: m.color, transparent: true, opacity: 0.32, roughness: 0.04, metalness: 0.35, depthWrite: false })); const q = P.add(new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.024, 8, 24).rotateX(Math.PI / 2), STEEL())); q.position.y = -0.14; }],
   ['robot', 'Robot head', '#8a929c', (P, m) => { const q = std(m.color, { metalness: 0.7, roughness: 0.35 }); P.box(0.24, 0.26, 0.24, 0, 0.012, 0, q); const e = lit('#ff4a4a', 1.5); for (const s of [-1, 1]) P.box(0.05, 0.03, 0.01, s * 0.056, 0.035, 0.122, e); const d = DARK(); P.box(0.14, 0.016, 0.01, 0, -0.06, 0.122, d); P.cyl(0.006, 0.006, 0.08, 0, 0.18, 0, d, 6); P.ball(0.016, 0.016, 0.016, 0, 0.225, 0, e); }],
-  ['pumpkin', 'Pumpkin head', '#e8761c', (P, m) => { P.ball(0.15, 0.13, 0.15, 0, 0.012, 0, m); const e = lit('#ffd24a', 1.5); for (const s of [-1, 1]) { const q = P.cone(0.03, 0.035, s * 0.05, 0.035, 0.137, e); q.rotation.x = 0; } P.box(0.09, 0.022, 0.01, 0, -0.045, 0.142, e); P.cyl(0.012, 0.016, 0.05, 0, 0.16, 0, std('#3c5a3f'), 6); }],
+  ['pumpkin', 'Pumpkin: orange', '#e8761c', (P, m) => pumpkin(P, m, '#ffb020', 2)],
+  ['pumpkin2', 'Pumpkin: purple', '#e8761c', (P, m) => pumpkin(P, m, '#b040ff', 4)],
+  ['pumpkin3', 'Pumpkin: green', '#e8761c', (P, m) => pumpkin(P, m, '#3dff5c', 7)],
 ];
 const BY = {}; for (const h of HEADGEAR) BY[h[0]] = h;
 export function addHeadgear(r, of) {

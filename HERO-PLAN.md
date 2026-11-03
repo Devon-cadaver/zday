@@ -63,6 +63,7 @@ Build order (one thing at a time, each tested in the Sandbox and pushed). The ch
   - [x] 12b7. Worm and kaiju: hovering camera behind her, on the monster. Lock on and grab the worm to ride it, punch and laser; it bucks her off.
   - [x] 12b8. Lock on and grab the kaiju to ride its shoulders, punch and laser; it shakes her off.
   - [x] 12b8b. Freeze holds a locked, close or ridden target for 2 s, hits do more.
+  - [x] 12b8c. Duel: End duel; harder by level with more blocks and knockbacks; ranged powers on a downed foe. Alien and zombie generals with jetpacks, fought in the air, knocked to the street.
   - [x] 12b9. Three heroes in their last outfits over the planet on the main menu.
   - [x] 12b10. Level 1's crowd: Greys, Mantis drones, Dome walkers and four alien dogs, with a few silver commanders in sphere helmets a punch knocks off.
   - [x] 12c. Agents play the whole game through and report what breaks or drags: first round done and tuned (no stop at walls, stragglers, the giants, Destroy's goal, the HUD). Run again as the game changes.

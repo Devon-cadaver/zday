@@ -752,6 +752,14 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 
 - The town camera reaches the home base (Sean, the Sandbox: it stopped at the edge of town, so the base stayed in the blurred foreground): its limit on the east runs to 30 m past the base. cam-test.cjs.
 
+- The duel AI, and generals (Sean, 2026-11-02). End duel beside Fight again, and Leave too now, back beside the ring (base.duelBack, no page reload). fighttest.kAI from the foe's level, 0 at 1 and 1 at 5: blocks 18 to 78% of what is thrown at it and answers with a shove, attacks more often (0.8 to 2.3 times), shorter wind-ups (1.25 to 0.7 times); two new moves with their own tells: shove (13, knocks back) and slam (15, all round it, from level 2). Powers but the kick reach a foe on the ground or getting up; knock powers also in the air (canTarget). Generals: horde.gens, 2 a level from 10 s and 36 s, the alien's silver commander and the zombie's green juggernaut, rig Tyrant's with a jetpack, gold diamonds on the map, count towards winning. They fly at her; 16 m away, or Lock on (they come first within 240 m), starts the real fight, o.air: this.top raised over the roofs (airLevel), walked on as if ground. A knockdown, flinging, or a finish drops top to the street: she and it fall, buildings under 45 m collapse on the way (THROUGH THE ROOF!). Both steady for 1.6 s: back up at 20 m/s. A loss knocks her out, 45 health, and the general keeps its damage and comes back in 12 s; the level goes on. ai-test.cjs, gen-test.cjs. Tests that clear a level must also clear genQ and gens.
+
+- Round on the AI: a stream of jabs could stun-lock it at any level; now the better it is the shorter its stun and the more it punches back through it, its big blows can be unstoppable (armor), and close range always chooses through closePick. Ground camera wider: on foot 46 in a crowd and 54 otherwise (was 32 and 46), the duel 26 and the street fight 30 at least (was 20). Pumpkin head in three (Sean loved it): orange, purple and green eyes, stems of 2, 4 and 7 pieces; ribs, sunk sockets with a glow and a bright core, a toothed grin, leaf and vine.
+
+- The mini map goes under nothing (Sean): hidden with a panel open (zd-panel, the Sandbox's Disasters too), paused, on the radio station and on an end screen. No depth blur in level fights.
+
+- A level no longer wins itself (found testing generals): saucer and tripod beams were abducting their own walkers, level 1 fell from 158 to about 80 in a minute with nobody playing. people.heroFoe(j) keeps those beams off a level's enemies, so the count stays until the hero acts. Level 1 is harder for it. She can no longer be left in grabbed by a foe that let go.
+
 ## Next
 - The hero game (Sean, 2026-11-01): see HERO-PLAN.md for the whole plan and build order. Next up: floors inside smashed buildings, then the Sandbox hero lab.
 
