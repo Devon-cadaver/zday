@@ -54,6 +54,7 @@ Build order (one thing at a time, each tested in the Sandbox and pushed). The ch
   - [x] 12b3. Story mode: BOOST held, powers on their own buttons. Level 1's saucers and tripods are real enemies: Lock on, ram, powers; rip a saucer out of the sky and throw it; punch a tripod's legs, dodge its red marks, lift the wreck and throw it; all must be down to win.
   - [x] 12b4. Locked on a saucer or tripod, in close like against a villain: tap to punch; GRAB, then Spin Toss or Smash Down, floating.
   - [x] 12b4b. GRAB IT stands out; the spin is worked with the control; Smash Down slams three times; tripods take several; flying view and invert on the pause menu.
+  - [x] 12b4c. Smaller furnished bases: fireplace, round table with the team, monitors, statues, super car and bike. The base's joystick fixed.
   - [x] 12b5. Radio station: choose the songs, repeat one, cinematic music with action music in the fights.
   - [x] 12b6. Globe stays sharp when zoomed in; Main Menu in the pause menu.
   - [x] 12b7. Worm and kaiju: hovering camera behind her, on the monster. Lock on and grab the worm to ride it, punch and laser; it bucks her off.
