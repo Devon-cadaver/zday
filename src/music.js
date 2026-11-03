@@ -76,7 +76,7 @@ export class Music {
     this.duckG.connect(this.lp); this.lp.connect(this.dryG); this.dryG.connect(this.out); this.wetG.connect(this.out); this.out.connect(out);
     this.space(this.menuOn);
     this.bgG = ctx.createGain(); this.bgG.connect(this.duckG); // the background tracks, dropped back while the band is heard
-    { const el = this.bandEl = document.createElement('audio'); el.preload = 'none'; el.loop = true; el.setAttribute('playsinline', ''); this.bandG = ctx.createGain(); this.bandG.gain.value = 0; const src = ctx.createMediaElementSource(el); this.bandDry = ctx.createGain(); src.connect(this.bandDry); this.bandDry.connect(this.bandG); this.bandG.connect(this.out); this.bandDist = ctx.createGain(); this.bandDist.gain.value = 0; const sh = this.bandShape = ctx.createWaveShaper(), cv = new Float32Array(1024); for (let i = 0; i < 1024; i++) { const x = i / 511.5 - 1; cv[i] = Math.tanh(x * 14) * 0.7; } sh.curve = cv; src.connect(this.bandDist); this.bandDist.connect(sh); sh.connect(this.bandG); }
+    { const el = this.bandEl = document.createElement('audio'); el.preload = 'none'; el.loop = true; el.setAttribute('playsinline', ''); this.bandG = ctx.createGain(); this.bandG.gain.value = 0; const src = ctx.createMediaElementSource(el); this.bandDry = ctx.createGain(); src.connect(this.bandDry); this.bandDry.connect(this.bandG); this.bandG.connect(this.out); this.bandDist = ctx.createGain(); this.bandDist.gain.value = 0; const sh = this.bandShape = ctx.createWaveShaper(), cv = new Float32Array(1024); for (let i = 0; i < 1024; i++) { const x = i / 511.5 - 1; cv[i] = Math.tanh(x * 14) * 0.7; } sh.curve = cv; src.connect(this.bandDist); this.bandDist.connect(sh); const post = ctx.createGain(); post.gain.value = 0.07; sh.connect(post); post.connect(this.bandG); }
     for (let k = 0; k < 2; k++) {
       const el = document.createElement('audio'); el.preload = 'auto'; el.setAttribute('playsinline', '');
       const g = ctx.createGain(); g.gain.value = 0; ctx.createMediaElementSource(el).connect(g); g.connect(this.bgG);
@@ -117,11 +117,11 @@ export class Music {
     const bg = 1 - (this.bandLoud ? 1 : 0.8) * Math.min(1, (on ? k : 0) * 1.3);
     if (Math.abs(bg - (this.bgW ?? -1)) > 0.01) { this.bgW = bg; this.bgG.gain.setTargetAtTime(bg, t, 0.5); }
   }
-  // a note missed in the band game (rhythm.js): the song itself crunches through the distortion for a moment, a squeal of feedback over it
+  // a note missed in the band game (rhythm.js): the song drops away and what is left of it crunches for a moment, a thin squeal of feedback in it. Always quieter than the song, never louder (Sean)
   bandHurt() {
     if (!this.ctx || !this.bandDist) return; const c = this.ctx, t = c.currentTime;
-    const a = this.bandDry.gain, d = this.bandDist.gain; a.cancelScheduledValues(t); d.cancelScheduledValues(t); a.setValueAtTime(0.12, t); a.setTargetAtTime(1, t + 0.22, 0.05); d.setValueAtTime(1, t); d.setTargetAtTime(0, t + 0.22, 0.05);
-    const o = c.createOscillator(), g = c.createGain(); o.type = 'sawtooth'; o.frequency.setValueAtTime(1500 + Math.random() * 900, t); o.frequency.exponentialRampToValueAtTime(320, t + 0.28); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.1, t + 0.015); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3); o.connect(g); g.connect(this.bandShape); o.start(t); o.stop(t + 0.32);
+    const a = this.bandDry.gain, d = this.bandDist.gain; a.cancelScheduledValues(t); d.cancelScheduledValues(t); a.setValueAtTime(0.3, t); a.setTargetAtTime(1, t + 0.28, 0.08); d.setValueAtTime(1, t); d.setTargetAtTime(0, t + 0.22, 0.05);
+    const o = c.createOscillator(), g = c.createGain(); o.type = 'sawtooth'; o.frequency.setValueAtTime(1500 + Math.random() * 900, t); o.frequency.exponentialRampToValueAtTime(320, t + 0.28); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.05, t + 0.015); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3); o.connect(g); g.connect(this.bandShape); o.start(t); o.stop(t + 0.32);
   }
   // the song falling apart: it stutters and jumps back a little, as a scratched disc does (the game's clock follows it)
   bandSkip() {

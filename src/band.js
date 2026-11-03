@@ -231,7 +231,7 @@ export class Band {
   // a miss in the band game: lamps on the truss spark and flicker
   sparkLamps() {
     for (let i = 0; i < 2; i++) { const lp = this.lamps[Math.floor(Math.random() * this.lamps.length)]; lp.flick = 0.5; this.g.localToWorld(this.v.copy(lp.lamp.position)); this.sparks.emit(this.v.x, this.v.y, this.v.z, 40, { up: [-4, 4], spread: 9, life: 0.7, size: 0.22 }); }
-    const V = this.venue; sfx('zap', V.x, V.y + V.H + 8, V.z, { gain: 0.25 });
+    const V = this.venue; sfx('zap', V.x, V.y + V.H + 8, V.z, { gain: 0.08 });
   }
   // played too badly: they down tools and walk off either side; back() brings them on again
   walkOff() { this.off = true; this.offDone = false; for (const mb of this.members) mb.side = mb.x < 0 || mb.role === 'vox' ? -1 : 1; }
