@@ -104,7 +104,7 @@ export function bandModel(role, girls) {
 export class Band {
   constructor(ctx) {
     this.ctx = ctx; // { scene, game, city, people, traffic, fire, disasters, camera, controls, music }
-    this.v = new THREE.Vector3(); this.m4 = new THREE.Matrix4(); this.q = new THREE.Quaternion(); this.e = new THREE.Euler(); this.s1 = new THREE.Vector3(1, 1, 1);
+    this.v = new THREE.Vector3(); this.m4 = new THREE.Matrix4(); this.q = new THREE.Quaternion(); this.e = new THREE.Euler(); this.s1 = new THREE.Vector3(1, 1, 1); this.s0 = new THREE.Vector3();
     this.girls = !!PLACES[placeKey()].style; // the Far Isles: the girl band, the second song
     if (ctx.music) ctx.music.bandSong = this.girls ? 'theme2' : 'theme';
     this.bps = (this.girls ? SONGS.theme2.bpm * 2 : SONGS.theme.bpm) / 60; // the girls' song in half time: they move at double
@@ -119,8 +119,8 @@ export class Band {
     const { city } = this.ctx, B = city.buildings, Bd = city.bounds, cx = (Bd.x0 + Bd.x1) / 2, cz = (Bd.z0 + Bd.z1) / 2, half = Math.min(Bd.x1 - Bd.x0, Bd.z1 - Bd.z0) / 2;
     const st = B.findIndex(b => b.landmark === 'Stadium');
     if (st >= 0) {
-      const b = B[st], f = b.roof, hw = (f.x1 - f.x0) / 2, x = (f.x0 + f.x1) / 2;
-      return { kind: 'stadium', k: st, x, z: f.z0 + 7, y: b.roofY, W: Math.min(24, hw * 1.3), D: 9, H: 1.6, crowd: { x0: x - hw * 0.8, x1: x + hw * 0.8, z0: f.z0 + 17, z1: f.z0 + 17 + hw * 1.2 }, n: 150 };
+      const b = B[st], f = b.roof, hw = (f.x1 - f.x0) / 2, x = (f.x0 + f.x1) / 2, cz = (f.z0 + f.z1) / 2, r0 = hw / 0.7, D = 9; // the pitch is a disc of r0 inside the stands (city.js): the stage at its far end, the crowd on the grass in front
+      return { kind: 'stadium', k: st, x, z: cz - r0 + D / 2 + 0.6, y: b.roofY, W: Math.min(24, r0 * 1.2), D, H: 1.6, crowd: { x0: x - r0 * 0.72, x1: x + r0 * 0.72, z0: cz - r0 + D + 2, z1: cz + r0 * 0.88 }, n: Math.round(Math.min(150, r0 * r0 * 0.9)), bowl: { cz, r0, R: (b.x1 - b.x0) / 2, y0: b.baseY } };
     }
     const n = Math.round(Math.min(70, Math.max(18, B.length / 18))); // a smaller crowd in a smaller town
     let best = null, bs = 1e9;
@@ -180,13 +180,13 @@ export class Band {
       beam.position.set(x, H + 8.6, D / 2 - 0.6); beam.renderOrder = 7; g.add(beam); this.lamps.push({ lamp, beam, i });
     }
     // the audience: the town's people, phones up, bouncing to it
-    const c = V.crowd, n = Math.max(6, V.n), geo = figureGeometry(), fm = figureMaterial(); this.fm = fm;
+    const c = V.crowd, n0 = Math.max(6, V.n), n = n0 + Math.max(30, Math.min(70, Math.round(n0 * 0.8))), geo = figureGeometry(), fm = figureMaterial(); this.fm = fm;
     const fa = figureAttributes(geo, n), r = (() => { let s = 12345; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
     this.crowd = new THREE.InstancedMesh(geo, fm.mat, n); this.crowd.castShadow = true; this.crowd.frustumCulled = false; scene.add(this.crowd);
     this.fans = [];
     for (let i = 0; i < n; i++) {
       let a = r(), A = ARCHETYPES[0]; for (const t of ARCHETYPES) { if ((a -= t.w) <= 0) { A = t; break; } }
-      fa.write(i, A.roll(r)); const phone = r() < 0.6; fa.arrays.anim[i] = phone ? 6 : 0;
+      fa.write(i, A.roll(r)); const phone = r() < 0.6; fa.arrays.anim[i] = phone ? 6 : 0; if (i >= n0) { const back = V.flip ? c.z0 : c.z1, fz = V.z + (V.flip ? -1 : 1) * (V.D / 2 + 1.4), tx = c.x0 + (0.08 + r() * 0.84) * (c.x1 - c.x0), tz = fz + (back - fz) * r() * 0.42, ox = c.x0 + r() * (c.x1 - c.x0); this.fans.push({ x: ox, z: back, x0: ox, z0: back, tx, tz, extra: true, need: 0.08 + (i - n0) / (n - n0) * 0.9, s: 0, phone, jump: true, ph: r() * 6.28, vx: 0, vz: 0 }); continue; } // more fans, for the band game: they come in from the back as the crowd warms up
       const x = c.x0 + r() * (c.x1 - c.x0), z = c.z0 + Math.pow(r(), 0.8) * (c.z1 - c.z0); // packed in thicker near the front
       this.fans.push({ x, z, x0: x, z0: z, phone, jump: r() < 0.35, ph: r() * 6.28, vx: 0, vz: 0 });
     }
@@ -194,6 +194,7 @@ export class Band {
     // the show: fireworks, flame jets, phone flashes
     this.fw = FW.map(col => { const s = new Splash(scene, 500); s.mat.blending = THREE.AdditiveBlending; s.mat.uniforms.uColor.value.setRGB(...col); return s; });
     this.pyro = new Splash(scene, 600); this.pyro.mat.blending = THREE.AdditiveBlending; this.pyro.mat.uniforms.uColor.value.setRGB(3, 1.1, 0.2);
+    this.sparks = new Splash(scene, 400); this.sparks.mat.blending = THREE.AdditiveBlending; this.sparks.mat.uniforms.uColor.value.setRGB(4, 3.4, 2.2); // the lamps shorting out (band game, a miss)
     this.rockets = [];
     this.flashes = new THREE.InstancedMesh(new THREE.SphereGeometry(0.16, 6, 4), M.flash, 14); this.flashes.frustumCulled = false; this.flashes.count = 0; scene.add(this.flashes); this.flashL = [];
   }
@@ -203,10 +204,11 @@ export class Band {
     if (!this.venue) return;
     const { city, traffic } = this.ctx, V = this.venue, c = V.crowd;
     this.on = true; this.t = 0; this.endT = 0; this.checkT = 1; this.fwT = 2; this.pyroT = 1.5; this.rockets.length = 0; this.flashL.length = 0;
-    for (const f of this.fans) { f.x = f.x0; f.z = f.z0; f.vx = f.vz = 0; f.run = false; }
+    for (const f of this.fans) { f.x = f.x0; f.z = f.z0; f.vx = f.vz = 0; f.run = false; if (f.extra) f.s = 0; }
+    this.hype = null; this.crowdK = 0; this.quiet = false; this.off = false; this.offDone = false; for (const mb of this.members) { mb.r.root.position.x = mb.x; mb.r.root.position.z = mb.z; } for (const lp of this.lamps) { lp.flick = 0; lp.lamp.visible = true; }
     this.g.visible = true; this.crowd.visible = true; this.crowd.count = this.fans.length;
     for (const mb of this.members) mb.r.root.visible = true;
-    for (const s of [...this.fw, this.pyro]) s.reset();
+    for (const s of [...this.fw, this.pyro, this.sparks]) s.reset();
     if (V.kind === 'park') { // clear the park where the stage and the crowd go: no trees through the stage, no parked cars in the crowd
       const mx = (c.x0 + c.x1) / 2, R = Math.hypot(c.x1 - c.x0, c.z1 - V.z) / 2 + 6, mz = (V.z + c.z1) / 2;
       city.takeStreetNear(mx, mz, R); for (const pc of traffic.parkedNear(mx, mz, R)) traffic.takeParked(pc);
@@ -226,6 +228,14 @@ export class Band {
     { const G = this.ctx.game, M = G && G.mode; if (!(M && M.round)) this.ctx.disasters.emit({ type: 'bandstop', x: sx, z: sz, text: why }); } // a story level (HeroGame's round) is not about the concert
   }
 
+  // a miss in the band game: lamps on the truss spark and flicker
+  sparkLamps() {
+    for (let i = 0; i < 2; i++) { const lp = this.lamps[Math.floor(Math.random() * this.lamps.length)]; lp.flick = 0.5; this.g.localToWorld(this.v.copy(lp.lamp.position)); this.sparks.emit(this.v.x, this.v.y, this.v.z, 40, { up: [-4, 4], spread: 9, life: 0.7, size: 0.22 }); }
+    const V = this.venue; sfx('zap', V.x, V.y + V.H + 8, V.z, { gain: 0.25 });
+  }
+  // played too badly: they down tools and walk off either side; back() brings them on again
+  walkOff() { this.off = true; this.offDone = false; for (const mb of this.members) mb.side = mb.x < 0 || mb.role === 'vox' ? -1 : 1; }
+  back() { this.off = false; this.offDone = false; for (const mb of this.members) { const r = mb.r.root; r.visible = true; r.position.x = mb.x; r.position.z = mb.z; } }
   // is the show still on? the stage's building, a disaster on it, fire, water, a pit, the undead in the crowd
   check() {
     const { city, disasters: D, fire, people } = this.ctx, V = this.venue, x = V.x, z = V.z + V.D;
@@ -254,6 +264,10 @@ export class Band {
     // the band
     for (const mb of this.members) {
       const r = mb.r; if (!this.on) { if (this.endT > 0.4) r.root.visible = false; continue; } // off the stage the moment it stops
+      if (this.off) { // walking off
+        if (!r.root.visible) continue; relax(r); const st = Math.sin(this.t * 7 + mb.ph), W = V.W / 2 + 0.4; r.legs[0].hip.rotation.x = st * 0.55; r.legs[1].hip.rotation.x = -st * 0.55; r.legs[0].knee.rotation.x = Math.max(0, -st) * 0.7; r.legs[1].knee.rotation.x = Math.max(0, st) * 0.7; r.arms[0].sh.rotation.x = -st * 0.4; r.arms[1].sh.rotation.x = st * 0.4; r.head.rotation.x = 0.3;
+        r.root.rotation.y = mb.side * Math.PI / 2; r.root.position.y = V.H; r.root.position.x += mb.side * 2.1 * dt; if (Math.abs(r.root.position.x) > W) { r.root.visible = false; if (this.members.every(q => !q.r.root.visible)) this.offDone = true; } detail(r, D); continue;
+      }
       const lift = playPose(r, mb.role, ph, mb.ph, this.t, mb.x); let hop = 0; if (mb.hop > 0) { mb.hop = Math.max(0, mb.hop - dt); hop = Math.sin(Math.PI * mb.hop / 0.35) * (mb.role === 'drums' ? 0.25 : 0.8); } // hop: a note hit in the band game
       if (mb.role !== 'drums') r.root.position.y = V.H + lift + hop; else r.root.position.y = V.H + hop;
       detail(r, D);
@@ -261,31 +275,34 @@ export class Band {
     for (const cy of this.cymbals) cy.rotation.z = Math.sin(ph * 2) * 0.08;
     // the lights sweep
     const nightK = 0.18 + 0.82 * Math.min(1, (this.ctx.game.daylight ? this.ctx.game.daylight.night : 0) * 1.5);
-    for (const lp of this.lamps) { const a = this.t * 0.9 + lp.i * 1.7; lp.beam.rotation.set(Math.sin(a) * 0.45 - 0.35, 0, Math.cos(a * 0.8) * 0.45); lp.beam.visible = this.on; lp.beam.material.opacity = nightK; } // faint by day, bright at night
+    for (const lp of this.lamps) { const a = this.t * 0.9 + lp.i * 1.7; lp.beam.rotation.set(Math.sin(a) * 0.45 - 0.35, 0, Math.cos(a * 0.8) * 0.45); lp.beam.visible = this.on && !this.off; lp.beam.material.opacity = nightK; if (lp.flick > 0) { lp.flick = Math.max(0, lp.flick - dt); const lit = Math.random() < 0.3; lp.beam.visible = lit && this.on && !this.off; lp.lamp.visible = lit; } else lp.lamp.visible = true; } // faint by day, bright at night; a spark: flickering
     // the crowd
     const c = this.crowd, m4 = this.m4, q = this.q, e = this.e, sx = V.x, sz = V.z, cam = camera.position;
     if (!this.on) this.endT += dt;
+    { const w = this.hype ?? 0; this.crowdK = (this.crowdK || 0) + (w - (this.crowdK || 0)) * Math.min(1, dt * 1.5); }
+    const fk = this.crowdK, fDir = V.flip ? -1 : 1, fz = sz + fDir * (V.D / 2 + 1.4), fxm = (V.crowd.x0 + V.crowd.x1) / 2;
     if (this.on || this.endT < 4) {
       this.fans.forEach((f, i) => {
-        let y = V.y; if (f.run) { f.x += f.vx * dt; f.z += f.vz * dt; } else if (f.jump) y += Math.max(0, Math.sin(ph + f.ph)) * 0.35;
+        let y = V.y, sc = 1; if (f.run) { f.x += f.vx * dt; f.z += f.vz * dt; } else { let tx, tz; if (f.extra) { const inn = this.hype != null && fk >= f.need; tx = inn ? f.tx : f.x0; tz = inn ? f.tz : f.z0; const gone = !inn && Math.hypot(f.x - f.x0, f.z - f.z0) < 0.5; f.s = Math.max(0, Math.min(1, f.s + (gone ? -3 : 3) * dt)); } else { tx = f.x0 + (fxm - f.x0) * fk * 0.2; tz = f.z0 + (fz - f.z0) * fk * 0.62; } const mx = tx - f.x, mz = tz - f.z, md = Math.hypot(mx, mz); if (md > 0.05) { const st = Math.min(md, 3.2 * dt); f.x += mx / md * st; f.z += mz / md * st; } if (f.jump || fk > 0.55) y += Math.max(0, Math.sin(ph + f.ph)) * (0.35 + fk * 0.3); } if (f.extra) sc = f.s;
         const hx = f.run ? f.vx : sx - f.x, hz = f.run ? f.vz : sz - f.z; e.set(0, Math.atan2(-hz, hx), 0); q.setFromEuler(e);
-        m4.compose(this.v.set(f.x, y, f.z), q, this.s1); c.setMatrixAt(i, m4);
+        m4.compose(this.v.set(f.x, y, f.z), q, sc === 1 ? this.s1 : this.s0.setScalar(Math.max(0.001, sc))); c.setMatrixAt(i, m4);
       });
       c.instanceMatrix.needsUpdate = true;
       if (!this.on && this.endT > 3.5) c.visible = false;
     }
     if (!this.on) { if (this.endT > 0.4 && !this.vanish) for (const lp of this.lamps) lp.beam.visible = false; this.syncFx(dt); return; }
     // phone flashes
-    if (Math.random() < dt * 9) { const f = this.fans[Math.floor(Math.random() * this.fans.length)]; if (f.phone && this.flashL.length < 14) { const dx = sx - f.x, dz = sz - f.z, d = Math.hypot(dx, dz) || 1; this.flashL.push({ x: f.x + dx / d * 0.45, y: V.y + 1.75, z: f.z + dz / d * 0.45, t: 0.07 }); } }
+    if (Math.random() < dt * 9) { const f = this.fans[Math.floor(Math.random() * this.fans.length)]; if (f.phone && !this.off && !(f.extra && !f.s) && this.flashL.length < 14) { const dx = sx - f.x, dz = sz - f.z, d = Math.hypot(dx, dz) || 1; this.flashL.push({ x: f.x + dx / d * 0.45, y: V.y + 1.75, z: f.z + dz / d * 0.45, t: 0.07 }); } }
     // flame jets along the front of the stage, every couple of bars
-    if ((this.pyroT -= dt) <= 0) {
-      this.pyroT = 4 * 2 / this.bps * (Math.random() < 0.3 ? 0.5 : 1);
+    const hy = this.hype; // the band game: the better it goes the more of the show (null: the show on its own)
+    if (!this.off && !this.quiet && (this.pyroT -= dt) <= 0) {
+      this.pyroT = 4 * 2 / this.bps * (Math.random() < 0.3 ? 0.5 : 1) * (hy == null ? 1 : 1.5 - 1.3 * hy);
       for (const s of [-1, -0.33, 0.33, 1]) this.pyro.emit(sx + s * V.W * 0.45, V.y + V.H + 0.3, sz + V.D / 2 - 0.4, 22, { up: [12, 19], spread: 1.2, life: 0.75, size: 2.4 });
       if (cam.distanceTo(this.v.set(sx, V.y, sz)) < 320) sfx('whoomph', sx, V.y + 3, sz, { gain: 0.12 }); // soft (Sean: much quieter)
     }
     // fireworks, from behind the stage
-    if ((this.fwT -= dt) <= 0) {
-      this.fwT = 1.2 + Math.random() * 2.8;
+    if (!this.off && !this.quiet && (this.fwT -= dt) <= 0) {
+      this.fwT = (1.2 + Math.random() * 2.8) * (hy == null ? 1 : 2.2 - 2 * hy);
       const m = new THREE.Mesh(this.flashes.geometry, mats(this.girls).rocket); m.scale.setScalar(1.6); m.position.set(sx + (Math.random() - 0.5) * V.W * 1.2, V.y + V.H + 2, sz - V.D / 2 - 1); this.ctx.scene.add(m);
       this.rockets.push({ m, vx: (Math.random() - 0.5) * 6, vy: 34 + Math.random() * 14, vz: (Math.random() - 0.5) * 6, t: 0, T: 1.4 + Math.random() * 0.5, c: Math.floor(Math.random() * this.fw.length) });
     }
@@ -303,7 +320,7 @@ export class Band {
   }
   syncFx(dt) {
     const { disasters: D, fire } = this.ctx, sc = fire.uniforms.uScale.value, lk = Math.max(0.6, D.lightK || 1);
-    for (const s of [...this.fw, this.pyro]) { s.update(dt); s.sync(lk, sc); }
+    for (const s of [...this.fw, this.pyro, this.sparks]) { s.update(dt); s.sync(lk, sc); }
     const fl = this.flashes; let n = 0;
     for (let k = this.flashL.length - 1; k >= 0; k--) { const f = this.flashL[k]; if ((f.t -= dt) <= 0) { this.flashL.splice(k, 1); continue; } this.m4.makeTranslation(f.x, f.y, f.z); fl.setMatrixAt(n++, this.m4); }
     fl.count = n; fl.instanceMatrix.needsUpdate = true;

@@ -760,6 +760,8 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 
 - A level no longer wins itself (found testing generals): saucer and tripod beams were abducting their own walkers, level 1 fell from 158 to about 80 in a minute with nobody playing. people.heroFoe(j) keeps those beams off a level's enemies, so the count stays until the hero acts. Level 1 is harder for it. She can no longer be left in grabbed by a foe that let go.
 
+- The band game grows up (Sean): the songs drift, so the one steady tempo was on the beat only by luck (onset strength on against off the count: 4.55 / 4.44). beatmap.js holds every beat of each song and what the drums play on it (k, s, b, -), measured from the files by a tracker (scratchpad beats4.cjs: 7.37 / 5.05 and 6.27 / 2.98). Balls fall on real hits, kick to bass or drums, snare to drums or singer. Live PERFECT, GOOD, MISS counts and a CROWD meter; S+ and ALL PERFECT at the end, otherwise N OF M PERFECT. A miss or a tap too soon: lamps spark and flicker, the song crunches through a waveshaper with a squeal (music.bandHurt). Perfects in a row raise hype: fans press in, up to 70 more walk in from the back, flames and fireworks come more often. CROWD 45 or lower: the song skips (music.bandSkip) and no show; at 0 (25 misses from full) the song stops, the band walks off either side, grade F, Try again or Done.
+
 ## Next
 - The hero game (Sean, 2026-11-01): see HERO-PLAN.md for the whole plan and build order. Next up: floors inside smashed buildings, then the Sandbox hero lab.
 
