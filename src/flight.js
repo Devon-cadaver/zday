@@ -107,6 +107,8 @@ const CSS = `
 #zd-flybar .row{display:flex;gap:6px}
 #zd-flybar .zd-btn{flex:1 1 0;min-width:0;padding:14px 4px;font-size:11px;color:#fff;background:linear-gradient(#8a3bff,#5216c2);border-color:rgba(255,255,255,.3)}
 #zd-flybar .zd-btn.exit{background:linear-gradient(#ff5a8a,#c2165a)}
+#zd-flybar .zd-btn.grabnow{background:linear-gradient(#fff27a,#ff9d00);color:#2a1038;border-color:#fff;font-size:14px;font-weight:900;animation:zdGrabNow .45s ease-in-out infinite alternate} /* GRAB IT can be done now (Sean: it must show) */
+@keyframes zdGrabNow{from{transform:scale(1);box-shadow:0 0 8px 2px rgba(255,220,80,.7)}to{transform:scale(1.1);box-shadow:0 0 26px 10px rgba(255,220,80,.95)}}
 #zd-flybar .zd-btn.load{flex:2 1 0;background:linear-gradient(#3a2a6a,#241848)}
 #zd-flybar .zd-btn.drop{background:linear-gradient(#ffb02e,#e05a10);font-size:13px;letter-spacing:.1em}
 #zd-flybar .zd-btn.drop.wait{opacity:.45}
@@ -136,7 +138,7 @@ export class Flight {
     this.loads = LOADS[this.kind] || []; this.load = 0; this.bombs = []; this.coolT = 0; this.seedT = 0;
     try { this.invert = localStorage.getItem(INVERT) === '1'; } catch (e) { this.invert = false; }
     this.ui(); this.active = true; controls.enabled = false; post.opts.dof = false; g.setFollow(-1); LAB.reset();
-    if (this.P.hero && !this.viewSet) { this.view = 'iso'; this.viewSet = true; } // heroes start in the town's view (Sean); after that the view is as it was left
+    if (this.P.hero && !this.viewSet) { let v = null; try { v = localStorage.getItem('zday_flyview'); } catch (e) { /* no storage */ } this.view = v === 'chase' || v === 'cockpit' ? v : 'iso'; this.viewSet = true; } // heroes start in the town's view (Sean); after that the view is as it was left
     document.body.classList.add('zd-flying');
     this.spawn(); this.setView(this.view);
     if (this.P.hero && LAB.army) this.army = new Army(this); // the rogue army, if the lab has it on (army.js)
@@ -189,13 +191,13 @@ export class Flight {
     } // up from the street fight: the grab button's place in the air
     // the finger as a stick: how far it has gone from where it came down
     let id = null, ox = 0, oy = 0;
-    let t0 = 0, far = false; ov.addEventListener('pointerdown', (e) => { if (id !== null) return; t0 = performance.now(); far = false; id = e.pointerId; ox = e.clientX; oy = e.clientY; this.stick.style.display = 'block'; this.stick.style.left = ox + 'px'; this.stick.style.top = oy + 'px'; this.knob.style.transform = ''; try { ov.setPointerCapture(id); } catch (er) { /* fine */ } e.preventDefault(); });
+    const held = () => this.fromHorde && (this.fromHorde.holdPhase === 'hold' || this.fromHorde.holdPhase === 'spin'); let t0 = 0, far = false; ov.addEventListener('pointerdown', (e) => { if (id !== null) return; t0 = performance.now(); far = false; id = e.pointerId; ox = e.clientX; oy = e.clientY; this.stick.style.display = 'block'; this.stick.style.left = ox + 'px'; this.stick.style.top = oy + 'px'; this.knob.style.transform = ''; try { ov.setPointerCapture(id); } catch (er) { /* fine */ } e.preventDefault(); });
     ov.addEventListener('pointermove', (e) => {
-      if (e.pointerId !== id) return; if (Math.hypot(e.clientX - ox, e.clientY - oy) > 14) far = true; if ((this.engaged || this.riding || this.bossClose) && !far) return; // in close a tap is a punch, only a real drag flies off
+      if (e.pointerId !== id) return; if (Math.hypot(e.clientX - ox, e.clientY - oy) > 14) far = true; if (held()) { if (far) { const H = this.fromHorde; if (H.holdPhase === 'hold') H.spinStart(ox, oy); H.spinDrag(e.clientX, e.clientY); } return; } /* holding it: a finger circling on the screen spins it too */ if ((this.engaged || this.riding || this.bossClose) && !far) return; // in close a tap is a punch, only a real drag flies off
       const dx = Math.max(-1, Math.min(1, (e.clientX - ox) / 70)), dy = Math.max(-1, Math.min(1, (e.clientY - oy) / 70));
       this.ix = dx; this.iy = this.invert ? -dy : dy; this.knob.style.transform = 'translate(' + dx * 30 + 'px,' + dy * 30 + 'px)';
     });
-    const up = (e) => { if (e.pointerId !== id) return; id = null; this.ix = this.iy = 0; this.stick.style.display = 'none'; if ((this.engaged || this.riding || this.bossClose) && !far && performance.now() - t0 < 350 && this.fromHorde) this.fromHorde.airPunch(); };
+    const up = (e) => { if (e.pointerId !== id) return; id = null; this.ix = this.iy = 0; this.stick.style.display = 'none'; if (this.fromHorde) this.fromHorde.spinRelease(); if ((this.engaged || this.riding || this.bossClose) && !far && performance.now() - t0 < 350 && this.fromHorde) this.fromHorde.airPunch(); };
     ov.addEventListener('pointerup', up); ov.addEventListener('pointercancel', up);
     // two fingers: a pinch zooms (the stick let go meanwhile); the mouse wheel too
     const pts = new Map(); let pinch = null;
@@ -220,6 +222,12 @@ export class Flight {
     };
     addEventListener('keydown', this.onKey); addEventListener('keyup', this.onKey);
   }
+  // a big word across the top of the screen: what she would be told on foot
+  bigText(text, col, T = 0.8) { if (!this.ov) return; let el = this.bigEl; if (!el || !el.isConnected) { el = this.bigEl = document.createElement('div'); el.style.cssText = 'position:absolute;left:8px;right:8px;top:calc(172px + env(safe-area-inset-top));text-align:center;font:900 30px Impact,"Arial Black",sans-serif;letter-spacing:.03em;text-shadow:0 2px 6px #000,0 0 14px rgba(0,0,0,.6);pointer-events:none;transition:opacity .2s;opacity:0'; this.ov.appendChild(el); } clearTimeout(this.bigT); el.textContent = text; el.style.color = col || '#fff'; el.style.opacity = text ? '1' : '0'; if (text) this.bigT = setTimeout(() => { el.style.opacity = '0'; }, T * 1000); }
+  // the pause menu's flying options, remembered (Sean)
+  viewName() { return { iso: 'Above', chase: 'Behind', cockpit: 'First person' }[this.view] || 'Above'; }
+  cycleView() { const v = this.nextView(); this.viewSet = true; try { localStorage.setItem('zday_flyview', v); } catch (e) { /* no storage */ } if (this.active) this.setView(v); else this.view = v; }
+  flipInvert() { this.invert = !this.invert; try { localStorage.setItem(INVERT, this.invert ? '1' : '0'); } catch (e) { /* no storage */ } if (this.active && this.invBtn) this.setInvert(this.invert, true); }
   tip(text) { if (!this.tipEl) return; this.tipEl.textContent = text; this.tipEl.style.opacity = '1'; clearTimeout(this.tipT); this.tipT = setTimeout(() => { if (this.tipEl) this.tipEl.style.opacity = '0'; }, 5000); }
   // nearer or further: the chase camera's distance, or in the cockpit how wide it sees
   setZoom(z) { this.zoom = Math.max(0.45, Math.min(3, z)); if (this.view === 'cockpit') { const c = this.ctx.camera; c.fov = FOV_COCKPIT * Math.max(0.35, Math.min(1.25, this.zoom)); c.updateProjectionMatrix(); } }
@@ -409,7 +417,7 @@ export class Flight {
       if (this.state === 'fly' && this.hull < 60) g.fire.spray(this.pos.x - _f.x * 3, this.pos.z - _f.z * 3, this.pos.y, this.hull < 30 ? 4 : 2, 1, 2.2); // smoke off a hurt plane
       if (g.audio) g.audio.engine(this.state === 'fly' ? this.P.sound : null, k);
       if (this.dropBtn) { this.dropBtn.textContent = this.seedT > 0 ? 'Seeding' : 'Drop'; this.dropBtn.classList.toggle('wait', this.coolT > 0 || this.seedT > 0 || this.state !== 'fly'); }
-      if (this.smashBtn && this.fromHorde) this.smashBtn.innerHTML = this.fromHorde.airLabel();
+      if (this.smashBtn && this.fromHorde) { const lb = this.fromHorde.airLabel(), now = lb.includes('GRAB IT'); this.smashBtn.innerHTML = lb; this.smashBtn.classList.toggle('grabnow', now); if (now && !this.grabWas) this.bigText('GRAB IT!', '#ffe27a', 1.4); this.grabWas = now; }
       if (this.flyBtn) this.flyBtn.innerHTML = this.ring ? '\u2708 LEAVE' : this.riding ? '\u2708 JUMP OFF' : this.hovering ? '\u2708 FLY' : '\u23F8 HOVER';
       if (this.lockBtn) { this.lockBtn.textContent = this.lock ? 'Let go of the lock' : '\uD83C\uDFAF Lock on'; this.lockBtn.classList.toggle('on', !!this.lock); this.bar.style.visibility = ''; }
     }
