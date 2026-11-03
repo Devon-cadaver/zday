@@ -66,11 +66,11 @@ export function furnish(key, room, w, d) {
     // the door to the middle, in front of the fire
     K.box(2.0, 0.02, 5.2, 0, 0.075, 3.6, std('#3a4a7a', { roughness: 1 })); K.box(2.3, 0.015, 5.5, 0, 0.07, 3.6, std('#d9b25a'));
     K.box(4.6, 0.02, 2.2, -1.9, 0.075, -4.3, std('#6d4a22', { roughness: 1 }));
-    roundTable(K, room, 3.9, 2.3, tick); solids.push([3.9, 2.3, 2.9]);
+    roundTable(K, room, 3.5, 2.2, tick); solids.push([3.5, 2.2, 2.6]);
     fireplace(K, -1.9, -6.5, tick); solids.push([-1.9, -6.1, 1.9], [-3.3, -5.9, 0.6], [-0.5, -5.9, 0.6]);
     monitors(K, 6.3, 3.5, -6.72, 3, 2, 1.1, 0.68); monitors(K, -8.72, 2.9, 0.6, 2, 2, 1.3, 0.8, Math.PI / 2);
     const team = HS.team('hero').map(id => HS.name(id)); statue(K, room, team[0] || 'Nova', -7.7, -2.6, Math.PI / 2); solids.push([-7.7, -2.6, 1.1]); statue(K, room, team[1] || team[0] || 'Nova', 7.7, -2.4, -Math.PI / 2); solids.push([7.7, -2.4, 1.1]);
-    plant(-7.9, 5.9); plant(7.9, 5.9); lamp(-8.1, -6.1); lamp(8.2, 1.2);
+    plant(-8.3, -6.3); plant(8.4, -6.4); lamp(-8.4, 0.3); solids.push([-8.7, 3.6, 0.55], [-8.7, 4.6, 0.55], [-8.7, 5.6, 0.55]);
     for (const [bx, c] of [[-4.6, '#ff3fcf'], [0.9, '#29e3ff']]) { K.box(0.9, 2.1, 0.06, bx, 3.2, -6.77, std(c, { roughness: 1 })); K.box(1.0, 0.1, 0.1, bx, 4.3, -6.75, std('#d9b25a')); }
     K.box(0.5, 2.6, 2.4, -8.7, 1.3, 4.6, std('#4a3020')); for (let j = 0; j < 4; j++) { K.box(0.54, 0.05, 2.3, -8.68, 0.4 + j * 0.62, 4.6, std('#2c1c10')); for (let i = 0; i < 8; i++) K.box(0.22, 0.42, 0.2, -8.48, 0.64 + j * 0.62, 3.7 + i * 0.26, std(['#a33', '#37a', '#3a6', '#ca3', '#845'][(i + j * 3) % 5])); }
   } else {

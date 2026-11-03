@@ -740,6 +740,8 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 
 - BASE flies her there (Sean, 2026-11-02; it used to cut straight in). horde.toBase lets go of what she holds or rides and calls flight.baseGo; baseRun, inside arcade: up over the roofs, at 1.6 times her top speed to a point 40 m in front of the base, then down to the door, the camera turned to look the way she is going; baseArrive: a quick fade and base.start. The button reads STOP meanwhile; BASE again, a real drag, Lock on or Land stop it. A knock out of the sky ends it. The fight goes on while she flies and she can be shot. Test: run-test.cjs.
 
+- Base walking round 2 (Sean: stuck behind the tree in the corner; the joystick dead on the right of the screen): a drag anywhere walks, a tap anywhere goes there (pressP, 12 px decides). solidOut: head on into a round thing she goes round it, walls are applied after the furniture, and pushing without getting anywhere for 0.6 s next to something lets her squeeze past for 0.5 s, so she cannot be held. Plants out of the corners nearest the camera, the bookcase solid, the table a little further from the wall. walk-test.cjs maps where she can walk.
+
 ## Next
 - The hero game (Sean, 2026-11-01): see HERO-PLAN.md for the whole plan and build order. Next up: floors inside smashed buildings, then the Sandbox hero lab.
 
