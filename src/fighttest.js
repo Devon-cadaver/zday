@@ -75,7 +75,7 @@ body.zd-flying #zd-side{top:calc(112px + env(safe-area-inset-top));transform:non
 #zd-fight .hint{position:absolute;left:10px;right:10px;bottom:calc(212px + env(safe-area-inset-bottom));text-align:center;font:700 12px/1.45 system-ui,sans-serif;text-shadow:0 1px 3px #000;pointer-events:none;opacity:.9;transition:opacity .6s}
 #zd-fight .acts{position:absolute;right:12px;top:calc(60px + env(safe-area-inset-top));display:flex;gap:6px}
 #zd-fight button{appearance:none;border:2px solid rgba(255,255,255,.35);border-radius:12px;padding:9px 14px;font:800 12px system-ui,sans-serif;color:#fff;background:rgba(40,20,60,.85);cursor:pointer}
-#zd-fight .en{height:6px;margin-top:3px;border-radius:3px;background:rgba(0,0,0,.55);overflow:hidden}
+#zd-fight .en{height:9px;margin-top:3px;border-radius:3px;background:rgba(0,0,0,.55);overflow:hidden}
 #zd-fight .en i{display:block;height:100%;width:30%;background:linear-gradient(90deg,#4fd8ff,#ffe27a)}
 #zd-fight .row4{position:absolute;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));display:flex;gap:8px}
 #zd-fight .row4>button{flex:1 1 0;min-width:0;height:64px;padding:0;border-radius:16px;font:900 13px/1.15 system-ui,sans-serif;letter-spacing:.03em;touch-action:none;position:relative;overflow:hidden}

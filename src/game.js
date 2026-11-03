@@ -80,6 +80,7 @@ const CSS = `
 .zd-card.sel{border-color:#a6ff4d;box-shadow:0 0 0 2px rgba(166,255,77,.35) inset;background:rgba(60,88,30,.85)}
 .zd-card.off{opacity:.45}
 .zd-nuke{border-color:rgba(255,90,60,.5)}.zd-nuke .cost{color:#ff8a6a}
+body.zd-flying #zd-toast{left:calc(50% + 28px);max-width:calc(100vw - 180px)}
 #zd-toast{position:fixed;left:50%;top:calc(112px + env(safe-area-inset-top));transform:translateX(-50%);max-width:min(80vw,380px);
   background:rgba(28,20,12,.66);color:#f6ead2;border:1px solid rgba(255,236,200,.14);border-radius:9px;padding:6px 10px;
   font:600 12px/1.3 system-ui,-apple-system,"Segoe UI",sans-serif;text-align:center;pointer-events:none;transition:opacity .4s;opacity:0}

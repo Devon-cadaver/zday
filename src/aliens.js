@@ -130,7 +130,7 @@ export class Invasion {
     if (!this.leaving && (this.t > this.life || (this.toLaunch === 0 && tripodsDown && this.saucers.every(beaten)))) {
       this.leaving = true; for (const t of this.tripods) t.recall();
       const won = tripodsDown && this.saucers.every(beaten);
-      D.emit({ type: 'aliensend', won, text: won ? 'Every saucer is down. The mothership is retreating' : 'The aliens are leaving with their captives' });
+      D.emit({ type: 'aliensend', won, text: won ? (D.ctx.people.heroOnly ? 'Every saucer is down. Finish the ones on the ground!' : 'Every saucer is down. The mothership is retreating') : 'The aliens are leaving with their captives' });
     }
     for (const s of this.saucers) { this.saucerStep(s, h); this.clear(s, h); }
     this.spread(h);

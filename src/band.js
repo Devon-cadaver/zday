@@ -223,7 +223,7 @@ export class Band {
     for (const f of this.fans) { const dx = f.x - sx, dz = f.z - sz, d = Math.hypot(dx, dz) || 1; f.vx = dx / d * (5 + Math.random() * 3); f.vz = dz / d * (5 + Math.random() * 3); f.run = true; }
     this.fa.arrays.anim.fill(2); this.fa.attrs.anim.needsUpdate = true;
     if (vanish) { this.g.visible = false; this.crowd.visible = false; }
-    this.ctx.disasters.emit({ type: 'bandstop', x: sx, z: sz, text: why });
+    { const G = this.ctx.game, M = G && G.mode; if (!(M && M.round)) this.ctx.disasters.emit({ type: 'bandstop', x: sx, z: sz, text: why }); } // a story level (HeroGame's round) is not about the concert
   }
 
   // is the show still on? the stage's building, a disaster on it, fire, water, a pit, the undead in the crowd
