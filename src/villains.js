@@ -8,6 +8,7 @@
 // the stuck cars. People scatter from all three and get out of buildings before
 // they come down. In the Sandbox they run riot on their own; in Be The Disaster
 // you control one at a time.
+import { addHeadgear } from './headgear.js';
 import * as THREE from 'three';
 import { Splash } from './water.js';
 import { ST } from './people.js';
@@ -234,8 +235,8 @@ export function pinPose(r, f) {
   }
 }
 export function villainRig(name, of) {
-  const base = vmats(name), mats = of ? { ...base, ...(of.suit ? { suit: clothMat(of.suit) } : null), ...(of.cape ? { cape: clothMat(of.cape, { side: THREE.DoubleSide, repeat: [5, 9] }) } : null), ...(of.dark ? { glove: clothMat(of.dark, { bumpScale: 0.15 }), boot: clothMat(of.dark, { bumpScale: 0.15 }) } : null) } : base;
-  const r = rig({ mats, arms: name === 'Weaver' ? 6 : 2, eyes: name === 'Tyrant', extras: of || {} }); relax(r); r.wings = []; return r;
+  const base = vmats(name), mats = of ? { ...base, ...(of.belt ? { belt: new THREE.MeshStandardMaterial({ color: of.belt, metalness: 0.4, roughness: 0.45 }) } : null), ...(of.suit ? { suit: clothMat(of.suit) } : null), ...(of.cape ? { cape: clothMat(of.cape, { side: THREE.DoubleSide, repeat: [5, 9] }) } : null), ...(of.dark ? { glove: clothMat(of.dark, { bumpScale: 0.15 }), boot: clothMat(of.dark, { bumpScale: 0.15 }) } : null) } : base;
+  const r = rig({ mats, arms: name === 'Weaver' ? 6 : 2, eyes: name === 'Tyrant', extras: of || {} }); relax(r); addHeadgear(r, of); r.wings = []; return r;
 }
 export function handsOnHips(r) {
   r.legs[0].hip.rotation.z = -0.09; r.legs[1].hip.rotation.z = 0.09;

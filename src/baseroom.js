@@ -31,8 +31,13 @@ function seated(room, name, x, z, ry, i) {
   const r = rigFor(name, HS.outfit(name)); r.root.position.set(x, -0.28, z); r.root.rotation.y = ry; for (const L of r.legs) { L.hip.rotation.x = -1.5; L.knee.rotation.x = 1.5; } r.arms.forEach((a, k) => { a.sh.rotation.set(-1.15 + (k + i) % 2 * 0.2, 0, a.sx * 0.12); a.el.rotation.set(-0.5, 0, 0); }); if (r.cape) r.cape.update(0.05, 0.05, 0.1); detail(r, null, true); room.add(r.root); return r;
 }
 function roundTable(K, room, x, z, tick) {
-  const others = HS.team('hero').map(id => HS.name(id)).filter(n => n !== HS.curName('hero')).slice(0, 3), seats = 4, chair = std('#2f2238');
-  for (let i = 0; i < seats; i++) { const a = Math.PI * 0.25 + i * Math.PI * 2 / seats, cx = x + Math.cos(a) * 2.25, cz = z + Math.sin(a) * 2.25, ry = Math.atan2(x - cx, z - cz); K.box(0.8, 0.1, 0.8, cx, 0.5, cz, chair, ry, true); K.box(0.8, 0.95, 0.1, cx + Math.cos(a) * 0.37, 0.98, cz + Math.sin(a) * 0.37, chair, ry); K.cyl(0.05, 0.05, 0.5, cx, 0.25, cz, std('#1a1420'), 6); const hx = x + Math.cos(a) * 1.95, hz = z + Math.sin(a) * 1.95; if (others[i]) seated(room, others[i], hx, hz, ry, i); K.cyl(0.08, 0.07, 0.14, x + Math.cos(a) * 1.15, 0.97, z + Math.sin(a) * 1.15, std('#e8e2d6'), 8); }
+  const seats = 4, chair = std('#2f2238');
+  for (let i = 0; i < seats; i++) { const a = Math.PI * 0.25 + i * Math.PI * 2 / seats, cx = x + Math.cos(a) * 2.25, cz = z + Math.sin(a) * 2.25, ry = Math.atan2(x - cx, z - cz); K.box(0.8, 0.1, 0.8, cx, 0.5, cz, chair, ry, true); K.box(0.8, 0.95, 0.1, cx + Math.cos(a) * 0.37, 0.98, cz + Math.sin(a) * 0.37, chair, ry); K.cyl(0.05, 0.05, 0.5, cx, 0.25, cz, std('#1a1420'), 6); K.cyl(0.08, 0.07, 0.14, x + Math.cos(a) * 1.15, 0.97, z + Math.sin(a) * 1.15, std('#e8e2d6'), 8); }
+}
+// those of the team who are not the one being played, in the looks they were given: made again when that changes
+export function seatTeam(room, x = 3.5, z = 2.2) {
+  if (room.userData.seats) room.remove(room.userData.seats); const g = room.userData.seats = new THREE.Group(); room.add(g); const others = HS.team('hero').map(id => HS.name(id)).filter(n => n !== HS.curName('hero')).slice(0, 3);
+  others.forEach((n, i) => { const a = Math.PI * 0.25 + i * Math.PI * 2 / 4, cx = x + Math.cos(a) * 2.25, cz = z + Math.sin(a) * 2.25; g.userData['s' + i] = seated(g, n, x + Math.cos(a) * 1.95, z + Math.sin(a) * 1.95, Math.atan2(x - cx, z - cz), i); });
 }
 function superCar(room, x, z, ry) {
   const g = new THREE.Group(), s = new THREE.Shape(); s.moveTo(-2.5, 0.28); s.lineTo(2.55, 0.28); s.lineTo(2.6, 0.62); s.lineTo(0.95, 0.82); s.lineTo(0.1, 1.2); s.lineTo(-1.15, 1.2); s.lineTo(-2.2, 0.92); s.lineTo(-2.6, 0.95); s.closePath();
@@ -54,7 +59,7 @@ export function furnish(key, room, w, d) {
   const K = kit(room), solids = [], tick = [], lamp = (x, z) => { K.cyl(0.05, 0.08, 1.9, x, 0.95, z, std('#2a2a2e'), 8); K.cyl(0.2, 0.32, 0.36, x, 1.95, z, glow('#ffd9a0', 1.2), 12); solids.push([x, z, 0.35]); }, plant = (x, z, s = 1) => { K.cyl(0.32 * s, 0.24 * s, 0.5 * s, x, 0.25 * s, z, std('#7a4a30'), 10); K.add(new THREE.Mesh(new THREE.IcosahedronGeometry(0.62 * s, 0), std('#4a7a34', { flatShading: true })), x, 1 * s, z, 0, true); solids.push([x, z, 0.5]); };
   if (key === 'office') {
     // the door to the middle, in front of the fire
-    roundTable(K, room, 3.5, 2.2, tick); solids.push([3.5, 2.2, 2.6]);
+    roundTable(K, room, 3.5, 2.2, tick); seatTeam(room, 3.5, 2.2); solids.push([3.5, 2.2, 2.6]);
     solids.push([-1.9, -6.1, 1.9], [-3.3, -5.9, 0.6], [-0.5, -5.9, 0.6]);
     monitors(K, 6.3, 3.5, -6.72, 3, 2, 1.1, 0.68); monitors(K, -8.72, 2.9, 0.6, 2, 2, 1.3, 0.8, Math.PI / 2);
     const team = HS.team('hero').map(id => HS.name(id)); statue(K, room, team[0] || 'Nova', -7.7, -2.6, Math.PI / 2); solids.push([-7.7, -2.6, 1.1]); statue(K, room, team[1] || team[0] || 'Nova', 7.7, -2.4, -Math.PI / 2); solids.push([7.7, -2.4, 1.1]);

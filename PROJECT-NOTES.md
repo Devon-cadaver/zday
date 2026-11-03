@@ -746,6 +746,12 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 
 - Names (Sean, 2026-11-02: The Skull Runner, Mr Death Face, The Black Kay): names.js, four scroll wheels (title, colour, name, ending, each may be left out) and Randomize, tens of millions of names, Back to the character's own. In the Wardrobe, and Change the name on the Defend and Destroy pick screens. Saved as chars[id].nick. HS.shown(id) and HS.disp(rigName) are what is displayed (cards, Play, Computer, HUD, fight bars, team-up, crossing over); HS.name stays the character's own, as the rigs and outfits go by it. name-test.cjs.
 
+- Headgear and belt (Sean, 2026-11-02): headgear.js, 31 choices (skull, hood, cowl, cowboy hat, head band, eye band, eye mask, visor, goggles, ninja, helmet, knight, viking, crowns, hats, gas mask, space helmet, robot, pumpkin and more), built on the rig's head for heroes and villains alike; outfit fields hg, hgc (its colour, else its own) and belt. Wardrobe now has tabs: Headgear (a strip with arrows, then its colours), Colours (suit, cape, belt, boots and gloves), Name; the camera comes down close on her (closeUp), facing her, so each change shows. Black in every list. The base is the hero side's: villains still have no wardrobe.
+
+- Keeping their look (Sean, 2026-11-02): the table was made once on walking in and nothing in the wardrobe could reach anyone but the one being played. The wardrobe has a row of the team: picking one makes them the one at the base (setWho) and the others go to the table in their looks (seatTeam). look-test.cjs checks the table and the menu's three against what was chosen.
+
+- The town camera reaches the home base (Sean, the Sandbox: it stopped at the edge of town, so the base stayed in the blurred foreground): its limit on the east runs to 30 m past the base. cam-test.cjs.
+
 ## Next
 - The hero game (Sean, 2026-11-01): see HERO-PLAN.md for the whole plan and build order. Next up: floors inside smashed buildings, then the Sandbox hero lab.
 

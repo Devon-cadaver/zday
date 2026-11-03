@@ -181,7 +181,7 @@ function frameBody() {
   if (!fl) controls.update();
   // keep the view over the city
   const tg = controls.target;
-  const cx = THREE.MathUtils.clamp(tg.x, B.x0 + M, B.x1 - M), cz = THREE.MathUtils.clamp(tg.z, B.z0 + M, B.z1 - M);
+  const bs = game.base && game.base.placed ? game.base.x + 30 : -Infinity /* Sean: the camera can get to the home base, just outside the town */, cx = THREE.MathUtils.clamp(tg.x, B.x0 + M, Math.max(B.x1 - M, bs)), cz = THREE.MathUtils.clamp(tg.z, B.z0 + M, B.z1 - M);
   if (!fl && (cx !== tg.x || cz !== tg.z)) { camera.position.x += cx - tg.x; camera.position.z += cz - tg.z; tg.x = cx; tg.z = cz; }
   tg.y = 0;
 

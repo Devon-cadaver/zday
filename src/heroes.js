@@ -11,6 +11,7 @@
 // broken up and its pieces go up too. In a flood or a tsunami they pull people
 // out of the water two at a time and fly them up onto a roof clear of it, and
 // Tempo holds back the incoming wave with his bubbles.
+import { addHeadgear } from './headgear.js';
 import * as THREE from 'three';
 import { clothMat } from './cloth.js';
 import { rig, relax, handsOnHips, tumble, detail, pinPose } from './villains.js';
@@ -455,8 +456,8 @@ export function heroModel(name) { return heroRig(name).root; }
 // the same, the rig itself to pose (flight.js: a hero the player flies); r.wings: Dragonfly's, to beat
 export function heroRig(name, of) { // of: an outfit (herogame.js): colours and extras
   const K = kit(), base = { ...K, ...K.look[name], hair: K.hair[name] }, ec = new THREE.Color(of && of.suit ? of.suit : '#000000');
-  if (of) { if (of.suit) base.suit = clothMat(of.suit, { emissive: ec, emissiveIntensity: 0.22 }); if (of.cape) base.cape = clothMat(of.cape, { side: THREE.DoubleSide, repeat: [5, 9] }); if (of.dark) { base.boot = clothMat(of.dark, { bumpScale: 0.15 }); base.glove = clothMat(of.dark, { bumpScale: 0.15 }); } }
-  const r = rig({ mats: base, slim: name === 'Nova', longHair: name === 'Nova', capeLen: 1.1, extras: of || {} }); relax(r); handsOnHips(r);
+  if (of) { if (of.belt) base.belt = new THREE.MeshStandardMaterial({ color: of.belt, metalness: 0.4, roughness: 0.45 }); if (of.suit) base.suit = clothMat(of.suit, { emissive: ec, emissiveIntensity: 0.22 }); if (of.cape) base.cape = clothMat(of.cape, { side: THREE.DoubleSide, repeat: [5, 9] }); if (of.dark) { base.boot = clothMat(of.dark, { bumpScale: 0.15 }); base.glove = clothMat(of.dark, { bumpScale: 0.15 }); } }
+  const r = rig({ mats: base, slim: name === 'Nova', longHair: name === 'Nova', capeLen: 1.1, extras: of || {} }); relax(r); handsOnHips(r); addHeadgear(r, of);
   const wings = [];
   if (name === 'Dragonfly') for (const [sx, y, sweep] of [[1, 0.46, 0.25], [-1, 0.46, 0.25], [1, 0.38, 0.7], [-1, 0.38, 0.7]]) {
     const pv = new THREE.Group(); pv.position.set(sx * 0.06, y, -0.12); pv.scale.x = sx; pv.rotation.y = -sweep; r.torso.add(pv);
