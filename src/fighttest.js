@@ -306,6 +306,7 @@ export class FightTest {
     if (A.seize) { v.go('swung', C.swung); h.go('spin', C.spinH); this.spinA = Math.atan2(nx, nz); this.turned = 0; this.spinAdd = 0; v.vx = v.vz = v.vy = 0; this.say('SPIN!', 0.7, '#ffd27a'); sfx('whoosh', h.x, h.y + 0.84, h.z, { gain: 0.9 }); return; }
     if (A.launch) { v.go('air', CLIPS.hitUp); v.vy = 18 + 22 * (this.k1 || 0); v.vx = 0; v.vz = 0; v.y = this.top + 0.21; this.finStage = 'rise'; this.say('TAP: FLY UP!', 1.5, '#ffd27a'); return; }
     if (A.knock || v.hp <= 0) { const K = A.knock || [14, 5]; v.go('flung', CLIPS[A.react]); v.vx = nx * K[0] * KB; v.vz = nz * K[0] * KB; v.vy = K[1]; return; }
+    if ((this.sinceAtk || 0) >= 2.6 && !this.over && v.hp > 0) { v.vx = nx * A.kb * 0.5; v.vz = nz * A.kb * 0.5; this.vilAtk(d < 2.8 ? 'shove' : 'charge'); return; } // its turn, through your blow
     v.go('stun', CLIPS[A.react]); v.vx = nx * A.kb; v.vz = nz * A.kb;
   }
   // held by the feet, the body one line with the arms: the feet at the hands, the head out beyond them
@@ -437,7 +438,7 @@ export class FightTest {
         if (this.over) { this.face(v, h, dt, 4); break; } this.slide(v, dt); this.face(v, h, dt, 6); v.armor = false; if (v.clip !== C.guard) v.play(C.guard); if (!['idle', 'attack', 'lunge', 'dodge', 'charge', 'land'].includes(h.state)) { this.cool = Math.max(this.cool, 0.4); }
         // round the hero, or in closer
         const r = 3.4, a = Math.atan2(v.z - h.z, v.x - h.x) + this.dirC * 0.5, tx = d > r + 2 ? h.x : h.x + Math.cos(a) * r, tz = d > r + 2 ? h.z : h.z + Math.sin(a) * r; this.walk(v, tx, tz, d > r + 2 ? 6 : 3.2, dt);
-        if ((this.cool -= dt * (0.8 + 1.5 * this.kAI)) <= 0 && this.gap <= 0) { const q = Math.random(); this.dirC = Math.random() < 0.5 ? 1 : -1; if (d > 4.6) { if (q < 0.3) this.vilAtk('charge'); else v.go('close'); } else if (d < 2.8) this.closePick(); else if (q < 0.3) this.vilAtk('charge'); else { v.go('close'); } }
+        if (((this.cool -= dt * (0.8 + 1.5 * this.kAI)) <= 0 && this.gap <= 0) || (this.sinceAtk || 0) >= 2.6) { const q = Math.random(); this.dirC = Math.random() < 0.5 ? 1 : -1; if (d > 4.6) { if (q < 0.3) this.vilAtk('charge'); else v.go('close'); } else if (d < 2.8) this.closePick(); else if (q < 0.3) this.vilAtk('charge'); else { v.go('close'); } }
         break;
       }
       case 'close': this.face(v, h, dt, 8); this.walk(v, h.x, h.z, 6.5, dt); if (d < 2.3) this.closePick(); else if (v.t > 2.2) { v.go('idle'); this.cool = 0.4; } break;
@@ -457,7 +458,7 @@ export class FightTest {
       case 'pushed': this.slide(v, dt, 3); if (Math.random() < 0.5) this.chips(v.x, v.z); this.smashBoxes(v.x, v.z, 1.2, 6); if (v.t > 0.7) { v.go('idle', C.guard); this.cool = 0.5; } break;
       case 'air': case 'flung': case 'slammed': if (this.finKind === 'sky' && this.finStage === 'rise' && v.vy < 1) { this.skyRise(); break; } if (Math.hypot(v.vx, v.vz) > 8) this.smashBoxes(v.x, v.z, 1.2, 10); v.vy -= G * dt; v.y += v.vy * dt; this.slide(v, dt, 1); if (v.y <= this.top) { const hard = v.state === 'slammed', was = v.state; v.y = this.top; v.vy = 0; v.vx *= 0.2; v.vz *= 0.2; v.go('down', hard ? CLIPS.crushed : C.down); if (hard) { this.killBlow(); this.puff(v, 1); this.g.shake = Math.max(this.g.shake || 0, 1); this.g.hitStop = 0.1; v.play(C.down); } else { if (was === 'air') this.hurtV(6); this.puff(v, 0.5 + 0.5 * (v.tossK || 0)); v.tossK = 0; } this.launched = false; } break;
       case 'down': this.slide(v, dt); if (this.fin) { if (!this.over && v.t > (this.finKind === 'sky' ? 1.6 : 0.5)) this.finish(true); break; } if (v.t > 1.3) v.go('getup', C.getup); break;
-      case 'getup': if (v.t > 0.55) { if (v.hp <= 0) { this.daze(); break; } v.go('idle', C.guard); if (d < 5 && Math.random() < this.kAI) { this.vilAtk(d < 2.8 ? (Math.random() < 0.7 ? 'jab' : 'grab') : 'charge'); v.armor = true; } else { this.cool = 0.6; this.gap = Math.max(this.gap || 0, 0.8); } } break; // up and straight at you: jabs won't stop this one
+      case 'getup': if (v.t > 0.55) { if (v.hp <= 0) { this.daze(); break; } v.go('idle', C.guard); if ((d < 5 && Math.random() < this.kAI) || (this.sinceAtk || 0) >= 2.6) { this.vilAtk(d < 2.8 ? (Math.random() < 0.7 ? 'jab' : 'grab') : 'charge'); v.armor = true; } else { this.cool = 0.6; this.gap = Math.max(this.gap || 0, 0.8); } } break; // up and straight at you: jabs won't stop this one
       default: break;
     }
   }

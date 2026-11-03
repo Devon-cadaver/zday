@@ -802,7 +802,7 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 
 ## Street fights: pace (2026-11-03; fighttest.js, kit.js)
 - `fightPace()` scales the fight's dt (Slower 0.8 by default; zday_fight_speed; pause menu). The horde has none of this: Sean has not said if zombie fights are too fast.
-- `this.gap`: the foe's idle will not start an attack until 0. Set by vilAtk (wind time + 1.4 - 0.6 kAI) and by your hits (1.1 - 0.4 kAI) unless `sinceAtk` >= 2.6 (fight seconds): then its turn comes and that attack is armoured (jabs do not stop it). Wind-ups x 1.25, 'WATCH OUT!'. Punched-back chances cut (block 0.4 kAI, stun 0.25 kAI); getting up it charges only by chance of kAI.
+- `this.gap`: the foe's idle will not start an attack until 0. Set by vilAtk (wind time + 1.4 - 0.6 kAI) and by your hits (1.1 - 0.4 kAI) unless `sinceAtk` >= 2.6 (fight seconds): then its turn comes whatever it is doing (idle, the next jab, getting up) and that attack is armoured (jabs do not stop it). Your turn: it cannot block (gap > 0). Wind-ups x 1.25, 'WATCH OUT!'. Punched-back chances cut (block 0.4 kAI, stun 0.25 kAI); getting up it charges only by chance of kAI.
 - Taps: next blow at 85% of the last; a tap in the first half of the wind-up is dropped; jabs end at 0.3 not 0.24. KB 0.65 on knock and push, kick 10 + 22k, hero flung 13 not 18, a held beam lets go at 13 m. Far away it mostly walks up (charge 30%, not 65%).
 - To revert: git revert the commit, or KB, gap and fightPace one at a time.
 
