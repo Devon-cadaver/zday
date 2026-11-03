@@ -121,7 +121,7 @@ export class People {
     this.hx0 = B.x0 - HALF; this.hz0 = B.z0 - HALF;
     this.hw = Math.ceil((B.x1 - B.x0 + 2 * HALF) / CELL) + 1;
     this.hh = Math.ceil((B.z1 - B.z0 + 2 * HALF) / CELL) + 1;
-    this.head = new Int32Array(this.hw * this.hh);
+    this.head = new Int32Array(this.hw * this.hh).fill(-1); // empty, not all pointing at person 0: a disaster started before the first frame (a new town) looped for ever
     this.next = new Int32Array(N);
 
     // figures: one instanced mesh, per-instance looks and animation id
@@ -1477,6 +1477,8 @@ export class People {
     A.kit[i * 4 + 1] = (A.kit[i * 4 + 1] | 0) & ~FLAG.GLOW;
     this.lookDirty = true; this.dirty[i] = 4;
   }
+  // a hero's fire, one street (stormgame.js); how many came back
+  thawNear(x, z, R) { let n = 0; this.around(x, z, R, (i) => { if (this.st[i] !== S.FROZEN || this.fx[i] >= 8) return; if (this.wz[i]) { this.st[i] = S.ZOMBIE; this.t1[i] = 0; } else { this.st[i] = S.IDLE; this.setLook(i, this.base[i]); this.dirty[i] = 0; n++; } }); return n; }
   thawAll() {
     for (let i = 0; i < this.active; i++) {
       if (this.st[i] !== S.FROZEN || this.fx[i] === 8) continue;

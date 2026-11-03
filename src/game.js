@@ -2,6 +2,7 @@
 // simulation, follow camera. Modes plug in: Commander (send help to the city),
 // Be The Disaster (drive one yourself) and Sandbox (drop zombies and disasters).
 import { openStation } from './radiobox.js';
+import { openLevels } from './levelmenu.js';
 import * as THREE from 'three';
 import { ST, KIND } from './people.js';
 import { Commander } from './commander.js';
@@ -22,7 +23,7 @@ import { HeroGame, HS, pickScreen } from './herogame.js';
 import { loadKit, saveKit, STUNS, KNOCKS, MELEES } from './kit.js';
 
 const CSS = `
-#zd-top{position:fixed;left:0;right:0;top:0;display:flex;gap:6px;align-items:center;justify-content:center;flex-wrap:wrap;
+#zd-top{position:fixed;left:0;right:70px;top:0;display:flex;gap:6px;align-items:center;justify-content:center;flex-wrap:wrap;
   padding:calc(8px + env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 0 max(10px, env(safe-area-inset-left));pointer-events:none;
   font:600 12px/1 system-ui,-apple-system,"Segoe UI",sans-serif;color:#f6ead2;letter-spacing:.04em}
 .zd-pill{display:flex;gap:6px;align-items:baseline;background:rgba(28,20,12,.62);border:1px solid rgba(255,236,200,.14);
@@ -240,15 +241,15 @@ body.zd-menu-on.zd-main #zd-side .zd-side-btn{background:rgba(12,18,34,.75);bord
 #zd-dis .zd-btn.hero{color:#ffe08a;border-color:rgba(255,224,138,.45)}
 #zd-dis .zd-btn.auto{color:#7be0ff;border-color:rgba(123,224,255,.4)}
 #zd-dis .zd-btn.auto.off{color:#f6ead2;opacity:.6;border-color:rgba(255,236,200,.18)}
-#zd-compass{width:40px;height:40px;border-radius:20px;padding:0;cursor:pointer;
+#zd-compass{position:fixed;left:40px;top:calc(60px + env(safe-area-inset-top));z-index:30;width:40px;height:40px;border-radius:20px;padding:0;cursor:pointer;
   border:1px solid rgba(255,236,200,.18);background:rgba(28,20,12,.72);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);touch-action:manipulation}
 #zd-compass svg{display:block;width:100%;height:100%}
 #zd-compass text{font:700 7.5px system-ui,-apple-system,"Segoe UI",sans-serif;fill:#f6ead2;text-anchor:middle;dominant-baseline:central}
 #zd-compass text.n{fill:#ff7a5a;font-size:9px}
 body.zd-menu-on #zd-compass,body.zd-panel #zd-compass{display:none}
-#zd-pause{width:40px;height:40px;border-radius:20px;padding:0;cursor:pointer;
+#zd-pause{position:fixed;right:12px;top:calc(10px + env(safe-area-inset-top));z-index:30;width:52px;height:52px;border-radius:26px;padding:0;cursor:pointer;
   border:1px solid rgba(255,236,200,.18);background:rgba(28,20,12,.72);color:#f6ead2;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);touch-action:manipulation}
-#zd-pause svg{width:18px;height:18px;display:block;margin:auto;fill:currentColor}
+#zd-pause svg{width:24px;height:24px;display:block;margin:auto;fill:currentColor}
 #zd-pause.on{border-color:#ffc233;color:#ffc233}
 body.zd-menu-on #zd-pause,body.zd-panel #zd-pause{display:none}
 body.zd-globe-on #zd-compass,body.zd-globe-on #zd-pause{display:none}
@@ -698,11 +699,11 @@ export class Game {
     cp.innerHTML = '<svg viewBox="0 0 48 48" aria-hidden="true"><g class="rose"><path d="M24 9 27.6 24 24 22 20.4 24z" fill="#ff5a3a"/><path d="M24 39 27.6 24 24 26 20.4 24z" fill="#f6ead2" opacity=".5"/>' +
       '<text class="n" x="24" y="6">N</text><text x="42" y="24.5">E</text><text x="24" y="42.5">S</text><text x="6" y="24.5">W</text></g></svg>';
     cp.onclick = () => { const off = this.camera.position.clone().sub(this.controls.target); this.faceNorth = { t: 0, from: Math.atan2(off.x, off.z) }; };
-    sideAdd(cp); this.rose = cp.querySelector('.rose'); this.roseA = 999;
+    document.body.appendChild(cp); /* not in the side column: its transform would carry position:fixed with it */ this.rose = cp.querySelector('.rose'); this.roseA = 999;
     // pause: the world and the round clock stop (the camera still moves); a tap goes on
     const pz = this.pauseBtn = document.createElement('button'); pz.type = 'button'; pz.id = 'zd-pause'; pz.title = 'Pause'; pz.setAttribute('aria-label', 'Pause');
     const ps = this.pausedEl = document.createElement('div'); ps.id = 'zd-paused'; ps.hidden = true; ps.innerHTML = '<div style="font-size:22px;margin-bottom:8px">PAUSED</div><div class="row"></div><small>Sound, music and the radio</small><button type="button" data-resume style="display:block;padding:12px 14px;border-radius:10px;border:0;background:linear-gradient(#ffc233,#d9860e);color:#2a1038;font:900 15px system-ui,sans-serif;cursor:pointer;touch-action:manipulation">\u25B6 RESUME</button><button type="button" data-station style="display:block;margin:8px auto 2px;padding:10px 14px;border-radius:10px;border:1px solid rgba(255,194,51,.6);background:rgba(255,194,51,.16);color:#ffe2a0;font:700 13px system-ui,sans-serif;cursor:pointer;touch-action:manipulation">\u{1F3B6} RADIO STATION</button><button type="button" data-home style="display:block;width:100%;margin:6px auto 2px;padding:10px 14px;border-radius:10px;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.08);color:#fff;font:700 13px system-ui,sans-serif;cursor:pointer;touch-action:manipulation">MAIN MENU</button>'; ps.addEventListener('click', (e) => e.stopPropagation()); { const q = this.homeBtn = ps.querySelector('[data-home]'); q.onclick = () => { if (q.dataset.sure) { this.leaveToMenu(); return; } q.dataset.sure = '1'; q.textContent = 'LEAVE THIS GAME? TAP AGAIN'; clearTimeout(this.homeT); this.homeT = setTimeout(() => this.homeReset(), 4000); }; } ps.querySelector('[data-resume]').onclick = () => this.setPaused(false); ps.querySelector('[data-station]').onclick = () => { if (this.audio) openStation(this.audio.music); }; { const mk = (attr) => { const q = document.createElement('button'); q.type = 'button'; q.setAttribute(attr, ''); q.style.cssText = 'display:block;width:100%;margin:6px auto 2px;padding:10px 14px;border-radius:10px;border:1px solid rgba(120,200,255,.6);background:rgba(120,200,255,.14);color:#d8f0ff;font:700 13px system-ui,sans-serif;cursor:pointer;touch-action:manipulation'; ps.querySelector('[data-home]').before(q); return q; }; const v = mk('data-flyview'), i = mk('data-flyinv'); this.flyOpts = () => { const F = this.flight; if (!F) { v.style.display = i.style.display = 'none'; return; } v.textContent = 'Flying view: ' + F.viewName(); i.textContent = 'Invert (behind, first person): ' + (F.invert ? 'ON' : 'OFF'); }; v.onclick = () => { if (this.flight) { this.flight.cycleView(); this.flyOpts(); } }; i.onclick = () => { if (this.flight) { this.flight.flipInvert(); this.flyOpts(); } }; }
-    pz.onclick = () => this.setPaused(!this.paused); sideAdd(pz); document.body.append(ps); this.setPaused(false);
+    pz.onclick = () => this.setPaused(!this.paused); document.body.appendChild(pz); document.body.append(ps); this.setPaused(false);
     const barH = () => document.documentElement.style.setProperty('--zd-bar-h', this.bar.offsetHeight + 'px');
     if (window.ResizeObserver) new ResizeObserver(barH).observe(this.bar); else setInterval(barH, 500);
   }
@@ -1147,7 +1148,7 @@ class Sandbox {
     g.addButton('zd-reset', 'Reset', () => this.reset());
     g.addButton('zd-menu-btn', 'Menu', () => g.toMenu());
     this.buildPanel(); this.bindHold();
-    setTimeout(() => { if (!g.base) return; g.addButton('zd-basebtn', 'Home Base', () => g.base.start()); g.addButton('zd-takeoff', 'Take off', () => { const F = g.flight; if (F.active || g.base.active) return; F.heroGame = true; F.start((HS.load().hero || {}).flyer || 'nova'); F.pos.set(g.base.x, g.base.y + 2, g.base.z + g.base.S.d / 2 + 5); F.yaw = Math.PI / 2; F.pitch = 0.8; F.speed = 4; F.thr = 4; F.setView('iso'); g.toast('Up from the base. Land anywhere in the street', 2500); }); /* take-off from the street outside the base (Sean: not from inside) */ g.base.place(); if (!new URLSearchParams(location.search).has('out')) g.base.start(); }, 0); // the Sandbox starts inside the base (base.js); ?out=1 starts in the street
+    setTimeout(() => { if (!g.base) return; g.addButton('zd-levels-b', 'Test levels', () => openLevels(g)); g.addButton('zd-basebtn', 'Home Base', () => g.base.start()); g.addButton('zd-takeoff', 'Take off', () => { const F = g.flight; if (F.active || g.base.active) return; F.heroGame = true; F.start((HS.load().hero || {}).flyer || 'nova'); F.pos.set(g.base.x, g.base.y + 2, g.base.z + g.base.S.d / 2 + 5); F.yaw = Math.PI / 2; F.pitch = 0.8; F.speed = 4; F.thr = 4; F.setView('iso'); g.toast('Up from the base. Land anywhere in the street', 2500); }); /* take-off from the street outside the base (Sean: not from inside) */ g.base.place(); if (!new URLSearchParams(location.search).has('out')) g.base.start(); }, 0); // the Sandbox starts inside the base (base.js); ?out=1 starts in the street
     this.dropsLeft = START_DROPS; this.clock = -1; this.milestone = 0;
     g.toast('Open Disasters to unleash a disaster, then fly a plane, drive a tank or patrol as a police officer', 4500);
   }

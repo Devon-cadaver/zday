@@ -24,7 +24,7 @@ const _v = new THREE.Vector3(), _w = new THREE.Vector3();
 
 const CSS = `
 #zd-band{position:fixed;left:0;top:0;right:0;bottom:0;z-index:29;touch-action:none;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
-#zd-band .hud{position:absolute;left:50%;top:calc(10px + env(safe-area-inset-top));transform:translateX(-50%);width:min(90vw,380px);padding:7px 10px;border-radius:12px;background:rgba(10,5,20,.66);text-align:center;color:#fff;text-shadow:0 1px 3px #000;pointer-events:none}
+#zd-band .hud{position:absolute;left:12px;right:74px;top:calc(10px + env(safe-area-inset-top));max-width:380px;margin:0 auto;padding:7px 10px;border-radius:12px;background:rgba(10,5,20,.66);text-align:center;color:#fff;text-shadow:0 1px 3px #000;pointer-events:none}
 #zd-band .ttl{font:900 13px/1.2 system-ui,-apple-system,sans-serif;letter-spacing:.08em}
 #zd-band .sc{display:flex;justify-content:space-between;margin-top:6px;font:800 14px/1 system-ui,-apple-system,sans-serif;font-variant-numeric:tabular-nums}
 #zd-band .sc b{color:#ffd27a}

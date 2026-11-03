@@ -779,6 +779,18 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 - Regression fixed: c665928 (2026-11-02, BASE flies her there) added `if (!this.fromHorde) return` in `arcade()`, so drag and BOOST did nothing in Destroy and in Defend's flying levels (tornado and the mixed ones); only Lock on moved you. Now it returns only if the flight stopped or crashed.
 - Defend's flying levels (tornado and the mixed ones) got the same button as BASE (Sean, 2026-11-03): every level now has its way home.
 
+## Test levels, aimed powers, weather jobs, zoom (2026-11-03)
+- Test levels (levelmenu.js): in the Sandbox (button in the base and on the bar), all 21 Defend (D1 to D21) and 21 Destroy (X1 to X21) levels with map, enemies and how they play. A run keeps a copy of the fighter in `testWas` and restores it after (HeroGame.hub) or on the next story start, so the story is untouched; the list comes back with how it went.
+- Story cap fixed: `s.idx` stopped at PATH.length - 1 (17 towns), so levels 18 to 21 of WAVES (black hole, spill, cold wave, the last) could never be reached. Now WAVES.length - 1, towns wrap.
+- A freeze fixed: `people.head` was all zeros before the first frame, so `around()` looped for ever on person 0 when a disaster raised the alarm in the same tick as a world move (D7, the flood in Sunvale, in the story too). Now filled with -1.
+- Aimed powers (heropower.js `closest`, `shoot`, `aimStep`): in flight in a level, a power finds the closest walker, machine, general, boss, villain or rival within 130 m (a red ring marks it). A villain's helicopters and, with nobody near, buildings within 90 m too (2 or more hits by height). Generals, villains and rivals only wear down to 30% (Lock on finishes them). The whole-town disasters still go through the old path. Laser cooldown 0.6 s.
+- Weather jobs (stormgame.js, `F.stormFor()`): Defend only, flood, dust storm, tsunami, cold wave. Lock on goes to the nearest spot first (before any villain); gauge and action button appear on arrival; the last job calls `finish`. Powers do nothing to the weather itself. The storm is slowed; the flood holds until done. Villains still knock you about while you work (test bot lost 3 knockdowns by not fighting them): watch this.
+- Zoom (nozoom.js): the second finger down within 450 ms is cancelled in the band and fight screens as well as the second lift; touchend is also listened for on the touched element, in case it left the page. While zoomed, `html.zd-zoomed *{touch-action:pinch-zoom}` lifts the game's touch-action:none, which had stopped the pinch out, and a line at the top of the visible area says so. Not testable off a real iPhone.
+- Pause: top right, 52 px. Compass: above the mini map, hidden with it (minimap.js). Both now children of body, because #zd-side's transform carried position:fixed. The radio line in flight sits right of the compass.
+
+## Weather in Destroy: the plan (not built; Sean to choose)
+- The weather is on your side and yours to aim; you score by wrecking; heroes, army and rescue squads undo it. The mirror of Defend: the same glowing jobs, done by the heroes against you (lifting buses, ice walls, thawing), each one weakening the storm unless you stop them.
+
 ## Private preview link
 - https://claude.ai/artifact/Jemm5Sxje8y9XvJxcFNPwN (private, Sean only). Page source: artifact/zday-city.html.
 - To update: `npx vite build --base ./`, then publish artifact/zday-city.html with files {"assets/<bundle>.js": "dist/assets/<bundle>.js"} and change the script src in the page to the new bundle name (the hash changes each build).

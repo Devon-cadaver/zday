@@ -26,6 +26,7 @@ import { Army } from './army.js';
 import { HeroPower, POWER } from './heropower.js';
 import { HS } from './herogame.js';
 import { WindGame } from './windgame.js';
+import { StormGame, stormKinds } from './stormgame.js';
 
 // speeds in metres a second; turn: how hard it turns at full bank; chase: the camera's distance behind and height above;
 // seat: the cockpit's place (forward, up) in the model
@@ -337,7 +338,7 @@ export class Flight {
   stop(quiet = false) {
     if (!this.active) return;
     const g = this.g, { camera, controls, post } = this.ctx;
-    this.fromHorde = null; this.fromBase = null; this.smashing = null; this.hovering = false; this.flyBtn = null; this.smashBtn = null; this.boosting = false; this.goBase = null; this.baseBtn = null; this.markM = null; this.barH = 0; if (this.inLevel && !this.fromHorde) document.body.classList.remove('zd-flying'); this.holdY = null; this.upDown = 0; this.udEl = null; this.cvWas = null; if (this.ring) { this.ring.clearJunk(); this.ring.ui(false); this.ring = null; } this.engaged = null; this.spinHold = false; this.riding = false; this.bucked = null; this.bossClose = false; this.lock = null; this.dropInside(); this.inB = -1; this.clearShots(); if (this.power) { this.power.dispose(); this.power = null; this.powerBtn = null; } if (this.army) { this.army.dispose(); this.army = null; } if (this.getaways) { for (const G of this.getaways) G.finish(); this.getaways = []; }
+    if (this.storm) this.storm.closeUi(); this.fromHorde = null; this.fromBase = null; this.smashing = null; this.hovering = false; this.flyBtn = null; this.smashBtn = null; this.boosting = false; this.goBase = null; this.baseBtn = null; this.markM = null; this.barH = 0; if (this.inLevel && !this.fromHorde) document.body.classList.remove('zd-flying'); this.holdY = null; this.upDown = 0; this.udEl = null; this.cvWas = null; if (this.ring) { this.ring.clearJunk(); this.ring.ui(false); this.ring = null; } this.engaged = null; this.spinHold = false; this.riding = false; this.bucked = null; this.bossClose = false; this.lock = null; this.dropInside(); this.inB = -1; this.clearShots(); if (this.power) { this.power.dispose(); this.power = null; this.powerBtn = null; } if (this.army) { this.army.dispose(); this.army = null; } if (this.getaways) { for (const G of this.getaways) G.finish(); this.getaways = []; }
     this.active = false; document.body.classList.remove('zd-flying');
     const hr = this.obj.userData.hero; g.disasters.ctx.scene.remove(this.obj); if (this.streak) { this.streak.dispose(g.disasters.ctx.scene); this.streak = null; }
     if (hr) { hr.cape.g.dispose(); if (hr.smooth && hr.smooth.mesh) { hr.smooth.mesh.geometry.dispose(); const m = hr.smooth.mesh.material; (Array.isArray(m) ? m : [m]).forEach(x => x && x.dispose()); } } else this.obj.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); // its own shapes and paint (a hero's are shared with the rest: only the cape is its own)
@@ -712,7 +713,7 @@ export class Flight {
   lockOn(v, again = false) {
     if (this.state !== 'fly' || this.riding || this.bucked || this.ring) return;
     this.lockHint = false; if (this.goBase) this.baseStop();
-    if (!v && this.storyTornado()) { this.ring = new WindGame(this, this.storyTornado()); return; }
+    if (!this.lock && this.stormFor()) { this.stormFor().lockOn(); return; } if (!v && this.storyTornado()) { this.ring = new WindGame(this, this.storyTornado()); return; }
     if (this.lock && !again) { this.lock = null; this.tip('Lock let go: flying free'); return; }
     if (this.fromBase) { this.tip('Nothing to lock on in the base; Land to come down'); return; }
     if (this.fromHorde && this.fromHorde.o.boss && !v) { const e = this.fromHorde.o.boss; if (e.type === 'worm' || e.type === 'kaiju') { this.bossClose = false; this.lock = { worm: e, name: 'it', get x() { return e.x; }, get z() { return e.z; }, get y() { return e.type === 'kaiju' ? 44 : Math.max(e.y, 6); }, get gone() { return !e.alive; } }; this.tip('Locked on! Straight at it'); sfx('whoosh', this.pos.x, this.pos.y, this.pos.z, { gain: 0.9 }); return; } this.lock = { zombie: -1, name: 'it', get x() { return e.x; }, get z() { return e.z; }, y: 0, get gone() { return !e.alive; } }; this.tip('Locked on! Straight at it, down to fight; or SMASH LAND'); sfx('whoosh', this.pos.x, this.pos.y, this.pos.z, { gain: 0.9 }); return; }
@@ -723,6 +724,8 @@ export class Flight {
     this.lock = v; this.tip('Locked on ' + v.name + '! Flying straight at them'); sfx('whoosh', this.pos.x, this.pos.y, this.pos.z, { gain: 0.9 });
   }
   // the level's tornado, on the defending side (windgame.js)
+  // the level's flood, dust storm, tsunami or cold wave, on the defending side (stormgame.js)
+  stormFor() { if (!this.heroGame || !this.inLevel || this.fromHorde || !this.owner || this.owner.side !== 'hero') return null; const e = this.g.disasters.list.find(q => q.alive && stormKinds[q.type]); if (!e) return null; if (!this.storm || this.storm.e !== e) { if (this.storm) this.storm.dispose(); this.storm = new StormGame(this, e); } return this.storm; }
   storyTornado() { if (!this.heroGame || !this.inLevel || this.fromHorde || !this.g.mode || this.g.mode.side !== 'hero') return null; return this.g.disasters.list.find(e => e.alive && e.type === 'tornado' && e.tw && e.tw.phase !== 'rope') || null; }
   // a story level: the arcade way (Sean). A finger on the screen and she goes that way on the screen, as on foot, faster the further it is pushed; let go and she stops and hovers. Her height looks after itself over the roofs; the arrows on the bar go up and down. Behind and first person, only for getting around: left and right turn, up and down climb and dive (Invert)
   arcadeOn() { return !!(this.P && this.P.hero && this.heroGame && (this.fromHorde || this.inLevel) && !this.fromBase); }
@@ -769,6 +772,7 @@ export class Flight {
     const v = this.lock, P = this.P; this.hovering = false;
     if (!v || v.gone || v.beaten) { this.lock = null; return false; }
     const ty = Math.max(2.4, (v.y || 0) + HIP), dx = v.x - this.pos.x, dy = ty - this.pos.y, dz = v.z - this.pos.z, d = Math.hypot(dx, dy, dz) || 0.01;
+    if (v.storm) { if (d < 12) { this.lock = null; this.speed = this.thr = 0; this.hovering = true; v.storm.arrive(v.spot); return true; } }
     if (v.gen) { if (d < 14) { this.lock = null; this.speed = 0; this.fromHorde.genFight(v.gen); return true; } }
     else if (v.worm) { if (d < (v.worm.type === 'kaiju' ? 28 : 14)) { this.lock = null; this.hovering = true; this.bossClose = true; this.speed = this.thr = 0; this.tip(v.worm.type === 'kaiju' ? 'In close: GRAB IT to climb on; tap to punch' : 'In close: GRAB IT to ride it; tap to punch when it is up'); return true; } }
     else if (v.machine) { if (d < 10) { this.fromHorde.hitMachine(v.machine, 10, 'HIT'); this.lock = null; this.hovering = true; this.engaged = v.machine; this.speed = this.thr = 0; this.tip('In close: tap to punch, or GRAB IT'); this.power.ramT = 0.8; return true; } }
