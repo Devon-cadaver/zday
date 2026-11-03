@@ -56,8 +56,19 @@ const ATK = {
   hamA: { clip: CLIPS.hammerDown, at: 0.14, end: 0.5, dmg: 18, react: 'hitBody', kb: 5, stop: 0.08, shake: 0.3, reach: 2.0 },
   hamB: { clip: CLIPS.hammerUp, at: 0.16, end: 0.55, dmg: 22, react: 'blownBack', knock: [15, 6], stop: 0.1, shake: 0.45, reach: 2.0 },
   kick: { clip: CLIPS.kick, at: 0.22, end: 0.5, dmg: 8, react: 'blownBack', knock: [14, 6], stop: 0.09, shake: 0.4, reach: 2.3, kick: true },
+  hook: { clip: CLIPS.cross, at: 0.1, end: 0.32, dmg: 14, react: 'hitHeadL', kb: 6, stop: 0.06, shake: 0.2, reach: 2.0 },
+  boxUp: { clip: CLIPS.uppercut, at: 0.28, end: 0.56, dmg: 24, react: 'blownBack', knock: [15, 9], stop: 0.1, shake: 0.4, reach: 2.2 },
+  snapKick: { clip: CLIPS.kick, at: 0.2, end: 0.42, dmg: 12, react: 'hitBody', kb: 6, stop: 0.06, shake: 0.18, reach: 2.4 },
+  palm: { clip: CLIPS.cross, at: 0.1, end: 0.42, dmg: 20, react: 'blownBack', knock: [18, 5], stop: 0.09, shake: 0.35, reach: 2.1 },
+  elbowU: { clip: CLIPS.elbowUp, at: 0.15, end: 0.4, dmg: 13, react: 'hitHeadR', kb: 4, stop: 0.07, shake: 0.2, reach: 1.9 },
+  elbowD: { clip: CLIPS.elbowDrop, at: 0.18, end: 0.46, dmg: 15, react: 'hitBody', kb: 5, stop: 0.08, shake: 0.28, reach: 1.9 },
+  slam: { clip: CLIPS.hammerDown, at: 0.16, end: 0.55, dmg: 26, react: 'blownBack', knock: [13, 8], stop: 0.12, shake: 0.55, reach: 2.0 },
+  highKick: { clip: CLIPS.kick, at: 0.22, end: 0.5, dmg: 20, react: 'blownBack', knock: [16, 7], stop: 0.1, shake: 0.4, reach: 2.5 },
+  spinKick: { clip: CLIPS.kick, at: 0.22, end: 0.42, dmg: 12, react: 'hitHeadL', kb: 6, stop: 0.06, shake: 0.2, reach: 2.6, spin: true },
+  highSpin: { clip: CLIPS.kick, at: 0.24, end: 0.5, dmg: 20, react: 'blownBack', knock: [16, 7], stop: 0.1, shake: 0.4, reach: 2.7, spin: true },
   counter: { clip: CLIPS.cross, at: 0.08, end: 0.4, dmg: 40, react: 'blownBack', knock: [22, 7], stop: 0.12, shake: 0.6, reach: 2.3 },
 };
+ATK.jabL2 = ATK.jabL; ATK.elbowU2 = ATK.elbowU; ATK.spinKick2 = ATK.spinKick; // a move used twice in a combo needs a second name: the next blow is found by name, and the same name twice went round before the finisher
 let COMBO = ['jabL', 'jabR', 'cross']; // the melee slot's (loadKit)
 const CAN_TARGET = ['idle', 'close', 'wind', 'strike', 'rush', 'stumble', 'stun', 'block', 'frozen'];
 const A0 = 0.95, A1 = Math.PI * 2 - 0.95, SMASH_DMG = [12, 14, 16]; // the swing's ends: their head on the ground in front, then behind
@@ -229,7 +240,7 @@ export class FightTest {
       this.heroStep(ft); this.vilStep(ft); this.mateStep(dt); if (this.teamEl) { this.teamEl.querySelector('i').style.width = (this.team || 0) + '%'; this.teamEl.classList.toggle('ok', this.team >= 100 && !this.mateR); } this.separate(); this.clamp(h); this.clamp(v);
       if (!(h.state === 'idle' && this.stick)) h.walkK = Math.max(0, h.walkK - ft * 8);
       this.streetStep(ft); this.airStep(ft);
-      h.pose(ft, this.top, this.grounded(h)); v.pose(v.state === 'frozen' ? 0 : ft, this.top, this.grounded(v)); if (v.state === 'dazed') this.wobble(v); if (h.state === 'dazed') this.wobble(h); this.fxStep(dt); ghost(h.r); ghost(v.r, '#ff6a50');
+      h.pose(ft, this.top, this.grounded(h)); if (h.state === 'attack' && ATK[this.atk] && ATK[this.atk].spin) h.r.root.rotation.y += Math.min(1, h.t / ATK[this.atk].end) * 6.283; v.pose(v.state === 'frozen' ? 0 : ft, this.top, this.grounded(v)); if (v.state === 'dazed') this.wobble(v); if (h.state === 'dazed') this.wobble(h); this.fxStep(dt); ghost(h.r); ghost(v.r, '#ff6a50');
       this.ee.style.width = this.energy + '%'; for (const k in this.pwBtn) this.pwBtn[k].classList.toggle('ok', this.energy >= this.COST[k]); this.holdStep(dt);
       this.hh.style.width = Math.max(0, h.hp / h.hpMax * 100) + '%'; this.vh.style.width = Math.max(0, v.hp / v.hpMax * 100) + '%';
       this.heroStreak.update(_c.set(h.x, h.y + 0.92, h.z), ['lunge', 'dodge', 'skyRise', 'skyDive', 'finRun'].includes(h.state), this.ctx.camera, ft); this.vilStreak.update(_c.set(v.x, v.y + 0.92, v.z), v.state === 'rush' || v.state === 'vrise' || v.state === 'vdive', this.ctx.camera, ft);
@@ -353,6 +364,7 @@ export class FightTest {
     if (free) { h.y = this.top; this.mash = 0; }
     h.yaw = Math.atan2(v.x - h.x, v.z - h.z); h.vx = 0; h.vz = 0;
     if (id === 'kick') { h.go('kickCharge', C.chargeWind); this.kickK = 0; this.holdP = id; this.holdT = 0; this.say('HOLD: FURTHER', 0.8, '#ffd27a'); return; }
+    if (K && K.shot) { h.go('cast', C.cast); this.shot(id, K); return; } if (K && K.beam) { h.go('cast', C.cast); this.holdP = id; this.holdT = 0; this.beamT = 0; this.push(K.dps, K.sp); sfx(id === 'firejet' ? 'whoomph' : 'whoosh', h.x, h.y + 1.2, h.z, { gain: 0.9 }); return; } if (STUNS[id] && STUNS[id].fx) { h.go('cast', C.cast); const X = STUNS[id].fx, fx0 = Math.sin(h.yaw), fz0 = Math.cos(h.yaw); this.beam(h.x + fx0 * 0.59, h.y + 1.34, h.z + fz0 * 0.59, v.x, v.y + 1.09, v.z, X.col, 0.26, 0.3); this.freezeV(id); return; }
     h.go('cast', C.cast);
     if (id === 'sonic') { this.sonic(); return; } if (id === 'gravity') { this.freezeV('gravity'); return; }
     if (id === 'gust') { this.holdP = id; this.holdT = 0; this.beamT = 0; this.push(0, 20); this.say('GUST', 0.5, '#dff6ff'); return; }
@@ -361,7 +373,7 @@ export class FightTest {
     else this.laser();
   }
   freezeV(kind) {
-    const v = this.v, S = this.g.disasters.ctx.scene; v.vx = 0; v.vz = 0; v.walkK = 0; v.go('frozen'); v.vy = 0; this.pinK = kind === 'gravity'; if (this.pinK) { v.t = -0.6; v.play(C.down); sfx('whoosh', v.x, v.y + 0.84, v.z, { gain: 0.9, rate: 0.5 }); this.say('PINNED! HIT THEM NOW', 1, '#d6a8ff'); this.ice = new THREE.Mesh(new THREE.CircleGeometry(1.6, 28).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: new THREE.Color(1.2, 0.5, 2), transparent: true, opacity: 0.45, depthWrite: false, fog: false })); this.ice.position.set(v.x, this.top + 0.06, v.z); this.ice.renderOrder = 4; S.add(this.ice); return; }
+    const v = this.v, S = this.g.disasters.ctx.scene; v.vx = 0; v.vz = 0; v.walkK = 0; v.go('frozen'); v.vy = 0; { const X = STUNS[kind] && STUNS[kind].fx; if (X) { this.pinK = true; v.t = 1.8 - X.secs; sfx(X.snd, v.x, v.y + 0.84, v.z, { gain: 0.9 }); this.say(X.say + ' HIT THEM NOW', 1, '#ffd27a'); const D0 = this.g.disasters; if (X.flash) { D0.flash(0.35); v.play(CLIPS.hitHeadL); } D0.brawl.stunts.ring(v.x, this.top + 0.3, v.z, 1.6, 0.4, new THREE.Color(X.col[0], X.col[1], X.col[2]), 0.8); this.ice = new THREE.Mesh(X.cage ? new THREE.BoxGeometry(1.05, 2.26, 1.05) : new THREE.CircleGeometry(1.6, 28).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: new THREE.Color(X.col[0], X.col[1], X.col[2]), transparent: true, opacity: 0.45, depthWrite: false, fog: false, wireframe: !!X.cage })); this.ice.position.set(v.x, this.top + 0.06, v.z); this.ice.renderOrder = 4; S.add(this.ice); return; } } this.pinK = kind === 'gravity'; if (this.pinK) { v.t = -0.6; v.play(C.down); sfx('whoosh', v.x, v.y + 0.84, v.z, { gain: 0.9, rate: 0.5 }); this.say('PINNED! HIT THEM NOW', 1, '#d6a8ff'); this.ice = new THREE.Mesh(new THREE.CircleGeometry(1.6, 28).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: new THREE.Color(1.2, 0.5, 2), transparent: true, opacity: 0.45, depthWrite: false, fog: false })); this.ice.position.set(v.x, this.top + 0.06, v.z); this.ice.renderOrder = 4; S.add(this.ice); return; }
     sfx('glass', v.x, v.y + 0.84, v.z, { gain: 0.9, rate: 0.6 }); this.say('STUNNED! HIT THEM NOW', 1, '#9fe8ff');
     this.ice = new THREE.Mesh(new THREE.BoxGeometry(1.05, 2.26, 1.05), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.75, 1.15, 1.5), transparent: true, opacity: 0.42, depthWrite: false, fog: false })); this.ice.position.set(v.x, this.top + 1.17, v.z); this.ice.renderOrder = 4; S.add(this.ice);
   }
@@ -381,9 +393,16 @@ export class FightTest {
     if (this.energy <= 0 || this.holdT > 3.5 || this.over) { this.energy = Math.max(0, this.energy); this.castUp(id); if (this.energy <= 0) this.say('OUT OF POWER', 0.6, '#9fd4ff'); return; }
     if (id === 'kick') { this.kickK = Math.min(1, this.holdT / 1.6); if (Math.random() < 0.4) this.g.disasters.brawl.stunts.ring(h.x, this.top + 0.3, h.z, 0.8 + 2.5 * this.kickK, 0.25, new THREE.Color(1.8, 1.2, 0.5), 0.7); if (this.kickK >= 1) this.castUp(id); return; }
     if (!['pushed', 'flung', 'idle', 'stumble', 'stun'].includes(v.state)) { this.castUp(id); return; } h.yaw = Math.atan2(v.x - h.x, v.z - h.z); if (h.state === 'cast') h.t = 0; const fx = Math.sin(h.yaw), fz = Math.cos(h.yaw);
+    if (K.beam) { this.push(K.dps * dt, K.sp); if ((this.beamT -= dt) <= 0) { this.beamT = 0.07; this.beam(h.x + fx * 0.59, h.y + 1.25, h.z + fz * 0.59, v.x, v.y + 1.05, v.z, K.beam, 0.3 * K.wide, 0.14); if (id === 'firejet') this.g.fire.burst(v.x, v.y + 1, v.z, 3, 0.8); else if (Math.random() < 0.5) this.chips(v.x, v.z); } return; }
     this.push(id === 'laser' ? 5 * dt : 0, id === 'laser' ? 27 : 24); if ((this.beamT -= dt) <= 0) { this.beamT = 0.07; if (id === 'laser') this.beam(h.x + fx * 0.59, h.y + 1.34, h.z + fz * 0.59, v.x, v.y + 1.17, v.z, [2.4, 0.3, 1.5], 0.3, 0.12); else { this.beam(h.x + fx * 0.59, h.y + 1.2, h.z + fz * 0.59, v.x, v.y + 1, v.z, [1.4, 1.6, 1.8], 0.9, 0.16); if (Math.random() < 0.7) this.chips(v.x, v.z); } }
   }
   castUp(id) { if (this.holdP !== id) return; const h = this.h; this.holdP = null; if (id === 'kick') { if (h.state === 'kickCharge') { this.startAtk('kick'); } return; } if (h.state === 'cast') h.t = 0.2; }
+  // the one-shot knockbacks: the stomp's ring round her, the boulder and the car thrown and landing on them a moment later
+  shot(id, K) {
+    const h = this.h, v = this.v, D = this.g.disasters; if (K.shot === 'wave') { for (let i = 0; i < 3; i++) D.brawl.stunts.ring(h.x, this.top + 0.2, h.z, 2 + i * 2.2, 0.3 + i * 0.1, new THREE.Color(1.8, 1.3, 0.6), 0.85); this.g.shake = Math.max(this.g.shake || 0, 0.7); sfx('thud', h.x, this.top, h.z, { gain: 1.2, rate: 0.7 }); this.chips(h.x, h.z); if (Math.hypot(v.x - h.x, v.z - h.z) < 8) this.push(12, 32); else this.say('TOO FAR', 0.5, '#ffd27a'); return; }
+    const car = K.shot === 'car', T = 0.38, sx = h.x, sy = h.y + 2.4, sz = h.z; D.debris.add(sx, sy, sz, car ? 2.8 : 1.5, car ? 1.2 : 1.3, car ? 1.4 : 1.5, car ? 0xc9352a : 0x8a8478, 'fly', { v: [(v.x - sx) / T, (v.y + 1 - sy) / T + G * T / 2, (v.z - sz) / T], life: 0.6 }); sfx('whoosh', sx, sy, sz, { gain: 1 });
+    setTimeout(() => { if (!this.active || this.over) return; const v2 = this.v; D.brawl.stunts.ring(v2.x, this.top + 0.6, v2.z, 3, 0.3, new THREE.Color(1.8, 1.4, 0.7), 0.8); sfx('crash', v2.x, this.top, v2.z, { gain: 1 }); this.g.shake = Math.max(this.g.shake || 0, 0.6); this.chips(v2.x, v2.z); if (Math.hypot(v2.x - this.h.x, v2.z - this.h.z) < 26) this.push(car ? 18 : 16, car ? 30 : 32); }, T * 1000);
+  }
   // the sonic clap: a stagger of 1.5 s and a shove, no harm
   sonic() { const h = this.h, v = this.v, d = Math.hypot(v.x - h.x, v.z - h.z) || 1, nx = (v.x - h.x) / d, nz = (v.z - h.z) / d, D = this.g.disasters; if (v.state === 'frozen') this.shatter(); for (let i = 0; i < 3; i++) D.brawl.stunts.ring(h.x, h.y + 1.1, h.z, 2 + i * 1.5, 0.35 + i * 0.1, new THREE.Color(1.6, 1.5, 1.2), 0.8); sfx('thud', h.x, h.y + 1, h.z, { gain: 1.2, rate: 1.6 }); sfx('glassBig', h.x, h.y + 1, h.z, { gain: 0.5, rate: 1.4 }); this.g.shake = Math.max(this.g.shake || 0, 0.4); v.armor = false; v.go('stun', CLIPS.hitHeadL); v.t = -1.1; v.vx = nx * 7; v.vz = nz * 7; this.say('STAGGERED!', 0.9, '#dff6ff'); }
   beam(ax, ay, az, bx, by, bz, c, r, T) { const D = this.g.disasters, m = new THREE.Mesh(this.ray, new THREE.MeshBasicMaterial({ color: new THREE.Color(c[0], c[1], c[2]), transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); _a.set(bx - ax, by - ay, bz - az); const l = _a.length() || 0.01; m.position.set(ax, ay, az); m.quaternion.setFromUnitVectors(_b.set(0, 1, 0), _a.normalize()); m.scale.set(r, l, r); m.frustumCulled = false; m.renderOrder = 7; D.ctx.scene.add(m); this.fx.push({ m, t: 0, T }); }

@@ -74,7 +74,8 @@ Build order (one thing at a time, each tested in the Sandbox and pushed). The ch
     - [x] Flood (lift buses onto roofs), dust storm (blow out the devils), tsunami (ice walls ahead of the wave), cold wave (thaw the streets): glowing spots, Lock on flies there, tap in the green (stormgame.js).
     - [ ] Earthquake (hold buildings up): not weather, not built yet.
     - [x] Destroy for points in every level (score, chains to x3, goal 100 x the old building count). Weather levels: Storm meter and Unleash (tornado follows you, levee breaks, army blinded, pick the wave's coast, buildings shatter). Heroes and rescue squads do jobs against you; Lock on and the gauge, or 3 power hits, stop them (stormgame.js StormWar).
-    - [ ] New powers: Sean's list of up to 20 each for stun, knockback and melee, waiting on his picks.
+    - [x] New powers, the first 5 of each list: stuns Shock web, Blinding flash, Sleep dust, Mud trap, Vine snare; knockbacks Shockwave stomp, Fire jet, Water cannon, Boulder throw, Car toss; melee Boxer, Kung fu, Wrestler, Muay Thai, Capoeira.
+    - [ ] The other 45 of Sean's 60, if these go well.
 
 Also done on the way: the stuck zoom on a phone fixed; the plan page at plan.html.
 

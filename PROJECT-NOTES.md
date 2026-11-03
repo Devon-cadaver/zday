@@ -794,6 +794,12 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 - Storm meter: buildings +6, cars +1.5, a job stopped +20. Unleash adds 25% storm. Tornado: size up and it follows you 12 s (your own tornado does not hurt you). Flood: water up (no dam model: a button), over 2.5 m it takes buildings. Dust: 15 s the army does not fire, 3 buildings go. Tsunami: alive, faster; else pick a coast. Cold: 15 s buildings break in one hit, 5 go.
 - Balance untested by a person: goals may be too high (X20 is 31,000).
 
+## The kit grows (2026-11-03; kit.js)
+- Data in kit.js: a stun's `fx` (col, secs, cage, flash, say, snd, r), a knockback's `shot` (wave, rock, car: one tap) or `beam`, `as`, `wide`, `dps`, `sp` (held, on the laser's or the gust's sweep in the horde). Used by fighttest.js `cast`, `freezeV`, `shot`, `holdStep`; horde.js `cast`, `line`/`line0`, `beam`; heropower.js POWER and WEAK (each borrows an old power's bites). Melee: new ATK names in both fighttest.js and horde.js; `spin` turns the figure round.
+- A combo may not use a name twice (afterAtk finds the next by name): `jabL2`, `elbowU2`, `spinKick2`. This was also why Flurry never reached its cross.
+- Mini map and compass hide in a street fight (they covered its big words).
+- The other 45 of Sean's 60 are in the session's list, not built: see the conversation of 2026-11-03 if asked; Sean: most likely all of them eventually.
+
 ## Private preview link
 - https://claude.ai/artifact/Jemm5Sxje8y9XvJxcFNPwN (private, Sean only). Page source: artifact/zday-city.html.
 - To update: `npx vite build --base ./`, then publish artifact/zday-city.html with files {"assets/<bundle>.js": "dist/assets/<bundle>.js"} and change the script src in the page to the new bundle name (the hash changes each build).
