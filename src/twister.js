@@ -168,6 +168,7 @@ export class Twister {
   }
 
   update(h) {
+    if (this.frozen > 0) { this.frozen -= h; return; } // Freeze (windgame.js) holds it
     const D = this.D, { people, traffic, city } = D.ctx;
     this.t += h;
     if (this.phase === 'ground') (this.brace || (this.brace = new Brace(D, (x, z) => [Math.hypot(x - this.x, z - this.z) - this.reach * 2, this.x, this.z], { range: 300, curl: false }))).update(h); // seen coming: run, turn round and drive off

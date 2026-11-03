@@ -25,6 +25,7 @@ import { Getaway } from './getaway.js';
 import { Army } from './army.js';
 import { HeroPower, POWER } from './heropower.js';
 import { HS } from './herogame.js';
+import { WindGame } from './windgame.js';
 
 // speeds in metres a second; turn: how hard it turns at full bank; chase: the camera's distance behind and height above;
 // seat: the cockpit's place (forward, up) in the model
@@ -326,7 +327,7 @@ export class Flight {
   stop(quiet = false) {
     if (!this.active) return;
     const g = this.g, { camera, controls, post } = this.ctx;
-    this.fromHorde = null; this.fromBase = null; this.smashing = null; this.hovering = false; this.flyBtn = null; this.smashBtn = null; this.boosting = false; this.engaged = null; this.spinHold = false; this.riding = false; this.bucked = null; this.bossClose = false; this.lock = null; this.dropInside(); this.inB = -1; this.clearShots(); if (this.power) { this.power.dispose(); this.power = null; this.powerBtn = null; } if (this.army) { this.army.dispose(); this.army = null; } if (this.getaways) { for (const G of this.getaways) G.finish(); this.getaways = []; }
+    this.fromHorde = null; this.fromBase = null; this.smashing = null; this.hovering = false; this.flyBtn = null; this.smashBtn = null; this.boosting = false; if (this.ring) { this.ring.clearJunk(); this.ring.ui(false); this.ring = null; } this.engaged = null; this.spinHold = false; this.riding = false; this.bucked = null; this.bossClose = false; this.lock = null; this.dropInside(); this.inB = -1; this.clearShots(); if (this.power) { this.power.dispose(); this.power = null; this.powerBtn = null; } if (this.army) { this.army.dispose(); this.army = null; } if (this.getaways) { for (const G of this.getaways) G.finish(); this.getaways = []; }
     this.active = false; document.body.classList.remove('zd-flying');
     const hr = this.obj.userData.hero; g.disasters.ctx.scene.remove(this.obj); if (this.streak) { this.streak.dispose(g.disasters.ctx.scene); this.streak = null; }
     if (hr) { hr.cape.g.dispose(); if (hr.smooth && hr.smooth.mesh) { hr.smooth.mesh.geometry.dispose(); const m = hr.smooth.mesh.material; (Array.isArray(m) ? m : [m]).forEach(x => x && x.dispose()); } } else this.obj.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); // its own shapes and paint (a hero's are shared with the rest: only the cape is its own)
@@ -374,7 +375,8 @@ export class Flight {
     if (burner) { burner.scale.set(0.6 + k * 0.9, 1, 1); burner.material.opacity = 0.35 + 0.55 * k; }
     // the camera: behind and above it, easing after it (no roll, so the horizon stays put), or in its seat
     _f.set(1, 0, 0).applyQuaternion(this.q);
-    if (this.view === 'cockpit' && this.state === 'fly') {
+    if (this.ring && this.state === 'fly') this.ring.cam(dt, cam, this.snap);
+    else if (this.view === 'cockpit' && this.state === 'fly') {
       _v.set(P.seat[0], P.seat[1], 0).applyQuaternion(this.q); cam.position.copy(this.pos).add(_v);
       cam.quaternion.copy(this.q).multiply(SEAT_TURN); cam.up.set(0, 1, 0).applyQuaternion(this.q);
     } else if (this.view === 'iso' && this.state !== 'down') { // the town's lens, behind and well above the hero's heading, aimed a little ahead of them
@@ -408,7 +410,7 @@ export class Flight {
       if (g.audio) g.audio.engine(this.state === 'fly' ? this.P.sound : null, k);
       if (this.dropBtn) { this.dropBtn.textContent = this.seedT > 0 ? 'Seeding' : 'Drop'; this.dropBtn.classList.toggle('wait', this.coolT > 0 || this.seedT > 0 || this.state !== 'fly'); }
       if (this.smashBtn && this.fromHorde) this.smashBtn.innerHTML = this.fromHorde.airLabel();
-      if (this.flyBtn) this.flyBtn.innerHTML = this.riding ? '\u2708 JUMP OFF' : this.hovering ? '\u2708 FLY' : '\u23F8 HOVER';
+      if (this.flyBtn) this.flyBtn.innerHTML = this.ring ? '\u2708 LEAVE' : this.riding ? '\u2708 JUMP OFF' : this.hovering ? '\u2708 FLY' : '\u23F8 HOVER';
       if (this.lockBtn) { this.lockBtn.textContent = this.lock ? 'Let go of the lock' : '\uD83C\uDFAF Lock on'; this.lockBtn.classList.toggle('on', !!this.lock); this.bar.style.visibility = ''; }
     }
     if (this.view === 'cockpit') this.hz.style.transform = 'translate(-50%,' + (this.pitch * 260).toFixed(0) + 'px) rotate(' + (-this.roll).toFixed(3) + 'rad)';
@@ -422,6 +424,7 @@ export class Flight {
       return;
     }
     if (this.smashing) { const Q = this.smashing, gy = this.g.people.groundY(this.pos.x, this.pos.z); this.pos.y -= Q.sp * dt; this.pitch = Q.smash ? -1.4 : 0; this.speed = 0; this.obj.position.copy(this.pos); if (this.pos.y <= gy + 1.2) { this.smashing = null; this.landHorde(Q.smash, true); } return; }
+    if (this.ring) { this.ring.step(dt); return; }
     if ((this.riding || this.bucked) && this.fromHorde) { this.fromHorde.rideAir(dt); return; } // on the worm's back, or thrown off it
     if (this.hovering) { if (Math.abs(this.ix) + Math.abs(this.iy) > 0.15 || K.has('arrowleft') || K.has('arrowright') || K.has('arrowup') || K.has('arrowdown')) this.unhover(); else { this.thr = 0; this.speed = 0; } } // floating in one spot till a finger or a button says go // the smash landing: straight down at 70 m/s
     if (this.lock && this.homeIn(dt)) return;
@@ -627,6 +630,7 @@ export class Flight {
     const p = this.pos, k = Math.pow(Math.max(0, Math.min(1, p.y / tw.H)), 1.5), ax = tw.x + (tw.vort.lx || 0) * k, az = tw.z + (tw.vort.lz || 0) * k;
     const dx = p.x - ax, dz = p.z - az, d = Math.hypot(dx, dz) || 0.01, r = tw.radiusAt(Math.min(p.y, tw.H)), reach = r * 4 + 70;
     this.note('tornado', d - r);
+    if (this.storyTornado()) { if (d < r + 12 && p.y < tw.H) { const e = this.g.disasters.list.find(q => q.tw === tw); if (e) { const G = WindGame.thrownFrom(this, e); G.a = Math.atan2(dz, dx); G.th.vx = Math.cos(G.a) * 46; G.th.vz = Math.sin(G.a) * 46; this.ring = G; } } return; }
     if (this.seedT > 0) { if (p.y < tw.H) { tw._seedMin = Math.min(tw._seedMin ?? 1e9, d - r); (this.seedTw || (this.seedTw = new Set())).add(tw); } else this.seedHigh = tw.H; } // only under the cloud base
     if (p.y > tw.H && d < reach) { this.g.shake = Math.max(this.g.shake || 0, 0.3); this.roll += (Math.random() - 0.5) * 0.08; } // the wall cloud over it: rough air
     if (p.y > tw.H * 1.15 || d > reach) { if (d > reach + 40) this.saidPull = false; return; }
@@ -686,7 +690,8 @@ export class Flight {
   }
   // Lock on (a hero): the nearest villain still up, and the hero flies straight at them (homeIn); pressed again, the lock let go
   lockOn(v, again = false) {
-    if (this.state !== 'fly' || this.riding || this.bucked) return;
+    if (this.state !== 'fly' || this.riding || this.bucked || this.ring) return;
+    if (!v && this.storyTornado()) { this.ring = new WindGame(this, this.storyTornado()); return; }
     if (this.lock && !again) { this.lock = null; this.tip('Lock let go: flying free'); return; }
     if (this.fromBase) { this.tip('Nothing to lock on in the base; Land to come down'); return; }
     if (this.fromHorde && this.fromHorde.o.boss && !v) { const e = this.fromHorde.o.boss; if (e.type === 'worm' || e.type === 'kaiju') { this.bossClose = false; this.lock = { worm: e, name: 'it', get x() { return e.x; }, get z() { return e.z; }, get y() { return e.type === 'kaiju' ? 44 : Math.max(e.y, 6); }, get gone() { return !e.alive; } }; this.tip('Locked on! Straight at it'); sfx('whoosh', this.pos.x, this.pos.y, this.pos.z, { gain: 0.9 }); return; } this.lock = { zombie: -1, name: 'it', get x() { return e.x; }, get z() { return e.z; }, y: 0, get gone() { return !e.alive; } }; this.tip('Locked on! Straight at it, down to fight; or SMASH LAND'); sfx('whoosh', this.pos.x, this.pos.y, this.pos.z, { gain: 0.9 }); return; }
@@ -695,7 +700,9 @@ export class Flight {
     if (!v || v.gone || v.beaten) { const B = this.g.city.bounds; this.lock = null; this.g.disasters.start('villains', (B.x0 + B.x1) / 2, (B.z0 + B.z1) / 2); this.tip('More villains are coming! Press Lock on again'); return; } // all beaten: three more
     this.lock = v; this.tip('Locked on ' + v.name + '! Flying straight at them'); sfx('whoosh', this.pos.x, this.pos.y, this.pos.z, { gain: 0.9 });
   }
-  unhover() { this.engaged = null; this.bossClose = false; if (this.riding && this.fromHorde) this.fromHorde.rideEnd(); this.hovering = false; this.thr = this.speed = Math.max(this.P.start || 30, 20); }
+  // the level's tornado, on the defending side (windgame.js)
+  storyTornado() { if (!this.heroGame || !this.inLevel || this.fromHorde || !this.g.mode || this.g.mode.side !== 'hero') return null; return this.g.disasters.list.find(e => e.alive && e.type === 'tornado' && e.tw && e.tw.phase !== 'rope') || null; }
+  unhover() { if (this.ring) this.ring.end(); this.engaged = null; this.bossClose = false; if (this.riding && this.fromHorde) this.fromHorde.rideEnd(); this.hovering = false; this.thr = this.speed = Math.max(this.P.start || 30, 20); }
   // back onto the base's floor (base.js land) from a flight round its hall
   landBase() { const Bs = this.fromBase; if (!Bs || this.state !== 'fly') return; this.fromBase = null; const x = this.pos.x, z = this.pos.z, cam = this.ctx.camera; this.g.camBlend = { pos: cam.position.clone(), quat: cam.quaternion.clone(), fov: cam.fov, t: 0, T: 1.0 }; this.stop(true); Bs.land(x, z); }
   // back down into the street fight she took off from (horde.js land): a plain landing where she is, or the smash: straight down first, a shockwave where she lands
