@@ -819,6 +819,17 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 - Look: marker on a blue to purple to red track, filled from the middle; color hsl(285 + 70 * lean). The line under it is levels won per side (sum of `idx`), in place of rounds, best score and stars.
 - Units came off the deck (its upgrades were only for old Commander; the panel, profile.js and commander.js are still there, reachable by ?mode=commander). Roster stays where it was, so the rim has one button on the right. Hidden with the rest of the XP panel on a phone on its side.
 
+## Fight feel from Sean's video (2026-11-03; fighttest.js, audio.js)
+Sean sent a 17 second solo dev clip: seven things that make a sword hit feel good, on two knights. What each became in the street fights (fighttest.js, so villains, generals and hero fights; the crowd fights in horde.js are untouched):
+- Flash: `Body.flash` swaps every mesh on the rig to one white material for 130 ms, real time (`flashStep`, `unflash`), for blows over 1 damage on either fighter, at most 4 a second (`took`). A block does not flash.
+- Sound: new `smack` (sharp, on the impact, over a quieter thud or crash) and `clang` (a block, a parry, armor) in audio.js. Rendered in code, never heard by Claude: judge by ear.
+- Sparks: `spark` takes a direction, 11 small quick sparks back off the blow, and a small four-pointed star on the spot (`star`). The ring only over R 2.5, or it hides the white body.
+- Health bar: `.ob` over the foe's head from the first hit (`obStep`), what a blow took stays white a moment, green over 50%, amber, red under 25%, a small pop on a hit. The two top bars stay.
+- Knockback: small blows already pushed (about 0.5 m). Added: `rk` a lean back on every hit over any state, `stag` the feet stepping on a head hit (`REACT`), armor gives 0.18 m.
+- Blood became soot and scuffs, the rule being tame violence: `scuff` darkens the smooth body's vertex colors, a new mark per ninth of health gone, on both fighters; `cleanBody` restores. Custom rigs with no smooth body get none.
+- Death: zero health holds the blow 0.18 s; `C.dazed` a slump; a finished fighter lands in `C.ko` with a bounce (`koT`) and lies still 1.5 s (2 s after the sky) instead of 0.5 before the result. Finishers still end the fight, as Sean designed.
+Poses learned from its frames: `punch()` makes jabs and crosses three clear poses: a coil away (COIL_T 0.09 more before the blow), a deep lunge (lead knee bent, back leg long, `lungeOf`), held HOLD_T 0.07. `FOE_JAB` the same with no coil. CLIPS itself is unchanged, so flying blows keep theirs. Camera nearer for bigger figures: 23 m street, 22 plaza (was 30, 26), side margin 3.6 (was 5).
+
 ## Private preview link
 - https://claude.ai/artifact/Jemm5Sxje8y9XvJxcFNPwN (private, Sean only). Page source: artifact/zday-city.html.
 - To update: `npx vite build --base ./`, then publish artifact/zday-city.html with files {"assets/<bundle>.js": "dist/assets/<bundle>.js"} and change the script src in the page to the new bundle name (the hash changes each build).
