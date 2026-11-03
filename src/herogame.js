@@ -12,6 +12,7 @@ import { heroRig } from './heroes.js';
 import { villainRig, detail } from './villains.js';
 import { POWER, finish as endDisaster } from './heropower.js';
 import { openLevels, restoreTests, levelInfo } from './levelmenu.js';
+import { Squad } from './squad.js';
 import { ALIEN_MIX } from './figures.js';
 import { CreatureLayer } from './creaturekit.js';
 
@@ -180,11 +181,11 @@ export class HeroGame {
     const town = PLACES[key].name, seen = s.towns[key]; F.tip(hero ? (hunted ? 'You have gone too far. The other heroes are coming for you!' : seen && seen.fear > 200 ? 'The people of ' + town + ' remember you. They run' : s.rep >= 60 ? 'The people of ' + town + ' cheer as you fly in. Use your powers and Lock on' : wave[0] === 'tornado' ? 'Defend ' + town + '. Lock on to go round the tornado against its spin' : 'Defend ' + town + '. Use your powers and Lock on') : 'Bring down ' + need + ' buildings in ' + town + ' and beat the heroes who come');
     if (hero && (s.rep < 35 || (seen && seen.fear > 200))) g.people.scare(cx, cz, 400, 0.5);
   }
-  flyUp(x, z) { const F = this.g.flight, s = this.s; F.owner = this; F.heroGame = true; F.inLevel = true; F.start(s.flyer); const k = 1 + 0.12 * this.count('speed'); if (k > 1) F.P = { ...F.P, max: F.P.max * k, start: F.P.start * k }; F.onStopped = () => {}; F.hovering = true; F.speed = F.thr = 0; F.pos.set(x, 70, z); F.pitch = 0; }
+  flyUp(x, z) { const F = this.g.flight, s = this.s; F.owner = this; F.heroGame = true; F.inLevel = true; F.start(this.squad ? this.squad.cur : s.flyer); const k = 1 + 0.12 * this.count('speed'); if (k > 1) F.P = { ...F.P, max: F.P.max * k, start: F.P.start * k }; F.onStopped = () => {}; F.hovering = true; F.speed = F.thr = 0; F.pos.set(x, 70, z); F.pitch = 0; }
   // a flying level: at the door, in you go; the level goes on outside, as in the horde's levels (horde.js)
-  baseArrive() { const g = this.g, F = g.flight, R = this.round; F.baseStop(); F.hovering = true; F.speed = F.thr = 0; const fd = document.createElement('div'); fd.style.cssText = 'position:fixed;inset:0;background:#000;opacity:0;transition:opacity .22s;z-index:65;pointer-events:none'; document.body.appendChild(fd); requestAnimationFrame(() => { fd.style.opacity = '1'; }); setTimeout(() => { if (R && R === this.round && !R.ended && F.active) { R.hull = F.hull; F.stop(true); g.base.start({ level: this }); } fd.style.transition = 'opacity .35s'; fd.style.opacity = '0'; setTimeout(() => fd.remove(), 400); }, 240); }
-  // back out of the door: over it, rested a little
-  back() { const g = this.g, F = g.flight, B = g.base, R = this.round; this.s = HS.load()[this.side]; this.flyUp(B.x, B.z + B.S.d / 2 + 8); if (R && R.hull != null) F.hull = Math.min(F.hullMax || 100, R.hull + 30); F.setView(F.view); F.tip('Back outside. Finish the job'); }
+  baseArrive() { const g = this.g, F = g.flight, R = this.round; F.baseStop(); F.hovering = true; F.speed = F.thr = 0; const fd = document.createElement('div'); fd.style.cssText = 'position:fixed;inset:0;background:#000;opacity:0;transition:opacity .22s;z-index:65;pointer-events:none'; document.body.appendChild(fd); requestAnimationFrame(() => { fd.style.opacity = '1'; }); setTimeout(() => { if (R && R === this.round && !R.ended && F.active) { if (this.squad) this.squad.note(); F.stop(true); g.base.start({ level: this }); } fd.style.transition = 'opacity .35s'; fd.style.opacity = '0'; setTimeout(() => fd.remove(), 400); }, 240); }
+  // back out of the door: over it, with what health the base's mini-game gave
+  back() { const g = this.g, F = g.flight, B = g.base, Q = this.squad; if (Q) { const now = HS.cur(this.side); if (now !== Q.cur && !Q.downs[now]) { Q.cur = now; Q.draw(); } else HS.load().last[this.side] = Q.cur; } this.flyUp(B.x, B.z + B.S.d / 2 + 8); if (Q) F.hull = (F.hullMax || 100) * Q.hp[Q.cur]; F.setView(F.view); F.tip('Back outside. Finish the job'); }
   // level 1 (Sean): the invasion: the fleet overhead, its soldiers rained into the streets and fought on foot like the horde; the fleet can be hit from the air
   alienLevel(key) {
     const g = this.g, s = this.s, P = g.people, D = g.disasters, B = g.city.bounds, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2, n = 150, pool = []; LAB.reset();
@@ -228,7 +229,7 @@ export class HeroGame {
   zombieNight() { return false; } // Sean's levels are played in the daylight: the zombies' night made everything too dark to see
   placeNow() { try { return new URLSearchParams(location.search).get('place') || null; } catch (e) { return null; } }
   update() {
-    const R = this.round; if (!R || R.ended) return; const F = this.g.flight, S = LAB.stats; R.t += 1 / 60;
+    const R = this.round; if (!R || R.ended) return; const F = this.g.flight, S = LAB.stats; R.t += 1 / 60; if (!this.squad) this.squad = new Squad(this); this.squad.step(1 / 60); if (R.ended) return;
     if (this.g.base && this.g.base.level === this) { if (this.rep) this.rep.style.display = 'none'; return; } // in the lair: nothing ends till you come out
     if (R.zombie) { const H = this.g.horde; if (!H.active && !H.flying) return this.finish(false, 'You left the town'); if (R.riot && R.evs[0] && !R.evs[0].alive && !H.over) { H.finish(true); return; } if (R.boss && (R.boss.heroHp <= 0 || !R.boss.alive) && !H.over) { H.finish(true); return; } this.rep.style.display = 'none'; this.rep.innerHTML = 'Hero · ' + H.left + R.noun + '<div class="bar"><i style="width:' + Math.max(0, 100 - H.left / R.n * 100) + '%"></i></div>'; return; }
     const live = R.evs.filter(e => e.alive && (e.type !== 'villains' || e.who.some(w => !w.gone && !w.beaten))).length;
@@ -237,13 +238,13 @@ export class HeroGame {
     const down = F.state === 'down' && !F.downAt; if (down && !R.wasDown) R.downs++; R.wasDown = down;
     this.rep.style.display = F.fighting ? 'none' : ''; if (F.fighting) return; // on foot, in the fight (flight.js fightFoe); the bars say it
     if (!F.active) return this.finish(false, 'You left the town');
-    if (R.downs >= 3) return this.finish(false, 'Knocked out of the sky three times');
+
     if (R.t > 1 && (R.hero ? live === 0 : (F.storm && F.storm.war ? F.storm.score >= F.storm.goal : S.buildings >= R.need) && live === 0)) this.finish(true);
   }
   // over the line: a hero under 15 becomes a villain (now picked under Destroy), a villain at 60 a hero (Defend). Returns the line for the tally
   cross(s) { const n = HS.shown(s.flyer); if (s.side === 'hero' && s.rep < 15) { s.side = 'villain'; s.rep = 14; return '<br><b style="color:#ff8a7a">' + n + ' has gone too far: now a villain. You will find them under Destroy</b>'; } if (s.side === 'villain' && s.rep >= 60) { s.side = 'hero'; s.rep = 60; return '<br><b style="color:#6cff8a">' + n + ' has done too much good: now a hero. You will find them under Defend</b>'; } return ''; }
   finish(won, why) {
-    const R = this.round, s = this.s, S = LAB.stats, F = this.g.flight, g = this.g; R.ended = true; if (F.storm) { if (F.storm.war) R.score = F.storm.score; F.storm.dispose(); F.storm = null; } const fear = LAB.fear(); if (this.rep) { this.rep.remove(); this.rep = null; }
+    const R = this.round, s = this.s, S = LAB.stats, F = this.g.flight, g = this.g; R.ended = true; if (this.squad) { this.squad.end(); this.squad = null; } if (F.storm) { if (F.storm.war) R.score = F.storm.score; F.storm.dispose(); F.storm = null; } const fear = LAB.fear(); if (this.rep) { this.rep.remove(); this.rep = null; }
     if (R.zombie) {
       const H = R.horde || g.horde, xp = won ? 300 + (R.boss ? 300 : H.kills) + (H.bitten < 10 ? 100 : 0) : 20 + Math.round(H.kills / 4); if (g.base && g.base.active) { g.base.level = null; g.base.stop(true); } if (H.active) H.stop(true); if (H.flying) { H.flying = false; if (H.el) H.el.remove(); if (g.flight.active) g.flight.stop(true); }
       for (const e of R.evs) if (e.alive) endDisaster(e); g.flight.heroGame = false; if (this.labWas) Object.assign(LAB, this.labWas, { spotK: 1, toughK: 1 });

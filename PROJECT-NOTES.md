@@ -800,6 +800,13 @@ READ THIS FIRST after a compaction. Current as of 2026-10-26.
 - Mini map and compass hide in a street fight (they covered its big words).
 - The other 45 of Sean's 60 are in the session's list, not built: see the conversation of 2026-11-03 if asked; Sean: most likely all of them eventually.
 
+## The team in a level (2026-11-03; squad.js)
+- `HeroGame.squad`, made on the first `update()` of a round, ended first thing in `finish`. Holds `cur`, `hp[id]` (0 to 1), `downs[id]` (where they lie: a rig on its back, a red beam, an X on the mini map). `step` runs from `update`, also while in the base.
+- A knockout: F.state 'down' for 1.3 s (`airKo`), or horde.bite at 0 (`footKo`, after its fall), or a street fight lost (via crash; a general's now too). `ko` picks the next not down and sets `last[side]` for the level; `end()` puts the picked one back. None left: the level is lost ('The whole team is down', or the horde's 'Overrun'). The old 'Knocked out of the sky three times' rule is gone.
+- Revive: within 18 m (on foot too) the heartbeat panel opens; 3 taps with the ring on the green; a miss loses one; 28 m away it closes, and does not reopen until you have been 26 m away. Back at 50% health. Tap a downed icon in flight: `F.lock` with `storm: this`, so homeIn's arrival calls `arrive`.
+- Health: Destroy and Defend's flying levels through `flyUp` and `back`; the horde now shares one health on foot and in the air in a level (`land`, `liftNow`, `swapTo`). Base: `healPanel`, 9% a second while the pressure is in the green. The free +30 on leaving the base is gone in levels.
+- XP and the story's progress go to the fighter who started the level, whoever finishes it.
+
 ## Street fights: pace (2026-11-03; fighttest.js, kit.js)
 - `fightPace()` scales the fight's dt (Slower 0.8 by default; zday_fight_speed; pause menu). The horde has none of this: Sean has not said if zombie fights are too fast.
 - `this.gap`: the foe's idle will not start an attack until 0. Set by vilAtk (wind time + 1.4 - 0.6 kAI) and by your hits (1.1 - 0.4 kAI) unless `sinceAtk` >= 2.6 (fight seconds): then its turn comes whatever it is doing (idle, the next jab, getting up) and that attack is armoured (jabs do not stop it). Your turn: it cannot block (gap > 0). Wind-ups x 1.25, 'WATCH OUT!'. Punched-back chances cut (block 0.4 kAI, stun 0.25 kAI); getting up it charges only by chance of kAI.
