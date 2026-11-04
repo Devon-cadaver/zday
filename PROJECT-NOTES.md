@@ -878,6 +878,14 @@ Sean: the game is not as fun as it should be; flying through buildings was the f
 - The neck drag (fighttest.js dragSmash, horde.js drag): through everything however tall, in every street fight. The ring moves with them (cx, cz) and only the town's edge turns them; streetStep leaves them alone. Up in the air they come down to the street for it. Player's drag: 10 damage and a harder final throw per building.
 - GRAB: a grab lands (state clutch, foe pinned), time slows, and three buttons (.grabs, grabPick): SPIN (spinP: tap winds it up, it runs down by itself, GRAB lets go, the toss goes where they are facing then, as far as the turns earned), THROW, DRAG (2.6 s, 15 damage, not a finisher: dragShort). No choice in about 2 s: thrown. Holding GRAB does nothing now. On-foot levels' own grab (horde.js) not changed yet.
 
+## The fights in the air (Sean, 2026-11-04; fighttest.js)
+Sean: hand to hand felt clunky; limit the area, always in the air, the powers and finishers using the town. Every story fight (generals, villains) is o.air. Practice robot and the plaza stay on the ground.
+- A fixed level, AIR_H (14 m) over the street, so buildings stand in the fight. The space is AIR_R (22 m) with a glowing ring you can see (airRing). Only a finisher or a drag takes them to the street (airStep), and they rise again after a short drag.
+- Any fighter meeting a building brings it down, however tall (airStep). Thrown through one, the foe takes 12 and you gain power; thrown yourself, 6.
+- Thrown, they catch themselves on the level (stun, hurt) rather than lying on nothing; so GRAB by the feet of a downed foe no longer comes up in the air. The grab's three moves are the way in.
+- Flying: Body.fly, leanK: legs trailing, leaning into speed, a bob; no feet looked for (grounded). The stick is AIR_RUN 11 m/s and she faces the way she goes; the foe's walking is 1.35 times faster.
+- HURL (hurl, hurlStep, HURL_COST 30): the nearest building within 60 m torn up and thrown (32), or a car (20). It lands where the foe was when it left, so a moving foe can be missed.
+
 ## Private preview link
 - https://claude.ai/artifact/Jemm5Sxje8y9XvJxcFNPwN (private, Sean only). Page source: artifact/zday-city.html.
 - To update: `npx vite build --base ./`, then publish artifact/zday-city.html with files {"assets/<bundle>.js": "dist/assets/<bundle>.js"} and change the script src in the page to the new bundle name (the hash changes each build).
