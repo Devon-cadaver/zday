@@ -36,6 +36,14 @@ export function playClip(r, clip, t) {
 }
 // a villain's reaction: f.react = { clip, t } played over its held pose while it lasts (villains.js pinPose)
 export function playReact(r, f) { if (!f.react) return false; if (!playClip(r, f.react.clip, f.react.t) && f.react.t > f.react.clip.keys[f.react.clip.keys.length - 1].t + (f.react.hold || 0)) { f.react = null; return false; } return true; }
+// a hand pinned at time t: how far on to its pin (0 to 1) and which pin, from the two keys round t. Key.pin is { L: 'neck', R: 'face' } (the Pose Lab, fighttest.js PINS)
+export function pinAt(clip, t, side, out) {
+  const K = clip.keys; let i = 0; while (i < K.length - 1 && t >= K[i + 1].t) i++;
+  const a = K[i], b = K[Math.min(i + 1, K.length - 1)], pa = a.pin && a.pin[side], pb = b.pin && b.pin[side]; if (!pa && !pb) return null;
+  const span = b.t - a.t, u = span > 0 ? Math.max(0, Math.min(1, (t - a.t) / span)) : 1, e = (EASE[b.ease] || EASE.soft)(u);
+  out.w = (pa ? 1 - e : 0) + (pb ? e : 0); out.on = pb && e > 0 ? pb : pa || pb; return out;
+}
+export { EASE, NAMES, val, J };
 const key = (t, p, ease) => ({ t, p, ease });
 
 // ---------- the hero's moves

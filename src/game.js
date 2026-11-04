@@ -187,6 +187,7 @@ body.zd-flying #zd-toast{left:calc(50% + 28px);max-width:calc(100vw - 180px)}
 #zd-menuflash{position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:8}
 #zd-menu .ufo .rim{position:absolute;top:83%;padding:4px 10px;min-width:0;font-size:9.5px;letter-spacing:.08em;border-radius:10px;background:rgba(10,14,26,.9);border:1px solid rgba(95,220,255,.55);color:#bff4ff;box-shadow:0 0 8px rgba(95,220,255,.35)}
 #zd-menu .ufo .rim.r{right:27%}
+#zd-menu .ufo .rim.l{left:27%}
 #zd-menu .ufo .rim::after{content:'';position:absolute;left:-10px;right:-10px;top:-12px;bottom:-12px} /* a bigger place to tap than the little label */
 @media (orientation:landscape) and (max-height:480px){#zd-menu .box.saucer{max-width:330px}#zd-menu .box.saucer .xp,#zd-menu .box.saucer .foot{display:none}} /* a phone on its side: the saucer smaller, the XP and the footer left off so it fits */
 #zd-menu .box.saucer .xp{margin:6px 10px 0;padding:8px 14px 9px;background:linear-gradient(180deg,rgba(14,20,36,.92),rgba(6,9,18,.94));border:1px solid rgba(95,220,255,.6);box-shadow:0 0 12px rgba(60,180,255,.3),inset 0 0 10px rgba(60,180,255,.12);
@@ -577,7 +578,7 @@ export class Game {
         wedgeBtn(1, 'data-play="villain"', MICON.be + '<b>Destroy</b>') +
         wedgeBtn(2, 'data-play="sandbox"', MICON.sandbox + '<b>Sandbox</b>') +
         wedgeBtn(3, 'data-play="tv"', MICON.tv + '<b>Watch</b>') + '</div>' + // just the names (Sean: the level shows below)
-        '<button class="zd-btn rim r" type="button" data-go="roster">Roster</button><button class="orbfire" type="button" aria-label="Fire"></button></div>' +
+        '<button class="zd-btn rim l" type="button" data-poses="1">Poses</button><button class="zd-btn rim r" type="button" data-go="roster">Roster</button><button class="orbfire" type="button" aria-label="Fire"></button></div>' +
         '<div class="xp"><div class="lg-top"><span class="h">Hero XP <b>' + L.hero.toLocaleString() + '</b></span><span class="t">Legend</span><span class="v">Villain XP <b>' + L.villain.toLocaleString() + '</b></span></div>' +
         '<div class="lg-bar" style="--c:' + hue + '"><i style="left:' + Math.min(50, at) + '%;width:' + Math.abs(at - 50) + '%"></i><u style="left:' + at + '%"></u></div><div class="lg-name" style="color:' + hue + '">' + L.title + '</div></div>' +
         '<div class="foot">Levels won: ' + L.heroWon + ' as heroes · ' + L.villainWon + ' as villains' + (pr.ok ? '' : ' · progress is not being saved on this device') + '</div>';
@@ -621,6 +622,7 @@ export class Game {
     if (this.globe) this.globe.backdrop();
     dragScroll(this.menu.querySelector('.mbody'), 'y');
     this.menu.querySelectorAll('[data-go]').forEach(b => { b.onclick = () => this.showMenu(b.dataset.go); });
+    this.menu.querySelectorAll('[data-poses]').forEach(b => { b.onclick = () => { location.href = './poses.html'; }; }); // the Pose Lab, a page of its own
     this.menu.querySelectorAll('[data-play]').forEach(b => { b.onclick = () => this.playMode(b.dataset.play); });
     const orb = this.menu.querySelector('.orbfire'); if (orb) this.orbFire(orb); // the saucer's laser (an Easter egg)
     this.menu.querySelectorAll('[data-place]').forEach(b => { b.onclick = () => travel(b.dataset.place); });
@@ -1150,6 +1152,7 @@ class Sandbox {
     g.addButton('zd-reset', 'Reset', () => this.reset());
     g.addButton('zd-menu-btn', 'Menu', () => g.toMenu());
     this.buildPanel(); this.bindHold();
+    if (/[?&]fight=1\b/.test(location.search)) setTimeout(() => { if (g.fightTest && !g.fightTest.active) g.fightTest.start(); }, 1500); // the Pose Lab's Try it in a fight
     setTimeout(() => { if (!g.base) return; g.addButton('zd-levels-b', 'Test levels', () => openLevels(g)); g.addButton('zd-basebtn', 'Home Base', () => g.base.start()); g.addButton('zd-takeoff', 'Take off', () => { const F = g.flight; if (F.active || g.base.active) return; F.heroGame = true; F.start((HS.load().hero || {}).flyer || 'nova'); F.pos.set(g.base.x, g.base.y + 2, g.base.z + g.base.S.d / 2 + 5); F.yaw = Math.PI / 2; F.pitch = 0.8; F.speed = 4; F.thr = 4; F.setView('iso'); g.toast('Up from the base. Land anywhere in the street', 2500); }); /* take-off from the street outside the base (Sean: not from inside) */ g.base.place(); if (!new URLSearchParams(location.search).has('out')) g.base.start(); }, 0); // the Sandbox starts inside the base (base.js); ?out=1 starts in the street
     this.dropsLeft = START_DROPS; this.clock = -1; this.milestone = 0;
     g.toast('Open Disasters to unleash a disaster, then fly a plane, drive a tank or patrol as a police officer', 4500);
