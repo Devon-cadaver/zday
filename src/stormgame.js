@@ -82,11 +82,13 @@ export class StormWar extends StormGame {
   constructor(F, R) {
     const type = (R.allies || []).map(e => e.type).find(t => WAR[t]) || 'none', e = (R.allies || []).find(q => q.type === type) || null, W = WAR[type];
     super(F, e || { type }, { act: '✊ STOP THEM', noun: '', how: '', go: 'Wreck the town for points. Lock on stops the heroes and squads undoing it', col: [0.5, 1.4, 3] });
-    this.war = true; this.R = R; this.type = type; this.W = W; this.e = e; this.score = 0; this.goal = R.need * 100; this.chain = 0; this.chainT = 0; this.mult = 1; this.meter = 0; this.strength = W.weather && e ? 100 : 0; this.jobT = 12; this.followT = 0; this.blindT = 0; this.shatterT = 0; this.sink = 0;
+    this.war = true; this.R = R; this.type = type; this.W = W; this.e = e; this.score = 0; this.goal = R.need * 400; this.chain = 0; this.chainT = 0; this.mult = 1; this.meter = 0; this.strength = W.weather && e ? 100 : 0; this.jobT = 12; this.followT = 0; this.blindT = 0; this.shatterT = 0; this.sink = 0;
     const D = this.D; this.p0 = LAB.stats.buildings; this.b0 = D.stats.buildings; this.c0 = D.ctx.traffic.stats.wrecks || 0; if (e && type === 'flood') e.hold = 1e6;
     const col = new THREE.Color(...this.K.col); this.geo = new THREE.CylinderGeometry(1.4, 1.4, 150, 8, 1, true).translate(0, 75, 0); this.mat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide }); this.ready = true;
   }
   place() {}
+  // flown through (flight.js burstOut): points by its height, times the chain, up on the screen
+  smashed(hgt) { this.chain += 1; this.chainT = 5; this.mult = Math.min(10, 1 + Math.floor(this.chain / 2)); const pts = Math.round((100 + hgt * 20) / 50) * 50 * this.mult; this.score += pts; this.p0 += 1; this.b0 += 1; this.meter = Math.min(100, this.meter + 6); const big = hgt > 40; this.F.bigText('+' + pts.toLocaleString() + (this.mult > 1 ? '  x' + this.mult : '') + (big ? ' TOWER!' : ''), big ? '#ff7a3a' : '#ffd27a', 0.9); if (this.chain > 1 && this.chain % 5 === 0) this.F.tip(this.chain + ' IN A ROW!'); }
   lockOn() { if (!this.left) return false; return super.lockOn(); }
   label() { return 'SCORE ' + Math.round(this.score) + ' / ' + this.goal + (this.mult > 1 ? ' <b style="color:#ffd27a">x' + this.mult + '</b>' : '') + (this.W.weather ? ' &middot; storm ' + Math.round(this.strength) + '%' : '') + (this.left ? ' &middot; <b style="color:#9fd4ff">' + this.left + ' to stop</b>' : ''); }
   pct() { return Math.min(100, this.score / (this.goal || 1) * 100); }
@@ -123,7 +125,7 @@ export class StormWar extends StormGame {
   step(h) {
     const F = this.F, g = F.g, D = this.D, e = this.e; this.t += h;
     const db = D.stats.buildings - this.b0, dc = (D.ctx.traffic.stats.wrecks || 0) - this.c0; this.b0 = D.stats.buildings; this.c0 = D.ctx.traffic.stats.wrecks || 0;
-    { const mine = Math.min(db, LAB.stats.buildings - this.p0); this.p0 = LAB.stats.buildings; if (mine > 0) { this.chain += mine; this.chainT = 4; this.mult = Math.min(3, 1 + Math.floor(this.chain / 4)); this.score += 100 * mine * this.mult; } /* yours chain; what the storm brings down scores half, no chain */ if (db > mine) this.score += 50 * (db - mine); } if (db > 0) this.meter = Math.min(100, this.meter + db * 6); if (dc > 0) { this.score += 25 * dc; this.meter = Math.min(100, this.meter + dc * 1.5); }
+    { const mine = Math.min(db, LAB.stats.buildings - this.p0); this.p0 = LAB.stats.buildings; if (mine > 0) { this.chain += mine; this.chainT = 5; this.mult = Math.min(10, 1 + Math.floor(this.chain / 2)); this.score += 100 * mine * this.mult; } /* yours chain; what the storm brings down scores half, no chain */ if (db > mine) this.score += 50 * (db - mine); } if (db > 0) this.meter = Math.min(100, this.meter + db * 6); if (dc > 0) { this.score += 25 * dc; this.meter = Math.min(100, this.meter + dc * 1.5); }
     if (this.chainT > 0 && (this.chainT -= h) <= 0) { this.chain = 0; this.mult = 1; }
     if (this.followT > 0 && e && e.tw) { this.followT -= h; if (this.followT > 0) e.tw.steer(F.pos.x + Math.cos(F.yaw) * 50, F.pos.z - Math.sin(F.yaw) * 50); else e.tw.steerT = null; }
     if (this.blindT > 0) { this.blindT -= h; const A = F.army; if (A) { A.fireT = Math.max(A.fireT, 2); for (const q of A.helis) q.shot = Math.max(q.shot, 2); } }

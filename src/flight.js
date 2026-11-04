@@ -45,6 +45,7 @@ const PLANES = {
   weaver: { name: 'Weaver', hero: 'Weaver', rigV: 1, min: 6, max: 66, start: 28, turn: 1.9, climb: 1.4, chase: [10, 3.4], seat: [1.9, 0.7], sound: 'wind', punch: 1.1 },
   tempo: { name: 'Tempo', hero: 'Tempo', min: 6, max: 64, start: 28, turn: 1.8, climb: 1.4, chase: [10, 3.4], seat: [1.9, 0.7], sound: 'wind', punch: 0.9, slow: 1.45 },
 };
+const CRUISE = 13; // how high she flies when left to it: at the height of the town's walls, so flying is through them (Sean)
 const CEIL = 650, KMH = 3.6, FOV_CHASE = 62, FOV_COCKPIT = 72, INVERT = 'zday_fly_invert';
 const FOV_ISO = 18, ISO_DIST = 64, ISO_EL = 0.84; // a fight is watched the way the town is (Sean): the town's narrow lens, far off and high (about 48 degrees), the miniature look with the blur on
 // what each plane carries, in the order the payload button goes round; wait: seconds before the next; R: the blast's reach; s: the bomb's size
@@ -589,6 +590,7 @@ export class Flight {
     }
     const shell = this.inside && this.inside.k === k ? this.inside.take() : null; this.inside = null; LAB.stats.buildings++;
     D.destroyBuilding(k, 'collapse', { dir: Math.atan2(-fx, fz), spare: true, noCrush: true, shell }); // leaning over the way the hero went, floors and all
+    if (this.storm && this.storm.smashed) this.storm.smashed(hgt);
   }
   // the inside of a building the hero never came out of (knocked down in it, landed): it comes down anyway
   dropInside() { const I = this.inside; this.inside = null; if (I && I.alive && !this.g.city.dead[I.k]) this.g.disasters.destroyBuilding(I.k, 'collapse', { spare: true, noCrush: true, shell: I.take() }); }
@@ -747,7 +749,7 @@ export class Flight {
     const px = this.pos.x, py = this.pos.y, pz = this.pos.z, cy = Math.cos(this.yaw), sy = Math.sin(this.yaw); this.pos.x += cy * this.speed * dt; this.pos.z -= sy * this.speed * dt;
     // height: where she was put, up over any roof near or just ahead
     if (this.arcGap || this.holdY == null) { if (this.holdTo != null) this.climbT = 0; this.holdY = this.holdTo != null ? this.holdTo : this.pos.y; this.holdTo = null; this.arcGap = false; }
-    if (close) { this.holdY = this.pos.y; } else { this.holdY = Math.max(4, Math.min(CEIL, this.holdY + ((this.upDown || 0) * 30 + vert) * dt)); let top = 0; const look = (x, z, r) => g.city.buildingsNear(x, z, r, (k, d, b) => { if (b.top > top) top = b.top; }); look(this.pos.x, this.pos.z, 7); if (this.speed > 4) look(this.pos.x + cy * this.speed * 0.5, this.pos.z - sy * this.speed * 0.5, 7); const to = top > 0 ? Math.max(this.holdY, top + 5) : this.holdY, cl = this.climbT == null ? 1 : Math.min(1, (this.climbT += dt)), vy = Math.max(-34, Math.min(6 + 44 * cl * cl, (to - this.pos.y) * (to > this.pos.y ? 6 : 2.4))); /* off the ground she builds up to it, or she is gone from the frame before the camera follows */ this.pos.y += vy * dt; this.pitch += (Math.max(-0.5, Math.min(0.5, vy * 0.015)) - this.pitch) * Math.min(1, dt * 5); }
+    if (close) { this.holdY = this.pos.y; } else { this.holdY = Math.max(4, Math.min(CEIL, this.holdY + ((this.upDown || 0) * 30 + vert) * dt)); let top = 0; if (this.goBase) { const look = (x, z, r) => g.city.buildingsNear(x, z, r, (k, d, b) => { if (b.top > top) top = b.top; }); look(this.pos.x, this.pos.z, 7); if (this.speed > 4) look(this.pos.x + cy * this.speed * 0.5, this.pos.z - sy * this.speed * 0.5, 7); } else { if (this.upDown || vert) this.ownHeight = 6; else if (this.ownHeight > 0) this.ownHeight -= dt; const cruise = g.people.groundY(this.pos.x, this.pos.z) + CRUISE; if (!(this.ownHeight > 0) && this.speed > 4 && this.holdY > cruise) this.holdY = Math.max(cruise, this.holdY - 16 * dt); } const to = top > 0 ? Math.max(this.holdY, top + 5) : this.holdY, cl = this.climbT == null ? 1 : Math.min(1, (this.climbT += dt)), vy = Math.max(-34, Math.min(6 + 44 * cl * cl, (to - this.pos.y) * (to > this.pos.y ? 6 : 2.4))); /* off the ground she builds up to it, or she is gone from the frame before the camera follows */ this.pos.y += vy * dt; this.pitch += (Math.max(-0.5, Math.min(0.5, vy * 0.015)) - this.pitch) * Math.min(1, dt * 5); }
     this.roll += (-turn * 0.7 - this.roll) * Math.min(1, dt * 6);
     this.hazards(dt); if (this.state !== 'fly' || this.caught) return;
     if (this.pos.y < 35 && this.speed > 4 && (this.scareT = (this.scareT || 0) - dt) <= 0) { this.scareT = 0.5; g.people.scare(this.pos.x, this.pos.z, 30, 0.4); }

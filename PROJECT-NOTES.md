@@ -871,6 +871,13 @@ A bot plays whole fights with the player's inputs in several towns watching for 
 ## The neck drag's camera pulled back (Sean, 2026-11-03; fighttest.js DRAG_CAM)
 Far too close at 5 m back, 6 m aside, 3.2 m up, and pulling that same low camera further back only put it inside buildings. So the drag now has the fight's own camera, which rides high and swings round what is in the way, zoomed out to DRAG_CAM (36 m, against 23). Change that one number to taste. horde.js had its own copy of the low camera; gone too, with its own wide camera coming in to 32 m for a drag.
 
+## Through the buildings, points, and picking the move (Sean, 2026-11-04)
+Sean: the game is not as fun as it should be; flying through buildings was the fun part; Destroy should be about wrecking; the spin was more fun when you controlled it.
+- Flying (flight.js arcade): the rule that lifted her over any roof near or ahead is gone, except on the way to the base (goBase). Moving, she settles to CRUISE (13 m), unless the up and down arrows were used in the last 6 s (ownHeight). plough does the rest, as it always did. In Defend too: smashing a building costs fear and reputation there, as it did.
+- Destroy (stormgame.js StormWar.smashed, from burstOut): 100 + 20 a metre of height, rounded to 50, times a chain up to x10 (one up every 2, 5 s to the next), big on the screen. The goal is R.need * 400 to match.
+- The neck drag (fighttest.js dragSmash, horde.js drag): through everything however tall, in every street fight. The ring moves with them (cx, cz) and only the town's edge turns them; streetStep leaves them alone. Up in the air they come down to the street for it. Player's drag: 10 damage and a harder final throw per building.
+- GRAB: a grab lands (state clutch, foe pinned), time slows, and three buttons (.grabs, grabPick): SPIN (spinP: tap winds it up, it runs down by itself, GRAB lets go, the toss goes where they are facing then, as far as the turns earned), THROW, DRAG (2.6 s, 15 damage, not a finisher: dragShort). No choice in about 2 s: thrown. Holding GRAB does nothing now. On-foot levels' own grab (horde.js) not changed yet.
+
 ## Private preview link
 - https://claude.ai/artifact/Jemm5Sxje8y9XvJxcFNPwN (private, Sean only). Page source: artifact/zday-city.html.
 - To update: `npx vite build --base ./`, then publish artifact/zday-city.html with files {"assets/<bundle>.js": "dist/assets/<bundle>.js"} and change the script src in the page to the new bundle name (the hash changes each build).
