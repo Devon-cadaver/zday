@@ -114,7 +114,7 @@ export const MOVES = [
 applyPoses(MOVES, new Set(Object.values(ATK)));
 const CAN_TARGET = ['idle', 'close', 'wind', 'strike', 'rush', 'stumble', 'stun', 'block', 'frozen'];
 const A0 = 0.95, A1 = Math.PI * 2 - 0.95, SMASH_DMG = [12, 14, 16]; // the swing's ends: their head on the ground in front, then behind
-const AZ0 = Math.atan2(0.6, 0.8), G = 24, ARENA = 40, TAP_MS = 220, SWIPE_PX = 26, COMBO_T = 0.6, DASH_COST = 12;
+const AZ0 = Math.atan2(0.6, 0.8), G = 24, ARENA = 40, TAP_MS = 220, SWIPE_PX = 26, COMBO_T = 0.6, DASH_COST = 12, RUN = 7.5; // RUN: the joystick, a little over the foe's 6.5, so you can make room
 export const CSS = `
 #zd-fight{position:fixed;left:0;top:0;right:0;bottom:0;z-index:28;touch-action:none;user-select:none;-webkit-user-select:none;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#fff}
 body.zd-flying #zd-bar,body.zd-flying #zd-dis,body.zd-flying #zd-followchip,body.zd-flying #zd-globe,body.zd-flying #zd-top{display:none!important}
@@ -291,7 +291,7 @@ export class FightTest {
     // just in time: the blow about to land or landing, and near enough to have mattered
     const late = (v.state === 'wind' && v.T - v.t < 0.28) || v.state === 'strike' || v.state === 'rush'; if (late && (this.dist() < 4.5 || v.state === 'rush' || v.kind === 'charge')) { this.gain(25); this.counterT = 0.95; this.slow = 0.45; this.say('COUNTER! TAP!', 0.9, '#ffd27a'); }
   }
-  // the joystick (the left half of the screen): walking in the camera's frame at up to 5 m/s, the legs going, facing the way she walks
+  // the joystick (the left half of the screen): running in the camera's frame at up to RUN, the legs going, facing the way she walks
   stickDir() { const cam = this.ctx.camera, [sx, sy] = this.stick, m = Math.min(1, Math.hypot(sx, sy)); if (m < 0.08) return null; _a.setFromMatrixColumn(cam.matrixWorld, 0); _a.y = 0; _a.normalize(); const fx = -cam.matrixWorld.elements[8], fz = -cam.matrixWorld.elements[10], fl = Math.hypot(fx, fz) || 1, wx = _a.x * sx - fx / fl * sy, wz = _a.z * sx - fz / fl * sy, wl = Math.hypot(wx, wz) || 1; return [wx / wl, wz / wl, m]; }
   // the screen held: in a finisher its holds; otherwise the block (Sean: hold to block), kept up until the finger lifts
   hold() { const h = this.h; if (this.hDazed || this.over) return false; if (this.finKind) return this.finHold(); if (['spin', 'ankles', 'smash', 'charge', 'glide'].includes(h.state) || this.atk === 'seize' || this.atk === 'neck') return false; this.blockOn(); return h.state === 'block'; }
@@ -322,7 +322,7 @@ export class FightTest {
   heroStep(dt) {
     const h = this.h, v = this.v; h.t += dt; h.walkK *= Math.exp(-dt * 10); const d = this.dist();
     switch (h.state) {
-      case 'idle': if (this.hDazed && !this.over) { this.dazeHero(); break; } if (this.stick && !this.finKind) { const w = this.stickDir(); if (w) { const nx = h.x + w[0] * 5 * w[2] * dt, nz = h.z + w[1] * 5 * w[2] * dt; if (Math.hypot(nx - this.cx, nz - this.cz) < this.R - 1) { h.x = nx; h.z = nz; } h.yaw = Math.atan2(w[0], w[1]); h.walkK = Math.min(1, h.walkK + dt * 6); h.phase += dt * 9 * w[2]; } } if (this.finKind && !this.over && (this.finStage === 'run' || this.finStage === 'up')) { h.go('finRun', C.guard); break; } this.slide(h, dt); this.face(h, v, dt); if (d > 6 && !this.over) this.walk(h, v.x, v.z, 5.5, dt); if (h.clip !== C.guard) h.play(C.guard); break;
+      case 'idle': if (this.hDazed && !this.over) { this.dazeHero(); break; } if (this.stick && !this.finKind) { const w = this.stickDir(); if (w) { h.x += w[0] * RUN * w[2] * dt; h.z += w[1] * RUN * w[2] * dt; { const ex = h.x - this.cx, ez = h.z - this.cz, el = Math.hypot(ex, ez); if (el > this.R - 1) { h.x = this.cx + ex / el * (this.R - 1); h.z = this.cz + ez / el * (this.R - 1); } } h.yaw = Math.atan2(w[0], w[1]); h.walkK = Math.min(1, h.walkK + dt * 6); h.phase += dt * 9 * w[2]; } } if (this.finKind && !this.over && (this.finStage === 'run' || this.finStage === 'up')) { h.go('finRun', C.guard); break; } this.slide(h, dt); this.face(h, v, dt); if (h.clip !== C.guard) h.play(C.guard); break; // a tap from far off still gets there: the lunge
       case 'lunge': { this.face(h, v, dt, 22); const A = ATK[this.atk], gap = A.reach - 0.6, sp = 30; if (v.state === 'air') { h.go('idle', C.guard); break; } if (d <= gap || h.t > 0.7) { h.go('attack', A.clip); break; } h.x += (v.x - h.x) / d * sp * dt; h.z += (v.z - h.z) / d * sp * dt; h.phase += dt * 30; h.walkK = 0.6; break; }
       case 'attack': { const A = ATK[this.atk]; this.face(h, v, dt, 18); this.slide(h, dt); if (!this.landed && h.t >= A.at) { this.landed = true; this.contact(A); if (h.state !== 'attack') break; } if (h.t >= A.end) this.afterAtk(); else if (this.buffer && this.landed && h.t >= Math.max(A.at + 0.09, A.end * 0.85) && COMBO.includes(this.atk)) this.afterAtk(); break; }
       case 'charge': this.face(h, v, dt); this.k = Math.min(1, this.k + dt / 0.9); h.r.root.position.y += 0; if (Math.random() < 0.3 * this.k) this.g.disasters.brawl.stunts.ring(h.x, this.top + 0.13, h.z, 1.6 + 2 * this.k, 0.25, new THREE.Color(1.6, 0.5, 1.4), 0.6); break;

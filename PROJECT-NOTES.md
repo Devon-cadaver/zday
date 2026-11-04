@@ -859,6 +859,9 @@ Sean: pick Defend or Destroy, the globe comes up, spin it until you see a disast
 - Sandbox: the numbered test levels are untouched.
 - A page load in ?mode=hero or ?mode=villain: the base is made after the mode, so the HeroGame constructor waits for it.
 
+## Room to move in a fight (Sean, 2026-11-03; fighttest.js)
+Sean, against an alien general: dashing or floating away he was slowly pulled back, forced to mash or block. Not planned: from before the joystick, the idle hero walked to the foe by herself over 6 m at 5.5 m/s, against a stick of 5. Gone; a tap from far off still arrives by the lunge (30 m/s). The stick is now RUN, 7.5 m/s, over the foe's 6 and 6.5, and at the ring's edge you slide round it rather than stopping dead. Getting away earns the foe's charge, which can be dashed for a counter.
+
 ## Private preview link
 - https://claude.ai/artifact/Jemm5Sxje8y9XvJxcFNPwN (private, Sean only). Page source: artifact/zday-city.html.
 - To update: `npx vite build --base ./`, then publish artifact/zday-city.html with files {"assets/<bundle>.js": "dist/assets/<bundle>.js"} and change the script src in the page to the new bundle name (the hash changes each build).
