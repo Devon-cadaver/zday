@@ -8,7 +8,7 @@ export const saveLocal = (o) => { try { localStorage.setItem(KEY, JSON.stringify
 const copy = (x) => JSON.parse(JSON.stringify(x));
 // a time in the move as written, moved with its keys
 export const warp = (t, base, keys) => {
-  const P = keys.filter((k) => k.src != null).map((k) => [base[k.src].t, k.t]).sort((a, b) => a[0] - b[0]); if (!P.length) return t;
+  const P = keys.filter((k) => k.src != null && base[k.src]).map((k) => [base[k.src].t, k.t]).sort((a, b) => a[0] - b[0]); if (!P.length) return t;
   if (t <= P[0][0]) return t + P[0][1] - P[0][0]; const L = P[P.length - 1]; if (t >= L[0]) return t + L[1] - L[0];
   for (let i = 1; i < P.length; i++) if (t <= P[i][0]) { const a = P[i - 1], b = P[i], u = b[0] > a[0] ? (t - a[0]) / (b[0] - a[0]) : 0; return a[1] + (b[1] - a[1]) * u; }
   return t;
@@ -19,7 +19,7 @@ export function applyPoses(moves, atk) {
   for (const m of moves) {
     if (m.base) continue; m.base = copy(m.clip.keys); m.basePair = m.clip.pair ? copy(m.clip.pair) : null;
     for (const A of atk) if (A.clip === m.clip && m.at == null) m.at = A.at; // the blow's moment as written, for the lab's timeline
-    const s = saved[m.id]; if (!s || !s.keys || !s.keys.length) continue;
+    const s = saved[m.id]; if (!s || !Array.isArray(s.keys) || !s.keys.length || !s.keys.every((k) => k && Number.isFinite(k.t) && k.p && typeof k.p === 'object')) continue; // anything else in the save is ignored, never a reason not to load
     m.clip.keys = copy(s.keys); if (s.pair && m.clip.pair) Object.assign(m.clip.pair, s.pair); m.changed = true;
     for (const A of atk) if (A.clip === m.clip) { A.at = warp(A.at, m.base, m.clip.keys); A.end = warp(A.end, m.base, m.clip.keys); }
   }

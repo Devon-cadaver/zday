@@ -2,7 +2,7 @@
 // and on the Map station in the base, where it sits in a screen's frame. globe.js draws the markers; this is the card, the fighter and the frame.
 import { PLACES } from './places.js';
 import { HS, levelOf } from './herogame.js';
-import { board, clearFresh, danger, setCurrent, threatName, iconOf, colourOf, VILLAIN_IDS } from './threats.js';
+import { board, clearFresh, danger, setCurrent, threatName, partnerOf, iconOf, colourOf, VILLAIN_IDS } from './threats.js';
 
 const CSS = `
 #zd-map{position:fixed;left:0;right:0;top:0;bottom:0;z-index:42;pointer-events:none;font-family:system-ui,-apple-system,sans-serif;color:#fff}
@@ -42,7 +42,7 @@ export function openMap(g, o) {
   const hide = () => { card.classList.remove('show'); G.controls.autoRotate = true; };
   const show = (key) => {
     const t = byKey[key]; if (!t) return; G.controls.autoRotate = false; card.style.setProperty('--c', colourOf(t.kind));
-    card.innerHTML = '<button type="button" class="x" aria-label="Close">✕</button><div class="top"><div class="ic">' + iconOf(t.kind) + '</div><div><b>' + PLACES[key].name + '</b><span>' + threatName(t, side, (id) => HS.shown(id)) + ' · danger ' + danger(t, level()) + '</span></div></div><p>' + (PLACES[key].blurb || '') + '</p><button type="button" class="go">' + (hero ? 'FLY IN AND DEFEND IT' : 'FLY IN AND WRECK IT') + '</button>';
+    card.innerHTML = '<button type="button" class="x" aria-label="Close">✕</button><div class="top"><div class="ic">' + iconOf(t.kind) + '</div><div><b>' + PLACES[key].name + '</b><span>' + threatName(t, side, (id) => HS.shown(id)) + (hero && partnerOf(t, villainsLeft()) ? ' + ' + HS.shown(partnerOf(t, villainsLeft())) : '') + ' · danger ' + danger(t, level()) + '</span></div></div><p>' + (PLACES[key].blurb || '') + '</p><button type="button" class="go">' + (hero ? 'FLY IN AND DEFEND IT' : 'FLY IN AND WRECK IT') + '</button>';
     card.classList.add('show'); card.querySelector('.x').onclick = hide;
     card.querySelector('.go').onclick = () => { setCurrent(side, t.id); clearFresh(side); stop(); G.threats = null; G.go(key); };
   };

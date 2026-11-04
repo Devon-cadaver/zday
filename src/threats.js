@@ -14,7 +14,7 @@ export const VILLAIN_IDS = ['blur', 'tyrant', 'weaver'];
 export const KIND_NAME = { villains: 'Villains', aliens: 'Alien invasion', worm: 'Giant worm', tornado: 'Tornado', flood: 'Flood', haboob: 'Dust storm', tsunami: 'Tsunami', coldwave: 'Cold wave', zombies: 'Zombies', kaiju: 'Kaiju', riot: 'Riot', quake: 'Earthquake', plant: 'Killer plant', volcano: 'Volcano', rift: 'Rift', sinkhole: 'Sinkhole', blackhole: 'Black hole', spill: 'Toxic spill' };
 const rnd = (a) => a[Math.floor(Math.random() * a.length)];
 let boards = null;
-const load = () => { if (boards) return boards; try { boards = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { boards = null; } return (boards = boards || {}); };
+const load = () => { if (boards) return boards; try { boards = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { boards = null; } return (boards = boards && typeof boards === 'object' ? boards : {}); };
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(boards)); } catch (e) { /* no storage: the board lasts as long as the page */ } };
 function freeCity(B, kind, not) { const taken = B.list.map((t) => t.key), want = NEEDS[kind] || PATH, open = want.filter((k) => !taken.includes(k) && k !== not && PLACES[k]); return open.length ? rnd(open) : null; }
 function add(B, slot, kind, o) { const key = freeCity(B, kind, B.avoid); if (!key) return null; const t = { id: ++B.n, key, slot, kind, ...o }; B.list.push(t); B.fresh.push(t.id); return t; }
@@ -30,7 +30,9 @@ function fill(B, side, villainsLeft) {
   while (count('random') < B.randomN) if (!add(B, 'random', pick(B, RANDOM))) break;
 }
 export function board(side, villainsLeft = []) {
-  const all = load(), B = all[side] || (all[side] = { list: [], fresh: [], recent: [], n: 0, randomN: 1 + Math.floor(Math.random() * 2), cur: null });
+  const all = load(); if (all[side] && !Array.isArray(all[side].list)) delete all[side];
+  const B = all[side] || (all[side] = { list: [], fresh: [], recent: [], n: 0, randomN: 1 + Math.floor(Math.random() * 2), cur: null });
+  B.fresh = B.fresh || []; B.recent = B.recent || []; B.n = B.n || 1000; B.randomN = B.randomN || 1; B.list = B.list.filter((t) => t && PLACES[t.key] && KIND_NAME[t.kind]);
   B.list = B.list.filter((t) => t.slot !== 'villains' || t.kind !== 'villains' || side !== 'hero' || villainsLeft.includes(t.v)); // a villain who has crossed over is not attacking anyone
   fill(B, side, villainsLeft); save(); return B;
 }
@@ -47,7 +49,9 @@ export function resolve(side, id, won, villainsLeft = []) {
 }
 export const danger = (t, level) => level + Math.floor(Math.max(0, PATH.indexOf(t.key)) / 6); // the bigger towns come later on the road
 // what is fought: Defend's villain by name, Destroy's guard has no disaster of its own (the heroes come for you anyway)
-export const waveOf = (t) => (t.kind === 'villains' ? (t.v ? [t.v] : []) : [t.kind]);
+const WITH_VILLAIN = ['flood', 'haboob', 'tsunami', 'coldwave', 'quake', 'plant', 'volcano', 'rift', 'sinkhole', 'blackhole', 'spill'];
+export const partnerOf = (t, left = []) => (t.kind !== 'villains' && WITH_VILLAIN.includes(t.kind) && left.length ? left[t.id % left.length] : null);
+export const waveOf = (t, left = []) => (t.kind === 'villains' ? (t.v ? [t.v] : []) : partnerOf(t, left) ? [t.kind, partnerOf(t, left)] : [t.kind]);
 export const threatName = (t, side, shown) => (t.kind === 'villains' ? (side === 'hero' ? (t.v ? shown(t.v) : 'Villains') : 'The heroes on guard') : KIND_NAME[t.kind] || t.kind);
 
 // the icons on the globe, drawn here so no phone is missing an emoji. The little animation is in storymap.js
