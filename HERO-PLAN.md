@@ -81,6 +81,8 @@ Build order (one thing at a time, each tested in the Sandbox and pushed). The ch
   - [x] Sean's fun pass, part 1 (2026-11-04): flying through buildings again, the neck drag through anything, Destroy's arcade points and chains, a grab lets you pick spin, throw or drag.
   - [x] Sean's fun pass, part 2 (2026-11-04): the fights with villains and generals always in the air, in a ring you can see; buildings come down under anyone who hits them; HURL throws a building or a car. First version: to be tuned by playing it.
   - [x] The tornado as a villain (Sean, 2026-11-04): a face, a health bar, it chases you, throws cars; Lock on is a flying punch, double in its open mouth.
+  - [x] Punchier melee (Sean, 2026-11-04): blocks and armour no longer stop a combo dead; a hit counter worth more as it grows; enders launch, tap follows them up, the third blow spikes them; a dash blow; each of the six with their own speed, weight, combo and signature move.
+  - [ ] The same in the on-foot levels (horde.js has its own melee).
   - [ ] The other weather as villains (Sean): the tsunami with a mouth, freeze sections and punch the frozen parts until a small part is left to fight hand to hand; the dust storm the same; the flood a villain with a hose, punching sinkholes to drain the water.
   - [ ] From Sean's enhancement brief, by its own order: more satisfying melee (heavy attacks, launchers, air combos); each of the six fighters moving and hitting differently, with a signature move; more grab moves (suplex, slam, throw into things); a combo counter and score in the fights; enemy types in the crowd levels (fast, heavy, ranged, armoured); street things to use (barrels, cars).
   - [ ] Destroy: jets and heroes chasing you, with mini games to shake them.

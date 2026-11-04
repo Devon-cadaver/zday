@@ -889,6 +889,15 @@ Sean: hand to hand felt clunky; limit the area, always in the air, the powers an
 ## The tornado as a villain (Sean, 2026-11-04; livestorm.js)
 Sean: turn the weather disasters more into villains. First one. Defend's tornado has a cartoon face on the funnel (27 m up, always towards you), a health bar (#zd-boss), and steers after you tearing up the town. It throws cars and rubble (hurl) at where you are heading, so stay moving; 8 damage, faster and in pairs as it weakens. Lock on (flight.js, was WindGame) is a flying punch from up to 330 m away: 5 (less with danger), 2.6 times that straight after a throw while its mouth hangs open, half as much again frozen; you bounce off, 0.8 s to breathe, it shrinks. The camera keeps it in view as with the giants (F.live stands in for the boss). Powers still hurt it. Touching the funnel still throws you off (WindGame.thrownFrom); the old ring mini game is no longer reached by Lock on. Next, as Sean described: the tsunami (a face; freeze sections, punch the frozen parts, then fight what is left hand to hand), the dust storm the same, the flood a villain with a hose while you punch sinkholes to drain it.
 
+## Punchier melee (Sean, 2026-11-04; fighttest.js)
+Why it felt clunky, by the rules: a foe blocked up to 78% of opening blows and a block knocked you back into its counter; every 2.6 s it powered through your combo.
+- The block: only on a combo's first blow, 8 to 28%, no stagger or counter: 30% goes through and two blows break it. FOE_TURN is 4.5 s.
+- The counter (.cmb, addHit, hitK): hits in a row on the screen, 1.8 s to the next, each worth 4% more up to +50%. Being hit clears it.
+- Enders launch: the last blow of a combo sends them up (state air). Tap goes after them (juggle, 40 m/s, jugWait): up to three blows, the third spikes them (v.spiked), 14 more on the level. A hard hit in any fight with a combo of more than one blow. Heavy, dash blow and counter still send them flying, into buildings.
+- Dash blow: tap straight out of a dash (ATK.dashBlow, 20, flung far).
+- The six (STYLES): speed of blows, damage, flying speed, default combo if the kit is left on its default ('combo'), a colour. Their signatures, from SIG_AT (8) hits in a row, tap when READY (15 s between; sigGo, sigStep, invulnerable while it lasts): Nova SUPERNOVA, Dragonfly RAZOR WINGS, Tempo TIME STOP, Tyrant WORLD BREAKER, Blur AFTERIMAGE, Weaver WEB SLAM.
+- Not done: the on-foot levels' own melee (horde.js) has none of this; the foe's own moves are unchanged.
+
 ## Private preview link
 - https://claude.ai/artifact/Jemm5Sxje8y9XvJxcFNPwN (private, Sean only). Page source: artifact/zday-city.html.
 - To update: `npx vite build --base ./`, then publish artifact/zday-city.html with files {"assets/<bundle>.js": "dist/assets/<bundle>.js"} and change the script src in the page to the new bundle name (the hash changes each build).
