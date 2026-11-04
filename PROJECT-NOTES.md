@@ -848,6 +848,17 @@ Sean: see the moves frame by frame and move limbs to where they should be; all a
 - Lab copies every move's keys on open, because many share a pose object as written (GUARD).
 - Limits: the foe's own moves are timed in the fight code, so moving their keys changes the look, not when the blow lands. Spin by the ankles and Swung have arms or body set by code (`armsA`, `bodyX`), and the lab says so. Walking legs, recoil and the like go on top in a fight. Partners other than the neck drag's are placed by eye, not as the game places them.
 
+## The story's globe (Sean, 2026-11-03; threats.js, storymap.js, herogame.js, base.js, globe.js)
+Sean: pick Defend or Destroy, the globe comes up, spin it until you see a disaster you want to play; the higher your level, the higher its level. After a city, back to base; dead, you wake there by a regeneration pod; the Map station flashes for new trouble.
+- `threats.js`: one board per side (zday_threats). SLOTS: always 1 villains, 1 aliens, 2 worm, 2 weather, and 1 or 2 rotating (randomN). One threat per city; tsunami only on a coast (NEEDS). Win: the city clears and the same slot hits elsewhere. Loss: it stays. After any level the oldest rotating one moves on. Change the mix in SLOTS, WEATHER, RANDOM.
+- Danger = your level + a little for the bigger towns (`danger`). `this.ix` is danger - 1 in a story level, s.idx in a test level, and takes s.idx's old place in LAB.villain, the army, rivals, buildings to bring down, XP, zombie and alien numbers. New: hitK on the on-foot blows (horde `bite`), heroTough on the giants' health.
+- `storymap.js openMap`: the card, the fighter button (the old pick screen), the screen frame in the base; G.threats gives globe.js its markers (the place labels turned into icons, drawn as SVG in threats.js so no phone lacks an emoji; animation in CSS). The globe's own spin is controls.autoRotate, stopped while a card is open.
+- The tower screen is gone. Its skills are on the base's computer (`skillsHtml`). `hub(msg, at)` now means the base (test runs still go back to the Test levels list). Won: `card` with Back to base lit. Lost: straight to the base at the pod. The base's door between levels opens the map.
+- Base: `storyStations` adds the pod (always in a story, heals by squad.js's pressure game in a level, replacing the floating Heal button; between levels it just says so, since you are whole) and the Map station (not during a level): wall screen flashing red, row button flashing, a toast, while `freshOnes` is not empty. Opening a level clears it. Not in the Sandbox's base.
+- A town fought in is rebuilt for the next level there (g.usedTown), else the riot won in seconds with no people left to riot.
+- Sandbox: the numbered test levels are untouched.
+- A page load in ?mode=hero or ?mode=villain: the base is made after the mode, so the HeroGame constructor waits for it.
+
 ## Private preview link
 - https://claude.ai/artifact/Jemm5Sxje8y9XvJxcFNPwN (private, Sean only). Page source: artifact/zday-city.html.
 - To update: `npx vite build --base ./`, then publish artifact/zday-city.html with files {"assets/<bundle>.js": "dist/assets/<bundle>.js"} and change the script src in the page to the new bundle name (the hash changes each build).

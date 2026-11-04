@@ -15,6 +15,8 @@ import { openLevels, restoreTests, levelInfo } from './levelmenu.js';
 import { Squad } from './squad.js';
 import { ALIEN_MIX } from './figures.js';
 import { CreatureLayer } from './creaturekit.js';
+import { current, danger, resolve, waveOf, threatName, freshOnes } from './threats.js';
+import { openMap, villainsLeft } from './storymap.js';
 
 
 const KEY = 'zday_hero';
@@ -118,7 +120,7 @@ export class HeroGame {
   constructor(g, side) {
     this.g = g; this.side = side; this.kind = side; this.msgs = {}; if (!g.testRun) restoreTests(); const S = HS.load(); this.s = S[side]; this.round = null;
     if (!document.getElementById('zd-hub-css')) { const c = document.createElement('style'); c.id = 'zd-hub-css'; c.textContent = CSS; document.head.appendChild(c); }
-    if (g.heroGo) { g.heroGo = false; this.start(); } else this.hub(); // arrived in the next town: straight in
+    if (g.heroGo) { g.heroGo = false; this.start(); } else { const wake = () => { if (!g.base || !g.people) { setTimeout(wake, 100); return; } if (g.mode !== this) return; if (current(side)) this.start(); else this.hub(); }; setTimeout(wake, 0); } // arrived in the next town: straight in. A page just loaded (the base is made after the mode): the city picked if there is one, else home
   }
   // the mode's duties to game.js
   tap() {} phase() { return 0.3; } onEvent() {} threat() { return 0; } busy() { return false; } reset() {}
@@ -126,46 +128,29 @@ export class HeroGame {
   get points() { return this.level - 1 - Object.keys(this.s.skills).length; }
   moves() { const on = {}; for (const k of Object.keys(LAB.moves)) on[k] = false; for (const k of START_MOVES) on[k] = true; for (const B of Object.values(TREE)) for (const q of B) if (q.move && this.s.skills[q.id]) on[q.move] = true; return on; }
   count(stat) { let n = 0; for (const B of Object.values(TREE)) for (const q of B) if (q.stat === stat && this.s.skills[q.id]) n++; return n; }
-  // ---------- the home tower
-  hub(msg) {
-    if (this.g.testRun) { const T = this.g.testRun; this.g.testRun = null; restoreTests(); openLevels(this.g, { side: T.side, last: T.i, code: levelInfo(T.side, T.i).code, msg: msg || '' }); return; } this.closeHub(); const el = this.el = document.createElement('div'); el.id = 'zd-hub'; document.body.appendChild(el); this.msg = msg || ''; this.s = HS.load()[this.side]; this.draw();
+  // ---------- home: the base (Sean: the tower's screen is gone; the skills are on its computer, the next city on its Map station)
+  hub(msg, at) {
+    if (this.g.testRun) { const T = this.g.testRun; this.g.testRun = null; restoreTests(); openLevels(this.g, { side: T.side, last: T.i, code: levelInfo(T.side, T.i).code, msg: msg || '' }); return; }
+    this.s = HS.load()[this.side]; if (!HS.team(this.side).length) { pickScreen(this.side, () => this.hub(msg, at), () => { this.g.toMenu ? this.g.toMenu() : location.reload(); }); return; }
+    const g = this.g; g.base.start({ hub: this, at: at || 'door' }); if (msg) this.card(msg, 'OK'); const N = freshOnes(this.side)[0]; if (N && g.toast) g.toast('The Map station is flashing: ' + threatName(N, this.side, (id) => HS.shown(id)) + ' in ' + PLACES[N.key].name, 3500);
   }
-  closeHub() { if (this.prev) { this.prev(); this.prev = null; } if (this.el) { this.el.remove(); this.el = null; } }
-  draw() {
-    const s = this.s, lv = this.level, hero = this.side === 'hero', key = PATH[s.idx % PATH.length], P = PLACES[key], rep = REP(s.rep), T = HS.team(this.side), nx = xpFor(lv + 1), lo = xpFor(lv);
-    if (!T.length) { this.el.innerHTML = '<div class="wrap"><div class="ttl">' + (hero ? 'THE TOWER' : 'THE LAIR') + '</div>' + (this.msg ? '<div style="margin:8px 0;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.08)">' + this.msg + '</div>' : '') + emptyHtml(this.side) + '<button type="button" class="b" data-out style="width:100%;margin-top:14px">Back to the menu</button></div>'; this.el.querySelector('[data-out]').onclick = () => { this.closeHub(); this.g.toMenu ? this.g.toMenu() : location.reload(); }; return; }
-    const floors = Array.from({ length: Math.min(lv, 12) }, (_, i) => i).reverse().map(i => '<rect x="20" y="' + (10 + (Math.min(lv, 12) - 1 - i) * 22) + '" width="' + (120 - i * 2) + '" height="20" rx="2" fill="#3a2a55" stroke="#ffd27a" stroke-width="1"/><text x="28" y="' + (24 + (Math.min(lv, 12) - 1 - i) * 22) + '" fill="#f4eee4" font-size="10">' + (['Team room', 'Wardrobe', 'Trophy wall', 'Map table', 'Gym', 'Lab', 'Hangar', 'Garden', 'Sick bay', 'Radio room', 'Vault', 'Roof deck'][i]) + '</text>').join('');
-    const skills = Object.entries(TREE).map(([br, L]) => { let open = true; return '<div class="branch">' + br + '</div><div class="row">' + L.map(q => { const have = !!s.skills[q.id], can = open && !have && this.points > 0; if (!have) open = false; return '<button type="button" class="b' + (have ? ' on' : can ? '' : ' off') + '" data-skill="' + (can ? q.id : '') + '">' + (q.move && POWER[q.move] ? POWER[q.move].icon + ' ' : '') + esc(q.name) + '</button>'; }).join('') + '</div>'; }).join('');
-    const hunted = hero && s.rep < 15;
-    this.el.innerHTML = '<div class="wrap"><div class="ttl">' + (hero ? 'THE TOWER' : 'THE LAIR') + '</div>' + (this.msg ? '<div style="margin:8px 0;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.08)">' + this.msg + '</div>' : '') +
-      '<div>Level <b>' + lv + '</b> · ' + s.xp + ' XP' + (lv < 20 ? ' / ' + nx : '') + '</div><div class="bar"><i style="width:' + (lv < 20 ? Math.round((s.xp - lo) / (nx - lo) * 100) : 100) + '%;background:linear-gradient(90deg,#ff4fa3,#ffd27a)"></i></div>' +
-      '<div>Reputation: <b>' + rep + '</b> (' + Math.round(s.rep) + ')</div>' + repBar(s) + '<div style="opacity:.7;font-size:11px">' + (hero ? 'Fall under 15 and you become a villain' : 'Climb to 60 and you become a hero') + '</div>' +
-      '<h2>Who fights</h2><div class="two"><canvas></canvas><div class="cards">' + cardsHtml(this.side, s.flyer) + '</div></div>' +
-      '<h2>Level ' + (s.idx + 1) + ': ' + levelName(s) + '</h2><div><b>' + esc(P.name) + '</b> · town ' + (s.idx % PATH.length + 1) + ' of ' + PATH.length + (hunted ? ' · <span style="color:#ff8a7a">the heroes are hunting you</span>' : '') + '</div><div style="opacity:.75;font-size:12px">' + esc(P.blurb || '') + '</div><button type="button" class="go" data-go2>' + (hero ? 'FLY TO DEFEND IT' : 'FLY IN AND WRECK IT') + '</button>' +
-      '<button type="button" class="b" data-walkin style="width:100%;margin-top:12px">' + (hero ? '\u{1F3F0} Walk into the tower' : '\u{1F480} Walk into the lair') + '</button><button type="button" class="b" data-station style="width:100%;margin-top:8px">\u{1F3B6} Radio station</button><div class="lab" style="margin-top:12px">Testing: jump to a level</div><div class="row">' + WAVES.slice(0, 5).map((w, i) => '<button type="button" class="b' + (s.idx === i ? ' on' : '') + '" data-jump="' + i + '">' + (i + 1) + ' ' + w[0] + '</button>').join('') + '</div>' +
-      '<h2>Skills · ' + this.points + ' point' + (this.points === 1 ? '' : 's') + ' to spend</h2>' + skills +
-      (s.trophies.length ? '<h2>Trophy wall</h2><div>' + s.trophies.map(esc).join(', ') + '</div>' : '') +
-      '<h2>' + (hero ? 'The tower' : 'The lair') + ': ' + Math.min(lv, 12) + ' floor' + (lv > 1 ? 's' : '') + '</h2><svg width="160" height="' + (Math.min(lv, 12) * 22 + 20) + '">' + floors + '</svg>' +
-      '<button type="button" class="b" data-out style="width:100%;margin-top:14px">Back to the menu</button></div>';
-    const $ = (q) => this.el.querySelector(q);
-    $('[data-go2]').onclick = () => this.start();
-    { const q = this.el.querySelector('[data-walkin]'); if (q) q.onclick = () => { this.closeHub(); this.g.base.start({ hub: this }); }; }
-    { const q = this.el.querySelector('[data-station]'); if (q) q.onclick = () => { if (this.g.audio) openStation(this.g.audio.music); }; }
-    this.el.querySelectorAll('[data-jump]').forEach(b => { b.onclick = () => { s.idx = +b.dataset.jump; HS.save(); this.msg = ''; this.draw(); }; }); // Sean, testing the fights: straight to any of the first four
-    $('[data-out]').onclick = () => { this.closeHub(); this.g.toMenu ? this.g.toMenu() : location.reload(); };
-    this.el.querySelectorAll('[data-who]').forEach(b => { b.onclick = () => { HS.load().last[this.side] = b.dataset.who; HS.save(); this.s = HS.load()[this.side]; this.msg = ''; this.draw(); }; });
-    this.el.querySelectorAll('[data-skill]').forEach(b => { b.onclick = () => { const id = b.dataset.skill; if (!id) return; s.skills[id] = 1; HS.save(); this.draw(); }; });
-    this.preview(HS.name(s.flyer));
-  }
-  // the figure in its outfit, turning
-  preview(name) { if (this.prev) { this.prev(); this.prev = null; } this.prev = turning(this.el.querySelector('canvas'), name); }
+  // the map, from the base's station or its door
+  map() { const g = this.g, G = g.globe, side = this.side; if (!G) return; G.open(); openMap(g, { side, screen: true, arrive: () => { g.base.stop(true); G.close(); this.start(); }, back: () => { G.close(); g.base.drawRow(); }, whoFn: (redraw) => pickScreen(side, () => { g.base.redress(); redraw(); }, redraw) }); }
+  // a result on a card; the button glows
+  card(html, label, onDone, other) { const c = document.createElement('div'); c.id = 'zd-result'; c.style.cssText = 'position:fixed;left:0;right:0;top:0;bottom:0;z-index:66;display:flex;align-items:center;justify-content:center;background:rgba(6,4,16,.55);padding:16px;box-sizing:border-box'; c.innerHTML = '<style>@keyframes zdgo{from{box-shadow:0 0 6px 1px #ffe27a}to{box-shadow:0 0 22px 7px #ffe27a}}</style><div style="max-width:420px;width:100%;padding:16px;border-radius:16px;background:rgba(20,14,38,.97);border:1px solid rgba(255,255,255,.3);color:#f4eee4;font:14px/1.4 system-ui,sans-serif">' + html + '<button type="button" data-a style="display:block;width:100%;min-height:54px;margin-top:14px;border:2px solid #ffe27a;border-radius:14px;background:linear-gradient(#ffb02e,#d9570f);color:#fff;font:900 16px system-ui,sans-serif;letter-spacing:.05em;animation:zdgo .8s ease-in-out infinite alternate">' + label + '</button>' + (other ? '<button type="button" data-b style="display:block;width:100%;min-height:44px;margin-top:8px;border:1px solid rgba(255,255,255,.3);border-radius:12px;background:rgba(255,255,255,.08);color:#fff;font:700 13px system-ui,sans-serif">' + other[0] + '</button>' : '') + '</div>'; document.body.appendChild(c); c.querySelector('[data-a]').onclick = () => { c.remove(); if (onDone) onDone(); }; if (other) c.querySelector('[data-b]').onclick = () => { c.remove(); other[1](); }; }
+  // a city over (Sean): won, the choice to go back to base is the one lit up; lost, you wake in the base beside the pod. The board moves on either way
+  ended(won, msg, side0) { const g = this.g, T = this.threat; this.threat = null; if (g.testRun) { this.hub(msg); return; } if (T) resolve(side0 || this.side, T.id, won, villainsLeft()); if (!won) { this.hub(msg, 'pod'); return; } this.card(msg, 'BACK TO BASE', () => this.hub(), ['Back to the menu', () => { g.toMenu ? g.toMenu() : location.reload(); }]); }
+  // the skills, for the base's computer
+  skillsHtml() { const s = this.s = HS.load()[this.side]; return '<div class="h">Level ' + this.level + ' \u00B7 ' + s.xp + ' XP \u00B7 ' + REP(s.rep) + ' \u00B7 ' + this.points + ' point' + (this.points === 1 ? '' : 's') + ' to spend</div>' + Object.entries(TREE).map(([br, L]) => { let open = true; return '<div class="h">' + br + '</div><div class="row">' + L.map(q => { const have = !!s.skills[q.id], can = open && !have && this.points > 0; if (!have) open = false; return '<button type="button"' + (have ? ' class="on"' : '') + (can ? ' data-skill="' + q.id + '"' : (have ? '' : ' style="opacity:.45"')) + '>' + (q.move && POWER[q.move] ? POWER[q.move].icon + ' ' : '') + esc(q.name) + '</button>'; }).join('') + '</div>'; }).join(''); }
   // ---------- a town
   start() {
-    const g = this.g, s = this.s, key = PATH[s.idx % PATH.length]; this.closeHub();
-    if (g.moveWorld && key !== placeKey()) { g.heroGo = true; g.moveWorld(key, this.side); g.startMode(this.side); return; } // the world moved: a new mode starts it there
+    const g = this.g, s = this.s = HS.load()[this.side], T = this.threat = g.testRun ? null : current(this.side), key = T ? T.key : PATH[s.idx % PATH.length], ix = this.ix = T ? danger(T, this.level) - 1 : s.idx; // the story's level comes from the board, its danger from your level; a test level from its number
+    if (!T && !g.testRun) { this.hub(); return; }
+    if (g.moveWorld && (key !== placeKey() || (T && g.usedTown))) { g.usedTown = false; g.heroGo = true; g.moveWorld(key, this.side); g.startMode(this.side); return; } // the world moved: a new mode starts it there. A town already fought in is built again: the last level took its people
+    g.usedTown = !!T;
     this.labWas = { hero: LAB.hero, villain: LAB.villain, moves: LAB.moves, army: LAB.army }; // the Sandbox's own settings, put back after
-    LAB.hero = this.level; LAB.villain = Math.max(1, s.idx + 1); LAB.moves = this.moves(); LAB.spotK = 1 + 0.15 * this.count('spot'); LAB.toughK = 1 + 0.2 * this.count('tough'); LAB.army = this.side === 'villain' ? s.idx >= 2 : s.idx >= 4 && s.idx % 3 === 1;
-    const D = g.disasters, B = g.city.bounds, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2, F = g.flight, hero = this.side === 'hero', wave = WAVES[s.idx % WAVES.length], evs = [], vs = [];
+    LAB.hero = this.level; LAB.villain = Math.max(1, ix + 1); LAB.moves = this.moves(); LAB.spotK = 1 + 0.15 * this.count('spot'); LAB.toughK = 1 + 0.2 * this.count('tough'); LAB.army = this.side === 'villain' ? ix >= 2 : ix >= 4 && ix % 3 === 1;
+    const D = g.disasters, B = g.city.bounds, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2, F = g.flight, hero = this.side === 'hero', wave = T ? waveOf(T) : WAVES[s.idx % WAVES.length], evs = [], vs = [];
     if (hero && wave[0] === 'tornado') LAB.army = false; // no helicopters shooting at her while she dodges what it throws
     if (hero && wave[0] === 'aliens' && g.horde) { this.alienLevel(key); return; }
     if (hero && (wave[0] === 'worm' || wave[0] === 'kaiju') && wave.length === 1 && g.horde) { this.bossLevel(key, wave[0]); return; }
@@ -174,11 +159,11 @@ export class HeroGame {
     for (const e of D.list) if (e.type === 'villains' && e.alive) for (const w of e.who) if (!w.gone) w.state = 'gone';
     const allies = []; if (!hero) { const P = g.people; for (const w of wave) { if (VILLAINS.includes(w)) continue; if (w === 'zombies') { for (let i = 0; i < 120; i++) P.drop(B.x0 + Math.random() * (B.x1 - B.x0), B.z0 + Math.random() * (B.z1 - B.z0), -1); } else { const e = D.start(w, cx + (Math.random() - 0.5) * 120, cz + (Math.random() - 0.5) * 120, { life: 99999 }); if (e) allies.push(e); } } } // Destroy: the disaster is on your side, the heroes come for you both
     if (hero) { for (const w of wave) { if (VILLAINS.includes(w)) { if (HS.load().chars[w].side === 'villain') vs.push(w); } else { const a0 = Math.random() * 6.28, far = w === 'tornado' ? 170 : 0, e = D.start(w, far ? cx + Math.cos(a0) * far : cx + (Math.random() - 0.5) * 120, far ? cz + Math.sin(a0) * far : cz + (Math.random() - 0.5) * 120, w === 'tornado' ? { life: 99999, size: 2.2 } : undefined); if (e) evs.push(e); } } }
-    const hunted = false, rivals = hero ? [] : ['nova', 'dragonfly', 'tempo'].filter(id => HS.load().chars[id].side === 'hero').slice(0, Math.min(3, 1 + Math.floor(s.idx / 3))).map(id => HS.name(id)); // only the heroes still heroes
+    const hunted = false, rivals = hero ? [] : ['nova', 'dragonfly', 'tempo'].filter(id => HS.load().chars[id].side === 'hero').slice(0, Math.min(3, 1 + Math.floor(ix / 3))).map(id => HS.name(id)); // only the heroes still heroes
     for (const n of vs) { const e = D.start('villains', cx + (Math.random() - 0.5) * 160, cz + (Math.random() - 0.5) * 160, { only: n, quiet: true }); if (e) evs.push(e); }
     if (rivals.length) { const e = D.start('villains', cx, cz, { rivals, quiet: true }); if (e) { evs.push(e); this.rivalEv = e; } }
     this.flyUp(cx, cz); // Sean: every level starts floating over the town
-    const need = hero ? 0 : Math.min(25 + 15 * s.idx, Math.floor(g.city.buildings.length * 0.6)); this.round = { evs, allies, need, t: 0, downs: 0, wasDown: false, hero, hunted, rivals, key, ended: false, nothing: !evs.length };
+    const need = hero ? 0 : Math.min(25 + 15 * ix, Math.floor(g.city.buildings.length * 0.6)); this.round = { evs, allies, need, t: 0, downs: 0, wasDown: false, hero, hunted, rivals, key, ended: false, nothing: !evs.length };
     this.rep = document.createElement('div'); this.rep.id = 'zd-rep'; document.body.appendChild(this.rep);
     const town = PLACES[key].name, seen = s.towns[key]; F.tip(hero ? (hunted ? 'You have gone too far. The other heroes are coming for you!' : seen && seen.fear > 200 ? 'The people of ' + town + ' remember you. They run' : s.rep >= 60 ? 'The people of ' + town + ' cheer as you fly in. Use your powers and Lock on' : wave[0] === 'tornado' ? 'Defend ' + town + '. Lock on to go round the tornado against its spin' : 'Defend ' + town + '. Use your powers and Lock on') : 'Bring down ' + need + ' buildings in ' + town + ' and beat the heroes who come');
     if (hero && (s.rep < 35 || (seen && seen.fear > 200))) g.people.scare(cx, cz, 400, 0.5);
@@ -190,10 +175,10 @@ export class HeroGame {
   back() { const g = this.g, F = g.flight, B = g.base, Q = this.squad; if (Q) { const now = HS.cur(this.side); if (now !== Q.cur && !Q.downs[now]) { Q.cur = now; Q.draw(); } else HS.load().last[this.side] = Q.cur; } this.flyUp(B.x, B.z + B.S.d / 2 + 8); if (Q) F.hull = (F.hullMax || 100) * Q.hp[Q.cur]; F.setView(F.view); F.tip('Back outside. Finish the job'); }
   // level 1 (Sean): the invasion: the fleet overhead, its soldiers rained into the streets and fought on foot like the horde; the fleet can be hit from the air
   alienLevel(key) {
-    const g = this.g, s = this.s, P = g.people, D = g.disasters, B = g.city.bounds, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2, n = 150, pool = []; LAB.reset();
+    const g = this.g, s = this.s, P = g.people, D = g.disasters, B = g.city.bounds, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2, n = Math.min(250, 140 + 10 * this.ix), pool = []; LAB.reset();
     for (let j = 0; j < P.active && pool.length < n; j++) { if (P.kind[j] === 0 && P.isCivilian(j) && P.lvl[j] === -1 && Math.hypot(P.x[j] - cx, P.z[j] - cz) > 60 && P.hide(j)) pool.push(j); }
-    const e = D.start('aliens', cx, cz, { life: 99999, noSquads: true, tripods: 2, n: 6 }); if (e) { e.launchT = 0.5; e.dropT = 8; } this.round = { evs: e ? [e] : [], need: 0, t: 0, downs: 0, hero: true, key, ended: false, zombie: true, n, noun: ' aliens' };
-    g.people.crLayer = new CreatureLayer(g.disasters.ctx.scene, g.people.active + 64); g.horde.start({ n, pool, level: true, generals: 'alien', fleet: e, types: ALIEN_MIX, label: 'ALIENS', verb: ' DOWN', onEnd: (won, H) => { this.round.horde = H; this.finish(won, won ? null : 'The invasion took you down'); } });
+    const e = D.start('aliens', cx, cz, { life: 99999, noSquads: true, tripods: Math.min(4, 2 + Math.floor(this.ix / 6)), n: 6 }); if (e) { e.launchT = 0.5; e.dropT = 8; } this.round = { evs: e ? [e] : [], need: 0, t: 0, downs: 0, hero: true, key, ended: false, zombie: true, n, noun: ' aliens' };
+    g.people.crLayer = new CreatureLayer(g.disasters.ctx.scene, g.people.active + 64); g.horde.start({ n, pool, level: true, generals: 'alien', hitK: 1 + 0.05 * this.ix, fleet: e, types: ALIEN_MIX, label: 'ALIENS', verb: ' DOWN', onEnd: (won, H) => { this.round.horde = H; this.finish(won, won ? null : 'The invasion took you down'); } });
     this.rep = document.createElement('div'); this.rep.id = 'zd-rep'; document.body.appendChild(this.rep);
     g.toast ? g.toast('Defend ' + PLACES[key].name + ': ' + n + ' alien soldiers in the streets, the fleet overhead') : 0;
   }
@@ -202,8 +187,8 @@ export class HeroGame {
     const g = this.g, D = g.disasters, B = g.city.bounds, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2, e = D.start(type, cx, cz, { life: 99999, quiet: true }); LAB.reset();
     if (!e) { this.round = { evs: [], need: 0, t: 0, downs: 0, hero: true, key, ended: false }; return this.finish(true); }
     if (type === 'kaiju') { e.x = cx + 80; e.z = cz; e.yaw = Math.PI; } // close by, not a minute's walk off
-    e.heroHp = 100; this.round = { evs: [e], need: 0, t: 0, downs: 0, hero: true, key, ended: false, zombie: true, boss: e, n: 100, noun: '% ' + type };
-    g.horde.start({ boss: e, n: 100, level: true, label: type.toUpperCase(), onEnd: (won, H) => { this.round.horde = H; this.finish(won, won ? null : 'The ' + (type === 'worm' ? 'worm' : 'kaiju') + ' was too much'); } });
+    e.heroHp = 100; e.heroTough = 1 + 0.08 * this.ix; this.round = { evs: [e], need: 0, t: 0, downs: 0, hero: true, key, ended: false, zombie: true, boss: e, n: 100, noun: '% ' + type };
+    g.horde.start({ boss: e, n: 100, level: true, hitK: 1 + 0.05 * this.ix, label: type.toUpperCase(), onEnd: (won, H) => { this.round.horde = H; this.finish(won, won ? null : 'The ' + (type === 'worm' ? 'worm' : 'kaiju') + ' was too much'); } });
     this.rep = document.createElement('div'); this.rep.id = 'zd-rep'; document.body.appendChild(this.rep);
     g.toast ? g.toast('Defend ' + PLACES[key].name + ': ' + (type === 'worm' ? 'hit the worm when it breaks out; move off the red marks' : 'hit it, throw cars at it, smash down on it; move off the red marks')) : 0;
   }
@@ -214,8 +199,8 @@ export class HeroGame {
     for (let j = 0; j < P.active; j++) { if (P.kind[j] !== 0) continue; if (kept < 20 && P.isCivilian(j) && P.lvl[j] === -1 && Math.hypot(P.x[j] - cx, P.z[j] - cz) < 60) { kept++; continue; } if (P.hide(j)) pool.push(j); }
     for (let i = pool.length - 1; i > 0; i--) { const k = Math.floor(Math.random() * (i + 1)); const t = pool[i]; pool[i] = pool[k]; pool[k] = t; }
     P.spawnOfficers(cx + 20, cz, 2); P.spawnOfficers(cx - 20, cz, 2);
-    const n = Math.min(400 + 100 * Math.min(3, s.idx), pool.length); this.round = { evs: [], need: 0, t: 0, downs: 0, hero: true, key, ended: false, zombie: true, n, noun: ' zombies' };
-    g.horde.start({ n, pool, level: true, generals: 'zombie', onEnd: (won, H) => { this.round.horde = H; this.finish(won, won ? null : 'Overrun by the horde'); } });
+    const n = Math.min(400 + 100 * Math.min(3, this.ix), pool.length); this.round = { evs: [], need: 0, t: 0, downs: 0, hero: true, key, ended: false, zombie: true, n, noun: ' zombies' };
+    g.horde.start({ n, pool, level: true, hitK: 1 + 0.05 * this.ix, generals: 'zombie', onEnd: (won, H) => { this.round.horde = H; this.finish(won, won ? null : 'Overrun by the horde'); } });
     this.rep = document.createElement('div'); this.rep.id = 'zd-rep'; document.body.appendChild(this.rep);
     g.toast ? g.toast('Defend ' + PLACES[key].name + ': ' + n + ' zombies in the streets. Tap to punch, swipe to dash, hold to slam') : 0;
   }
@@ -224,7 +209,7 @@ export class HeroGame {
     const g = this.g, s = this.s, B = g.city.bounds, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2, D = g.disasters, e = D.start('riot', cx + (Math.random() - 0.5) * 80, cz + (Math.random() - 0.5) * 80);
     if (!e) { this.round = { evs: [], need: 0, t: 0, downs: 0, hero: true, key, ended: false }; return this.finish(true); }
     this.round = { evs: [e], need: 0, t: 0, downs: 0, hero: true, key, ended: false, zombie: true, riot: true, n: e.members.length, noun: ' rioters' }; LAB.reset();
-    g.horde.start({ mode: 'riot', riot: e, level: true, onEnd: (won, H) => { this.round.horde = H; if (won) e.end(true); this.finish(won, won ? null : 'The mob got the better of you'); } });
+    g.horde.start({ mode: 'riot', riot: e, level: true, hitK: 1 + 0.05 * this.ix, onEnd: (won, H) => { this.round.horde = H; if (won) e.end(true); this.finish(won, won ? null : 'The mob got the better of you'); } });
     this.rep = document.createElement('div'); this.rep.id = 'zd-rep'; document.body.appendChild(this.rep);
     g.toast ? g.toast('Defend ' + PLACES[key].name + ': a riot of ' + e.members.length + '. Knock them flat and they go home') : 0;
   }
@@ -251,19 +236,18 @@ export class HeroGame {
       const H = R.horde || g.horde, xp = won ? 300 + (R.boss ? 300 : H.kills) + (H.bitten < 10 ? 100 : 0) : 20 + Math.round(H.kills / 4); if (g.base && g.base.active) { g.base.level = null; g.base.stop(true); } if (H.active) H.stop(true); if (H.flying) { H.flying = false; if (H.el) H.el.remove(); if (g.flight.active) g.flight.stop(true); }
       for (const e of R.evs) if (e.alive) endDisaster(e); g.flight.heroGame = false; if (this.labWas) Object.assign(LAB, this.labWas, { spotK: 1, toughK: 1 });
       const lv0 = this.level, was = s.rep, fear2 = LAB.fear(); s.xp += xp; if (won) s.threat = Math.min(100, (s.threat || 0) + 20); const up = this.level - lv0; if (won) s.idx = Math.min(WAVES.length - 1, s.idx + 1); s.towns[R.key] = { won: (s.towns[R.key] && s.towns[R.key].won) || won, fear: Math.round(fear2) }; s.rep = Math.max(0, Math.min(100, s.rep + (won ? 6 : 0) - fear2 / 30)); const cross = this.cross(s); HS.save(); this.round = null; g.heroGo = false;
-      this.hub('<b>' + (won ? 'TOWN SAVED' : (why || 'NOT THIS TIME')) + '</b> · +' + xp + ' XP' + (up ? ' · <b>LEVEL UP!</b> A skill point to spend' : '') + '<br>' + (R.boss ? 'Hit ' + H.bitten.toFixed(0) + ' times' : (R.noun.trim() + ' down ' + H.kills + ' · hit ') + H.bitten + ' times') + ' · ' + Math.round(H.time) + ' s · reputation ' + Math.round(was) + ' to ' + Math.round(s.rep) + cross); return;
+      this.ended(won, '<b>' + (won ? 'TOWN SAVED' : (why || 'NOT THIS TIME')) + '</b> · +' + xp + ' XP' + (up ? ' · <b>LEVEL UP!</b> A skill point to spend' : '') + '<br>' + (R.boss ? 'Hit ' + H.bitten.toFixed(0) + ' times' : (R.noun.trim() + ' down ' + H.kills + ' · hit ') + H.bitten + ' times') + ' · ' + Math.round(H.time) + ' s · reputation ' + Math.round(was) + ' to ' + Math.round(s.rep) + cross); return;
     }
     F.onStopped = null; for (const e of R.evs) if (e.type === 'villains') for (const w of e.who) { if (w.beaten && !s.trophies.includes(w.name)) s.trophies.push(w.name); }
     let xp = 0, lines = [];
-    if (R.hero) { const was = s.rep; xp = won ? Math.max(50, 200 + 100 * s.idx + (S.stopped || 0) * 60 + S.won * 80 + S.saved * 30 - Math.round(fear / 4)) : 25; const gain = won ? 6 : 0; s.rep = Math.max(0, Math.min(100, s.rep + gain - fear / 30)); if (R.hunted && !won) { s.rep = Math.min(100, s.rep + 15); xp = 0; lines.push('The heroes beat you. You wake in the tower, and it is a lesson'); } lines.push('Reputation ' + Math.round(was) + ' to ' + Math.round(s.rep) + ': ' + REP(s.rep)); s.towns[R.key] = { won: (s.towns[R.key] && s.towns[R.key].won) || won, fear: Math.round(fear) }; if (R.hunted && won) lines.push('You beat the heroes. This town now lives in fear of you'); }
-    else { const was = s.rep, good = (S.stopped || 0) * 35 + S.saved * 2; s.rep = Math.max(0, Math.min(100, s.rep + good - (won ? 3 : 0))); lines.push('Reputation ' + Math.round(was) + ' to ' + Math.round(s.rep) + (good ? ': the town noticed the good you did' : '')); xp = won ? 200 + 100 * s.idx + S.buildings * 15 + S.won * 100 : 10 + S.buildings * 5; s.towns[R.key] = { won: (s.towns[R.key] && s.towns[R.key].won) || won, fear: Math.round(fear) }; }
+    if (R.hero) { const was = s.rep; xp = won ? Math.max(50, 200 + 100 * this.ix + (S.stopped || 0) * 60 + S.won * 80 + S.saved * 30 - Math.round(fear / 4)) : 25; const gain = won ? 6 : 0; s.rep = Math.max(0, Math.min(100, s.rep + gain - fear / 30)); if (R.hunted && !won) { s.rep = Math.min(100, s.rep + 15); xp = 0; lines.push('The heroes beat you. You wake in the tower, and it is a lesson'); } lines.push('Reputation ' + Math.round(was) + ' to ' + Math.round(s.rep) + ': ' + REP(s.rep)); s.towns[R.key] = { won: (s.towns[R.key] && s.towns[R.key].won) || won, fear: Math.round(fear) }; if (R.hunted && won) lines.push('You beat the heroes. This town now lives in fear of you'); }
+    else { const was = s.rep, good = (S.stopped || 0) * 35 + S.saved * 2; s.rep = Math.max(0, Math.min(100, s.rep + good - (won ? 3 : 0))); lines.push('Reputation ' + Math.round(was) + ' to ' + Math.round(s.rep) + (good ? ': the town noticed the good you did' : '')); xp = won ? 200 + 100 * this.ix + S.buildings * 15 + S.won * 100 : 10 + S.buildings * 5; s.towns[R.key] = { won: (s.towns[R.key] && s.towns[R.key].won) || won, fear: Math.round(fear) }; }
     const lv0 = this.level; s.xp += xp; if (won) s.threat = Math.min(100, (s.threat || 0) + (R.zombie ? 20 : 25)); const up = this.level - lv0; if (won) s.idx = Math.min(WAVES.length - 1, s.idx + 1); { const cross = this.cross(s); if (cross) lines.push(cross.replace('<br>', '')); } HS.save();
     if (F.active) F.stop(true);
     for (const e of R.allies || []) if (e.alive) endDisaster(e);
     F.heroGame = false; F.inLevel = false; Object.assign(LAB, this.labWas, { spotK: 1, toughK: 1 });
     for (const e of R.evs) { if (!e.alive) continue; if (e.type === 'villains') { for (const w of e.who) if (!w.gone) { w.state = 'gone'; w.rig.root.visible = false; } } else endDisaster(e); } // what is left of the trouble goes with you
     if (R.score != null) lines.unshift('Score ' + Math.round(R.score)); const head = won ? (R.hero ? 'TOWN SAVED' : 'TOWN WRECKED') : (why || 'NOT THIS TIME');
-    this.hub('<b>' + head + '</b> · +' + xp + ' XP' + (up ? ' · <b>LEVEL UP!</b> A skill point to spend' : '') + '<br>Buildings down ' + S.buildings + ' · people scared ' + S.scared + ' · hurt ' + S.hurt + ' · saved ' + S.saved + ' · fear ' + Math.round(fear) + (lines.length ? '<br>' + lines.join('<br>') : ''));
-    this.round = null;
+    this.round = null; this.ended(won, '<b>' + head + '</b> · +' + xp + ' XP' + (up ? ' · <b>LEVEL UP!</b> A skill point to spend' : '') + '<br>Buildings down ' + S.buildings + ' · people scared ' + S.scared + ' · hurt ' + S.hurt + ' · saved ' + S.saved + ' · fear ' + Math.round(fear) + (lines.length ? '<br>' + lines.join('<br>') : ''));
   }
 }

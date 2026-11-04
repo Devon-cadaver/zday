@@ -347,7 +347,7 @@ export class Globe {
     for (const key in PLACES) {
       const d = document.createElement('button'); d.type = 'button'; d.className = 'zd-place'; d.textContent = PLACES[key].name + (key === placeKey() ? ' · here' : '');
       d.style.cssText = 'position:fixed;left:0;top:0;z-index:41;transform:translate(-50%,-150%);padding:5px 10px;border-radius:12px;border:1px solid rgba(255,255,255,0.25);background:rgba(18,16,14,0.78);color:#f6eedc;font:600 12px system-ui,sans-serif;white-space:nowrap;cursor:pointer;display:none';
-      d.onclick = (e) => { e.stopPropagation(); if (this.state !== 'menu') this.go(key); };
+      d.onclick = (e) => { e.stopPropagation(); if (this.state === 'menu') return; if (this.threats) { if (!this.fly) this.threats.tap(key); return; } this.go(key); };
       document.body.appendChild(d); this.tags[key] = d;
     }
   }
@@ -356,7 +356,8 @@ export class Globe {
   // lock on those not open yet, dimmed. Behind the menu and on the way down from it there are none
   relabel() {
     for (const key in this.tags) {
-      const d = this.tags[key], s = this.status ? this.status(key) : null, here = this.state === 'game' && key === placeKey();
+      const d = this.tags[key], s = this.status ? this.status(key) : null, here = this.state === 'game' && key === placeKey(), T = this.threats && this.threats.get(key);
+      d.classList.toggle('zd-threat', !!T); if (T) { d.style.setProperty('--c', T.colour); d.style.transform = 'translate(-50%,-85%)'; d.style.opacity = '1'; d.innerHTML = '<div class="ic">' + T.icon + (T.isNew ? '<i class="new" style="font-style:normal">NEW</i>' : '') + '</div><em>' + T.name + '</em>'; d._w = 0; continue; } d.style.transform = 'translate(-50%,-150%)';
       const name = here || !this.known || this.known(key) ? PLACES[key].name : '???';
       d.textContent = (s ? s.num + ' \u00B7 ' : '') + name + (s ? s.mark : '') + (here ? ' · here' : ''); d._w = 0; // measured again
       d.style.opacity = s && s.locked ? '0.55' : '1';
@@ -466,7 +467,7 @@ export class Globe {
       C.minPolarAngle = C.maxPolarAngle = Math.acos(Math.max(-1, Math.min(1, this.cam.position.y / this.cam.position.length())));
       this.tiltTo = Math.PI / 2 - (Math.min(...lats) + Math.max(...lats)) / 2;
     }
-    this.controls.autoRotate = false; this.controls.enabled = !opts.key; this.shiftTo = 0; this.showRoad(!!opts.road, opts.mode || null); this.relabel();
+    this.controls.autoRotate = !!opts.spin; this.controls.autoRotateSpeed = 0.45; this.distTo = opts.spin ? this.fit() * 1.03 : null; if (opts.spin) this.controls.maxDistance = Math.max(this.controls.maxDistance, this.distTo * 1.3); this.controls.enabled = !opts.key; this.shiftTo = 0; this.showRoad(!!opts.road, opts.mode || null); this.relabel();
     this.uiEl.firstChild.textContent = opts.title || ''; this.say(opts.sub || ''); this.uiEl.style.display = '';
     this.metBtn.style.display = 'none'; this.backBtn.textContent = 'Back'; this.backBtn.style.display = opts.back ? '' : 'none';
     if (opts.key) this.turn = { t: 0, key: opts.key, r: Math.min(this.cam.position.length(), R * 3), to: toVec(...this.spots[opts.key], 1).normalize() };
@@ -520,6 +521,7 @@ export class Globe {
       if (k >= 1) { this.turn = null; this.go(T.key); }
     } else {
       if (this.tiltTo != null) { const C = this.controls, a = C.minPolarAngle, b = a + (this.tiltTo - a) * Math.min(1, dt * 4); C.minPolarAngle = C.maxPolarAngle = b; if (Math.abs(b - this.tiltTo) < 0.002 || this.state !== 'pick') this.tiltTo = null; } // easing to the picker's tilt
+      if (this.distTo && this.state === 'pick') { const L = this.cam.position.length(), L2 = L + (this.distTo - L) * Math.min(1, dt * 2.5); this.cam.position.setLength(L2); if (Math.abs(this.distTo - L2) < this.distTo * 0.01) this.distTo = null; } // left alone once there, so a pinch still zooms
       this.controls.update();
     }
     // labels over the places on the side facing you; where two would overlap, the one nearer the middle of the view
@@ -527,14 +529,14 @@ export class Globe {
     const v = new THREE.Vector3(), camDir = this.cam.position.clone().normalize(), cand = [], placed = [];
     for (const key in this.tags) {
       const [lat, lon] = this.spots[key], p = toVec(lat, lon, R * 1.01), el = this.tags[key], dot = p.clone().normalize().dot(camDir);
-      if (!this.active || this.leaving || this.state === 'menu' || this.state === 'path' || dot < 0.25 || this.fly || this.rise) { el.style.display = 'none'; continue; }
+      if (!this.active || this.leaving || this.state === 'menu' || this.state === 'path' || dot < 0.25 || this.fly || this.rise || (this.threats && !this.threats.get(key))) { el.style.display = 'none'; continue; }
       v.copy(p).project(this.cam);
       cand.push({ el, x: (v.x + 1) / 2 * innerWidth, y: (1 - v.y) / 2 * innerHeight, pri: dot + (key === placeKey() && this.state === 'game' ? 2 : 0) + (this.turn && this.turn.key === key ? 3 : 0) });
     }
     cand.sort((a, b) => b.pri - a.pri);
     for (const c of cand) {
       if (!c.el._w) { c.el.style.display = ''; c.el._w = c.el.offsetWidth || 90; }
-      const r = { x0: c.x - c.el._w / 2 - 3, x1: c.x + c.el._w / 2 + 3, y0: c.y - 42, y1: c.y - 12 };
+      const r = this.threats ? { x0: c.x - c.el._w / 2, x1: c.x + c.el._w / 2, y0: c.y - 52, y1: c.y + 14 } : { x0: c.x - c.el._w / 2 - 3, x1: c.x + c.el._w / 2 + 3, y0: c.y - 42, y1: c.y - 12 };
       if (placed.some(q => r.x0 < q.x1 && r.x1 > q.x0 && r.y0 < q.y1 && r.y1 > q.y0)) { c.el.style.display = 'none'; continue; }
       placed.push(r); c.el.style.display = ''; c.el.style.left = c.x + 'px'; c.el.style.top = c.y + 'px';
     }
