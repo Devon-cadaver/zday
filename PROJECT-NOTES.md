@@ -886,6 +886,9 @@ Sean: hand to hand felt clunky; limit the area, always in the air, the powers an
 - Flying: Body.fly, leanK: legs trailing, leaning into speed, a bob; no feet looked for (grounded). The stick is AIR_RUN 11 m/s and she faces the way she goes; the foe's walking is 1.35 times faster.
 - HURL (hurl, hurlStep, HURL_COST 30): the nearest building within 60 m torn up and thrown (32), or a car (20). It lands where the foe was when it left, so a moving foe can be missed.
 
+## The tornado as a villain (Sean, 2026-11-04; livestorm.js)
+Sean: turn the weather disasters more into villains. First one. Defend's tornado has a cartoon face on the funnel (27 m up, always towards you), a health bar (#zd-boss), and steers after you tearing up the town. It throws cars and rubble (hurl) at where you are heading, so stay moving; 8 damage, faster and in pairs as it weakens. Lock on (flight.js, was WindGame) is a flying punch from up to 330 m away: 5 (less with danger), 2.6 times that straight after a throw while its mouth hangs open, half as much again frozen; you bounce off, 0.8 s to breathe, it shrinks. The camera keeps it in view as with the giants (F.live stands in for the boss). Powers still hurt it. Touching the funnel still throws you off (WindGame.thrownFrom); the old ring mini game is no longer reached by Lock on. Next, as Sean described: the tsunami (a face; freeze sections, punch the frozen parts, then fight what is left hand to hand), the dust storm the same, the flood a villain with a hose while you punch sinkholes to drain it.
+
 ## Private preview link
 - https://claude.ai/artifact/Jemm5Sxje8y9XvJxcFNPwN (private, Sean only). Page source: artifact/zday-city.html.
 - To update: `npx vite build --base ./`, then publish artifact/zday-city.html with files {"assets/<bundle>.js": "dist/assets/<bundle>.js"} and change the script src in the page to the new bundle name (the hash changes each build).
