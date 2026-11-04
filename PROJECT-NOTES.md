@@ -868,6 +868,9 @@ Sean got a general to zero and could not reach him, stuck on the far side of rub
 ## Bug pass (2026-11-03, asked for by Sean)
 A bot plays whole fights with the player's inputs in several towns watching for stuck states, a walk through the awkward flows, and a read through of the code. Scripts were throwaway, in the session's scratchpad. Fixed: the lair's Map button walked her to the Plans table and never opened the map (station moved); a stale saved pose could stop the game loading (poses.js checks every saved move); disasters ending by themselves gave a free TOWN SAVED (now "It passed without you", the city stays; the ones you cannot stop come with a villain to beat, as the old road had them, `partnerOf`); the last fighter crossing over lost the result card; two maps on Escape; a wrong-shaped or out-of-date zday_threats (dropped or filtered).
 
+## The neck drag's camera pulled back (Sean, 2026-11-03; fighttest.js DRAG_CAM)
+Far too close at 5 m back, 6 m aside, 3.2 m up, and pulling that same low camera further back only put it inside buildings. So the drag now has the fight's own camera, which rides high and swings round what is in the way, zoomed out to DRAG_CAM (36 m, against 23). Change that one number to taste. horde.js had its own copy of the low camera; gone too, with its own wide camera coming in to 32 m for a drag.
+
 ## Private preview link
 - https://claude.ai/artifact/Jemm5Sxje8y9XvJxcFNPwN (private, Sean only). Page source: artifact/zday-city.html.
 - To update: `npx vite build --base ./`, then publish artifact/zday-city.html with files {"assets/<bundle>.js": "dist/assets/<bundle>.js"} and change the script src in the page to the new bundle name (the hash changes each build).
