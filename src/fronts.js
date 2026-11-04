@@ -88,7 +88,7 @@ float push(float tc, float y, float u) {
 }
 void main() {
   float tc = position.x, u = aN.z, hk = 0.85 + 0.3 * fbm(vec2(tc * 0.004, uTime * 0.01)); // taller and lower stretches
-  float y = position.y * uH * hk, s = position.z * uH;
+  float cut = min(1.0, pileAt(tc)), y = position.y * uH * hk * cut, s = position.z * uH * cut; // a gap torn in the wall (livestorm.js: sw.cap)
   float b = push(tc, y, u), bx = push(tc + 4.0, y, u), by = push(tc, y + 4.0, u);
   float sOff = frontAt(tc) + s + aN.x * b, yy = max(0.0, y + aN.y * b);
   vec3 w = vec3(uOrigin.x + uTan.x * tc + uDir.x * sOff, yy, uOrigin.y + uTan.y * tc + uDir.y * sOff);

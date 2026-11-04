@@ -49,7 +49,7 @@ export function resolve(side, id, won, villainsLeft = []) {
 }
 export const danger = (t, level) => level + Math.floor(Math.max(0, PATH.indexOf(t.key)) / 6); // the bigger towns come later on the road
 // what is fought: Defend's villain by name, Destroy's guard has no disaster of its own (the heroes come for you anyway)
-const WITH_VILLAIN = ['flood', 'coldwave', 'quake', 'plant', 'volcano', 'rift', 'sinkhole', 'blackhole', 'spill'];
+const WITH_VILLAIN = [ 'quake', 'plant', 'volcano', 'rift', 'sinkhole', 'blackhole', 'spill'];
 export const partnerOf = (t, left = []) => (t.kind !== 'villains' && WITH_VILLAIN.includes(t.kind) && left.length ? left[t.id % left.length] : null);
 export const waveOf = (t, left = []) => (t.kind === 'villains' ? (t.v ? [t.v] : []) : partnerOf(t, left) ? [t.kind, partnerOf(t, left)] : [t.kind]);
 export const threatName = (t, side, shown) => (t.kind === 'villains' ? (side === 'hero' ? (t.v ? shown(t.v) : 'Villains') : 'The heroes on guard') : KIND_NAME[t.kind] || t.kind);

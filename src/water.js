@@ -295,7 +295,7 @@ export class SweepFront {
       H[k] = 0;
       const b = bar && bar.list.length ? bar.holdAt(this, -this.halfW + k * this.segW, f0) : null;
       if (b && F[k] > b.stop) { F[k] = b.stop; H[k] = 1; b.held = true; } // stopped at a flood barrier
-      P[k] += ((H[k] ? 1.15 : blocked ? this.pileK : 1) - P[k]) * Math.min(1, h * 2.5);
+      P[k] += ((H[k] ? 1.15 : blocked ? this.pileK : 1) - P[k]) * Math.min(1, h * 2.5); if (this.cap && P[k] > this.cap[k]) P[k] = this.cap[k]; // LiveFront: a gap torn in it stays torn
     }
     // keep it one body: a little smoothing, and no section may trail its neighbour by more than a steep slope
     const T = this.T, L = this.segW * 1.3;

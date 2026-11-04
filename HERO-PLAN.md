@@ -83,8 +83,8 @@ Build order (one thing at a time, each tested in the Sandbox and pushed). The ch
   - [x] The tornado as a villain (Sean, 2026-11-04): a face, a health bar, it chases you, throws cars; Lock on is a flying punch, double in its open mouth.
   - [x] Punchier melee (Sean, 2026-11-04): blocks and armour no longer stop a combo dead; a hit counter worth more as it grows; enders launch, tap follows them up, the third blow spikes them; a dash blow; each of the six with their own speed, weight, combo and signature move.
   - [ ] The same in the on-foot levels (horde.js has its own melee).
-  - [x] The tsunami and the dust storm as villains (Sean, 2026-11-04): a wall of sections with a face, punch or freeze then shatter them, what is left is fought hand to hand.
-  - [ ] The flood as a villain (Sean): a villain with a hose, punching sinkholes to drain the water. The cold wave too.
+  - [x] The tsunami, dust storm and cold front as villains (Sean, 2026-11-04): the real towering storm with a ghostly face in it; punching tears real gaps, freezing then punching shatters a section; what is left is fought hand to hand. The tornado has the same ghost face.
+  - [x] The flood as a villain (Sean, 2026-11-04): Captain Deluge with a fire hose, the water rising; punch sinkholes to drain it, high water makes him stronger.
   - [ ] From Sean's enhancement brief, by its own order: more satisfying melee (heavy attacks, launchers, air combos); each of the six fighters moving and hitting differently, with a signature move; more grab moves (suplex, slam, throw into things); a combo counter and score in the fights; enemy types in the crowd levels (fast, heavy, ranged, armoured); street things to use (barrels, cars).
   - [ ] Destroy: jets and heroes chasing you, with mini games to shake them.
   - [ ] The on-foot levels' grab gets the same choice of moves.

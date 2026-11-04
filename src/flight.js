@@ -26,7 +26,7 @@ import { Army } from './army.js';
 import { HeroPower, POWER } from './heropower.js';
 import { HS } from './herogame.js';
 import { WindGame } from './windgame.js';
-import { LiveTornado, LiveWall } from './livestorm.js';
+import { LiveTornado } from './livestorm.js';
 import { StormGame, StormWar, stormKinds } from './stormgame.js';
 
 // speeds in metres a second; turn: how hard it turns at full bank; chase: the camera's distance behind and height above;
@@ -635,7 +635,7 @@ export class Flight {
   note(name, d) { if (!this.threat || d < this.threat.d) this.threat = { name, d }; }
   // the disasters fight back: each one near enough has its go at the plane
   hazards(h) {
-    this.threat = null; if (!this.live && this.wallE && this.wallE.alive && this.inLevel && !this.fighting) this.live = new LiveWall(this, this.wallE, this.wallE.type); if (this.live && this.live.wall) { this.live.step(h); if (this.state !== 'fly') return; }
+    this.threat = null; if (!this.live && this.wallE && this.wallE.alive && this.inLevel && !this.fighting) this.live = this.wallE.make(this); if (this.live && this.live.wall) { this.live.step(h); if (this.state !== 'fly') return; }
     for (const e of this.g.disasters.list) {
       if (!e.alive || this.state !== 'fly' || this.caught) continue;
       if (e.type === 'tornado' && e.tw) this.twister(e.tw, h);
@@ -731,7 +731,7 @@ export class Flight {
   }
   // the level's tornado, on the defending side (windgame.js)
   // the level's flood, dust storm, tsunami or cold wave, on the defending side (stormgame.js)
-  stormFor() { if (!this.heroGame || !this.inLevel || this.fromHorde || !this.owner) return null; if (this.owner.side === 'villain') { const R = this.owner.round; if (!R || R.ended) return null; if (!this.storm) this.storm = new StormWar(this, R); return this.storm; } if (this.owner.side !== 'hero') return null; const e = this.g.disasters.list.find(q => q.alive && stormKinds[q.type]); if (!e) return null; if (!this.storm || this.storm.e !== e) { if (this.storm) this.storm.dispose(); this.storm = new StormGame(this, e); } return this.storm; }
+  stormFor() { if (!this.heroGame || !this.inLevel || this.fromHorde || !this.owner || (this.wallE && this.wallE.alive)) return null; if (this.owner.side === 'villain') { const R = this.owner.round; if (!R || R.ended) return null; if (!this.storm) this.storm = new StormWar(this, R); return this.storm; } if (this.owner.side !== 'hero') return null; const e = this.g.disasters.list.find(q => q.alive && stormKinds[q.type]); if (!e) return null; if (!this.storm || this.storm.e !== e) { if (this.storm) this.storm.dispose(); this.storm = new StormGame(this, e); } return this.storm; }
   storyTornado() { if (!this.heroGame || !this.inLevel || this.fromHorde || !this.g.mode || this.g.mode.side !== 'hero') return null; return this.g.disasters.list.find(e => e.alive && e.type === 'tornado' && e.tw && e.tw.phase !== 'rope') || null; }
   // a story level: the arcade way (Sean). A finger on the screen and she goes that way on the screen, as on foot, faster the further it is pushed; let go and she stops and hovers. Her height looks after itself over the roofs; the arrows on the bar go up and down. Behind and first person, only for getting around: left and right turn, up and down climb and dive (Invert)
   arcadeOn() { return !!(this.P && this.P.hero && this.heroGame && (this.fromHorde || this.inLevel) && !this.fromBase); }
