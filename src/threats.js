@@ -17,7 +17,7 @@ let boards = null;
 const load = () => { if (boards) return boards; try { boards = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { boards = null; } return (boards = boards || {}); };
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(boards)); } catch (e) { /* no storage: the board lasts as long as the page */ } };
 function freeCity(B, kind, not) { const taken = B.list.map((t) => t.key), want = NEEDS[kind] || PATH, open = want.filter((k) => !taken.includes(k) && k !== not && PLACES[k]); return open.length ? rnd(open) : null; }
-function add(B, slot, kind, o, not) { const key = freeCity(B, kind, not); if (!key) return null; const t = { id: ++B.n, key, slot, kind, ...o }; B.list.push(t); B.fresh.push(t.id); return t; }
+function add(B, slot, kind, o) { const key = freeCity(B, kind, B.avoid); if (!key) return null; const t = { id: ++B.n, key, slot, kind, ...o }; B.list.push(t); B.fresh.push(t.id); return t; }
 // a kind not played just now and not on the board already, if there is one
 function pick(B, pool) { const on = B.list.map((t) => t.kind), a = pool.filter((k) => !on.includes(k) && !B.recent.includes(k)), b = pool.filter((k) => !on.includes(k)); return rnd(a.length ? a : b.length ? b : pool); }
 // each slot made up to its number. villainsLeft: who is still a villain, for Defend; Destroy's villains slot is the heroes standing guard
@@ -43,7 +43,7 @@ export function resolve(side, id, won, villainsLeft = []) {
   const B = board(side, villainsLeft), t = B.list.find((q) => q.id === id); B.cur = null; if (t) { B.recent = [t.kind, ...B.recent].slice(0, 3); if (won) B.list.splice(B.list.indexOf(t), 1); }
   const rot = B.list.filter((q) => q.slot === 'random' && q !== t).sort((a, b) => a.id - b.id)[0]; if (rot) B.list.splice(B.list.indexOf(rot), 1);
   B.randomN = 1 + Math.floor(Math.random() * 2); while (B.list.filter((q) => q.slot === 'random').length > B.randomN) B.list.splice(B.list.findIndex((q) => q.slot === 'random'), 1);
-  fill(B, side, villainsLeft); save(); return B;
+  B.avoid = t && won ? t.key : null; fill(B, side, villainsLeft); B.avoid = null; save(); return B; // the trouble moves on: not back to the city just saved
 }
 export const danger = (t, level) => level + Math.floor(Math.max(0, PATH.indexOf(t.key)) / 6); // the bigger towns come later on the road
 // what is fought: Defend's villain by name, Destroy's guard has no disaster of its own (the heroes come for you anyway)
