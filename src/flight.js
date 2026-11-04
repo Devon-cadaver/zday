@@ -26,7 +26,7 @@ import { Army } from './army.js';
 import { HeroPower, POWER } from './heropower.js';
 import { HS } from './herogame.js';
 import { WindGame } from './windgame.js';
-import { LiveTornado } from './livestorm.js';
+import { LiveTornado, LiveWall } from './livestorm.js';
 import { StormGame, StormWar, stormKinds } from './stormgame.js';
 
 // speeds in metres a second; turn: how hard it turns at full bank; chase: the camera's distance behind and height above;
@@ -635,7 +635,7 @@ export class Flight {
   note(name, d) { if (!this.threat || d < this.threat.d) this.threat = { name, d }; }
   // the disasters fight back: each one near enough has its go at the plane
   hazards(h) {
-    this.threat = null;
+    this.threat = null; if (!this.live && this.wallE && this.wallE.alive && this.inLevel && !this.fighting) this.live = new LiveWall(this, this.wallE, this.wallE.type); if (this.live && this.live.wall) { this.live.step(h); if (this.state !== 'fly') return; }
     for (const e of this.g.disasters.list) {
       if (!e.alive || this.state !== 'fly' || this.caught) continue;
       if (e.type === 'tornado' && e.tw) this.twister(e.tw, h);
@@ -718,6 +718,7 @@ export class Flight {
   lockOn(v, again = false) {
     if (this.state !== 'fly' || this.riding || this.bucked || this.ring) return;
     this.lockHint = false; if (this.goBase) this.baseStop();
+    if (!v && this.live && this.live.wall) { this.live.charge(); return; }
     { const SG = this.lock ? null : this.stormFor(); if (SG && SG.lockOn() !== false) return; } if (!v && this.storyTornado()) { if (this.live) this.live.charge(); return; }
     if (this.lock && !again) { this.lock = null; this.tip('Lock let go: flying free'); return; }
     if (this.fromBase) { this.tip('Nothing to lock on in the base; Land to come down'); return; }
@@ -800,10 +801,10 @@ export class Flight {
     const g = this.g, T = g.fightTest, D = g.disasters, P = g.people, cam = this.ctx.camera, s = { kind: this.kind, P: this.P, heroGame: this.heroGame, onStopped: this.onStopped, view: this.view, stats: { ...LAB.stats }, hullK: this.hull / (this.hullMax || 100), hero: this.P.hero };
     const q = P.snapWalkable(v.x, v.z, 40) || [v.x, v.z], lvl = LAB.villain || 1, hpMax = 180 + 70 * lvl; v.gripped = true; v.rig.root.visible = false; g.camBlend = { pos: cam.position.clone(), quat: cam.quaternion.clone(), fov: cam.fov, t: 0, T: 1.1 };
     this.stop(true); this.fighting = true;
-    T.start({ ring: { x: q[0], z: q[1], y: P.groundY(q[0], q[1]), r: 26 }, street: true, air: true, who: s.hero, hp: Math.max(20, s.hullK * 100), foe: { name: v.name, hpMax, hp: v.fightHp ?? hpMax, dmgK: 0.75 + 0.1 * lvl }, onEnd: (won, F2) => {
+    T.start({ ring: { x: q[0], z: q[1], y: P.groundY(q[0], q[1]), r: 26 }, street: true, air: true, who: s.hero, hp: Math.max(20, s.hullK * 100), foe: { name: v.name, rig: v.fightRig, hpMax, hp: v.fightHp ?? hpMax, dmgK: 0.75 + 0.1 * lvl }, onEnd: (won, F2) => {
       const x = F2.h.x, z = F2.h.z, y = F2.h.y, yaw = F2.h.yaw, left = F2.h.hp, foeLeft = F2.v.hp; g.camBlend = { pos: cam.position.clone(), quat: cam.quaternion.clone(), fov: cam.fov, t: 0, T: 1.1 }; T.stop(true); this.fighting = false; this.heroGame = s.heroGame; this.start(s.kind); this.P = s.P; this.onStopped = s.onStopped; Object.assign(LAB.stats, s.stats); this.pos.set(x, y + 1.5, z); this.yaw = Math.atan2(-Math.cos(yaw), Math.sin(yaw)); this.pitch = 0.9; this.speed = 5; this.thr = Math.max(this.P.start || 5, 5); this.setView(s.view); this.hull = this.hullMax * Math.max(0.2, left / 100);
       v.gripped = false; v.rig.root.visible = true; v.x = F2.v.x; v.z = F2.v.z;
-      if (won) { LAB.stats.won++; delete v.fightHp; v.heroWin = true; for (const e of D.list) if (e.type === 'villains' && e.who.includes(v)) e.beat(v, s.hero); this.tip(v.name + ' is beaten!'); } else { v.fightHp = Math.max(40, foeLeft); this.crash(-1, v.name + ' knocked you out!'); }
+      if (won) { LAB.stats.won++; delete v.fightHp; v.heroWin = true; for (const e of D.list) if (e.type === 'villains' && e.who.includes(v)) e.beat(v, s.hero); this.tip(v.name + ' is beaten!'); if (v.onWin) v.onWin(); } else { v.fightHp = Math.max(40, foeLeft); if (v.onLose) v.onLose(v.fightHp); this.crash(-1, v.name + ' knocked you out!'); }
     } });
   }
   // a hero's pose: flat out along the way at speed, one fist ahead; upright and treading air slow or in a fight; a punch;

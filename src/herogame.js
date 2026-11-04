@@ -16,6 +16,7 @@ import { Squad } from './squad.js';
 import { ALIEN_MIX } from './figures.js';
 import { CreatureLayer } from './creaturekit.js';
 import { current, danger, resolve, waveOf, threatName, freshOnes } from './threats.js';
+import { LiveWall } from './livestorm.js';
 import { openMap, villainsLeft } from './storymap.js';
 
 
@@ -156,6 +157,7 @@ export class HeroGame {
     if (hero && (wave[0] === 'worm' || wave[0] === 'kaiju') && wave.length === 1 && g.horde) { this.bossLevel(key, wave[0]); return; }
     if (hero && wave[0] === 'zombies' && g.horde) { this.zombieLevel(key); return; }
     if (hero && wave[0] === 'riot' && wave.length === 1 && g.horde) { this.riotLevel(key); return; }
+    if (hero && (wave[0] === 'tsunami' || wave[0] === 'haboob')) { this.wallLevel(key, wave[0], cx, cz); return; }
     for (const e of D.list) if (e.type === 'villains' && e.alive) for (const w of e.who) if (!w.gone) w.state = 'gone';
     const allies = []; if (!hero) { const P = g.people; for (const w of wave) { if (VILLAINS.includes(w)) continue; if (w === 'zombies') { for (let i = 0; i < 120; i++) P.drop(B.x0 + Math.random() * (B.x1 - B.x0), B.z0 + Math.random() * (B.z1 - B.z0), -1); } else { const e = D.start(w, cx + (Math.random() - 0.5) * 120, cz + (Math.random() - 0.5) * 120, { life: 99999 }); if (e) allies.push(e); } } } // Destroy: the disaster is on your side, the heroes come for you both
     if (hero) { for (const w of wave) { if (VILLAINS.includes(w)) { if (HS.load().chars[w].side === 'villain') vs.push(w); } else { const a0 = Math.random() * 6.28, far = w === 'tornado' ? 170 : 0, e = D.start(w, far ? cx + Math.cos(a0) * far : cx + (Math.random() - 0.5) * 120, far ? cz + Math.sin(a0) * far : cz + (Math.random() - 0.5) * 120, w === 'tornado' ? { life: 99999, size: 2.2 } : undefined); if (e) evs.push(e); } } }
@@ -173,6 +175,8 @@ export class HeroGame {
   baseArrive() { const g = this.g, F = g.flight, R = this.round; F.baseStop(); F.hovering = true; F.speed = F.thr = 0; const fd = document.createElement('div'); fd.style.cssText = 'position:fixed;inset:0;background:#000;opacity:0;transition:opacity .22s;z-index:65;pointer-events:none'; document.body.appendChild(fd); requestAnimationFrame(() => { fd.style.opacity = '1'; }); setTimeout(() => { if (R && R === this.round && !R.ended && F.active) { if (this.squad) this.squad.note(); F.stop(true); g.base.start({ level: this }); } fd.style.transition = 'opacity .35s'; fd.style.opacity = '0'; setTimeout(() => fd.remove(), 400); }, 240); }
   // back out of the door: over it, with what health the base's mini-game gave
   back() { const g = this.g, F = g.flight, B = g.base, Q = this.squad; if (Q) { const now = HS.cur(this.side); if (now !== Q.cur && !Q.downs[now]) { Q.cur = now; Q.draw(); } else HS.load().last[this.side] = Q.cur; } this.flyUp(B.x, B.z + B.S.d / 2 + 8); if (Q) F.hull = (F.hullMax || 100) * Q.hp[Q.cur]; F.setView(F.view); F.tip('Back outside. Finish the job'); }
+  // the wave and the dust storm as villains (livestorm.js): an event of its own, out of the disasters' list, alive till what is left of it is beaten
+  wallLevel(key, type, cx, cz) { const F = this.g.flight, e = { type, alive: true, own: true }; for (const q of this.g.disasters.list) if (q.type === 'villains' && q.alive) for (const w of q.who) if (!w.gone) w.state = 'gone'; this.flyUp(cx, cz); this.round = { evs: [e], allies: [], need: 0, t: 0, downs: 0, wasDown: false, hero: true, hunted: false, rivals: [], key, ended: false, nothing: false }; this.rep = document.createElement('div'); this.rep.id = 'zd-rep'; document.body.appendChild(this.rep); F.wallE = e; F.live = new LiveWall(F, e, type); }
   // level 1 (Sean): the invasion: the fleet overhead, its soldiers rained into the streets and fought on foot like the horde; the fleet can be hit from the air
   alienLevel(key) {
     const g = this.g, s = this.s, P = g.people, D = g.disasters, B = g.city.bounds, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2, n = Math.min(250, 140 + 10 * this.ix), pool = []; LAB.reset();
@@ -247,7 +251,7 @@ export class HeroGame {
     if (F.active) F.stop(true);
     for (const e of R.allies || []) if (e.alive) endDisaster(e);
     F.heroGame = false; F.inLevel = false; Object.assign(LAB, this.labWas, { spotK: 1, toughK: 1 });
-    for (const e of R.evs) { if (!e.alive) continue; if (e.type === 'villains') { for (const w of e.who) if (!w.gone) { w.state = 'gone'; w.rig.root.visible = false; } } else endDisaster(e); } // what is left of the trouble goes with you
+    for (const e of R.evs) { if (!e.alive) continue; if (e.own) { e.alive = false; continue; } if (e.type === 'villains') { for (const w of e.who) if (!w.gone) { w.state = 'gone'; w.rig.root.visible = false; } } else endDisaster(e); } // what is left of the trouble goes with you
     if (R.score != null) lines.unshift('Score ' + Math.round(R.score)); const head = won ? (R.hero ? 'TOWN SAVED' : 'TOWN WRECKED') : (why || 'NOT THIS TIME');
     this.round = null; this.ended(won, '<b>' + head + '</b> · +' + xp + ' XP' + (up ? ' · <b>LEVEL UP!</b> A skill point to spend' : '') + '<br>Buildings down ' + S.buildings + ' · people scared ' + S.scared + ' · hurt ' + S.hurt + ' · saved ' + S.saved + ' · fear ' + Math.round(fear) + (lines.length ? '<br>' + lines.join('<br>') : ''));
   }
