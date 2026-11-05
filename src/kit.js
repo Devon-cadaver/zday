@@ -1,11 +1,9 @@
-// The kit (Sean, 10c): what a hero fights with, one pick in each slot, dozens to come. Stuns stop the enemy a moment and do no
-// harm; knockbacks shove them, and the longer the button is held the more power it costs and the further they go (the laser kept
-// on them as they fly back, a kick wound up before it lands); melee is the tap combo. Picked in the Sandbox's Fight test card
-// (and later the tower), kept in localStorage zday_kit; the fight test and the horde read it when they start.
-const KEY = 'zday_kit';
+// The kit (Sean): what a fighter fights with, one pick in each slot. Every one of the six has their own (Sean, 2026-11-04: make one your main, the others alternates with different powers), kept in localStorage zday_kits by fighter. Stuns stop the enemy a moment and do no harm; knockbacks shove them, and the longer the button is held the more power it costs and the further they go; melee is the tap combo; two finishers, chosen at zero health. The order of each list is the order they open as a fighter levels (opensAt); the Sandbox has everything open. Picked on the base's computer and the Sandbox card (kitmenu.js); the fights read it when they start.
+const KEY = 'zday_kits', OLD = 'zday_kit';
 export const STUNS = {
   freeze: { name: 'Freeze', icon: '❄', cost: 50, blurb: 'A block of ice for 2 s; hits land in full' },
   sonic: { name: 'Sonic clap', icon: '👏', cost: 40, blurb: 'A clap that staggers them 1.5 s and shoves them off' },
+  guardian: { name: 'Guardian Shield', icon: '🛡', cost: 40, self: true, blurb: 'A shield and a small heal on you. On an alternate: they fly in and put it on you, instead of attacking' },
   gravity: { name: 'Gravity pin', icon: '🌀', cost: 45, blurb: 'Pinned to the ground 2.4 s, open to everything' },
   web: { name: 'Shock web', icon: '🕸', cost: 45, blurb: 'Crackling lines hold them 2.2 s', fx: { col: [0.5, 1.6, 3.2], secs: 2.2, cage: true, say: 'WEBBED!', snd: 'zap', r: 6 } },
   flash: { name: 'Blinding flash', icon: '💡', cost: 35, blurb: 'They stagger, arms over their eyes, 1.6 s', fx: { col: [3.4, 3.2, 2], secs: 1.6, flash: true, say: 'BLINDED!', snd: 'zap', r: 9 } },
@@ -33,10 +31,38 @@ export const MELEES = {
   muay: { name: 'Muay Thai', icon: '🦵', combo: ['elbowU', 'snapKick', 'elbowU2', 'highKick'], blurb: 'Elbows and kicks, the last a high kick' },
   capoeira: { name: 'Capoeira', icon: '🌀', combo: ['spinKick', 'spinKick2', 'highSpin'], blurb: 'Spinning, dancing kicks' },
 };
-export const SLOTS = { stun: STUNS, knock: KNOCKS, melee: MELEES };
-const DEF = { stun: 'freeze', knock: 'laser', melee: 'combo' };
-export function loadKit() { let o = null; try { o = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { /* no storage */ } const k = { ...DEF, ...(o || {}) }; for (const s in SLOTS) if (!SLOTS[s][k[s]]) k[s] = DEF[s]; return k; }
-export function saveKit(k) { try { localStorage.setItem(KEY, JSON.stringify(k)); } catch (e) { /* no storage */ } }
+export const FINISHERS = {
+  neck: { name: 'Neck drag', icon: '🤜', tip: 'HOLD and steer, let go to fling', blurb: 'By the neck through the town, punching on the way; let go to fling them' },
+  sky: { name: 'To the sky', icon: '☄', tip: 'HOLD, TAP, HOLD, HOLD', blurb: 'Up past them, grab them, and down with a shockwave, up to a mini nuke' },
+};
+export const SLOTS = { stun: STUNS, knock: KNOCKS, melee: MELEES, fin1: FINISHERS, fin2: FINISHERS };
+export const SLOT_NAME = { stun: 'Stun', knock: 'Knockback', melee: 'Melee', fin1: 'Finisher 1', fin2: 'Finisher 2' };
+// what each of the six starts with, so they differ from the first fight; always open to them
+const START = {
+  nova: { stun: 'freeze', knock: 'laser', melee: 'boxer', fin1: 'neck', fin2: 'sky' },
+  dragonfly: { stun: 'sonic', knock: 'gust', melee: 'capoeira', fin1: 'sky', fin2: 'neck' },
+  tempo: { stun: 'guardian', knock: 'kick', melee: 'flurry', fin1: 'neck', fin2: 'sky' },
+  tyrant: { stun: 'gravity', knock: 'car', melee: 'hammer', fin1: 'neck', fin2: 'sky' },
+  blur: { stun: 'flash', knock: 'kick', melee: 'kungfu', fin1: 'sky', fin2: 'neck' },
+  weaver: { stun: 'web', knock: 'water', melee: 'muay', fin1: 'neck', fin2: 'sky' },
+};
+const idOf = (w) => String(w || '').toLowerCase();
+let all = null;
+const write = () => { try { localStorage.setItem(KEY, JSON.stringify(all)); } catch (e) { /* no storage */ } };
+// the one kit of an older save goes to whoever was last played on each side, and those picks stay open to them; the others start with their own
+function read() {
+  if (all) return all; let o = null; try { o = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { /* no storage */ } all = o || {};
+  if (!o) { let old = null, last = null; try { old = JSON.parse(localStorage.getItem(OLD) || 'null'); last = (JSON.parse(localStorage.getItem('zday_hero') || 'null') || {}).last; } catch (e) { /* no storage */ } if (old) { for (const id of [(last && last.hero) || 'nova', (last && last.villain) || 'tyrant']) { const k = {}, keep = []; for (const s of ['stun', 'knock', 'melee']) if (old[s] && SLOTS[s][old[s]] && !(s === 'melee' && old[s] === 'combo')) { k[s] = old[s]; keep.push(old[s]); } all[id] = { ...k, keep }; } } write(); }
+  return all;
+}
+export function loadKit(who) { const id = idOf(who), base = START[id] || START.nova, k = { ...base, ...(read()[id] || {}) }; for (const s in SLOTS) if (!SLOTS[s][k[s]]) k[s] = base[s]; if (k.fin1 === k.fin2) k.fin2 = Object.keys(FINISHERS).find((q) => q !== k.fin1); return k; }
+export function saveKit(who, k) { const id = idOf(who); read()[id] = { ...(all[id] || {}), ...k }; write(); }
+// the level a pick opens at: the first few of a list from the start, the rest spread over the levels to 20
+const FREE = { stun: 3, knock: 3, melee: 3, fin1: 2, fin2: 2 };
+export function opensAt(slot, id) { const L = Object.keys(SLOTS[slot]), i = L.indexOf(id), f = FREE[slot], rest = L.length - f; return i < f ? 1 : 1 + Math.ceil((i - f + 1) * 19 / Math.max(19, rest)); }
+export function isOpen(who, slot, id, level) { const q = idOf(who), K = read()[q] || {}; return level >= opensAt(slot, id) || (START[q] && START[q][slot] === id) || (K.keep || []).includes(id); }
+// the two gold buttons at zero health
+export const finBtns = (k) => [k.fin1, k.fin2].map((f) => '<button type="button" data-f="' + f + '">' + FINISHERS[f].icon + ' ' + FINISHERS[f].name.toUpperCase() + '<small>' + FINISHERS[f].tip + '</small></button>').join('');
 
 // how fast a street fight runs (Sean: too fast to follow); Slower unless changed in the pause menu. Crowds on foot keep their own speed
 export const FIGHT_SPEEDS = { Normal: 1, Slower: 0.8, Slowest: 0.65 };

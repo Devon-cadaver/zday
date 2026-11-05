@@ -503,7 +503,7 @@ export class Flight {
   // hurt: the hull down by n (at nothing it goes down, why the reason), told once in a while
   damage(n, why) {
     if (this.state !== 'fly' && this.state !== 'tossed') return;
-    this.hull -= n; LAB.stats.taken += n; if (this.hull <= 0) { this.crash(-1, why); return; }
+    if (this.power) n = this.power.soak(n); this.hull -= n; LAB.stats.taken += n; if (this.hull <= 0) { this.crash(-1, why); return; }
     if ((this.hurtT || 0) < this.t2) { this.hurtT = this.t2 + 1.5; this.tip(why + (this.P.hero ? ' Health ' : ' Hull ') + Math.round(this.hull / (this.hullMax || 100) * 100) + '%'); sfx('crash', this.pos.x, this.pos.y, this.pos.z, { gain: 0.4, rate: 1.3 }); }
   }
   // the hero thrown (a villain's grab, heroduel.js): tumbling along, through whatever is in the way, down into the street,

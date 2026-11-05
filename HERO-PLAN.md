@@ -76,6 +76,7 @@ Build order (one thing at a time, each tested in the Sandbox and pushed). The ch
     - [x] Destroy for points in every level (score, chains to x3, goal 100 x the old building count). Weather levels: Storm meter and Unleash (tornado follows you, levee breaks, army blinded, pick the wave's coast, buildings shatter). Heroes and rescue squads do jobs against you; Lock on and the gauge, or 3 power hits, stop them (stormgame.js StormWar).
     - [x] New powers, the first 5 of each list: stuns Shock web, Blinding flash, Sleep dust, Mud trap, Vine snare; knockbacks Shockwave stomp, Fire jet, Water cannon, Boulder throw, Car toss; melee Boxer, Kung fu, Wrestler, Muay Thai, Capoeira.
     - [ ] The other 45 of Sean's 60, if these go well.
+  - [x] Each fighter has their own powers, a main and alternates, a scroll wheel for each type with picks opening by level, Guardian Shield, TEAM calling either alternate (Sean, 2026-11-04).
   - [x] Neck drag rebuilt (Sean, 2026-11-03): a hand locked on the neck by IK, the other fist punching on a beat or a tap, flying in a V with the ground torn up on the dips; for the foe too.
   - [x] Pose Lab (Sean's idea, 2026-11-03): both fighters on a stage, step through a move frame by frame, drag limbs, set timing, pin a hand; saved on the device, export to make it permanent. poses.html, the Poses button on the menu.
   - [x] Sean's fun pass, part 1 (2026-11-04): flying through buildings again, the neck drag through anything, Destroy's arcade points and chains, a grab lets you pick spin, throw or drag.

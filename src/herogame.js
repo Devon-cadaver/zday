@@ -32,7 +32,7 @@ export const HS = {
     if (this.d) return this.d; let o = null; try { o = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { /* no storage */ } o = o || {}; const chars = {};
     for (const id of Object.keys(ROSTER)) { const side = ROSTER[id][1], old = !o.chars && o[side] && (o[side].flyer || (side === 'hero' ? 'nova' : 'tyrant')) === id ? o[side] : null; chars[id] = { ...fresh(side, id), ...(old || {}), ...((o.chars && o.chars[id]) || {}), flyer: id }; } // an old save's one profile goes to whoever was flying it
     const last = { hero: (o.last && o.last.hero) || (o.hero && o.hero.flyer) || 'nova', villain: (o.last && o.last.villain) || (o.villain && o.villain.flyer) || 'tyrant' }, H = this;
-    this.d = { chars, last, outfits: o.outfits || {} }; for (const side of ['hero', 'villain']) Object.defineProperty(this.d, side, { get() { return chars[H.cur(side)]; } }); return this.d;
+    { const ok = new Set(Object.values(TREE).flat().map((q) => q.id)); for (const c of Object.values(chars)) for (const k of Object.keys(c.skills)) if (!ok.has(k)) delete c.skills[k]; } this.d = { chars, last, outfits: o.outfits || {} }; for (const side of ['hero', 'villain']) Object.defineProperty(this.d, side, { get() { return chars[H.cur(side)]; } }); return this.d;
   },
   save() { try { const d = this.d; localStorage.setItem(KEY, JSON.stringify({ chars: d.chars, last: d.last, outfits: d.outfits })); } catch (e) { /* no storage */ } },
   outfit(name) { return this.load().outfits[name] || null; },
@@ -48,17 +48,23 @@ export const HS = {
 };
 // a character's body, whichever side they stand on now
 export const rigFor = (name, of, hd = true) => (['Nova', 'Dragonfly', 'Tempo'].includes(name) ? heroRig(name, of, hd) : villainRig(name, of, hd));
+// the two a fighter can call on TEAM: whoever else stands on their side now, by the character's own name
+export const matesOf = (who) => { const D = HS.load(), id = String(who).toLowerCase(), side = (D.chars[id] || {}).side || 'hero'; return HS.team(side).filter((q) => q !== id).slice(0, 2).map((q) => HS.name(q)); };
+export const mateDown = (g, name) => { const Q = g.mode && g.mode.squad; return !!(Q && Q.downs && Q.downs[String(name).toLowerCase()]); };
+// a teammate's body in flight, kept for the next call so a call never has to build one
+const MATE_RIGS = new Map();
+export const mateRig = (name) => { const of = HS.outfit(name), k = name + JSON.stringify(of || {}); let r = MATE_RIGS.get(k); if (!r) { r = rigFor(name, of); MATE_RIGS.set(k, r); } r.body.rotation.x = 1.35; for (const a of r.arms) a.sh.rotation.set(-3, 0, a.sx * 0.1); return r; };
 if (typeof window !== 'undefined') window.__hs = HS;
 export const levelOf = (xp) => Math.min(20, 1 + Math.floor((Math.sqrt(1 + xp / 50) - 1) / 2)); // 1 at 0, then 400, 1200, 2400... XP
 export const xpFor = (lv) => 50 * ((2 * (lv - 1) + 1) ** 2 - 1);
 // Legend, the menu's bar (Sean): all the heroes' XP pulls one way, all the villains' the other. A fighter counts for the side they stand on now, so one who crosses over swings it. The 2000 is the cushion: a first win does not throw it to one end. A Sandbox test still running counts as what it saved over (testWas)
 export const legend = () => { const L = { hero: 0, villain: 0, heroWon: 0, villainWon: 0 }; for (const c of Object.values(HS.load().chars)) { const s = c.testWas ? JSON.parse(c.testWas) : c; L[s.side] += s.xp; L[s.side + 'Won'] += s.idx; } const lean = L.lean = (L.villain - L.hero) / (L.villain + L.hero + 2000); L.title = lean <= -0.6 ? 'Champion of the City' : lean <= -0.25 ? 'Trusted Hero' : lean < 0.25 ? 'Wild Card' : lean < 0.6 ? 'Troublemaker' : 'Public Enemy'; return L; };
-// the skill tree: four branches, each in order; a point a level. move: a move or power it opens; stat: what it raises
+// the skill tree: four branches, each in order; a point a level. stat: what it raises (Heavy hands: blows 6% harder; Afterburn: flying 12% faster; Deep well: power fills 10% faster; Tough: 20% more health; Team spirit: TEAM fills 15% faster). The powers are the kit's now (kit.js), so the old skills that opened moves are gone, and their points came back (HS.load)
 export const TREE = {
-  Strength: [{ id: 'jab', name: 'Jab combo', move: 'jab' }, { id: 'upper', name: 'Uppercut', move: 'upper' }, { id: 'pound', name: 'Ground pound', move: 'pound' }, { id: 'fling', name: 'Throw into a building', move: 'fling' }, { id: 'hammer', name: 'Hammer throw', move: 'hammer' }, { id: 'elbow', name: 'Elbow drop', move: 'elbow' }, { id: 'slam', name: 'Sky slam', move: 'slam' }],
-  Speed: [{ id: 'quick1', name: 'Quick hands 1', stat: 'spot' }, { id: 'fast1', name: 'Afterburn 1', stat: 'speed' }, { id: 'quick2', name: 'Quick hands 2', stat: 'spot' }, { id: 'fast2', name: 'Afterburn 2', stat: 'speed' }, { id: 'quick3', name: 'Quick hands 3', stat: 'spot' }, { id: 'tag', name: 'Tag team', move: 'tag' }],
-  Energy: [{ id: 'freeze', name: 'Freeze', move: 'freeze' }, { id: 'lightning', name: 'Lightning', move: 'lightning' }, { id: 'sonic', name: 'Sonic clap', move: 'sonic' }],
-  Control: [{ id: 'tough1', name: 'Tough 1', stat: 'tough' }, { id: 'shield', name: 'Shield', move: 'shield' }, { id: 'gravity', name: 'Gravity pulse', move: 'gravity' }, { id: 'tough2', name: 'Tough 2', stat: 'tough' }, { id: 'tk', name: 'Telekinesis', move: 'tk' }],
+  Strength: [1, 2, 3, 4, 5].map((n) => ({ id: 'str' + n, name: 'Heavy hands ' + n, stat: 'power' })),
+  Speed: [1, 2, 3, 4, 5].map((n) => ({ id: 'fast' + n, name: 'Afterburn ' + n, stat: 'speed' })),
+  Energy: [1, 2, 3, 4, 5].map((n) => ({ id: 'en' + n, name: 'Deep well ' + n, stat: 'energy' })),
+  Control: [{ id: 'tough1', name: 'Tough 1', stat: 'tough' }, { id: 'team1', name: 'Team spirit 1', stat: 'team' }, { id: 'tough2', name: 'Tough 2', stat: 'tough' }, { id: 'team2', name: 'Team spirit 2', stat: 'team' }, { id: 'tough3', name: 'Tough 3', stat: 'tough' }],
 };
 const START_MOVES = ['spin', 'kick', 'laser', 'drag', 'wind', 'fire']; // and two powers to start with
 // a town's trouble, along the road: disasters by type, villains by name
@@ -128,6 +134,7 @@ export class HeroGame {
   tap() {} phase() { return 0.3; } onEvent() {} threat() { return 0; } busy() { return false; } reset() {}
   get level() { return levelOf(this.s.xp); }
   get points() { return this.level - 1 - Object.keys(this.s.skills).length; }
+  shareXp(xp) { if (this.g.testRun || xp <= 0) return; const D = HS.load(); for (const id of HS.team(this.side)) if (D.chars[id] !== this.s) D.chars[id].xp += Math.round(xp / 2); }
   moves() { const on = {}; for (const k of Object.keys(LAB.moves)) on[k] = false; for (const k of START_MOVES) on[k] = true; for (const B of Object.values(TREE)) for (const q of B) if (q.move && this.s.skills[q.id]) on[q.move] = true; return on; }
   count(stat) { let n = 0; for (const B of Object.values(TREE)) for (const q of B) if (q.stat === stat && this.s.skills[q.id]) n++; return n; }
   // ---------- home: the base (Sean: the tower's screen is gone; the skills are on its computer, the next city on its Map station)
@@ -143,7 +150,7 @@ export class HeroGame {
   // a city over (Sean): won, the choice to go back to base is the one lit up; lost, you wake in the base beside the pod. The board moves on either way
   ended(won, msg, side0) { const g = this.g, T = this.threat; this.threat = null; if (g.testRun) { this.hub(msg); return; } if (T) resolve(side0 || this.side, T.id, won, villainsLeft()); if (!won) { this.hub(msg, 'pod'); return; } this.card(msg, 'BACK TO BASE', () => this.hub(), ['Back to the menu', () => { g.toMenu ? g.toMenu() : location.reload(); }]); }
   // the skills, for the base's computer
-  skillsHtml() { const s = this.s = HS.load()[this.side]; return '<div class="h">Level ' + this.level + ' \u00B7 ' + s.xp + ' XP \u00B7 ' + REP(s.rep) + ' \u00B7 ' + this.points + ' point' + (this.points === 1 ? '' : 's') + ' to spend</div>' + Object.entries(TREE).map(([br, L]) => { let open = true; return '<div class="h">' + br + '</div><div class="row">' + L.map(q => { const have = !!s.skills[q.id], can = open && !have && this.points > 0; if (!have) open = false; return '<button type="button"' + (have ? ' class="on"' : '') + (can ? ' data-skill="' + q.id + '"' : (have ? '' : ' style="opacity:.45"')) + '>' + (q.move && POWER[q.move] ? POWER[q.move].icon + ' ' : '') + esc(q.name) + '</button>'; }).join('') + '</div>'; }).join(''); }
+  skillsHtml(id) { const s0 = this.s = HS.load()[this.side], s = id ? HS.load().chars[id] : s0, lv = levelOf(s.xp), pts = lv - 1 - Object.keys(s.skills).length; return '<div class="h">Level ' + lv + ' \u00B7 ' + s.xp + ' XP \u00B7 ' + REP(s.rep) + ' \u00B7 ' + pts + ' point' + (pts === 1 ? '' : 's') + ' to spend</div>' + Object.entries(TREE).map(([br, L]) => { let open = true; return '<div class="h">' + br + '</div><div class="row">' + L.map(q => { const have = !!s.skills[q.id], can = open && !have && pts > 0; if (!have) open = false; return '<button type="button"' + (have ? ' class="on"' : '') + (can ? ' data-skill="' + q.id + '"' : (have ? '' : ' style="opacity:.45"')) + '>' + esc(q.name) + '</button>'; }).join('') + '</div>'; }).join(''); }
   // ---------- a town
   start() {
     const g = this.g, s = this.s = HS.load()[this.side], T = this.threat = g.testRun ? null : current(this.side), key = T ? T.key : PATH[s.idx % PATH.length], ix = this.ix = T ? danger(T, this.level) - 1 : s.idx; // the story's level comes from the board, its danger from your level; a test level from its number
@@ -151,7 +158,7 @@ export class HeroGame {
     if (g.moveWorld && (key !== placeKey() || (T && g.usedTown))) { g.usedTown = false; g.heroGo = true; g.moveWorld(key, this.side); g.startMode(this.side); return; } // the world moved: a new mode starts it there. A town already fought in is built again: the last level took its people
     g.usedTown = !!T;
     this.labWas = { hero: LAB.hero, villain: LAB.villain, moves: LAB.moves, army: LAB.army }; // the Sandbox's own settings, put back after
-    LAB.hero = this.level; LAB.villain = Math.max(1, ix + 1); LAB.moves = this.moves(); LAB.spotK = 1 + 0.15 * this.count('spot'); LAB.toughK = 1 + 0.2 * this.count('tough'); LAB.army = this.side === 'villain' ? ix >= 2 : ix >= 4 && ix % 3 === 1;
+    LAB.hero = this.level; LAB.villain = Math.max(1, ix + 1); LAB.moves = this.moves(); LAB.powerK = 1 + 0.06 * this.count('power'); LAB.energyK = 1 + 0.1 * this.count('energy'); LAB.teamK = 1 + 0.15 * this.count('team'); LAB.spotK = 1 + 0.15 * this.count('spot'); LAB.toughK = 1 + 0.2 * this.count('tough'); LAB.army = this.side === 'villain' ? ix >= 2 : ix >= 4 && ix % 3 === 1;
     const D = g.disasters, B = g.city.bounds, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2, F = g.flight, hero = this.side === 'hero', wave = T ? waveOf(T, this.side === 'hero' ? villainsLeft() : []) : WAVES[s.idx % WAVES.length], evs = [], vs = [];
     if (hero && wave[0] === 'tornado') LAB.army = false; // no helicopters shooting at her while she dodges what it throws
     if (hero && wave[0] === 'aliens' && g.horde) { this.alienLevel(key); return; }
@@ -239,8 +246,8 @@ export class HeroGame {
     const R = this.round, s = this.s, S = LAB.stats, F = this.g.flight, g = this.g; R.ended = true; if (this.squad) { this.squad.end(); this.squad = null; } if (F.storm) { if (F.storm.war) R.score = F.storm.score; F.storm.dispose(); F.storm = null; } const fear = LAB.fear(); if (this.rep) { this.rep.remove(); this.rep = null; }
     if (R.zombie) {
       const H = R.horde || g.horde, xp = won ? 300 + (R.boss ? 300 : H.kills) + (H.bitten < 10 ? 100 : 0) : 20 + Math.round(H.kills / 4); if (g.base && g.base.active) { g.base.level = null; g.base.stop(true); } if (H.active) H.stop(true); if (H.flying) { H.flying = false; if (H.el) H.el.remove(); if (g.flight.active) g.flight.stop(true); }
-      for (const e of R.evs) if (e.alive) endDisaster(e); g.flight.heroGame = false; if (this.labWas) Object.assign(LAB, this.labWas, { spotK: 1, toughK: 1 });
-      const lv0 = this.level, was = s.rep, fear2 = LAB.fear(); s.xp += xp; if (won) s.threat = Math.min(100, (s.threat || 0) + 20); const up = this.level - lv0; if (won) s.idx = Math.min(WAVES.length - 1, s.idx + 1); s.towns[R.key] = { won: (s.towns[R.key] && s.towns[R.key].won) || won, fear: Math.round(fear2) }; s.rep = Math.max(0, Math.min(100, s.rep + (won ? 6 : 0) - fear2 / 30)); const cross = this.cross(s); HS.save(); this.round = null; g.heroGo = false;
+      for (const e of R.evs) if (e.alive) endDisaster(e); g.flight.heroGame = false; if (this.labWas) Object.assign(LAB, this.labWas, { spotK: 1, toughK: 1, powerK: 1, energyK: 1, teamK: 1 });
+      const lv0 = this.level, was = s.rep, fear2 = LAB.fear(); s.xp += xp; this.shareXp(xp); if (won) s.threat = Math.min(100, (s.threat || 0) + 20); const up = this.level - lv0; if (won) s.idx = Math.min(WAVES.length - 1, s.idx + 1); s.towns[R.key] = { won: (s.towns[R.key] && s.towns[R.key].won) || won, fear: Math.round(fear2) }; s.rep = Math.max(0, Math.min(100, s.rep + (won ? 6 : 0) - fear2 / 30)); const cross = this.cross(s); HS.save(); this.round = null; g.heroGo = false;
       this.ended(won, '<b>' + (won ? 'TOWN SAVED' : (why || 'NOT THIS TIME')) + '</b> · +' + xp + ' XP' + (up ? ' · <b>LEVEL UP!</b> A skill point to spend' : '') + '<br>' + (R.boss ? 'Hit ' + H.bitten.toFixed(0) + ' times' : (R.noun.trim() + ' down ' + H.kills + ' · hit ') + H.bitten + ' times') + ' · ' + Math.round(H.time) + ' s · reputation ' + Math.round(was) + ' to ' + Math.round(s.rep) + cross); return;
     }
     F.onStopped = null; for (const e of R.evs) if (e.type === 'villains') for (const w of e.who) { if (w.beaten && !s.trophies.includes(w.name)) s.trophies.push(w.name); }
@@ -248,10 +255,10 @@ export class HeroGame {
     let xp = 0, lines = [];
     if (R.hero) { const was = s.rep; xp = won ? Math.max(50, 200 + 100 * this.ix + (S.stopped || 0) * 60 + S.won * 80 + S.saved * 30 - Math.round(fear / 4)) : 25; const gain = won ? 6 : 0; s.rep = Math.max(0, Math.min(100, s.rep + gain - fear / 30)); if (R.hunted && !won) { s.rep = Math.min(100, s.rep + 15); xp = 0; lines.push('The heroes beat you. You wake in the tower, and it is a lesson'); } lines.push('Reputation ' + Math.round(was) + ' to ' + Math.round(s.rep) + ': ' + REP(s.rep)); s.towns[R.key] = { won: (s.towns[R.key] && s.towns[R.key].won) || won, fear: Math.round(fear) }; if (R.hunted && won) lines.push('You beat the heroes. This town now lives in fear of you'); }
     else { const was = s.rep, good = (S.stopped || 0) * 35 + S.saved * 2; s.rep = Math.max(0, Math.min(100, s.rep + good - (won ? 3 : 0))); lines.push('Reputation ' + Math.round(was) + ' to ' + Math.round(s.rep) + (good ? ': the town noticed the good you did' : '')); xp = won ? 200 + 100 * this.ix + S.buildings * 15 + S.won * 100 : 10 + S.buildings * 5; s.towns[R.key] = { won: (s.towns[R.key] && s.towns[R.key].won) || won, fear: Math.round(fear) }; }
-    const lv0 = this.level; s.xp += xp; if (won) s.threat = Math.min(100, (s.threat || 0) + (R.zombie ? 20 : 25)); const up = this.level - lv0; if (won) s.idx = Math.min(WAVES.length - 1, s.idx + 1); { const cross = this.cross(s); if (cross) lines.push(cross.replace('<br>', '')); } HS.save();
+    const lv0 = this.level; s.xp += xp; this.shareXp(xp); if (won) s.threat = Math.min(100, (s.threat || 0) + (R.zombie ? 20 : 25)); const up = this.level - lv0; if (won) s.idx = Math.min(WAVES.length - 1, s.idx + 1); { const cross = this.cross(s); if (cross) lines.push(cross.replace('<br>', '')); } HS.save();
     if (F.active) F.stop(true);
     for (const e of R.allies || []) if (e.alive) endDisaster(e);
-    F.heroGame = false; F.inLevel = false; Object.assign(LAB, this.labWas, { spotK: 1, toughK: 1 });
+    F.heroGame = false; F.inLevel = false; Object.assign(LAB, this.labWas, { spotK: 1, toughK: 1, powerK: 1, energyK: 1, teamK: 1 });
     for (const e of R.evs) { if (!e.alive) continue; if (e.own) { e.alive = false; if (e.cleanup) { e.cleanup(); e.cleanup = null; } continue; } if (e.type === 'villains') { for (const w of e.who) if (!w.gone) { w.state = 'gone'; w.rig.root.visible = false; } } else endDisaster(e); } // what is left of the trouble goes with you
     if (R.score != null) lines.unshift('Score ' + Math.round(R.score)); const head = won ? (R.hero ? 'TOWN SAVED' : 'TOWN WRECKED') : (why || 'NOT THIS TIME');
     this.round = null; this.ended(won, '<b>' + head + '</b> · +' + xp + ' XP' + (up ? ' · <b>LEVEL UP!</b> A skill point to spend' : '') + '<br>Buildings down ' + S.buildings + ' · people scared ' + S.scared + ' · hurt ' + S.hurt + ' · saved ' + S.saved + ' · fear ' + Math.round(fear) + (lines.length ? '<br>' + lines.join('<br>') : ''));
