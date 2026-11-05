@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { sfx } from './audio.js';
 import { LAB } from './lab.js';
-import { loadKit, MELEES, STUNS } from './kit.js';
+import { loadKit, MELEES, STUNS, KNOCKS } from './kit.js';
 import { GuardFx, GUARD } from './guard.js';
 
 export const POWER = {
@@ -22,6 +22,7 @@ export const WEAK = {
 };
 const MELEE_ON = { kaiju: 2, worm: 2, riot: 2, aliens: 2, plant: 2, meteor: 1, tornado: 1, rift: 1, blackhole: 0.5 }, LASER_ON = { aliens: 3, kaiju: 2, worm: 2, rift: 2, plant: 2, meteor: 2, blackhole: 1, tornado: 1 };
 for (const t in WEAK) { WEAK[t].guardian = 0.5; WEAK[t].gust = WEAK[t].wind || 0.5; WEAK[t].kick = MELEE_ON[t] || 0.5; WEAK[t].ram = MELEE_ON[t] || 0.5; WEAK[t].laser = LASER_ON[t] || 0.5; for (const [n, q] of [['web', 'lightning'], ['flash', 'sonic'], ['sleep', 'gravity'], ['mud', 'gravity'], ['vine', 'tk'], ['stomp', 'sonic'], ['firejet', 'fire'], ['water', 'freeze'], ['boulder', 'kick'], ['car', 'kick']]) WEAK[t][n] = WEAK[t][q] || 0.5; }
+for (const [n, o] of [...Object.entries(STUNS), ...Object.entries(KNOCKS)]) { if (!POWER[n]) POWER[n] = { name: o.name, icon: o.icon, col: (o.fx && o.fx.col) || o.col || [1.6, 1.4, 1], snd: (o.fx && o.fx.snd) || (o.ar ? 'boom' : 'thud'), ring: 1 }; if (o.like) for (const t in WEAK) WEAK[t][n] = WEAK[t][o.like] || 0.5; }
 const NAME = { tornado: 'tornado', haboob: 'dust storm', flood: 'flood', tsunami: 'tsunami', quake: 'earthquake', sinkhole: 'sinkhole', volcano: 'volcano', meteor: 'meteor', blackhole: 'black hole', rift: 'rift', aliens: 'invasion', worm: 'giant worm', kaiju: 'kaiju', spill: 'outbreak', riot: 'riot', nuclear: 'nuclear attack', meltdown: 'meltdown', solar: 'solar storm', coldwave: 'cold wave', plant: 'killer plant' };
 const REACH = 320, WHOLE = { haboob: 1, flood: 1, tsunami: 1, solar: 1, coldwave: 1, meltdown: 1, aliens: 1 };
 const where = (e) => (e.tw ? e.tw : e.x != null ? e : null);
