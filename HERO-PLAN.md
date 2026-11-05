@@ -83,6 +83,7 @@ Build order (one thing at a time, each tested in the Sandbox and pushed). The ch
   - [x] The tornado as a villain (Sean, 2026-11-04): a face, a health bar, it chases you, throws cars; Lock on is a flying punch, double in its open mouth.
   - [x] Punchier melee (Sean, 2026-11-04): blocks and armour no longer stop a combo dead; a hit counter worth more as it grows; enders launch, tap follows them up, the third blow spikes them; a dash blow; each of the six with their own speed, weight, combo and signature move.
   - [ ] The same in the on-foot levels (horde.js has its own melee).
+  - [x] A test of a more detailed fighter (Sean, 2026-11-04): Tyrant only, compare at fighter.html. The other five wait on how it looks and runs on the phones.
   - [x] The tornado played with what it throws (Sean, 2026-11-04): no flying punch; PUNCH a throw back in time, GRAB one later still, spin it and throw it back harder, LASER held once a meter from near misses and hits back is full.
   - [x] The tsunami, dust storm and cold front as villains (Sean, 2026-11-04): the real towering storm with a ghostly face in it; punching tears real gaps, freezing then punching shatters a section; what is left is fought hand to hand. The tornado has the same ghost face.
   - [x] The flood as a villain (Sean, 2026-11-04): Captain Deluge with a fire hose, the water rising; punch sinkholes to drain it, high water makes him stronger.

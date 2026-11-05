@@ -9,6 +9,6 @@ export default defineConfig({
   build: {
     target: 'es2019',
     chunkSizeWarningLimit: 1200,
-    rollupOptions: { input: { main: resolve(__dirname, 'index.html'), showcase: resolve(__dirname, 'showcase.html'), creatures: resolve(__dirname, 'creatures.html'), poses: resolve(__dirname, 'poses.html') } },
+    rollupOptions: { input: { main: resolve(__dirname, 'index.html'), showcase: resolve(__dirname, 'showcase.html'), creatures: resolve(__dirname, 'creatures.html'), poses: resolve(__dirname, 'poses.html'), fighter: resolve(__dirname, 'fighter.html') } },
   },
 });
