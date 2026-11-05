@@ -134,8 +134,8 @@ class Hero {
     this.x = H.sig.sx + (Math.random() - 0.5) * 30; this.y = H.sig.sy + 20; this.z = H.sig.sz + (Math.random() - 0.5) * 30; this.vx = this.vy = this.vz = 0; this.hs = 0; this.yaw = 0; this.pitch = 0;
     this.side = 'hero'; this.busyT = 0;
     this.state = 'wait'; this.waitT = 2.5 + (o.delay || 0); this.job = null; this.cd = 0; this.gcd = 0; this.punchT = 0; this.castT = 0; this.carry = null;
-    this.rig = rig({ mats: { ...K, ...K.look[name], hair: K.hair[name] }, slim: o.slim, longHair: o.longHair, capeLen: 1.1 }); this.rig.root.visible = false; H.scene.add(this.rig.root);
-    if (o.wings) { // four insect wings at the shoulder blades
+    { const look = hdLook(name); this.rig = rig({ mats: { ...K, ...K.look[name], hair: K.hair[name] }, slim: look.f, capeLen: 1.1, hd: look }); } this.rig.root.visible = false; H.scene.add(this.rig.root);
+    if (o.wings && !this.rig.o.hd) { // four insect wings at the shoulder blades
       this.wings = [];
       for (const [sx, y, sweep] of [[1, 0.46, 0.25], [-1, 0.46, 0.25], [1, 0.38, 0.7], [-1, 0.38, 0.7]]) {
         const pv = new THREE.Group(); pv.position.set(sx * 0.06, y, -0.12); pv.scale.x = sx; pv.rotation.y = -sweep; this.rig.torso.add(pv);
@@ -453,7 +453,7 @@ class Hero {
 }
 
 // a hero on their own for the roster
-export function heroModel(name) { return heroRig(name).root; }
+export function heroModel(name) { return heroRig(name, undefined, true).root; }
 // the same, the rig itself to pose (flight.js: a hero the player flies); r.wings: Dragonfly's, to beat
 export function heroRig(name, of, hd = false) { // of: an outfit (herogame.js): colours and extras; hd: the detailed body it dresses
   const K = kit(), base = { ...K, ...K.look[name], hair: K.hair[name] }, ec = new THREE.Color(of && of.suit ? of.suit : '#000000');

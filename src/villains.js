@@ -9,7 +9,7 @@
 // they come down. In the Sandbox they run riot on their own; in Be The Disaster
 // you control one at a time.
 import { addHeadgear } from './headgear.js';
-import { hdSmooth, hdParts, hdCapeMat, hdLook } from './hdbody.js';
+import { hdSmooth, hdParts, hdCapeMat, hdLook, hdFar } from './hdbody.js';
 import * as THREE from 'three';
 import { Splash } from './water.js';
 import { ST } from './people.js';
@@ -23,7 +23,7 @@ import { fightPose } from './melee.js';
 import { clothMat } from './cloth.js';
 
 export const S = 0.92; // a villain or a hero stands the height of a person (Sean; it was 2.2, twice a person, to be picked out from above)
-const NEAR = 330; // closer than this to the camera, a figure has its smooth body
+const HD_NEAR = 60; /* the detailed body only this close, unless asked for always */ const NEAR = 330; // closer than this to the camera, a figure has its smooth body
 const G = 9.8, HANDS = 4.9; // gravity; hands raised overhead, metres above the feet
 const DRIVE = 0, REST = 2, EXT = 4, AIR = 5; // car modes (traffic.js)
 const now = () => performance.now();
@@ -101,7 +101,7 @@ class Cape {
 
 // a figure about 1.8 m tall (before scaling) facing +z, feet at the origin; every limb a pivot
 export function rig(o = {}) {
-  const m = kit(), mt = o.mats || m, root = new THREE.Group(), body = new THREE.Group(); root.add(body); body.scale.setScalar(S);
+  const m = kit(), mt = o.hd ? hdFar(o.hd, o.mats || m) : o.mats || m, root = new THREE.Group(), body = new THREE.Group(); root.add(body); body.scale.setScalar(S);
   const parts = [], part = (g, mat, sx, sy, sz, x, y, z, parent) => { const me = new THREE.Mesh(g, mat); me.scale.set(sx, sy, sz); me.position.set(x, y, z); me.castShadow = true; parent.add(me); parts.push(me); return me; };
   const pivot = (parent, x, y, z) => { const p = new THREE.Group(); p.position.set(x, y, z); parent.add(p); return p; };
   const hips = pivot(body, 0, 0.94, 0), xtra = o.extras || {};
@@ -179,7 +179,8 @@ function smoothBody(r) {
 // close up (or always, for the roster) the smooth body; further off the boxy figure, a few pixels tall, where the
 // extra detail would cost frames and show nothing. Call after the pose is set
 export function detail(r, D, always = false) {
-  const cam = D && D.ctx.camera, near = always || (cam && cam.position.distanceToSquared(r.root.position) < NEAR * NEAR);
+  const cam = D && D.ctx.camera, hd = r.o && r.o.hd, lim = hd ? HD_NEAR : NEAR, near = always || (cam && cam.position.distanceToSquared(r.root.position) < lim * lim);
+  if (hd) { if (near && !r.smooth) r.smooth = smoothBody(r); const on = !!near; if (on !== r.hdOn) { r.hdOn = on; if (r.smooth) r.smooth.mesh.visible = on; for (const p of r.parts) { if (p.userData.keep) { if (!p.userData.hdOff) p.visible = on; } else p.visible = !on; } } if (on) { r.root.updateMatrixWorld(true); sweepTubes(r.body, r.smooth.body); } return; }
   if (near && !r.smooth) r.smooth = smoothBody(r);
   if (!r.smooth) return;
   if (near !== !!r.smoothOn) { r.smoothOn = near; r.smooth.mesh.visible = near; for (const p of r.parts) if (!p.userData.keep) p.visible = !near; }
@@ -272,7 +273,7 @@ class Trail {
 class Villain {
   constructor(V, o) {
     this.V = V; this.D = V.D; this.x = o.x; this.z = o.z; this.y = o.y ?? 0; this.yaw = Math.random() * 6.28; this.t = Math.random() * 5; this.speed = 0; this.player = false; this.hp = 780 * LAB.villainHp(); this.hpMax = this.hp; this.trapped = 0; this.side = 'villain'; this.busyT = 0;
-    this.rig = rig({ ...(o.rig || {}), mats: vmats(o.name) }); V.scene.add(this.rig.root);
+    { const look = ['Blur', 'Tyrant', 'Weaver'].includes(o.name) ? hdLook(o.name) : null; this.rig = rig({ ...(o.rig || {}), mats: vmats(o.name), hd: look, slim: !!(look && look.f) }); } V.scene.add(this.rig.root);
     const mk = this.mask = new THREE.Group(), kk = kit(); if (!MASK) MASK = new THREE.MeshStandardMaterial({ color: '#3a3f47', roughness: 0.45, metalness: 0.6 }); // the breathing mask a hero can break (heroduel.js)
     const box = (sx, sy, sz, x, y, z) => { const b = new THREE.Mesh(kk.box, MASK); b.scale.set(sx, sy, sz); b.position.set(x, y, z); mk.add(b); };
     box(0.1, 0.07, 0.035, 0, -0.05, 0.11); box(0.03, 0.03, 0.05, -0.035, -0.055, 0.125); box(0.03, 0.03, 0.05, 0.035, -0.055, 0.125); box(0.2, 0.014, 0.02, 0, -0.03, 0.04); this.rig.head.add(mk);
@@ -316,13 +317,13 @@ class Villain {
 
 // a villain on its own for the roster: Blur and Tyrant hands on hips, Weaver crouched with his six arms out
 export function villainModel(name, of) { // of: an outfit (the roster's robot leader: Tyrant's frame in the ring's grey)
-  const r = of ? villainRig(name, of) : rig({ ...(name === 'Tyrant' ? { eyes: true } : name === 'Weaver' ? { arms: 6, capeLen: 1.05 } : {}), mats: vmats(name) }); relax(r);
+  const r = villainRig(name, of, true); relax(r);
   if (name === 'Weaver') {
     r.hips.position.y = 0.6; r.torso.rotation.x = 0.55; r.head.rotation.x = -0.5; r.legs[0].hip.rotation.set(-1.2, 0, -0.35); r.legs[1].hip.rotation.set(-1.2, 0, 0.35);
     for (const L of r.legs) L.knee.rotation.x = 2.0;
     for (const a of r.arms) { a.sh.rotation.set(-0.7 + a.row * 0.55, 0, a.sx * (0.95 + a.row * 0.2)); a.el.rotation.set(-1.0, 0, -a.sx * 0.3); }
   } else handsOnHips(r);
-  r.root.userData.tick = (dt) => r.cape.update(dt, 0.12, 0.35); r.cape.update(0.1, 0.12, 0.35); if (!of) detail(r, null, true);
+  r.root.userData.tick = (dt) => r.cape.update(dt, 0.12, 0.35); r.root.updateMatrixWorld(true); r.cape.update(0.1, 0.12, 0.35); r.cape.update(0.03, 0.12, 0.35); detail(r, null, true);
   return r.root;
 }
 

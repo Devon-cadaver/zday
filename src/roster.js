@@ -80,7 +80,7 @@ export function startRoster({ canvas, list, root }) {
   // ---------- heroes, villains and the rebuilding
   for (const n of ['Dragonfly', 'Nova', 'Tempo']) add('Super heroes', n, heroModel(n), 2.1);
   for (const n of ['Blur', 'Tyrant', 'Weaver']) add('Super villains', n, villainModel(n), 2.1);
-  add('Robots', 'The robot leader', villainModel('Tyrant', { suit: '#8f97a3', cape: '#3a3f47', dark: '#20242a' }), 2.1); // the rigs are person-sized since the rescale (villains.js S), so a figure's fit // the ring's robot (base.js); his army comes with the zombie types below
+  add('Robots', 'The robot leader', villainModel('Tyrant', { suit: '#8f97a3', cape: '#3a3f47', dark: '#20242a', face: 'robot', facea: '#a4acb8', faceb: '#3a4048', eyec: '#ff3a2a', back: 'none', chest: 'plate', sh: 'plate', belt: '#5a606a' }), 2.1); // the rigs are person-sized since the rescale (villains.js S), so a figure's fit // the ring's robot (base.js); his army comes with the zombie types below
   for (const s of Object.keys(STYLES)) add('Home bases', STYLES[s].name, baseBuilding({ style: s, wall: STYLES[s].side === 'hero' ? '#b9b1a0' : '#4a4f57', trim: STYLES[s].side === 'hero' ? '#e8dcc2' : '#2b2b2e', win: STYLES[s].side === 'hero' ? '#9fd4ff' : '#ff4a4a', door: '#8a1c2a' }, 0), 24);
   for (const girls of [false, true]) for (const [role, n] of [['vox', 'singer'], ['gtr', 'guitarist'], ['bass', 'bassist'], ['drums', 'drummer']]) add('The bands', (girls ? 'Goth ' : 'Punk ') + n, bandModel(role, girls), 3.6); // the punks; the Far Isles' girls
   add('Rebuilding', 'Construction site', siteModel(), 30);

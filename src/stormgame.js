@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { sfx } from './audio.js';
 import { LAB } from './lab.js';
 import { finish } from './heropower.js';
-import { villainRig } from './villains.js';
+import { villainRig, detail } from './villains.js';
 import { buildVehicle } from './vehicles.js';
 
 const KINDS = {
@@ -112,7 +112,7 @@ export class StormWar extends StormGame {
   newJob() {
     const F = this.F, g = F.g, P = g.people, S = this.D.ctx.scene, B = g.city.bounds, a = Math.random() * 6.283, r = Math.min(B.x1 - B.x0, B.z1 - B.z0) * (0.2 + Math.random() * 0.25), q = P.snapWalkable((B.x0 + B.x1) / 2 + Math.cos(a) * r, (B.z0 + B.z1) / 2 + Math.sin(a) * r, 60); if (!q) return;
     const s = { x: q[0], z: q[1], t: 0 }, gy = P.groundY(s.x, s.z), free = g.disasters.list.filter(e => e.alive && e.type === 'villains').flatMap(e => e.who).filter(w => !w.gone && !w.beaten && !w.gripped && !this.spots.some(o => o.who === w && !o.done && !o.lost));
-    if (free.length && Math.random() < 0.6) { const w = free[Math.floor(Math.random() * free.length)]; s.who = w; s.T = 16; w.gripped = true; w.rig.root.visible = false; const rig = villainRig(w.name); rig.root.position.set(s.x, gy + 5, s.z); S.add(rig.root); s.bus = rig.root; F.tip(w.name + ' ' + this.W.job + '! Lock on to stop them'); }
+    if (free.length && Math.random() < 0.6) { const w = free[Math.floor(Math.random() * free.length)]; s.who = w; s.T = 16; w.gripped = true; w.rig.root.visible = false; const rig = villainRig(w.name, undefined, true); rig.root.position.set(s.x, gy + 5, s.z); S.add(rig.root); rig.root.updateMatrixWorld(true); rig.cape.update(0.1, 0.2, 0.3); rig.cape.update(0.03, 0.2, 0.3); detail(rig, null, true); s.bus = rig.root; F.tip(w.name + ' ' + this.W.job + '! Lock on to stop them'); }
     else { s.T = 22; const v = buildVehicle(SQUADS[Math.floor(Math.random() * SQUADS.length)]); v.scale.setScalar(1.6); v.position.set(s.x, gy, s.z); v.rotation.y = Math.random() * 6.28; S.add(v); s.bus = v; F.tip('A rescue squad is at work! Stop them, or Lock on'); }
     s.m = new THREE.Mesh(this.geo, this.mat); s.m.frustumCulled = false; s.m.renderOrder = 6; s.m.position.set(s.x, gy, s.z); S.add(s.m); this.spots.push(s);
   }

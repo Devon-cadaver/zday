@@ -27,7 +27,7 @@ function monitors(K, x, y, z, cols, rows, sw, sh, ry = 0, kinds = ['news', 'map'
 // a figure of one of the team cut in stone, on a plinth
 function statue(K, room, name, x, z, ry) {
   K.box(1.5, 0.9, 1.5, x, 0.45, z, std('#6f6a66'), 0, true); K.box(1.7, 0.14, 1.7, x, 0.97, z, std('#8a8580'));
-  const r = rigFor(name, null, false), stone = std('#b5b0a8', { roughness: 0.95 }); r.root.traverse((m) => { if (m.isMesh) { m.material = stone; m.castShadow = true; } }); for (const a of r.arms) { a.sh.rotation.set(0.15, 0, a.sx * 0.75); a.el.rotation.set(-1.7, 0, 0); } r.root.position.set(x, 1.04, z); r.root.rotation.y = ry; r.root.scale.setScalar(1.15); detail(r, null, true); room.add(r.root);
+  const r = rigFor(name, null), stone = std('#b5b0a8', { roughness: 0.95, side: 2 }), toStone = () => r.root.traverse((m) => { if (m.isMesh) { m.material = stone; m.castShadow = true; } }); toStone(); for (const a of r.arms) { a.sh.rotation.set(0.15, 0, a.sx * 0.75); a.el.rotation.set(-1.7, 0, 0); } r.root.position.set(x, 1.04, z); r.root.rotation.y = ry; r.root.scale.setScalar(1.15); r.root.updateMatrixWorld(true); r.cape.update(0.1, 0.1, 0.1); r.cape.update(0.03, 0.1, 0.1); detail(r, null, true); toStone(); room.add(r.root);
 }
 function seated(room, name, x, z, ry, i) {
   const r = rigFor(name, HS.outfit(name)); r.root.position.set(x, -0.28, z); r.root.rotation.y = ry; for (const L of r.legs) { L.hip.rotation.x = -1.5; L.knee.rotation.x = 1.5; } r.arms.forEach((a, k) => { a.sh.rotation.set(-1.15 + (k + i) % 2 * 0.2, 0, a.sx * 0.12); a.el.rotation.set(-0.5, 0, 0); }); if (r.cape) r.cape.update(0.05, 0.05, 0.1); detail(r, null, true); room.add(r.root); return r;
