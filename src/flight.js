@@ -719,7 +719,7 @@ export class Flight {
     if (this.state !== 'fly' || this.riding || this.bucked || this.ring) return;
     this.lockHint = false; if (this.goBase) this.baseStop();
     if (!v && this.live && this.live.wall) { this.live.charge(); return; }
-    { const SG = this.lock ? null : this.stormFor(); if (SG && SG.lockOn() !== false) return; } if (!v && this.storyTornado()) { if (this.live) this.live.charge(); return; }
+    { const SG = this.lock ? null : this.stormFor(); if (SG && SG.lockOn() !== false) return; } if (!v && this.storyTornado()) { if (this.live) this.live.parry(); return; }
     if (this.lock && !again) { this.lock = null; this.tip('Lock let go: flying free'); return; }
     if (this.fromBase) { this.tip('Nothing to lock on in the base; Land to come down'); return; }
     if (this.fromHorde && this.fromHorde.o.boss && !v) { const e = this.fromHorde.o.boss; if (e.type === 'worm' || e.type === 'kaiju') { this.bossClose = false; this.lock = { worm: e, name: 'it', get x() { return e.x; }, get z() { return e.z; }, get y() { return e.type === 'kaiju' ? 44 : Math.max(e.y, 6); }, get gone() { return !e.alive; } }; this.tip('Locked on! Straight at it'); sfx('whoosh', this.pos.x, this.pos.y, this.pos.z, { gain: 0.9 }); return; } this.lock = { zombie: -1, name: 'it', get x() { return e.x; }, get z() { return e.z; }, y: 0, get gone() { return !e.alive; } }; this.tip('Locked on! Straight at it, down to fight; or SMASH LAND'); sfx('whoosh', this.pos.x, this.pos.y, this.pos.z, { gain: 0.9 }); return; }
