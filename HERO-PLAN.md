@@ -77,7 +77,8 @@ Build order (one thing at a time, each tested in the Sandbox and pushed). The ch
     - [x] New powers, the first 5 of each list: stuns Shock web, Blinding flash, Sleep dust, Mud trap, Vine snare; knockbacks Shockwave stomp, Fire jet, Water cannon, Boulder throw, Car toss; melee Boxer, Kung fu, Wrestler, Muay Thai, Capoeira.
     - [x] The other 45 of Sean's 60 (Sean, 2026-11-04).
   - [x] 18 more finishers, 20 to choose from, two held at a time; foes use theirs on you (Sean, 2026-11-04).
-  - [ ] The tsunami, dust storm and cold front fights changed: Sean is deciding (options: tornado controls plus a twist each, the plain tornado fight in three looks, one shared push-it-back fight).
+  - [x] The tsunami, dust storm and cold front on the tornado's controls, a twist each: the wave pushed back and held with your hands, the dust half blind with devils to hurl, the cold front's beam duel (Sean, 2026-11-04).
+  - [x] A villain behind each disaster, fought after it, each throwing their own: Twister (mini tornados), Riptide, the Dust Devil, Jack Frost; the worm's Burrower and the kaiju's Beast Keeper (Sean, 2026-11-04).
   - [x] TEAM in flight and in the storm fights: the team's icons are the buttons (Sean, 2026-11-04).
   - [x] Each fighter has their own powers, a main and alternates, a scroll wheel for each type with picks opening by level, Guardian Shield, TEAM calling either alternate (Sean, 2026-11-04).
   - [x] Neck drag rebuilt (Sean, 2026-11-03): a hand locked on the neck by IK, the other fist punching on a beat or a tap, flying in a V with the ground torn up on the dips; for the foe too.

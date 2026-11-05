@@ -13,6 +13,7 @@ import { sfx } from './audio.js';
 import { placeKey, travel } from './places.js';
 import { loadKit, finBtns, FINISHERS, STUNS, KNOCKS, MELEES, fightPace } from './kit.js';
 import { FIN_SCRIPTS, FinRun, boomFx } from './finishers.js';
+import { foeShot } from './foepower.js';
 import { GuardFx, GUARD as SHIELD } from './guard.js';
 import { stunLook, ShotList, runShot, addProp, meleeFx } from './powerfx.js';
 import { STUN_POSE, MELEE_ATK, MELEE_MOVES, FIN_POSE } from './fightclips.js';
@@ -128,7 +129,7 @@ export const MOVES = [
   ...Object.entries(FIN_POSE).map(([id, clip]) => mv('FP.' + id, 'Finisher: ' + id, 'Finishers', clip)), ...Object.entries(STUN_POSE).map(([id, clip]) => mv('SP.' + id, 'Stunned: ' + id, 'Getting hit', clip)),
 ];
 applyPoses(MOVES, new Set(Object.values(ATK)));
-const CAN_TARGET = ['idle', 'close', 'wind', 'strike', 'rush', 'stumble', 'stun', 'block', 'frozen'];
+const CAN_TARGET = ['vcast', 'idle', 'close', 'wind', 'strike', 'rush', 'stumble', 'stun', 'block', 'frozen'];
 const A0 = 0.95, A1 = Math.PI * 2 - 0.95, SMASH_DMG = [12, 14, 16]; // the swing's ends: their head on the ground in front, then behind
 const AZ0 = Math.atan2(0.6, 0.8), G = 24, ARENA = 40, TAP_MS = 220, SWIPE_PX = 26, COMBO_T = 0.7, DASH_COST = 12, FOE_TURN = 4.5, SIG_AT = 8, DRAG_CAM = 36, AIR_H = 14, AIR_R = 22, AIR_RUN = 11, HURL_COST = 30, RUN = 7.5; // DRAG_CAM: how far back the neck drag is seen from, against 23 in the fight // RUN: the joystick, a little over the foe's 6.5, so you can make room
 export const CSS = `
@@ -262,7 +263,7 @@ export class FightTest {
     this.strip = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2).translate(0, 0, 0.5), new THREE.MeshBasicMaterial({ color: new THREE.Color(1.6, 0.25, 0.1), transparent: true, opacity: 0, depthWrite: false, fog: false })); this.strip.renderOrder = 3; S.add(this.strip);
     if (o.ring) { this.boxes = []; this.scars = []; this.scarGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2); this.scarMat = new THREE.MeshStandardMaterial({ color: '#6b6250', roughness: 1 }); } else this.buildBoxes(); this.fx = []; this.ray = new THREE.CylinderGeometry(1, 1, 1, 8, 1, true).translate(0, 0.5, 0);
     this.heroStreak = new Streak(S, [1.6, 0.5, 1.4]); this.vilStreak = new Streak(S, [1.3, 0.3, 1.6]);
-    this.guard = new GuardFx(S); this.fxa = new ShotList(S); this.css(); this.ui(); this.restart();
+    this.foePow = (o.foe && o.foe.power) || null; this.powT = 1.5; this.guard = new GuardFx(S); this.fxa = new ShotList(S); this.css(); this.ui(); this.restart();
     if (o.street) { for (const f of [this.h, this.v]) { const q = g.people.snapWalkable(f.x, f.z, 12); if (q) { f.x = q[0]; f.z = q[1]; } f.px = f.x; f.pz = f.z; } this.el.querySelector('.acts').style.display = 'none'; } if (o.hp != null) this.h.hp = o.hp; if (o.foe) this.v.hp = o.foe.hp;
     camera.fov = innerWidth < innerHeight ? 28 : 18; camera.up.set(0, 1, 0); camera.updateProjectionMatrix(); this.place(1); camera.position.copy(this.camTo);
   }
@@ -552,8 +553,8 @@ export class FightTest {
   tellOff() { this.tell.material.opacity = 0; this.strip.material.opacity = 0; }
   // ---------- Tyrant
   vilStep(dt) {
-    const h = this.h, v = this.v; v.t += dt; v.walkK *= Math.exp(-dt * 10); const d = this.dist();
-    if (v.hp <= 0 && !this.fin && ['idle', 'close', 'wind', 'strike', 'rush', 'block', 'stumble', 'stun', 'pushed', 'hold'].includes(v.state)) { this.daze(); return; }
+    const h = this.h, v = this.v; v.t += dt; v.walkK *= Math.exp(-dt * 10); const d = this.dist(); if (this.powT > 0) this.powT -= dt;
+    if (v.hp <= 0 && !this.fin && ['vcast', 'idle', 'close', 'wind', 'strike', 'rush', 'block', 'stumble', 'stun', 'pushed', 'hold'].includes(v.state)) { this.daze(); return; }
     if (this.hDazed && !this.vfKind && !this.over && ['idle', 'close', 'wind', 'strike', 'rush', 'block', 'stumble', 'stun', 'pushed', 'hold', 'frozen'].includes(v.state)) { if (v.state === 'frozen') this.shatter(); this.vfStart(); return; }
     switch (v.state) {
       case 'vfin': { this.face(v, h, dt, 12); if (h.state !== 'dazed') break; if (d > 1.7) { this.walk(v, h.x, h.z, 8, dt); break; } if (FIN_SCRIPTS[this.vfKind]) { this.finGo(this.vfKind, v, h); break; } if (this.vfKind === 'neck') this.vfNeck(); else { this.vfStage = 'charge'; v.go('vcharge', C.chargeWind); } break; }
@@ -563,6 +564,7 @@ export class FightTest {
       case 'vrise': { const k = Math.min(1, v.t / 0.35); v.x = h.x; v.z = h.z; v.y = v.y0 + (h.y + 1.34 - v.y0) * (1 - (1 - k) * (1 - k)); if (k >= 1) { v.go('vgrab', CLIPS.hammerUp); } break; }
       case 'vgrab': v.x = h.x; v.z = h.z; v.y = h.y + 1.34 - 0.7 * Math.min(1, v.t / 0.6); if (v.t > 0.7) { this.vfStage = 'dive'; this.finSlow = 0.3; v.go('vdive', CLIPS.hammerDown); h.go('vdived', CLIPS.crushed); this.spark(h.x, h.y + 0.84, h.z, 2.5, [2.2, 0.6, 0.6]); } break;
       case 'vdive': v.y -= 60 * dt; h.x = v.x; h.z = v.z; h.y = v.y - 2.8; h.yaw = v.yaw; if (h.y <= this.top) this.vfHit(); break;
+      case 'vcast': this.face(v, h, dt, 6); if (v.t > 0.4) v.go('idle', C.guard); break;
       case 'vdone': this.face(v, h, dt, 4); if (v.y > this.top) v.y = Math.max(this.top, v.y - 30 * dt); break;
       case 'dazed': this.face(v, h, dt, 2); v.walkK = 0; break;
       case 'hang': v.vy = 0; v.y += Math.sin(v.t * 3) * dt * 0.4; break;
@@ -571,14 +573,14 @@ export class FightTest {
         if (this.over) { this.face(v, h, dt, 4); break; } this.slide(v, dt); this.face(v, h, dt, 6); v.armor = false; if (v.clip !== C.guard) v.play(C.guard); if (!['idle', 'attack', 'lunge', 'dodge', 'charge', 'land'].includes(h.state)) { this.cool = Math.max(this.cool, 0.4); }
         // round the hero, or in closer
         const r = 3.4, a = Math.atan2(v.z - h.z, v.x - h.x) + this.dirC * 0.5, tx = d > r + 2 ? h.x : h.x + Math.cos(a) * r, tz = d > r + 2 ? h.z : h.z + Math.sin(a) * r; this.walk(v, tx, tz, d > r + 2 ? 6 : 3.2, dt);
-        if (((this.cool -= dt * (0.8 + 1.5 * this.kAI)) <= 0 && this.gap <= 0) || (this.sinceAtk || 0) >= FOE_TURN) { const q = Math.random(); this.dirC = Math.random() < 0.5 ? 1 : -1; if (d > 4.6) { if (q < 0.3) this.vilAtk('charge'); else v.go('close'); } else if (d < 2.8) this.closePick(); else if (q < 0.3) this.vilAtk('charge'); else { v.go('close'); } }
+        if (((this.cool -= dt * (0.8 + 1.5 * this.kAI)) <= 0 && this.gap <= 0) || (this.sinceAtk || 0) >= FOE_TURN) { const q = Math.random(); this.dirC = Math.random() < 0.5 ? 1 : -1; if (this.foePow && this.powT <= 0 && (d > 3 || q < 0.35)) { this.powT = 3 + Math.random() * 2.2; this.vilAtk('shot'); break; } if (d > 4.6) { if (q < 0.3) this.vilAtk('charge'); else v.go('close'); } else if (d < 2.8) this.closePick(); else if (q < 0.3) this.vilAtk('charge'); else { v.go('close'); } }
         break;
       }
       case 'close': this.face(v, h, dt, 8); this.walk(v, h.x, h.z, 6.5, dt); if (d < 2.3) this.closePick(); else if (v.t > 2.2) { v.go('idle'); this.cool = 0.4; } break;
       case 'wind': {
         this.face(v, h, dt, v.kind === 'charge' && v.T - v.t < 0.3 ? 0 : 9); const u = Math.min(1, v.t / v.T);
-        if (v.kind === 'charge') { const fx = Math.sin(v.yaw), fz = Math.cos(v.yaw); this.strip.position.set(v.x, this.top + 0.06, v.z); this.strip.rotation.y = v.yaw; this.strip.scale.set(2, 1, 14); this.strip.material.opacity = 0.15 + 0.45 * u; } else { const R = v.kind === 'grab' ? 2.1 : v.kind === 'slam' ? 3.8 : 2.4, off = v.kind === 'slam' ? 0 : 1.1; this.tell.position.set(v.x + Math.sin(v.yaw) * off, this.top + 0.06, v.z + Math.cos(v.yaw) * off); this.tell.scale.setScalar(R * u + 0.4); this.tell.material.opacity = 0.15 + 0.4 * u; }
-        if (v.t >= v.T) { this.tellOff(); if (v.kind === 'charge') { v.go('rush', C.rush); v.fx = Math.sin(v.yaw); v.fz = Math.cos(v.yaw); v.ran = 0; sfx('whoosh', v.x, v.y, v.z, { gain: 1.2, rate: 0.7 }); } else if (v.kind === 'laser') { this.vLaser(); v.go('idle', C.guard); this.cool = 1.2 + Math.random(); } else if (v.kind === 'shove') { v.go('strike', FOE_JAB); this.vl = false; v.vx = Math.sin(v.yaw) * 10; v.vz = Math.cos(v.yaw) * 10; } else if (v.kind === 'slam') { v.go('strike', CLIPS.hammerDown); this.vl = false; } else if (v.kind === 'jab') { v.go('strike', FOE_JAB); this.vl = false; v.vx = Math.sin(v.yaw) * 7; v.vz = Math.cos(v.yaw) * 7; } else { v.go('strike', C.grab); this.vl = false; v.vx = Math.sin(v.yaw) * 13; v.vz = Math.cos(v.yaw) * 13; } }
+        if (v.kind === 'charge') { const fx = Math.sin(v.yaw), fz = Math.cos(v.yaw); this.strip.position.set(v.x, this.top + 0.06, v.z); this.strip.rotation.y = v.yaw; this.strip.scale.set(2, 1, 14); this.strip.material.opacity = 0.15 + 0.45 * u; } else if (v.kind !== 'shot') { const R = v.kind === 'grab' ? 2.1 : v.kind === 'slam' ? 3.8 : 2.4, off = v.kind === 'slam' ? 0 : 1.1; this.tell.position.set(v.x + Math.sin(v.yaw) * off, this.top + 0.06, v.z + Math.cos(v.yaw) * off); this.tell.scale.setScalar(R * u + 0.4); this.tell.material.opacity = 0.15 + 0.4 * u; }
+        if (v.t >= v.T) { this.tellOff(); if (v.kind === 'charge') { v.go('rush', C.rush); v.fx = Math.sin(v.yaw); v.fz = Math.cos(v.yaw); v.ran = 0; sfx('whoosh', v.x, v.y, v.z, { gain: 1.2, rate: 0.7 }); } else if (v.kind === 'shot') { v.go('vcast', C.cast); foeShot(this, this.foePow); this.cool = 0.8 + Math.random(); } else if (v.kind === 'laser') { this.vLaser(); v.go('idle', C.guard); this.cool = 1.2 + Math.random(); } else if (v.kind === 'shove') { v.go('strike', FOE_JAB); this.vl = false; v.vx = Math.sin(v.yaw) * 10; v.vz = Math.cos(v.yaw) * 10; } else if (v.kind === 'slam') { v.go('strike', CLIPS.hammerDown); this.vl = false; } else if (v.kind === 'jab') { v.go('strike', FOE_JAB); this.vl = false; v.vx = Math.sin(v.yaw) * 7; v.vz = Math.cos(v.yaw) * 7; } else { v.go('strike', C.grab); this.vl = false; v.vx = Math.sin(v.yaw) * 13; v.vz = Math.cos(v.yaw) * 13; } }
         break;
       }
       case 'strike': this.slide(v, dt, 6); if (!this.vl && v.t >= (v.kind === 'grab' ? 0.2 : v.kind === 'slam' ? 0.26 : 0.09)) { this.vl = true; if (v.kind === 'shove' || v.kind === 'slam') { const R0 = v.kind === 'slam' ? 3.8 : 2.6, n0 = (v.kind === 'slam' ? 15 : 13) * (this.dmgK || 1); if (v.kind === 'slam') { this.puff(v, 1); this.g.shake = Math.max(this.g.shake || 0, 0.7); } else sfx('thud', v.x, v.y + 1, v.z, { gain: 1, rate: 0.7 }); if (d < R0 && this.canHit()) { if (h.state === 'block') this.blocked(n0, 20); else { const dd = d || 1; this.fling(n0, (h.x - v.x) / dd, (h.z - v.z) / dd, 'KNOCKED BACK!'); } } } else if (v.kind === 'jab') { if (d < 2.1 && this.canHit()) { this.hitHero(8, 7); } } else if (d < 1.9 && this.canHit()) { h.go('grabbed', C.held); h.yaw = Math.atan2(v.x - h.x, v.z - h.z); v.go('hold', C.hold); this.mash = 0; this.hurtH(4, 'TAP TAP TAP!'); this.say('TAP TAP TAP!', 1.2, '#ff8a7a'); return; } } if (v.t > (v.kind === 'grab' ? 0.7 : 0.42)) { v.go('idle', C.guard); this.cool = 0.5 + Math.random() * 0.9; } break;
