@@ -80,7 +80,7 @@ Build order (one thing at a time, each tested in the Sandbox and pushed). The ch
   - [x] The tsunami, dust storm and cold front on the tornado's controls, a twist each: the wave pushed back and held with your hands, the dust half blind with devils to hurl, the cold front's beam duel (Sean, 2026-11-04).
   - [x] A villain behind each disaster, fought after it, each throwing their own: Twister (mini tornados), Riptide, the Dust Devil, Jack Frost; the worm's Burrower and the kaiju's Beast Keeper (Sean, 2026-11-04).
   - [x] TEAM in flight and in the storm fights: the team's icons are the buttons (Sean, 2026-11-04).
-  - [ ] Drawn strokes in combos instead of mashing (Sean, 2026-11-05). First test: a check mark for an uppercut, robot fight only. If it feels good: more shapes, for powers too.
+  - [ ] Drawn strokes in combos instead of mashing (Sean, 2026-11-05). First test: a check mark for an uppercut, robot fight only: Sean loves it. Second test: the right of the screen with no box, five shapes for the slots, two ways of timing a dash. Then: all fights, if it holds up.
   - [x] Each fighter has their own powers, a main and alternates, a scroll wheel for each type with picks opening by level, Guardian Shield, TEAM calling either alternate (Sean, 2026-11-04).
   - [x] Neck drag rebuilt (Sean, 2026-11-03): a hand locked on the neck by IK, the other fist punching on a beat or a tap, flying in a V with the ground torn up on the dips; for the foe too.
   - [x] Pose Lab (Sean's idea, 2026-11-03): both fighters on a stage, step through a move frame by frame, drag limbs, set timing, pin a hand; saved on the device, export to make it permanent. poses.html, the Poses button on the menu.
