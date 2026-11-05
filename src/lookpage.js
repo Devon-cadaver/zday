@@ -1,7 +1,8 @@
 // The look test (fighter.html): the old Tyrant and the detailed one side by side, doing real moves, with the frame rate on show. Its own page, nothing else loaded.
 import * as THREE from 'three';
 import { MOVES } from './fighttest.js';
-import { villainRig, relax, detail, handsOnHips } from './villains.js';
+import { villainRig, relax, detail } from './villains.js';
+import { heroRig } from './heroes.js';
 import { playClip } from './clips.js';
 
 const $ = (id) => document.getElementById(id), gl = $('gl');
@@ -9,7 +10,7 @@ const renderer = new THREE.WebGLRenderer({ canvas: gl, antialias: true }); rende
 const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
 const hemi = new THREE.HemisphereLight('#ffffff', '#4a4336', 1), sun = new THREE.DirectionalLight('#ffffff', 1), rim = new THREE.DirectionalLight('#ffffff', 1); sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024); Object.assign(sun.shadow.camera, { left: -3, right: 3, top: 3, bottom: -3 }); sun.position.set(2, 5, 4); rim.position.set(-3, 3, -4); scene.add(hemi, sun, rim);
 const floor = new THREE.Mesh(new THREE.CircleGeometry(9, 48).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#3a3d46', roughness: 0.95 })); floor.receiveShadow = true; scene.add(floor);
-const oldR = villainRig('Tyrant', {}), newR = villainRig('Tyrant'); scene.add(oldR.root, newR.root); const FIG = [oldR, newR];
+let oldR = null, newR = null; const FIG = []; function cast(w, of) { for (const r of FIG) scene.remove(r.root); const Tv = w === 'Tyrant'; oldR = Tv ? villainRig('Tyrant', {}) : heroRig('Nova', {}); newR = Tv ? villainRig('Tyrant', of, true) : heroRig('Nova', of, true); scene.add(oldR.root, newR.root); FIG.length = 0; FIG.push(oldR, newR); } cast('Tyrant');
 const LIGHT = { Night: { bg: '#141a33', hemi: ['#8ea2e0', '#191624', 1.15], sun: ['#ccd8ff', 2.0], rim: ['#b9c8ff', 3.2], floor: '#23263a' }, Day: { bg: '#b8c8d8', hemi: ['#ffffff', '#6a6250', 1.6], sun: ['#fff2dd', 2.4], rim: ['#ffffff', 0.8], floor: '#8a8678' } };
 const S = { show: 'both', view: 'full', yaw: 0.25, pitch: 0.06, move: null, t: 0, light: 'Night' };
 function setLight() { const L = LIGHT[S.light]; scene.background = new THREE.Color(L.bg); hemi.color.set(L.hemi[0]); hemi.groundColor.set(L.hemi[1]); hemi.intensity = L.hemi[2]; sun.color.set(L.sun[0]); sun.intensity = L.sun[1]; rim.color.set(L.rim[0]); rim.intensity = L.rim[1]; floor.material.color.set(L.floor); }
@@ -24,7 +25,7 @@ const bar = (id, items, get, set) => { const el = $(id); el.innerHTML = items.ma
 bar('bShow', [['both', 'Both'], ['old', 'Old'], ['new', 'New']], () => S.show, (k) => { S.show = k; });
 bar('bView', [['full', 'Whole'], ['close', 'Close'], ['face', 'Face']], () => S.view, (k) => { S.view = k; });
 bar('bMove', LIST.map((q) => [q[0], q[0]]), () => S.moveName || 'Stand', (k) => { S.moveName = k; const q = LIST.find((x) => x[0] === k); S.move = q && q[1]; S.t = 0; });
-bar('bLight', [['Night', 'Night'], ['Day', 'Day']], () => S.light, (k) => { S.light = k; setLight(); });
+bar('bLight', [['Night', 'Night'], ['Day', 'Day'], ['Tyrant', 'Tyrant'], ['Nova', 'Nova']], () => null, (k) => { if (k === 'Tyrant' || k === 'Nova') cast(k); else { S.light = k; setLight(); } }); window.__lookDress = (n, of) => { cast(n, of); place(); };
 { let down = null; gl.addEventListener('pointerdown', (e) => { down = [e.clientX, e.clientY, S.yaw, S.pitch]; gl.setPointerCapture(e.pointerId); }); gl.addEventListener('pointermove', (e) => { if (!down) return; S.yaw = down[2] - (e.clientX - down[0]) * 0.012; S.pitch = Math.max(-0.2, Math.min(0.7, down[3] + (e.clientY - down[1]) * 0.006)); place(); }); for (const n of ['pointerup', 'pointercancel']) gl.addEventListener(n, () => { down = null; }); }
 function pose(r, dt) {
   relax(r);

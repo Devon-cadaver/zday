@@ -11,6 +11,7 @@
 // broken up and its pieces go up too. In a flood or a tsunami they pull people
 // out of the water two at a time and fly them up onto a roof clear of it, and
 // Tempo holds back the incoming wave with his bubbles.
+import { hdLook } from './hdbody.js';
 import { addHeadgear } from './headgear.js';
 import * as THREE from 'three';
 import { clothMat } from './cloth.js';
@@ -454,18 +455,18 @@ class Hero {
 // a hero on their own for the roster
 export function heroModel(name) { return heroRig(name).root; }
 // the same, the rig itself to pose (flight.js: a hero the player flies); r.wings: Dragonfly's, to beat
-export function heroRig(name, of) { // of: an outfit (herogame.js): colours and extras
+export function heroRig(name, of, hd = false) { // of: an outfit (herogame.js): colours and extras; hd: the detailed body it dresses
   const K = kit(), base = { ...K, ...K.look[name], hair: K.hair[name] }, ec = new THREE.Color(of && of.suit ? of.suit : '#000000');
   if (of) { if (of.belt) base.belt = new THREE.MeshStandardMaterial({ color: of.belt, metalness: 0.4, roughness: 0.45 }); if (of.suit) base.suit = clothMat(of.suit, { emissive: ec, emissiveIntensity: 0.22 }); if (of.cape) base.cape = clothMat(of.cape, { side: THREE.DoubleSide, repeat: [5, 9] }); if (of.dark) { base.boot = clothMat(of.dark, { bumpScale: 0.15 }); base.glove = clothMat(of.dark, { bumpScale: 0.15 }); } }
-  const r = rig({ mats: base, slim: name === 'Nova', longHair: name === 'Nova', capeLen: 1.1, extras: of || {} }); relax(r); handsOnHips(r); addHeadgear(r, of);
+  const look = hd ? hdLook(name, of) : null, r = rig({ mats: base, slim: look ? look.f : name === 'Nova', longHair: !look && name === 'Nova', capeLen: 1.1, extras: of || {}, hd: look }); relax(r); handsOnHips(r); addHeadgear(r, of);
   const wings = [];
-  if (name === 'Dragonfly') for (const [sx, y, sweep] of [[1, 0.46, 0.25], [-1, 0.46, 0.25], [1, 0.38, 0.7], [-1, 0.38, 0.7]]) {
+  if (name === 'Dragonfly' && !look) for (const [sx, y, sweep] of [[1, 0.46, 0.25], [-1, 0.46, 0.25], [1, 0.38, 0.7], [-1, 0.38, 0.7]]) {
     const pv = new THREE.Group(); pv.position.set(sx * 0.06, y, -0.12); pv.scale.x = sx; pv.rotation.y = -sweep; r.torso.add(pv);
     const w = new THREE.Mesh(K.wingGeo, K.wing); w.scale.setScalar(0.85); pv.add(w); wings.push(pv);
   }
-  if (name === 'Tempo') for (const a of r.arms) { const g = new THREE.Mesh(K.sphere, K.glow); g.scale.setScalar(0.07); g.position.y = -0.3; a.el.add(g); }
+  if (name === 'Tempo' && !look) for (const a of r.arms) { const g = new THREE.Mesh(K.sphere, K.glow); g.scale.setScalar(0.07); g.position.y = -0.3; a.el.add(g); }
   let t = 0; r.root.userData.tick = (dt) => { t += dt; r.cape.update(dt, 0.12, 0.35); wings.forEach((w, i) => { w.rotation.z = Math.sin(t * 40 + i * 1.3) * 0.4 + 0.15; }); }; r.cape.update(0.1, 0.12, 0.35); detail(r, null, true);
-  r.wings = wings; return r;
+  r.wings = look ? (r.insect || []) : wings; return r;
 }
 
 export class Heroes {

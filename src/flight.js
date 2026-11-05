@@ -83,7 +83,7 @@ function stuntModel() {
 }
 // any of the others: the airstrikes' own models, sized up
 function planeModel(kind, P) {
-  if (P.hero) { const g = new THREE.Group(), r = P.rigV ? villainRig(P.hero, HS.outfit(P.hero)) : heroRig(P.hero, HS.outfit(P.hero)); r.root.rotation.y = Math.PI / 2; g.add(r.root); g.userData.hero = r; return g; } // a hero lying along +x, posed each frame (heroPose)
+  if (P.hero) { const g = new THREE.Group(), r = P.rigV ? villainRig(P.hero, HS.outfit(P.hero), true) : heroRig(P.hero, HS.outfit(P.hero), true); r.root.rotation.y = Math.PI / 2; g.add(r.root); g.userData.hero = r; return g; } // a hero lying along +x, posed each frame (heroPose)
   if (kind === 'stunt') return stuntModel();
   if (kind === 'jet') return jetModel();
   const g = new THREE.Group(), m = buildVehicle(P.model); m.scale.setScalar(P.scale); g.add(m); return g;

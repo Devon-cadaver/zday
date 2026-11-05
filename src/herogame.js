@@ -47,7 +47,7 @@ export const HS = {
   curName(side) { return ROSTER[this.cur(side)][0]; },
 };
 // a character's body, whichever side they stand on now
-export const rigFor = (name, of) => (['Nova', 'Dragonfly', 'Tempo'].includes(name) ? heroRig(name, of) : villainRig(name, of));
+export const rigFor = (name, of, hd = true) => (['Nova', 'Dragonfly', 'Tempo'].includes(name) ? heroRig(name, of, hd) : villainRig(name, of, hd));
 if (typeof window !== 'undefined') window.__hs = HS;
 export const levelOf = (xp) => Math.min(20, 1 + Math.floor((Math.sqrt(1 + xp / 50) - 1) / 2)); // 1 at 0, then 400, 1200, 2400... XP
 export const xpFor = (lv) => 50 * ((2 * (lv - 1) + 1) ** 2 - 1);

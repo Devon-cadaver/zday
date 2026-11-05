@@ -24,7 +24,7 @@ const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 200);
 scene.add(new THREE.HemisphereLight('#dfe8ff', '#4a4336', 2.1)); const sun = new THREE.DirectionalLight('#fff2dd', 2.2); sun.position.set(3, 7, 4); scene.add(sun);
 const floor = new THREE.Mesh(new THREE.CircleGeometry(9, 48).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#39405f', roughness: 1 })); floor.position.y = -0.01; scene.add(floor);
 const grid = new THREE.GridHelper(12, 12, '#6f78a8', '#505880'); scene.add(grid);
-const A = new Body(rigFor('Nova', HS.outfit('Nova')), 100), B = new Body(villainRig('Tyrant'), 100); A.foe = B; B.foe = A; scene.add(A.r.root, B.r.root); const FIGHTERS = [A, B];
+const A = new Body(rigFor('Nova', HS.outfit('Nova')), 100), B = new Body(villainRig('Tyrant', undefined, true), 100); A.foe = B; B.foe = A; scene.add(A.r.root, B.r.root); const FIGHTERS = [A, B];
 const orbit = { yaw: 0.95, pitch: 0.2, dist: 6.2, x: 0, y: 1.05, z: 0.7 };
 function placeCamera() { const c = Math.cos(orbit.pitch); camera.position.set(orbit.x + Math.sin(orbit.yaw) * c * orbit.dist, orbit.y + Math.sin(orbit.pitch) * orbit.dist, orbit.z + Math.cos(orbit.yaw) * c * orbit.dist); camera.lookAt(orbit.x, orbit.y, orbit.z); camera.updateMatrixWorld(true); }
 let W = 1, H = 1;

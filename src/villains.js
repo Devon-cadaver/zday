@@ -9,7 +9,7 @@
 // they come down. In the Sandbox they run riot on their own; in Be The Disaster
 // you control one at a time.
 import { addHeadgear } from './headgear.js';
-import { hdSmooth, hdParts, hdCapeMat } from './hdbody.js';
+import { hdSmooth, hdParts, hdCapeMat, hdLook } from './hdbody.js';
 import * as THREE from 'three';
 import { Splash } from './water.js';
 import { ST } from './people.js';
@@ -74,19 +74,20 @@ function dropShell(scene, shell) { scene.remove(shell); shell.traverse((m) => { 
 // a cape: cloth hung from the shoulders that streams out behind with speed and ripples
 class Cape {
   constructor(parent, len, mat, hd) {
-    this.hd = hd; this.C = hd ? 11 : 5; this.R = hd ? 15 : 9; this.len = len; this.lift = 0; this.t = Math.random() * 10;
+    this.hd = hd; this.hooks = []; this.wk = hd && hd.f ? 0.8 : 1; this.C = hd ? 11 : 5; this.R = hd ? 15 : 9; this.len = len; this.lift = 0; this.t = Math.random() * 10;
     this.g = new THREE.PlaneGeometry(1, 1, this.C - 1, this.R - 1); // its vertices are laid out again every frame
     this.mesh = new THREE.Mesh(this.g, mat || kit().cape); this.mesh.castShadow = true; this.mesh.frustumCulled = false; parent.add(this.mesh);
   }
   // lift: 0 hangs straight down, 1 streams straight back; flap: how hard it ripples
   update(dt, lift, flap) {
+    for (const h of this.hooks) h(dt, lift, flap); // what moves with the cape: hair, wings, a jet's flame (hdbody.js)
     this.t += dt; this.lift += (lift - this.lift) * Math.min(1, dt * 4);
     const p = this.g.attributes.position, C = this.C, R = this.R, seg = this.len / (R - 1), hd = this.hd;
     for (let c = 0; c < C; c++) {
       const u = c / (C - 1) - 0.5;
       let y = hd ? 0.56 : 0.55, z = hd ? -0.14 : -0.11;
       for (let r = 0; r < R; r++) {
-        const v = r / (R - 1), w = hd ? 0.62 + 0.62 * v : 0.36 + 0.32 * v; // wider at the hem
+        const v = r / (R - 1), w = hd ? (0.62 + 0.62 * v) * this.wk : 0.36 + 0.32 * v; // wider at the hem
         if (r > 0) {
           const a = this.lift * 1.45 * Math.min(1, 0.35 + v) + Math.sin(this.t * (4 + flap * 7) - v * 5 + u * 2) * (0.05 + flap * 0.24) * v;
           y -= Math.cos(a) * seg; z -= Math.sin(a) * seg;
@@ -143,7 +144,7 @@ export function rig(o = {}) {
   if (xtra.hood) keep(part(m.ball, mt.cape || mt.suit, 0.135, 0.15, 0.135, 0, 0.02, -0.025, head));
   if (xtra.plates) { keep(part(m.box, mt.badge || mt.glove || mt.suit, 0.3 * sl, 0.2, 0.05, 0, 0.1, 0.09, chest)); for (const L of legs) keep(part(m.box, mt.badge || mt.glove || mt.suit, 0.09, 0.2, 0.09, 0, -0.22, 0.03, L.hip)); }
   if (xtra.coat) { keep(part(m.box, mt.cape || mt.suit, 0.38 * sl, 0.55, 0.22, 0, -0.32, 0, hips)); }
-  const cape = new Cape(torso, xtra.noCape ? 0.01 : o.capeLen ?? 1.15, o.hd ? hdCapeMat() : mt.cape, o.hd); if (xtra.noCape) cape.mesh.visible = false;
+  const cape = new Cape(torso, xtra.noCape ? 0.01 : o.capeLen ?? 1.15, o.hd ? hdCapeMat(o.hd) : mt.cape, o.hd); if (xtra.noCape) cape.mesh.visible = false;
   const R0 = { root, body, hips, torso, chest, head, legs, arms, eyes, cape, parts, mt, o }; if (o.hd) hdParts(R0, keep); return R0;
 }
 // the close-up body: smooth tubes swept through the same joints (flesh.js), each part in its own colour - a suit with
@@ -236,9 +237,9 @@ export function pinPose(r, f) {
     for (const l of L) { l.hip.rotation.x = 0.15; l.knee.rotation.x = 0.35; }
   }
 }
-export function villainRig(name, of) {
+export function villainRig(name, of, hd = false) { // hd: the detailed body, dressed by the outfit (hdbody.js)
   const base = vmats(name), mats = of ? { ...base, ...(of.skin ? { skin: new THREE.MeshStandardMaterial({ color: of.skin, roughness: 0.8 }) } : null), ...(of.belt ? { belt: new THREE.MeshStandardMaterial({ color: of.belt, metalness: 0.4, roughness: 0.45 }) } : null), ...(of.suit ? { suit: clothMat(of.suit) } : null), ...(of.cape ? { cape: clothMat(of.cape, { side: THREE.DoubleSide, repeat: [5, 9] }) } : null), ...(of.dark ? { glove: clothMat(of.dark, { bumpScale: 0.15 }), boot: clothMat(of.dark, { bumpScale: 0.15 }) } : null) } : base;
-  const r = rig({ mats, arms: name === 'Weaver' ? 6 : 2, eyes: name === 'Tyrant', extras: of || {}, hd: name === 'Tyrant' && !of }); /* the test of the detailed look: Tyrant in no outfit of his own */ relax(r); addHeadgear(r, of); r.wings = []; return r;
+  const look = hd ? hdLook(name, of) : null, r = rig({ mats, arms: name === 'Weaver' ? 6 : 2, eyes: name === 'Tyrant', extras: of || {}, hd: look, slim: !!(look && look.f) }); relax(r); addHeadgear(r, of); r.wings = []; return r;
 }
 export function handsOnHips(r) {
   r.legs[0].hip.rotation.z = -0.09; r.legs[1].hip.rotation.z = 0.09;

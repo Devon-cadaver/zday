@@ -27,7 +27,7 @@ export class Squad {
   note() { const F = this.F, H = this.H; if (F.active && F.state === 'fly') this.hp[this.cur] = Math.max(0.02, F.hull / (F.hullMax || 100)); else if (H.active && H.h) this.hp[this.cur] = Math.max(0.02, H.h.hp / (H.h.hpMax || 100)); }
   // knocked out: where, and who is next
   ko(x, z) {
-    const g = this.g, id = this.cur, P = g.people, q = P.snapWalkable(x, z, 40) || [x, z], gy = P.groundY(q[0], q[1]), rig = rigFor(HS.name(id), HS.outfit(HS.name(id))); rig.root.position.set(q[0], gy + 0.25, q[1]); rig.root.rotation.x = -Math.PI / 2; this.S.add(rig.root); const m = new THREE.Mesh(this.geo, this.mat); m.position.set(q[0], gy, q[1]); m.frustumCulled = false; m.renderOrder = 6; this.S.add(m);
+    const g = this.g, id = this.cur, P = g.people, q = P.snapWalkable(x, z, 40) || [x, z], gy = P.groundY(q[0], q[1]), rig = rigFor(HS.name(id), HS.outfit(HS.name(id)), false); rig.root.position.set(q[0], gy + 0.25, q[1]); rig.root.rotation.x = -Math.PI / 2; this.S.add(rig.root); const m = new THREE.Mesh(this.geo, this.mat); m.position.set(q[0], gy, q[1]); m.frustumCulled = false; m.renderOrder = 6; this.S.add(m);
     this.downs[id] = { id, x: q[0], z: q[1], y: gy, rig, m }; this.hp[id] = 0; this.closeRev();
     const next = this.ids.find(o => !this.downs[o]); if (!next) { this.draw(); return null; } this.cur = next; HS.load().last[this.side] = next; this.draw(); return next;
   }
