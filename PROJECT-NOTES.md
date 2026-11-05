@@ -966,3 +966,4 @@ Defend only. Captain Deluge (Body with a tinted Blur rig at 2.6 times size, a ha
 - chkMode, a button by Restart, saved in zday_dash_mode: at once (the dash starts at 26 px as everywhere; a corner at the lift cancels it, refunds the power and does the move) or on lift (nothing until the lift). To find which feels right.
 
 - Stroke test, joystick (Sean, 2026-11-05): the left half popped a joystick when a stroke began there, so a move became a walk. In the robot fight the stick is fixed in a corner (chkStick, 85 px round it), bottom right as Sean asked, a Stick button flips it (zday_stick_side); a stroke can start anywhere else.
+- The shape key: a green dot where a stroke starts, a red one where it ends (Sean, 2026-11-05: a line does not say which way). Heavy is a thin hairpin, out and back.
