@@ -89,6 +89,7 @@ Build order (one thing at a time, each tested in the Sandbox and pushed). The ch
   - [x] Headgear fits the new heads, nothing floating; the rest remade with detail.
   - [x] The detailed bodies on generals, the robot, storm foes, downed teammates, statues, the Roster, town villains and rivals (simple figures far from the camera) (Sean, 2026-11-04).
   - [x] Skin from nearly white to dark, any colour, and a colour picker (Sean, 2026-11-04).
+  - [x] The wardrobe its own screen, the fighter always in view above the choices (Sean, 2026-11-04).
   - [x] The tornado played with what it throws (Sean, 2026-11-04): no flying punch; PUNCH a throw back in time, GRAB one later still, spin it and throw it back harder, LASER held once a meter from near misses and hits back is full.
   - [x] The tsunami, dust storm and cold front as villains (Sean, 2026-11-04): the real towering storm with a ghostly face in it; punching tears real gaps, freezing then punching shatters a section; what is left is fought hand to hand. The tornado has the same ghost face.
   - [x] The flood as a villain (Sean, 2026-11-04): Captain Deluge with a fire hose, the water rising; punch sinkholes to drain it, high water makes him stronger.

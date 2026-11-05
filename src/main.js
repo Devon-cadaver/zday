@@ -200,7 +200,7 @@ function frameBody() {
   if (game.simT !== shadowAt || !camAt.equals(camera.position)) { renderer.shadowMap.needsUpdate = true; shadowAt = game.simT; camAt.copy(camera.position); }
   const focus = fl ? pilot.focus : camera.position.distanceTo(game.focusAt || tg); // whatever Follow is on stays in focus
   const lv = fl ? pilot.lod : focus > 300 ? 3 : 0; if (city.far !== lv) { city.far = lv; city.lod(!!(lv & 1)); W.people.lod(!!(lv & 2)); W.traffic.lod(!!(lv & 2)); } // in fewer pieces: the tree crowns (1), the people and cars (2) - zoomed out or flying all of them, on the ground only the trees
-  const nearZ = fl ? pilot.near : Math.max(10, focus * 0.2); // the near plane follows the zoom: far more depth precision, so flat rooftop details don't flicker on phones
+  const nearZ = game.base && game.base.ward ? 0.25 : fl ? pilot.near : Math.max(10, focus * 0.2); // the near plane follows the zoom: far more depth precision, so flat rooftop details don't flicker on phones
   if (Math.abs(camera.near - nearZ) > 0.5) { camera.near = nearZ; camera.updateProjectionMatrix(); }
   // camera shake (quakes, blasts, the tsunami): a jolt for this frame only
   let jx = 0, jy = 0, jz = 0;
