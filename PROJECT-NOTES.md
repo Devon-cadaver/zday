@@ -967,3 +967,9 @@ Defend only. Captain Deluge (Body with a tinted Blur rig at 2.6 times size, a ha
 
 - Stroke test, joystick (Sean, 2026-11-05): the left half popped a joystick when a stroke began there, so a move became a walk. In the robot fight the stick is fixed in a corner (chkStick, 85 px round it), bottom right as Sean asked, a Stick button flips it (zday_stick_side); a stroke can start anywhere else.
 - The shape key: a green dot where a stroke starts, a red one where it ends (Sean, 2026-11-05: a line does not say which way). Heavy is a thin hairpin, out and back.
+
+## Strokes in every fight on foot (Sean, 2026-11-05; strokes.js)
+- The stroke code left fighttest.js for strokes.js, mixed into FightTest and Horde. Each says what is going on (chkCtx: go, fin, clutch, feet, let, off), what the shapes mean there (chkEntries, which is also the key) and does it (chkDo). Same five shapes everywhere: similar moves share a shape. The GRAB, stun, knockback and gold finisher buttons are hidden by CSS (class strokes), still in the page because the code touches them; TEAM, HURL and TAKE OFF stay. The grab choice buttons too, in effect: clutch reads check throw, caret spin, mirror drag.
+- A dazed foe: check is Finisher 1, caret Finisher 2, the key large and gold. Neck drag and spin have no finger held now: the stick steers the drag, a tap punches, any stroke flings or lets go; the drag ends by itself at 8 s. Sky runs on its own with holds optional. A power from a stroke is one shot (no holding to charge); the kick is fixed at 0.6.
+- Foes' fixed joystick and the settings: stick and dash timing saved in zday_stick_side, zday_dash_mode; their buttons only where the fight's top buttons show (robot, Sandbox).
+- Not strokes: flying (a drag is the stick there) and the storm fights' PUNCH, GRAB, LASER.
