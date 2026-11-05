@@ -79,6 +79,24 @@ export const MELEES = {
 export const FINISHERS = {
   neck: { name: 'Neck drag', icon: '🤜', tip: 'HOLD and steer, let go to fling', blurb: 'By the neck through the town, punching on the way; let go to fling them' },
   sky: { name: 'To the sky', icon: '☄', tip: 'HOLD, TAP, HOLD, HOLD', blurb: 'Up past them, grab them, and down with a shockwave, up to a mini nuke' },
+  crater: { name: 'Crater slam', icon: '🕳', tip: 'TAP for a bigger crater', blurb: 'Lifted overhead, a leap, and down into the road' },
+  hundred: { name: 'Hundred fists', icon: '👊', tip: 'TAP for faster fists', blurb: 'A blur of punches, then a launch' },
+  swing: { name: 'Giant swing', icon: '🌀', tip: 'TAP to swing faster', blurb: 'By the ankles through everything near, then over and down' },
+  clap: { name: 'Thunder clap', icon: '👐', tip: 'TAP for a bigger clap', blurb: 'Both hands right in their face, and a shockwave' },
+  starkick: { name: 'Star kick', icon: '⭐', tip: 'TAP for a brighter star', blurb: 'Kicked so high they twinkle away' },
+  icetomb: { name: 'Ice tomb', icon: '🧊', tip: 'TAP for a harder punch', blurb: 'Frozen in a block, then a punch breaks it and they drop out dazed' },
+  meteor: { name: 'Meteor drop', icon: '☄', tip: 'TAP for a bigger crash', blurb: 'Carried up high and driven back down in flames' },
+  lightning: { name: 'Lightning strike', icon: '⚡', tip: 'TAP for more bolts', blurb: 'Held up in the air while bolts come down from the sky' },
+  cyclone: { name: 'Cyclone spin', icon: '🌪', tip: 'TAP to spin faster', blurb: 'Spun until a tornado forms, then let go' },
+  surf: { name: 'Street surf', icon: '🏄', tip: 'TAP for more speed', blurb: 'Ridden down the street like a surfboard' },
+  roadwave: { name: 'Road wave', icon: '🌊', tip: 'TAP for a bigger wave', blurb: 'A stomp sends the street rippling under them' },
+  mindlift: { name: 'Mind lift', icon: '🧠', tip: 'TAP for a harder hurl', blurb: 'Raised with your mind, spun, and hurled down' },
+  carpile: { name: 'Car pile', icon: '🚗', tip: 'TAP for more cars', blurb: 'Buried under a heap of cars dropped from above' },
+  lamphomer: { name: 'Lamp post homer', icon: '🏮', tip: 'TAP to hit it further', blurb: 'Rips up a lamp post and bats them across town' },
+  rocket: { name: 'Rocket ride', icon: '🚀', tip: 'TAP for a harder drop', blurb: 'Flown through loops, then let go' },
+  blackhole: { name: 'Black hole toss', icon: '⚫', tip: 'TAP for a harder blast', blurb: 'Swallowed by a small black hole and spat back out' },
+  nova: { name: 'Supernova', icon: '🌟', tip: 'TAP to charge it', blurb: 'Charge up and burst in a blinding blast' },
+  team: { name: 'Team finisher', icon: '🤝', tip: 'TAP for a bigger finish', blurb: 'All three of you hit together, all the way down' },
 };
 export const SLOTS = { stun: STUNS, knock: KNOCKS, melee: MELEES, fin1: FINISHERS, fin2: FINISHERS };
 export const SLOT_NAME = { stun: 'Stun', knock: 'Knockback', melee: 'Melee', fin1: 'Finisher 1', fin2: 'Finisher 2' };
