@@ -80,3 +80,32 @@ export function runShot(E, id, K, to, hit) {
     default: hit();
   }
 }
+
+// what a melee style carries: a blade of light, a staff, claws, rocks on the fists, a tail, a lamp post, glowing fists. On the fighter's own rig, once
+const AIM_X = 2.36, propGlow = (c, op = 0.85) => new THREE.MeshBasicMaterial({ color: new THREE.Color(c[0], c[1], c[2]), transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+export function addProp(r, kind) {
+  if (!kind || r.propOn === kind) return; r.propOn = kind; const R = r.arms[1].wr, Ls = r.arms[0].wr, on = (par, m, x = 0, y = -0.07, z = 0) => { m.position.set(x, y, z); m.frustumCulled = false; par.add(m); return m; };
+  if (kind === 'blade') { const b = new THREE.Mesh(new THREE.BoxGeometry(0.045, 1.2, 0.016).translate(0, 0.6, 0), propGlow([0.5, 1.5, 2.4])); on(R, b).rotation.x = AIM_X; const c = new THREE.Mesh(new THREE.BoxGeometry(0.018, 1.24, 0.03).translate(0, 0.62, 0), propGlow([1.6, 2.2, 2.6], 1)); on(R, c).rotation.x = AIM_X; on(R, new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.2, 8), new THREE.MeshStandardMaterial({ color: '#30343c', metalness: 0.8, roughness: 0.3 }))).rotation.x = AIM_X; }
+  else if (kind === 'staff') { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.024, 2.7, 8), new THREE.MeshStandardMaterial({ color: '#5a3d22', roughness: 0.7 })); on(R, b).rotation.x = AIM_X; for (const s of [1, -1]) { const t = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.22, 8), new THREE.MeshStandardMaterial({ color: '#c9a24a', metalness: 0.7, roughness: 0.3 })); t.position.y = s * 1.26; b.add(t); } }
+  else if (kind === 'claws') { for (const W of [R, Ls]) for (const x of [-0.04, 0, 0.04]) { const c = new THREE.Mesh(new THREE.ConeGeometry(0.014, 0.34, 6).translate(0, 0.17, 0), propGlow([1.8, 0.6, 2.2], 1)); on(W, c, x, -0.1, 0.02).rotation.x = 2.75; } }
+  else if (kind === 'rock') { for (const W of [R, Ls]) { const m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.19, 0), new THREE.MeshStandardMaterial({ color: '#7d756a', roughness: 1, flatShading: true })); on(W, m, 0, -0.08, 0).rotation.set(0.5, 0.7, 0); } }
+  else if (kind === 'shock' || kind === 'flame' || kind === 'ice') { const c = kind === 'shock' ? [0.5, 1.2, 2.6] : kind === 'flame' ? [2.4, 0.9, 0.2] : [0.6, 1.3, 1.9]; for (const W of [R, Ls]) { on(W, new THREE.Mesh(new THREE.IcosahedronGeometry(kind === 'ice' ? 0.115 : 0.1, 1), propGlow(c, kind === 'ice' ? 0.6 : 0.55))); } }
+  else if (kind === 'lamp') { const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.05, 3.5, 8).translate(0, 1.5, 0), new THREE.MeshStandardMaterial({ color: '#3c4148', metalness: 0.6, roughness: 0.5 })); on(R, pole).rotation.x = AIM_X; const head = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.1, 0.3), new THREE.MeshStandardMaterial({ color: '#2c3036', roughness: 0.6 })); head.position.set(0, 3.25, 0.1); pole.add(head); const lit = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.03, 0.2), propGlow([2.6, 2.3, 1.4], 1)); lit.position.set(0, -0.06, 0); head.add(lit); }
+  else if (kind === 'tail') { const P = new THREE.CatmullRomCurve3([new THREE.Vector3(0, 0.9, -0.1), new THREE.Vector3(0, 0.72, -0.55), new THREE.Vector3(0.1, 0.5, -1.05), new THREE.Vector3(-0.08, 0.36, -1.6), new THREE.Vector3(0.05, 0.42, -2.1)]), m = new THREE.Mesh(new THREE.TubeGeometry(P, 22, 0.07, 7, false), propGlow([0.5, 1.9, 1], 0.85)); on(r.body, m, 0, 0, 0); }
+}
+// what a blow leaves: E is either fight
+export function meleeFx(E, A, x, y, z) {
+  const D = E.g.disasters, d = (n, c, sp = 7, life = 0.5, s0 = 0.08) => { for (let i = 0; i < n; i++) { const s = s0 + Math.random() * s0 * 1.6; D.debris.add(x, y, z, s, s, s, c, 'fly', { v: [(Math.random() - 0.5) * sp * 2, 1 + Math.random() * sp, (Math.random() - 0.5) * sp * 2], life }); } };
+  switch (A.fx) {
+    case 'shock': { const h = E.h; zig(E, h.x + Math.sin(h.yaw) * 0.7, h.y + 1.25, h.z + Math.cos(h.yaw) * 0.7, x, y, z, [0.8, 1.4, 3], 0.035, 4, 0.14); d(7, 0x9fd8ff, 8); sfx('zap', x, y, z, { gain: 0.7, rate: 1.2 + Math.random() * 0.3 }); break; }
+    case 'flame': { E.g.fire.burst(x, y, z, 5, 1); sfx('whoomph', x, y, z, { gain: 0.5, rate: 1.4 }); if (E.v && !(E.burnT > 0)) { E.burnT = 1; let t0 = 0; E.fxa.add(2.2, (u, dt) => { if (E.over) return; E.hurtV(3 * dt); if ((t0 -= dt) <= 0) { t0 = 0.25; E.g.fire.burst(E.v.x, E.v.y + 1, E.v.z, 2, 0.6); } }, () => { E.burnT = 0; }); } break; }
+    case 'ice': d(9, 0xdff6ff, 7, 0.6, 0.1); sfx('glass', x, y, z, { gain: 0.6, rate: 1.4 }); break;
+    case 'rock': d(12, 0x7d756a, 9, 0.8, 0.16); sfx('crash', x, y, z, { gain: 0.8, rate: 0.7 }); break;
+    case 'sand': d(26, 0xc9a86a, 6, 0.7, 0.06); sfx('whoosh', x, y, z, { gain: 0.8, rate: 1.5 }); break;
+    case 'slash': E.spark(x, y, z, 2, [0.8, 1.7, 2.6]); sfx('laser', x, y, z, { gain: 0.5, rate: 1.7 }); break;
+    case 'lamp': d(8, 0x3c4148, 8, 0.7, 0.1); sfx('clang', x, y, z, { gain: 1.1, rate: 0.7 }); break;
+    case 'thud': sfx('clang', x, y, z, { gain: 0.5, rate: 1.3 }); break;
+    case 'pound': { const h = E.h, top = E.top != null ? E.top : h.y; for (let i = 0; i < 3; i++) D.brawl.stunts.ring(h.x, top + 0.2, h.z, 3 + i * 2.2, 0.3 + i * 0.1, new THREE.Color(1.8, 1.3, 0.6), 0.85); for (let i = 0; i < 18; i++) { const a = Math.random() * 6.28, s = 0.15 + Math.random() * 0.35; D.debris.add(h.x + Math.cos(a) * 2, top + 0.2, h.z + Math.sin(a) * 2, s, s * 0.6, s, 0x8a8478, 'fly', { v: [Math.cos(a) * 8, 3 + Math.random() * 7, Math.sin(a) * 8], life: 0.9 }); } sfx('crash', h.x, top, h.z, { gain: 1.1, rate: 0.7 }); break; }
+    default: break;
+  }
+}
