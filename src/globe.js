@@ -151,20 +151,22 @@ export class Globe {
   watchers() {
     const ids = HS.team('hero').slice(0, 3), key = JSON.stringify([ids, ids.map(id => HS.outfit(HS.name(id)))]); if (key === this.watchKey) return; this.watchKey = key;
     for (const w of this.watch || []) this.scene.remove(w.r.root);
-    const SPOTS = [[-9.2, 6.6, 0], [9.0, -0.8, 1], [-7.6, -8.6, 2]];
-    this.watch = ids.map((id, i) => { const nm = HS.name(id), r = rigFor(nm, HS.outfit(nm)), [a, b, pose] = SPOTS[i]; r.root.scale.setScalar(2.5); this.scene.add(r.root);
+    const SPOTS = [[-1.32, 0.62, 0], [1.34, -0.3, 1], [-1.24, -1.02, 2]]; // where their feet are, in globe radii from its middle on the screen (Sean, 2026-11-06: one was half in the globe)
+    this.watch = ids.map((id, i) => { const nm = HS.name(id), r = rigFor(nm, HS.outfit(nm)), [fa, fb, pose] = SPOTS[i]; r.root.scale.setScalar(3); this.scene.add(r.root);
       for (const q of r.arms) { if (pose === 0) { q.sh.rotation.set(0.2, 0, q.sx * 0.5); q.el.rotation.set(-0.35, 0, 0); } else if (pose === 1) { q.sh.rotation.set(-0.5, 0, -q.sx * 0.35); q.el.rotation.set(-1.75, 0, 0); } else { q.sh.rotation.set(0.15, 0, q.sx * 0.75); q.el.rotation.set(-1.7, 0, 0); } }
       r.legs.forEach((L, k) => { L.hip.rotation.x = k ? -0.15 : 0.3; L.knee.rotation.x = k ? 0.3 : 0.65; });
-      return { r, a, b, ph: i * 2.1 }; });
+      return { r, fa, fb, a: 0, b: 0, da: 0, db: 0, ph: i * 2.1 }; });
   }
   // the secret button's first three shots (Sean): the next hero still there is hit, and goes spinning off the screen. Where to aim, on the page
   knockNext() { const w = (this.state === 'menu' && !this.rise && this.watch || []).find(q => !q.fly); if (!w) return null; const v = w.r.root.position.clone(); v.y += 0; const P = v.clone().add(new THREE.Vector3(0, 2.2, 0)).project(this.cam); this.knock(w); return [(P.x + 1) / 2 * innerWidth, (1 - P.y) / 2 * innerHeight]; }
-  knock(w) { const l = Math.hypot(w.a, w.b) || 1; w.fly = { t: 0, vx: w.a / l * 26, vy: w.b / l * 26 + 3, spin: w.a > 0 ? 1 : -1 }; }
+  knock(w) { const l = Math.hypot(w.a, w.b) || 1; w.fly = { t: 0, vx: w.a / l * 26, vy: w.b / l * 26 + 3, spin: w.a > 0 ? 1 : -1 }; } // off the way they are from the middle
   knockAll() { for (const w of this.watch || []) if (!w.fly) this.knock(w); }
   watchStep(dt) {
     if (!this.watch || !this.watch.length) return; const on = this.state === 'menu' && !this.rise; if (!on) { for (const w of this.watch) w.r.root.visible = false; return; }
     const c = this.cam.position, cl = c.length() || 1, zx = c.x / cl, zy = c.y / cl, zz = c.z / cl; let rx = zz, rz = -zx; const rl = Math.hypot(rx, rz) || 1; rx /= rl; rz /= rl; const ux = -zy * rz, uy = zz * rx - zx * rz, uz = zy * rx;
-    for (const w of this.watch) { const r = w.r; if (w.fly) { w.fly.t += dt; if (w.fly.t > 2.5) { r.root.visible = false; continue; } w.a += w.fly.vx * dt; w.b += w.fly.vy * dt; w.fly.vx *= 1 + dt * 0.6; w.fly.vy *= 1 + dt * 0.6; } const s = Math.sin(this.t * 0.6 + w.ph), a = w.a, b = w.b + s * 0.35, k = 13; r.root.visible = true; r.root.position.set(rx * a + ux * b + zx * k, uy * b + zy * k, rz * a + uz * b + zz * k); r.root.lookAt(0, 0, 0); r.root.rotateZ(Math.sin(this.t * 0.4 + w.ph) * 0.06); if (w.fly) { r.root.rotateZ(w.fly.t * 11 * w.fly.spin); r.root.rotateX(w.fly.t * 7); } if (r.root.userData.tick) r.root.userData.tick(dt); else if (r.cape) r.cape.update(dt, 0.12, 0.35); detail(r, null, true); }
+    // from the menu's distance (not the camera's now: a pinch in still sends them off the screen), how far out the globe's edge is at their depth, and how wide the screen is there
+    const k = 13, Dm = Math.max(R * 2.2, this.menuTo || this.fit()), T = R / Math.sqrt(Dm * Dm - R * R), Lw = (Dm - k) * T, rpx = innerHeight / 2 * T / Math.tan(16 * Math.PI / 180), xmax = Math.max(1.05, (innerWidth / 2 - 30) / rpx);
+    for (const w of this.watch) { const r = w.r; w.a = Math.sign(w.fa) * Math.min(Math.abs(w.fa), xmax) * Lw + w.da; w.b = w.fb * Lw + w.db; if (w.fly) { w.fly.t += dt; if (w.fly.t > 2.5) { r.root.visible = false; continue; } w.da += w.fly.vx * dt; w.db += w.fly.vy * dt; w.fly.vx *= 1 + dt * 0.6; w.fly.vy *= 1 + dt * 0.6; } const s = Math.sin(this.t * 0.6 + w.ph), a = w.a, b = w.b + s * 0.35; r.root.visible = true; r.root.position.set(rx * a + ux * b + zx * k, uy * b + zy * k, rz * a + uz * b + zz * k); r.root.lookAt(0, 0, 0); r.root.rotateZ(Math.sin(this.t * 0.4 + w.ph) * 0.06); if (w.fly) { r.root.rotateZ(w.fly.t * 11 * w.fly.spin); r.root.rotateX(w.fly.t * 7); } if (r.root.userData.tick) r.root.userData.tick(dt); else if (r.cape) r.cape.update(dt, 0.12, 0.35); detail(r, null, true); }
   }
   // the planet, built the first time it is opened
   build() {
@@ -441,9 +443,9 @@ export class Globe {
   // menu card (Sean: all of it in view above the menu); a long panel leaving no gap: the planet behind it all
   menuFit() {
     const H = innerHeight, t = document.querySelector('#zd-menu .mtitle'), b = document.querySelector('#zd-menu .box'), rt = t && t.getBoundingClientRect(), rb = b && b.getBoundingClientRect();
-    let y0 = rt && rt.height ? rt.bottom + 6 : 0, y1 = rb && rb.height ? rb.top - 6 : H;
-    if (y1 - y0 < H * 0.28) { y0 = 0; y1 = H; }
-    const d = R * 1.14 / ((y1 - y0) / H * Math.tan(16 * Math.PI / 180)); // its height into the gap (the camera's view is 32 degrees tall)
+    let y0 = rt && rt.height ? rt.bottom + 6 : 0, y1 = rb && rb.height ? rb.top + (b.classList.contains('saucer') ? rb.height * 0.11 : 0) - 6 : H; // the saucer's box starts above its dome
+    if (y1 - y0 < H * 0.2 || innerWidth > H * 1.15) { y0 = 0; y1 = H; }
+    const d = R * 1.12 / ((y1 - y0) / H * Math.tan(16 * Math.PI / 180)); // its height into the gap (the camera's view is 32 degrees tall)
     return { d: Math.max(d, this.fit() * 1.05), shift: 0.5 - (y0 + y1) / 2 / H }; // and its width onto the screen
   }
   // the menu reached up through the clouds from a town: start just over that town and pull back to where the menu looks from

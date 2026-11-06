@@ -111,7 +111,7 @@ body.zd-flying #zd-toast{left:calc(50% + 28px);max-width:calc(100vw - 180px)}
 #zd-menu.gone{opacity:0}
 #zd-menu.gone .box{transform:translateY(60px)}
 #zd-menu .mtitle{position:absolute;left:0;right:0;top:max(18px, env(safe-area-inset-top));text-align:center;pointer-events:none}
-#zd-menu .mtitle .tag{margin:8px 0 0;font-size:13px;font-weight:700;letter-spacing:.03em;text-transform:none;opacity:1;color:#ffd6ef;text-shadow:0 0 10px rgba(255,79,163,.7),0 1px 6px rgba(0,0,0,.8)}
+#zd-menu .mtitle .tag{margin:4px 0 0;font-size:11.5px;font-weight:700;letter-spacing:.03em;text-transform:none;opacity:1;color:#ffd6ef;text-shadow:0 0 10px rgba(255,79,163,.7),0 1px 6px rgba(0,0,0,.8)}
 #zd-menu .box{width:100%;max-width:420px;background:rgba(27,10,46,.88);border:1px solid rgba(196,128,255,.32);box-shadow:0 0 28px rgba(140,60,255,.25);border-radius:16px;text-align:center;max-height:calc(100% - 96px);
   display:flex;flex-direction:column;overflow:hidden;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:transform .35s}
 #zd-menu .mbody{overflow-y:auto;overscroll-behavior:contain;padding:14px 14px 12px;min-height:0;flex:1 1 auto}
@@ -137,7 +137,7 @@ body.zd-flying #zd-toast{left:calc(50% + 28px);max-width:calc(100vw - 180px)}
 #zd-menu .own-go{min-width:64px;min-height:44px}
 #zd-menu .ufo .rim::after,#zd-menu .ufo .orbfire::after{content:'';position:absolute;inset:-12px -6px}
 #zd-menu .mhead .mt{flex:1;text-align:left;font-weight:800;font-size:15px;letter-spacing:.14em;text-transform:uppercase;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#zd-menu h1{margin:0;font:900 38px/0.95 Impact,Futura-CondensedExtraBold,\"Arial Black\",sans-serif;letter-spacing:.04em;color:#f4eee4;text-shadow:3px 3px 0 #7a0d12,0 0 22px rgba(255,79,163,.55)} /* the PLAY screen's logo */
+#zd-menu h1{margin:0;white-space:nowrap;font:900 24px/1 Impact,Futura-CondensedExtraBold,\"Arial Black\",sans-serif;letter-spacing:.04em;color:#f4eee4;text-shadow:3px 3px 0 #7a0d12,0 0 22px rgba(255,79,163,.55)} /* the PLAY screen's logo */
 #zd-menu .tag{font-size:12px;letter-spacing:.12em;text-transform:uppercase;opacity:.7;margin:2px 0 14px}
 #zd-menu .rank{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;margin:0 0 6px}
 #zd-menu .rank b{font-size:16px;color:#a6ff4d}
@@ -157,6 +157,7 @@ body.zd-flying #zd-toast{left:calc(50% + 28px);max-width:calc(100vw - 180px)}
 #zd-menu .zd-side-btn{background:rgba(64,22,110,.85);border-color:rgba(196,128,255,.45);box-shadow:0 0 10px rgba(138,59,255,.35)}
 #zd-menu .box.saucer{background:transparent;border:0;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;overflow:visible;max-width:440px} /* the saucer (Sean's picture) */
 #zd-menu .box.saucer .mbody{overflow:visible;padding:0 0 4px}
+@media (orientation:portrait){#zd-menu .box.saucer{max-width:min(440px, calc(110vh - 330px));max-width:min(440px, calc(110dvh - 330px))}}
 #zd-menu .ufo{position:relative;margin:0 -16px;aspect-ratio:400/248}
 #zd-menu .ufo .hull{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 #zd-menu .ufo .hull .spin{animation:zdSpin 2.4s steps(24) infinite}#zd-menu .ufo .hull .s2{animation-duration:7s}#zd-menu .ufo .hull .s3{animation-duration:4s}#zd-menu .ufo .hull .s4{animation-duration:2s}
@@ -190,11 +191,13 @@ body.zd-flying #zd-toast{left:calc(50% + 28px);max-width:calc(100vw - 180px)}
 #zd-menu .ufo .rim.r{right:27%}
 #zd-menu .ufo .rim.l{left:27%}
 #zd-menu .ufo .rim::after{content:'';position:absolute;left:-10px;right:-10px;top:-12px;bottom:-12px} /* a bigger place to tap than the little label */
-@media (orientation:landscape) and (max-height:480px){#zd-menu .box.saucer{max-width:330px}#zd-menu .box.saucer .xp,#zd-menu .box.saucer .foot{display:none}} /* a phone on its side: the saucer smaller, the XP and the footer left off so it fits */
-#zd-menu .box.saucer .xp{margin:6px 10px 0;padding:8px 14px 9px;background:linear-gradient(180deg,rgba(14,20,36,.92),rgba(6,9,18,.94));border:1px solid rgba(95,220,255,.6);box-shadow:0 0 12px rgba(60,180,255,.3),inset 0 0 10px rgba(60,180,255,.12);
+@media (orientation:landscape) and (max-height:480px){#zd-menu .box.saucer{max-width:330px}#zd-menu .mtitle .xp,#zd-menu .mtitle .foot{display:none}} /* a phone on its side: the saucer smaller, the XP and the footer left off so it fits */
+#zd-menu .mtitle .xp{margin:7px auto 0;max-width:262px;padding:5px 10px 7px;background:linear-gradient(180deg,rgba(14,20,36,.92),rgba(6,9,18,.94));border:1px solid rgba(95,220,255,.6);box-shadow:0 0 12px rgba(60,180,255,.3),inset 0 0 10px rgba(60,180,255,.12);
   clip-path:polygon(10px 0,calc(100% - 10px) 0,100% 10px,100% calc(100% - 10px),calc(100% - 10px) 100%,10px 100%,0 calc(100% - 10px),0 10px)} /* notched corners */
 #zd-menu .lg-top{display:flex;justify-content:space-between;align-items:baseline;gap:6px;font-size:10.5px;color:#cfe3f5;white-space:nowrap;margin:0 0 8px}#zd-menu .lg-top b{display:block;font-size:14px}#zd-menu .lg-top .h b{color:#5aa8ff}#zd-menu .lg-top .v{text-align:right}#zd-menu .lg-top .v b{color:#ff5a6a}#zd-menu .lg-top .t{font-size:12px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#fff}
-#zd-menu .lg-bar{position:relative;height:8px;margin:0 7px;border-radius:4px;background:linear-gradient(90deg,#17427e,#4a2a78 50%,#7e1a2c)}#zd-menu .lg-bar i{position:absolute;top:0;bottom:0;background:var(--c);opacity:.85}#zd-menu .lg-bar::after{content:'';position:absolute;left:50%;top:-2px;bottom:-2px;width:2px;margin-left:-1px;background:rgba(255,255,255,.55)}#zd-menu .lg-bar u{position:absolute;z-index:1;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:#fff;border:3px solid var(--c);box-sizing:border-box;box-shadow:0 0 8px var(--c)}#zd-menu .lg-name{margin:8px 0 0;text-align:center;font-size:14px;font-weight:900;letter-spacing:.03em}
+#zd-menu .lg-bar{position:relative;height:8px;margin:0 7px;border-radius:4px;background:linear-gradient(90deg,#17427e,#4a2a78 50%,#7e1a2c)}#zd-menu .lg-bar i{position:absolute;top:0;bottom:0;background:var(--c);opacity:.85}#zd-menu .lg-bar::after{content:'';position:absolute;left:50%;top:-2px;bottom:-2px;width:2px;margin-left:-1px;background:rgba(255,255,255,.55)}#zd-menu .lg-bar u{position:absolute;z-index:1;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:#fff;border:3px solid var(--c);box-sizing:border-box;box-shadow:0 0 8px var(--c)}#zd-menu .lg-name{margin:4px 0 0;text-align:center;font-size:11.5px;font-weight:900;letter-spacing:.03em}
+#zd-menu .mtitle .lg-top{font-size:9px;margin:0 0 5px}#zd-menu .mtitle .lg-top b{font-size:12px}#zd-menu .mtitle .lg-top .t{font-size:8.5px;opacity:.85}#zd-menu .mtitle .lg-top .t i{display:block;font-style:normal;font-size:12px;letter-spacing:.02em;text-transform:none;margin-top:1px;opacity:1}#zd-menu .mtitle .lg-bar{height:6px}#zd-menu .mtitle .lg-bar u{width:11px;height:11px;margin:-5.5px 0 0 -5.5px;border-width:2px}
+#zd-menu .mtitle .foot{margin:4px 0 0;font-size:10px;opacity:.6;text-shadow:0 1px 3px #000}
 #zd-menu .box.saucer .foot{margin-top:6px}
 body.zd-menu-on.zd-main #zd-side{display:flex;position:fixed} /* the main menu: the sound buttons float out in space */
 body.zd-menu-on.zd-main #zd-side > *{animation:zdFloat 4s ease-in-out infinite}body.zd-menu-on.zd-main #zd-side > :nth-child(2n){animation-delay:-1.3s}body.zd-menu-on.zd-main #zd-side > :nth-child(3n){animation-delay:-2.6s}
@@ -568,7 +571,7 @@ export class Game {
     const rank = '<div class="rank"><span>Commander level <b>' + lvl + '</b></span><span>' + pr.xp.toLocaleString() + ' XP' + (next ? ' / ' + next.toLocaleString() : '') + '</span></div>' +
       '<div class="bar"><i style="width:' + Math.round(pr.progress * 100) + '%"></i></div>' +
       '<div class="next">' + (next ? (next - pr.xp).toLocaleString() + ' XP to level ' + (lvl + 1) + this.nextUnlockText(lvl + 1) : 'Maximum level') + '</div>';
-    let body, head = '';
+    let body, head = '', legendTop = '';
     const top = (title) => '<div class="mhead"><button class="zd-btn" type="button" data-go="main">\u2039 Back</button><div class="mt">' + title + '</div></div>';
     if (panel === 'travel') { // the places in the world: the big city and the towns
       const here = placeKey();
@@ -580,9 +583,10 @@ export class Game {
         wedgeBtn(2, 'data-play="sandbox"', MICON.sandbox + '<b>Sandbox</b>') +
         wedgeBtn(3, 'data-play="tv"', MICON.tv + '<b>Watch</b>') + '</div>' + // just the names (Sean: the level shows below)
         '<button class="zd-btn rim l" type="button" data-poses="1">Poses</button><button class="zd-btn rim r" type="button" data-go="roster">Roster</button><button class="orbfire" type="button" aria-label="Fire"></button></div>' +
-        '<div class="xp"><div class="lg-top"><span class="h">Hero XP <b>' + L.hero.toLocaleString() + '</b></span><span class="t">Legend</span><span class="v">Villain XP <b>' + L.villain.toLocaleString() + '</b></span></div>' +
-        '<div class="lg-bar" style="--c:' + hue + '"><i style="left:' + Math.min(50, at) + '%;width:' + Math.abs(at - 50) + '%"></i><u style="left:' + at + '%"></u></div><div class="lg-name" style="color:' + hue + '">' + L.title + '</div></div>' +
-        '<div class="foot">Levels won: ' + L.heroWon + ' as heroes · ' + L.villainWon + ' as villains' + (pr.ok ? '' : ' · progress is not being saved on this device') + '</div>';
+        '';
+      legendTop = '<div class="xp"><div class="lg-top"><span class="h">Hero XP <b>' + L.hero.toLocaleString() + '</b></span><span class="t">Legend<i style="color:' + hue + '">' + L.title + '</i></span><span class="v">Villain XP <b>' + L.villain.toLocaleString() + '</b></span></div>' +
+        '<div class="lg-bar" style="--c:' + hue + '"><i style="left:' + Math.min(50, at) + '%;width:' + Math.abs(at - 50) + '%"></i><u style="left:' + at + '%"></u></div></div>' +
+        '<div class="foot">Levels won: ' + L.heroWon + ' as heroes · ' + L.villainWon + ' as villains' + (pr.ok ? '' : ' · progress is not being saved on this device') + '</div>'; // at the top under the title (Sean, 2026-11-06), so the saucer sits lower and the globe whole between them
     } else if (panel === 'roster') { // every model, turning on its plinth (roster.js, loaded only now)
       head = top('Roster');
       body = '<div class="rsec"><div class="tag">Bringing out the models...</div></div>';
@@ -613,7 +617,7 @@ export class Game {
         '<div class="btns back"><button class="zd-btn" type="button" data-go="main">Back</button></div>';
     }
     this.stopRoster(); this.menuPanel = panel;
-    this.menu.innerHTML = '<div class="mtitle"><h1>MY LITTLE<br>DISASTER</h1><div class="tag">Save it, wreck it, or sit back and bet on it!</div></div><div class="box' + (panel === 'roster' ? ' tall' : panel === 'main' ? ' saucer' : '') + '">' + head + '<div class="mbody">' + body + '</div></div>';
+    this.menu.innerHTML = '<div class="mtitle"><h1>MY LITTLE DISASTER</h1><div class="tag">Save it, wreck it, or sit back and bet on it!</div>' + legendTop + '</div><div class="box' + (panel === 'roster' ? ' tall' : panel === 'main' ? ' saucer' : '') + '">' + head + '<div class="mbody">' + body + '</div></div>';
     if (panel === 'roster') {
       const cv = document.createElement('canvas'); cv.className = 'rgl'; this.menu.appendChild(cv);
       import('./roster.js').then(m => { if (!cv.isConnected) return; const sec = this.menu.querySelector('.rsec'); sec.innerHTML = ''; this.roster = m.startRoster({ canvas: cv, list: this.menu.querySelector('.mbody'), root: sec }); });
