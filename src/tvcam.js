@@ -77,6 +77,7 @@ export class TvCam {
 
   // where to look: the newest disaster (or what is left of it), else the middle of town
   want() {
+    { const wp = this.tv.watchPoint ? this.tv.watchPoint() : null; this.wp = !!wp; if (wp) { this.frontDir = null; this.dist = wp[3]; return [wp[0], wp[1], wp[2]]; } } // a level (tv.js): the hero and what she fights, framed from the helicopter
     const g = this.g, tv = this.tv, c = tv.cur, D = g.disasters;
     const parts = c ? [].concat(c.who || [], c.tripods || [], c.saucers || []) : [];
     const F = c && g.front ? g.front(c) : null; // a wave or a storm front: the wall itself in the middle (the follow camera's point is out ahead of it)
@@ -125,7 +126,7 @@ export class TvCam {
       if (!this.pv) { this.pv = [0, 0]; this.pp = [p[0], p[2]]; }
       const vx = (p[0] - this.pp[0]) / Math.max(h, 1e-3), vz = (p[2] - this.pp[2]) / Math.max(h, 1e-3), kv = 1 - Math.exp(-h * 1.5); this.pp = [p[0], p[2]];
       if (Math.hypot(vx, vz) < 120) { this.pv[0] += (vx - this.pv[0]) * kv; this.pv[1] += (vz - this.pv[1]) * kv; } // a jump to another subject is not a speed
-      const tx = p[0] + this.pv[0] * 0.6, ty = py > 25 ? py : py * 0.6, tz = p[2] + this.pv[1] * 0.6;
+      const tx = p[0] + this.pv[0] * 0.6, ty = this.wp ? py : py > 25 ? py : py * 0.6, tz = p[2] + this.pv[1] * 0.6; // a level's point is aimed at as it is (tv.js watchPoint)
       V.x += ((tx - this.L.x) * w * w - 2 * w * V.x) * h; V.y += ((ty - this.L.y) * w * w - 2 * w * V.y) * h; V.z += ((tz - this.L.z) * w * w - 2 * w * V.z) * h;
       this.L.addScaledVector(V, h);
     }
@@ -145,7 +146,7 @@ export class TvCam {
     if (c.kind === 'heli') {
       const h = this.heli;
       if (!look) { if (this.frontDir != null) { let da = this.frontDir + 0.55 - h.ang; da = Math.atan2(Math.sin(da), Math.cos(da)); h.ang += da * Math.min(1, dt * 0.25); } else h.ang += dt * 0.07; } // out ahead of a front, looking back at it as it comes
-      this.dd = this.dd == null ? Math.max(300, Math.min(700, (this.dist || 260) * 1.4)) : this.dd + (Math.max(300, Math.min(700, (this.dist || 260) * 1.4)) - this.dd) * Math.min(1, dt * 0.6); // closing in or standing off, gently
+      this.dd = this.dd == null ? (this.wp ? Math.max(60, Math.min(700, this.dist || 120)) : Math.max(300, Math.min(700, (this.dist || 260) * 1.4))) : this.dd + ((this.wp ? Math.max(60, Math.min(700, this.dist || 120)) : Math.max(300, Math.min(700, (this.dist || 260) * 1.4))) - this.dd) * Math.min(1, dt * 0.6); // closing in or standing off, gently
       const dd = this.dd, R = dd * 0.82, H = Math.max(dd * 0.57 + a.y * 0.5, (a.y > 25 ? a.y : a.y / 0.6) + dd * 0.5), sx = Math.sin(this.t * 0.6) * 3, sy = Math.sin(this.t * 0.9) * 2; // further off for a kaiju than a villain; always above what it films, looking down with the town behind (level with a high flyer it showed only sky)
       this.P.set(a.x + Math.cos(h.ang) * R + sx, H + sy, a.z + Math.sin(h.ang) * R);
       this.F.set(a.x + Math.sin(this.t * 1.3) * 1.5, a.y + Math.sin(this.t * 1.7) * 1.2, a.z);
@@ -190,6 +191,7 @@ export class TvCam {
   // now and then the disaster notices the camera: after a while on air, a chance every few seconds (twice a disaster at most)
   // the villains and the kaiju come after the cameras often (Sean): a car thrown at it, or straight up to it to grab it
   maybeAttack(sdt) {
+    if (this.tv.lv) return; // in a level the kaiju and the villains are busy with the hero
     const c = this.cur, kind = this.tv.kind; let style = STYLE[kind]; if (!style || this.tv.leaving >= 0) return;
     const big = kind === 'villains' || kind === 'kaiju';
     if (!big && c.kind === 'heli' && !SKY_OK.has(style)) return;
