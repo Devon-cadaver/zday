@@ -99,7 +99,7 @@ const FOE_JAB = (() => { const [k0, k1, k2] = CLIPS.jabR.keys, hit = lungeOf(k1.
 // hit in the head: the feet go too, one stepping back, so a blow moves the whole body
 const stag = (clip) => ({ keys: clip.keys.map((q, i) => (i === 1 ? key(q.t, { ...q.p, body: -0.16, bodyY: -0.1, hipL: 0.45, kneeL: 0.35, hipR: -0.45, kneeR: 0.65 }, q.ease) : q)) });
 // the six (Sean; his brief: they should not all fight the same): speed of the blows, weight of them, how fast they fly, which combo they use unless the kit has been changed, and a signature. wind: before the first blow; gap: between; knock: [how far, how high]
-const STYLES = {
+export const STYLES = {
   Nova: { melee: 'boxer', spd: 1, dmg: 1, run: 1, col: '#ff7ad9', sig: { name: 'SUPERNOVA', n: 3, wind: 0.2, gap: 0.2, dmg: 13, clips: [CLIPS.cross, CLIPS.uppercut, CLIPS.uppercut], knock: [20, 12], burst: true, shake: 1.2, rgb: [2.6, 1.2, 2.2] } },
   Dragonfly: { melee: 'capoeira', spd: 1.12, dmg: 0.9, run: 1.15, col: '#7dff9a', sig: { name: 'RAZOR WINGS', n: 6, wind: 0.1, gap: 0.12, dmg: 6.5, clips: [CLIPS.kick], circle: true, knock: [16, 7], shake: 0.7, rgb: [0.8, 2.6, 1.2] } },
   Tempo: { melee: 'flurry', spd: 1.3, dmg: 0.75, run: 1.05, col: '#6fe8ff', sig: { name: 'TIME STOP', n: 9, wind: 0.05, gap: 0.075, dmg: 4.5, clips: [CLIPS.jabL, CLIPS.jabR], knock: [18, 5], shake: 0.8, rgb: [0.8, 2.2, 2.8] } },
