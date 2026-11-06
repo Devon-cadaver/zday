@@ -138,7 +138,9 @@ export class Horde {
     if (this.o.level) this.ctx.post.opts.dof = false; this.place(dt); g.focusAt = _a.copy((this.cineK || 0) > 0.5 && this.look2 ? this.look2 : this.look); tg.set(g.focusAt.x, 0, g.focusAt.z); this.focus = this.ctx.camera.position.distanceTo(g.focusAt);
   }
   // only the streets: a step that leaves them is taken back
-  move(dx, dz) { const h = this.h, P = this.g.people, nx = h.x + dx, nz = h.z + dz; if (P.walkable(nx, nz)) { h.x = nx; h.z = nz; } else if (P.walkable(nx, h.z)) { h.x = nx; } else if (P.walkable(h.x, nz)) { h.z = nz; } else { h.vx = 0; h.vz = 0; } h.y = P.groundY(h.x, h.z); }
+  // stuck on sidewalks (Sean, 2026-11-05, in the riot): the people's walking grid blocks rubble, trees and the edges of things. As in the street fights (fighttest.js open): anywhere in the town but inside a standing building; caught somewhere that is not, any step gets her out
+  openAt(x, z) { const P = this.g.people, c = this.g.city; if (P.cellOf(x, z) < 0) return false; let ok = true; c.buildingsNear(x, z, 1.5, (k, d, b) => { if (!c.dead[k] && x > b.x0 - 0.4 && x < b.x1 + 0.4 && z > b.z0 - 0.4 && z < b.z1 + 0.4) ok = false; }); return ok; }
+  move(dx, dz) { const h = this.h, P = this.g.people, nx = h.x + dx, nz = h.z + dz, free = !this.openAt(h.x, h.z), ok = (x, z) => free || this.openAt(x, z); if (ok(nx, nz)) { h.x = nx; h.z = nz; } else if (ok(nx, h.z)) { h.x = nx; } else if (ok(h.x, nz)) { h.z = nz; } else { h.vx = 0; h.vz = 0; } h.y = P.groundY(h.x, h.z); }
   heroStep(dt) {
     const h = this.h, P = this.g.people;
     switch (h.state) {
