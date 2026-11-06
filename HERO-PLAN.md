@@ -69,10 +69,10 @@ Build order (one thing at a time, each tested in the Sandbox and pushed). The ch
   - [x] 12b9. Three heroes in their last outfits over the planet on the main menu.
   - [x] 12b10. Level 1's crowd: Greys, Mantis drones, Dome walkers and four alien dogs, with a few silver commanders in sphere helmets a punch knocks off.
   - [x] 12c. Agents play the whole game through and report what breaks or drags: first round done and tuned (no stop at walls, stragglers, the giants, Destroy's goal, the HUD). Run again as the game changes.
-  - [ ] 12d. The weather levels, with their own play style. Lock on starts a mini-game and the game does the flying.
+  - [x] 12d. The weather levels, with their own play style. Lock on starts a mini-game and the game does the flying.
     - [x] Tornado: round it against its spin, three heights to dodge at, GUST in time, Freeze holds it.
     - [x] Flood (lift buses onto roofs), dust storm (blow out the devils), tsunami (ice walls ahead of the wave), cold wave (thaw the streets): glowing spots, Lock on flies there, tap in the green (stormgame.js).
-    - [ ] Earthquake (hold buildings up): not weather, not built yet.
+    - [x] Earthquake: the Faultline, a 50 m giant of rock and lava (the Basalt Brute in Asian towns, the Living Mountain in western ones) that quakes and throws boulders; throw them back until it falls, beat the stone men, and it splits in two, then four fought hand to hand, then a crowd (Sean, 2026-11-05).
     - [x] Destroy for points in every level (score, chains to x3, goal 100 x the old building count). Weather levels: Storm meter and Unleash (tornado follows you, levee breaks, army blinded, pick the wave's coast, buildings shatter). Heroes and rescue squads do jobs against you; Lock on and the gauge, or 3 power hits, stop them (stormgame.js StormWar).
     - [x] New powers, the first 5 of each list: stuns Shock web, Blinding flash, Sleep dust, Mud trap, Vine snare; knockbacks Shockwave stomp, Fire jet, Water cannon, Boulder throw, Car toss; melee Boxer, Kung fu, Wrestler, Muay Thai, Capoeira.
     - [x] The other 45 of Sean's 60 (Sean, 2026-11-04).
