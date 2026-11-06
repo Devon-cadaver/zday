@@ -52,6 +52,7 @@ renderer.toneMapping = THREE.NoToneMapping;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
+if (!low) { const L = new THREE.PointLight('#ffffff', 0, 9, 2); scene.add(L); scene.userData.hitLight = L; } // the flash of light from a blow (hitfx.js): there from the start, dark, so no material rebuilds its shader when it first lights; none on a phone (a light costs every pixel there)
 const haze = new THREE.Color('#d9bf95');
 scene.background = haze;
 scene.fog = new THREE.FogExp2(haze, num('fog', 0.0006));

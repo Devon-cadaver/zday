@@ -218,7 +218,9 @@ function splash(size) {
   return norm(clip(x, 1.2), 0.85);
 }
 // a blow landing: a sharp slap right on the impact (over a thud or a crash for the weight), and a clang: one that does not get through
-function smack() { const x = len(0.22), c = biquad(noise(Math.ceil(0.04 * SR)), 'hp', 2500); env(c, 0.0003, 0.012); add(x, c, 0, 1); ping(x, 0, 1900 + rnd() * 300, 0.035, 0.5); ping(x, 0, 3100 + rnd() * 500, 0.02, 0.35); thump(x, 0, 150, 70, 0.012, 0.04, 0.8); return norm(clip(x, 1.4), 0.9); }
+// a blow (Sean, 2026-11-05: the old one rang at 1900 and 3100 Hz like a tin can; he picked Snappy from hits.html, hitsound.js): a tight snap of a hit and a small thump, no ring. The three made are light, middling and heavy, so a run of blows is never the same
+let smackN = 0;
+function smack() { const k = [0.2, 0.55, 0.9][smackN++ % 3], x = len(0.2); grain(x, 0, 0.022, 1350, 1, 0.85); thump(x, 0, 165 - 30 * k, 85 - 20 * k, 0.008, 0.025 + 0.02 * k, 0.65 + 0.3 * k); return norm(clip(x, 1.5 + k * 0.8), 0.9); }
 function clang() { const x = len(0.55), c = biquad(noise(Math.ceil(0.02 * SR)), 'hp', 3000); env(c, 0.0003, 0.006); add(x, c, 0, 0.7); const k = 0.96 + rnd() * 0.08; ping(x, 0, 1430 * k, 0.18, 0.55); ping(x, 0, 2140 * k, 0.14, 0.45); ping(x, 0, 3570 * k, 0.1, 0.35); ping(x, 0, 5210 * k, 0.06, 0.25); return norm(x, 0.85); }
 // a punch, a body landing
 function thud() { const x = len(0.4); thump(x, 0, 110, 50, 0.02, 0.06, 1); const c = biquad(noise(Math.ceil(0.03 * SR)), 'lp', 1800); env(c, 0.0005, 0.008); add(x, c, 0, 0.6); return norm(x, 0.8); }
