@@ -107,12 +107,12 @@ export function rig(o = {}) {
   const hips = pivot(body, 0, 0.94, 0), xtra = o.extras || {};
   const sl = o.slim ? 0.88 : 1, fancy = !!mt.fancy && !o.hd, keep = (p) => { p.userData.keep = true; return p; }; // fancy (cloth.js looks): the extra parts, kept over the smooth body
   part(m.box, mt.suit, 0.3 * sl, 0.16, 0.18, 0, 0, 0, hips);
-  const legs = [-1, 1].map(sx => {
-    const hip = pivot(hips, sx * 0.09, -0.04, 0); part(m.limb, mt.leg || mt.suit, 0.075 * sl, 0.46, 0.075 * sl, 0, 0, 0, hip); // leg: leggings in a colour of their own
+  const legs = (o.legs === 4 ? [[-1, 0.09], [1, 0.09], [-1, 0.2], [1, 0.2]] : [[-1, 0.09], [1, 0.09]]).map(([sx, hx], li) => {
+    const hip = pivot(hips, sx * hx, -0.04, 0); if (li >= 2) part(m.ball, mt.leg || mt.suit, 0.085 * sl, 0.085, 0.085 * sl, 0, 0, 0, hip); /* the second pair's hip joint */ part(m.limb, mt.leg || mt.suit, 0.075 * sl, 0.46, 0.075 * sl, 0, 0, 0, hip); // leg: leggings in a colour of their own
     const knee = pivot(hip, 0, -0.45, 0); part(m.limb, mt.leg || mt.suit, 0.06 * sl, 0.44, 0.06 * sl, 0, 0, 0, knee);
     const ank = pivot(knee, 0, -0.45, 0); part(m.box, mt.boot || mt.suit, 0.1, 0.07, 0.22, 0, 0, 0.05, ank); // the boot on its ankle
     if (fancy) keep(part(m.box, mt.boot, 0.1, 0.035, 0.1, 0, 0.065, 0, ank)); // the boot's cuff
-    return { hip, knee, ank };
+    return { hip, knee, ank, sx, extra: li >= 2 };
   });
   const torso = pivot(hips, 0, 0.06, 0); // the waist
   part(m.box, mt.suit, 0.36 * sl, 0.26, 0.2, 0, 0.16, 0, torso);
@@ -123,15 +123,18 @@ export function rig(o = {}) {
   part(m.box, mt.suit, 0.44 * sl, 0.1, 0.22, 0, 0.2, 0, chest); // shoulders
   if (mt.badge) part(m.box, mt.badge, 0.12, 0.12, 0.02, 0, 0.06, 0.105, chest); // the emblem on the chest
   if (fancy) keep(part(m.box, mt.suit, 0.17 * sl, 0.045, 0.11, 0, 0.3, 0.015, chest)); // the collar
-  const head = pivot(chest, 0, 0.4, 0);
-  part(m.ball, mt.skin, 0.11, 0.13, 0.115, 0, 0, 0, head);
-  part(m.ball, mt.hair, 0.117, 0.085, 0.122, 0, 0.055, -0.014, head); // the hair
-  if (o.longHair) part(m.box, mt.hair, 0.12, 0.26, 0.06, 0, -0.1, -0.1, head).userData.keep = true; // a long ponytail down the back
-  part(m.box, mt.skin, 0.06, 0.08, 0.06, 0, -0.13, 0, head); // neck
-  if (fancy) { const fm = mt.face || mt.hair; for (const sx of [-1, 1]) { if (!o.eyes) keep(part(m.ball, fm, 0.019, 0.015, 0.012, sx * 0.04, 0.012, 0.106, head)); keep(part(m.box, fm, 0.042, 0.008, 0.01, sx * 0.04, 0.045, 0.108, head)); } keep(part(m.box, fm, 0.034, 0.006, 0.01, 0, -0.045, 0.11, head)); } // eyes, brows, a mouth
-  const eyes = o.eyes ? [-1, 1].map(sx => { const e = part(m.ball, mt.eye || m.eye, 0.024, 0.02, 0.016, sx * 0.042, 0.015, 0.108, head); e.userData.keep = true; return e; }) : null;
+  const heads = (o.heads === 2 ? [-0.12, 0.12] : [0]).map((hx) => {
+    const head = pivot(chest, hx, 0.4, 0);
+    part(m.ball, mt.skin, 0.11, 0.13, 0.115, 0, 0, 0, head);
+    part(m.ball, mt.hair, 0.117, 0.085, 0.122, 0, 0.055, -0.014, head); // the hair
+    if (o.longHair) part(m.box, mt.hair, 0.12, 0.26, 0.06, 0, -0.1, -0.1, head).userData.keep = true; // a long ponytail down the back
+    part(m.box, mt.skin, 0.06, 0.08, 0.06, 0, -0.13, 0, head); // neck
+    if (fancy) { const fm = mt.face || mt.hair; for (const sx of [-1, 1]) { if (!o.eyes) keep(part(m.ball, fm, 0.019, 0.015, 0.012, sx * 0.04, 0.012, 0.106, head)); keep(part(m.box, fm, 0.042, 0.008, 0.01, sx * 0.04, 0.045, 0.108, head)); } keep(part(m.box, fm, 0.034, 0.006, 0.01, 0, -0.045, 0.11, head)); } // eyes, brows, a mouth
+    return head;
+  }), head = heads[0];
+  const eyes = o.eyes ? heads.flatMap((hd) => [-1, 1].map(sx => { const e = part(m.ball, mt.eye || m.eye, 0.024, 0.02, 0.016, sx * 0.042, 0.015, 0.108, hd); e.userData.keep = true; return e; })) : null;
   const arms = [];
-  (o.arms === 6 ? [0.18, 0.04, -0.1] : [0.18]).forEach((y, row) => {
+  [0.18, 0.04, -0.1].slice(0, o.arms === 6 ? 3 : o.arms === 4 ? 2 : 1).forEach((y, row) => {
     for (const sx of [-1, 1]) {
       const sh = pivot(chest, sx * 0.23 * sl, y, 0); part(m.limb, mt.suit, 0.055 * sl, 0.3, 0.055 * sl, 0, 0, 0, sh);
       if (fancy && row === 0) keep(part(m.ball, mt.suit, 0.078, 0.05, 0.078, 0, 0.012, 0, sh)); // a shoulder pad
@@ -145,7 +148,7 @@ export function rig(o = {}) {
   if (xtra.plates) { keep(part(m.box, mt.badge || mt.glove || mt.suit, 0.3 * sl, 0.2, 0.05, 0, 0.1, 0.09, chest)); for (const L of legs) keep(part(m.box, mt.badge || mt.glove || mt.suit, 0.09, 0.2, 0.09, 0, -0.22, 0.03, L.hip)); }
   if (xtra.coat) { keep(part(m.box, mt.cape || mt.suit, 0.38 * sl, 0.55, 0.22, 0, -0.32, 0, hips)); }
   const cape = new Cape(torso, xtra.noCape ? 0.01 : o.capeLen ?? 1.15, o.hd ? hdCapeMat(o.hd) : mt.cape, o.hd); if (xtra.noCape) cape.mesh.visible = false;
-  const R0 = { root, body, hips, torso, chest, head, legs, arms, eyes, cape, parts, mt, o }; if (o.hd) hdParts(R0, keep); return R0;
+  const R0 = { root, body, hips, torso, chest, head, heads, legs, arms, eyes, cape, parts, mt, o, extraL: arms.length > 2 || legs.length > 2 || heads.length > 1 }; if (o.hd) hdParts(R0, keep); return R0;
 }
 // the close-up body: smooth tubes swept through the same joints (flesh.js), each part in its own colour - a suit with
 // a belt and an emblem, boots, gloves, a head with hair over the crown. Built the first time a figure comes near
@@ -161,13 +164,13 @@ function smoothBody(r) {
   T({ rings: 16, cols: 14, len: 0.8, radii: [0.12, 0.15, 0.14, 0.17, 0.21, 0.1].map(v => v * sl), bulge: [0, 0, 0.012, 0.01, 0], capStart: true, capEnd: true, shape: (u, c, s) => 1 / Math.sqrt((c / 0.62) ** 2 + s * s),
     tint: (u, c, s) => (belt && u > 0.24 && u < 0.3 ? belt : badge && c > 0.75 && u > 0.6 && u < 0.72 && Math.abs(s) < 0.4 ? badge : fancy && (Math.abs(s) > 0.965 || (c > 0.985 && u > 0.32) || Math.abs(u - 0.56) < 0.012) ? seamS : suit) }, // seams down the sides, the front, and across the chest
     [[H, 0, -0.08, 0], [H, 0, 0.02, 0], [Tq, 0, 0.12, 0], [Ch, 0, 0.02, 0], [Ch, 0, 0.2, 0], [Ch, 0, 0.3, 0]], [Ch, 0, 0, 1]);
-  T({ rings: 14, cols: 12, len: 0.4, radii: [0.05, 0.045, 0.085, 0.112, 0.06], capStart: true, capEnd: true, shape: (u, c, s) => 1 / Math.sqrt((c / 1.05) ** 2 + (s / 0.93) ** 2),
+  for (const Hd of r.heads || [r.head]) T({ rings: 14, cols: 12, len: 0.4, radii: [0.05, 0.045, 0.085, 0.112, 0.06], capStart: true, capEnd: true, shape: (u, c, s) => 1 / Math.sqrt((c / 1.05) ** 2 + (s / 0.93) ** 2),
     tint: (u, c) => (u > 0.72 || (u > 0.5 && c < -0.2) ? hair : skin) }, // hair over the crown and down the back
-    [[Ch, 0, 0.28, 0], [Hd, 0, -0.12, 0], [Hd, 0, -0.06, 0.012], [Hd, 0, 0.03, 0], [Hd, 0, 0.14, -0.01]], [Hd, 0, 0, 1]);
+    [[Ch, Hd.position.x * 0.8, 0.28, 0], [Hd, 0, -0.12, 0], [Hd, 0, -0.06, 0.012], [Hd, 0, 0.03, 0], [Hd, 0, 0.14, -0.01]], [Hd, 0, 0, 1]);
   for (const L of r.legs) {
     const sx = Math.sign(L.hip.position.x) || 1;
     T({ rings: 16, cols: 10, len: 1.0, radii: [0.085 * sl, 0.08 * sl, 0.058 * sl, 0.045, 0.045, 0.035], bulge: [0, 0.014, 0.012, 0, 0], capStart: true, capEnd: true, tint: (u) => (u > 0.72 ? boot : fancy && u > 0.675 ? seamS : leg && u > 0.12 ? leg : suit) },
-      [[H, sx * 0.06, 0.02, 0], [L.hip, 0, 0, 0], [L.knee, 0, 0, 0], [L.ank, 0, 0.05, 0], [L.ank, 0, 0, 0.06], [L.ank, 0, -0.01, 0.15]], [H, 0, 0, 1]);
+      [[H, L.hip.position.x * 0.66, 0.02, 0], [L.hip, 0, 0, 0], [L.knee, 0, 0, 0], [L.ank, 0, 0.05, 0], [L.ank, 0, 0, 0.06], [L.ank, 0, -0.01, 0.15]], [H, 0, 0, 1]);
   }
   for (const A of r.arms) {
     T({ rings: 14, cols: 9, len: 0.75, radii: [0.07 * sl, 0.058 * sl, 0.046 * sl, 0.04, 0.045, 0], bulge: [0, 0.01, 0.008, 0, 0], capStart: true, capEnd: true, tint: (u) => (u > 0.8 ? glove : fancy && u > 0.74 ? seamS : suit) },
@@ -179,6 +182,7 @@ function smoothBody(r) {
 // close up (or always, for the roster) the smooth body; further off the boxy figure, a few pixels tall, where the
 // extra detail would cost frames and show nothing. Call after the pose is set
 export function detail(r, D, always = false) {
+  if (r.extraL) followLimbs(r);
   const cam = D && D.ctx.camera, hd = r.o && r.o.hd, lim = hd ? HD_NEAR : NEAR, near = always || (cam && cam.position.distanceToSquared(r.root.position) < lim * lim);
   if (hd) { if (near && !r.smooth) r.smooth = smoothBody(r); const on = !!near; if (on !== r.hdOn) { r.hdOn = on; if (r.smooth) r.smooth.mesh.visible = on; for (const p of r.parts) { if (p.userData.keep) { if (!p.userData.hdOff) p.visible = on; } else p.visible = !on; } } if (on) { r.root.updateMatrixWorld(true); sweepTubes(r.body, r.smooth.body); } return; }
   if (near && !r.smooth) r.smooth = smoothBody(r);
@@ -192,7 +196,7 @@ export const handAt = (arm, out) => arm.el.localToWorld(out.set(0, -0.3, 0));
 export function relax(r) {
   for (const L of r.legs) { L.hip.rotation.set(0, 0, 0); L.knee.rotation.set(0, 0, 0); if (L.ank) L.ank.rotation.set(0, 0, 0); }
   for (const a of r.arms) { a.sh.rotation.set(0, 0, a.sx * 0.08); a.el.rotation.set(0, 0, 0); if (a.wr) a.wr.rotation.set(0, 0, 0); }
-  r.torso.rotation.set(0, 0, 0); if (r.chest) r.chest.rotation.set(0, 0, 0); r.head.rotation.set(0, 0, 0); r.body.rotation.set(0, 0, 0); r.body.position.y = 0; r.hips.position.y = 0.94;
+  r.torso.rotation.set(0, 0, 0); if (r.chest) r.chest.rotation.set(0, 0, 0); for (const h of r.heads || [r.head]) h.rotation.set(0, 0, 0); r.body.rotation.set(0, 0, 0); r.body.position.y = 0; r.hips.position.y = 0.94;
 }
 // a sprint at phase ph; k: how hard
 function run(r, ph, k) {
@@ -240,13 +244,41 @@ export function pinPose(r, f) {
 }
 export function villainRig(name, of, hd = false) { // hd: the detailed body, dressed by the outfit (hdbody.js)
   const base = vmats(name), mats = of ? { ...base, ...(of.skin ? { skin: new THREE.MeshStandardMaterial({ color: of.skin, roughness: 0.8 }) } : null), ...(of.belt ? { belt: new THREE.MeshStandardMaterial({ color: of.belt, metalness: 0.4, roughness: 0.45 }) } : null), ...(of.suit ? { suit: clothMat(of.suit) } : null), ...(of.cape ? { cape: clothMat(of.cape, { side: THREE.DoubleSide, repeat: [5, 9] }) } : null), ...(of.dark ? { glove: clothMat(of.dark, { bumpScale: 0.15 }), boot: clothMat(of.dark, { bumpScale: 0.15 }) } : null) } : base;
-  const look = hd ? hdLook(name, of) : null, r = rig({ mats, arms: name === 'Weaver' ? 6 : 2, eyes: name === 'Tyrant', extras: of || {}, hd: look, slim: !!(look && look.f) }); relax(r); addHeadgear(r, of); r.wings = []; return r;
+  const look = hd ? hdLook(name, of) : null, n = limbs(name, of), r = rig({ mats, arms: n.arms, legs: n.legs, heads: n.heads, eyes: name === 'Tyrant', extras: of || {}, hd: look, slim: !!(look && look.f) }); relax(r); headgearAll(r, of); r.wings = []; return r;
 }
 export function handsOnHips(r) {
   r.legs[0].hip.rotation.z = -0.09; r.legs[1].hip.rotation.z = 0.09;
-  for (const a of r.arms) { a.sh.rotation.set(0.15, 0, a.sx * 0.6); a.el.rotation.set(-0.3, 0, -a.sx * 1.7); }
+  for (const a of r.arms) { if (a.row && r.extraL) continue; /* the other rows follow the first (followLimbs) */ a.sh.rotation.set(0.15, 0, a.sx * 0.6); a.el.rotation.set(-0.3, 0, -a.sx * 1.7); }
 }
 
+// how many arms, legs and heads a character has: what the wardrobe chose (Sean, 2026-11-06), else their own (Weaver six arms)
+export const limbs = (name, of) => { const q = (k, ok, d) => { const v = +(of && of[k]); return ok.includes(v) ? v : d; }; return { arms: q('arms', [2, 4, 6], name === 'Weaver' ? 6 : 2), legs: q('legs', [2, 4], 2), heads: q('heads', [1, 2], 1) }; };
+// a hat on each head
+export function headgearAll(r, of) { addHeadgear(r, of); if (r.heads && r.heads[1]) { const q = { head: r.heads[1], o: r.o }; addHeadgear(q, of); r.headgear2 = q.headgear || null; } }
+// The extra limbs follow the first pair (Sean, 2026-11-06): every pose in the game is made for two arms, two legs and a head, so the rest copy them, each a
+// moment behind and spread out: the second and third rows of arms a little lower and wider, the second pair of legs splayed and in step with the other
+// side's (a trot), the second head looking its own way a little. Only a limb the pose left at rest (relax), unless force (the fight bodies, which ease
+// every arm themselves). Called from detail(), after the pose
+const z0 = (o) => !o || (o.rotation.x === 0 && o.rotation.y === 0 && o.rotation.z === 0);
+const atRestA = (a) => a.sh.rotation.x === 0 && a.sh.rotation.y === 0 && a.sh.rotation.z === a.sx * 0.08 && z0(a.el) && z0(a.wr);
+function ease(st, i, v, k) { st[i] = st.ready ? st[i] + (v - st[i]) * k : v; return st[i]; }
+export function followLimbs(r, force = false) {
+  if (!r.extraL) return; const now = performance.now(), dt = r.fT == null ? 0 : Math.min(0.1, (now - r.fT) / 1000); r.fT = now; r.fTk = (r.fTk || 0) + dt;
+  for (const a of r.arms) {
+    if (!a.row) continue; if (!force && !atRestA(a)) { a.fs = null; continue; }
+    const m = r.arms[a.sx < 0 ? 0 : 1], st = a.fs || (a.fs = new Float32Array(9)), k = 1 - Math.exp(-dt * (24 - a.row * 7)), R = a.row;
+    a.sh.rotation.set(ease(st, 0, m.sh.rotation.x + R * 0.3, k), ease(st, 1, m.sh.rotation.y, k), ease(st, 2, m.sh.rotation.z + a.sx * R * 0.2, k));
+    a.el.rotation.set(ease(st, 3, m.el.rotation.x * (1 - R * 0.12), k), ease(st, 4, m.el.rotation.y, k), ease(st, 5, m.el.rotation.z, k));
+    if (a.wr && m.wr) a.wr.rotation.set(ease(st, 6, m.wr.rotation.x, k), ease(st, 7, m.wr.rotation.y, k), ease(st, 8, m.wr.rotation.z, k)); st.ready = true;
+  }
+  for (const L of r.legs) {
+    if (!L.extra) continue; if (!force && !(z0(L.hip) && z0(L.knee) && z0(L.ank))) { L.fs = null; continue; }
+    const m = r.legs[L.sx < 0 ? 1 : 0], st = L.fs || (L.fs = new Float32Array(5)), k = 1 - Math.exp(-dt * 20), hz = ease(st, 2, -m.hip.rotation.z + L.sx * 0.24, k);
+    L.hip.rotation.set(ease(st, 0, m.hip.rotation.x, k), ease(st, 1, -m.hip.rotation.y, k), hz); L.knee.rotation.set(ease(st, 3, m.knee.rotation.x, k), 0, 0); if (L.ank) L.ank.rotation.set(ease(st, 4, m.ank ? m.ank.rotation.x : 0, k), 0, -hz * 0.8); st.ready = true;
+  }
+  const H2 = r.heads && r.heads[1];
+  if (H2) { if (!force && !z0(H2)) H2.fs = null; else { const h = r.head, st = H2.fs || (H2.fs = new Float32Array(3)), k = 1 - Math.exp(-dt * 10), t = r.fTk; H2.rotation.set(ease(st, 0, h.rotation.x + Math.sin(t * 0.9) * 0.05, k), ease(st, 1, h.rotation.y + 0.22 + Math.sin(t * 0.6) * 0.18, k), ease(st, 2, h.rotation.z + 0.06, k)); st.ready = true; } }
+}
 const TRAIL_VS = /* glsl */`attribute float aA; varying float vA; void main() { vA = aA; gl_Position = projectionMatrix * viewMatrix * vec4(position, 1.0); }`;
 const TRAIL_FS = /* glsl */`uniform vec3 uColor; varying float vA; void main() { gl_FragColor = vec4(uColor * vA, 1.0); }`;
 // Blur's streak: a glowing red ribbon along the last half second of his run
@@ -320,7 +352,7 @@ export function villainModel(name, of) { // of: an outfit (the roster's robot le
   const r = villainRig(name, of, true); relax(r);
   if (name === 'Weaver') {
     r.hips.position.y = 0.6; r.torso.rotation.x = 0.55; r.head.rotation.x = -0.5; r.legs[0].hip.rotation.set(-1.2, 0, -0.35); r.legs[1].hip.rotation.set(-1.2, 0, 0.35);
-    for (const L of r.legs) L.knee.rotation.x = 2.0;
+    for (const L of r.legs) if (!L.extra) L.knee.rotation.x = 2.0; // a second pair of legs follows these (followLimbs)
     for (const a of r.arms) { a.sh.rotation.set(-0.7 + a.row * 0.55, 0, a.sx * (0.95 + a.row * 0.2)); a.el.rotation.set(-1.0, 0, -a.sx * 0.3); }
   } else handsOnHips(r);
   r.root.userData.tick = (dt) => r.cape.update(dt, 0.12, 0.35); r.root.updateMatrixWorld(true); r.cape.update(0.1, 0.12, 0.35); r.cape.update(0.03, 0.12, 0.35); detail(r, null, true);

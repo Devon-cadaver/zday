@@ -4,7 +4,8 @@
 // from the menu (loaded only then), and on its own page (showcase.html).
 import * as THREE from 'three';
 import { figureGeometry, figureMaterial, figureAttributes, ARCHETYPES, OFFICER_LOOK, FIREFIGHTER_LOOK, SOLDIER_LOOK, CREW_LOOK, HAZMAT_LOOK, MEDIC_LOOK, ZTYPES, FLAG } from './figures.js';
-import { heroModel } from './heroes.js';
+import { heroRig } from './heroes.js';
+import { nameOf } from './names.js';
 import { villainModel } from './villains.js';
 import { STYLES, baseBuilding } from './base.js';
 import { bandModel } from './band.js';
@@ -14,6 +15,9 @@ import { VEHICLES, buildVehicle } from './vehicles.js';
 import { rng } from './textures.js';
 import { BUILD } from './creaturekit.js';
 
+// the six as the player has them now: read from the hero game's save (herogame.js HS, zday_hero) without loading the game itself (showcase.html shows this too)
+const SIX = [['dragonfly', 'Dragonfly', 'hero'], ['nova', 'Nova', 'hero'], ['tempo', 'Tempo', 'hero'], ['blur', 'Blur', 'villain'], ['tyrant', 'Tyrant', 'villain'], ['weaver', 'Weaver', 'villain']], HEROES = new Set(['Nova', 'Dragonfly', 'Tempo']);
+function cast() { let o = null; try { o = JSON.parse(localStorage.getItem('zday_hero') || 'null'); } catch (e) { /* no storage */ } o = o || {}; const ch = o.chars || {}, of = o.outfits || {}; return SIX.map(([id, n, side]) => { const c = ch[id] || {}, shown = nameOf(c.nick) || n; return { n, side: c.side || side, shown, of: of[n] || null }; }); }
 // canvas: where the tiles are drawn (fixed, over the panel); list: the scrolling list (tiles show only inside it);
 // root: where the sections go. Returns stop(), which frees it all
 export function startRoster({ canvas, list, root }) {
@@ -46,7 +50,7 @@ export function startRoster({ canvas, list, root }) {
     return g;
   }
 
-  function add(section, name, obj, fit) {
+  function add(section, name, obj, fit, sub) { // sub: a second, smaller line (a renamed fighter's own name)
     let grid = root.querySelector('[data-section="' + section + '"]');
     if (!grid) {
       const h = document.createElement('h2'); h.textContent = section;
@@ -54,7 +58,7 @@ export function startRoster({ canvas, list, root }) {
       root.append(h, grid);
     }
     const el = document.createElement('div'); el.className = 'tile';
-    const lbl = document.createElement('div'); lbl.className = 'lbl'; lbl.textContent = name;
+    const lbl = document.createElement('div'); lbl.className = 'lbl'; lbl.textContent = name; if (sub) { const s = document.createElement('small'); s.textContent = sub; lbl.appendChild(s); }
     el.appendChild(lbl); grid.appendChild(el);
     const scene = new THREE.Scene();
     const hemi = new THREE.HemisphereLight('#dfe7f2', '#2a3340', 1.1);
@@ -78,8 +82,7 @@ export function startRoster({ canvas, list, root }) {
   add('Responders', 'Hazmat crew', figure(HAZMAT_LOOK(r), 1), 1.9);
   add('Responders', 'Paramedic', figure(MEDIC_LOOK(r), 0), 1.9);
   // ---------- heroes, villains and the rebuilding
-  for (const n of ['Dragonfly', 'Nova', 'Tempo']) add('Super heroes', n, heroModel(n), 2.1);
-  for (const n of ['Blur', 'Tyrant', 'Weaver']) add('Super villains', n, villainModel(n), 2.1);
+  { const C = cast(); for (const side of ['hero', 'villain']) for (const q of C) if (q.side === side) add(side === 'hero' ? 'Super heroes' : 'Super villains', q.shown, HEROES.has(q.n) ? heroRig(q.n, q.of, true).root : villainModel(q.n, q.of), 2.1, q.shown === q.n ? '' : q.n); } // a renamed or redressed fighter as they are now; one who crossed over in their new side's row
   add('Robots', 'The robot leader', villainModel('Tyrant', { suit: '#8f97a3', cape: '#3a3f47', dark: '#20242a', face: 'robot', facea: '#a4acb8', faceb: '#3a4048', eyec: '#ff3a2a', back: 'none', chest: 'plate', sh: 'plate', belt: '#5a606a' }), 2.1); // the rigs are person-sized since the rescale (villains.js S), so a figure's fit // the ring's robot (base.js); his army comes with the zombie types below
   for (const s of Object.keys(STYLES)) add('Home bases', STYLES[s].name, baseBuilding({ style: s, wall: STYLES[s].side === 'hero' ? '#b9b1a0' : '#4a4f57', trim: STYLES[s].side === 'hero' ? '#e8dcc2' : '#2b2b2e', win: STYLES[s].side === 'hero' ? '#9fd4ff' : '#ff4a4a', door: '#8a1c2a' }, 0), 24);
   for (const girls of [false, true]) for (const [role, n] of [['vox', 'singer'], ['gtr', 'guitarist'], ['bass', 'bassist'], ['drums', 'drummer']]) add('The bands', (girls ? 'Goth ' : 'Punk ') + n, bandModel(role, girls), 3.6); // the punks; the Far Isles' girls

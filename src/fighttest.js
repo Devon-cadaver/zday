@@ -5,7 +5,7 @@
 // the ground (jab, charge, grab), each stopped by a hit while winding up. Blows land only if the bodies really meet. Good fighting fills a meter that pays for two powers: a stun (ice, no damage, under 2 s) and a knockback (the laser, next to no damage, stops anything, frees you from a grab). Sandbox card;
 // main.js hands it the camera like the planes. Leaving reloads the town, so nothing here has to be put back.
 import * as THREE from 'three';
-import { villainRig, relax, detail } from './villains.js';
+import { villainRig, relax, followLimbs, detail } from './villains.js';
 import { CLIPS, playClip, pinAt } from './clips.js';
 import { applyPoses } from './poses.js';
 import { Streak } from './streak.js';
@@ -280,6 +280,7 @@ export class Body {
     if (this.tw) { r.chest.rotation.y += this.tw; r.torso.rotation.y += this.tw * 0.5; } // the shoulders turning into a blow
     if (this.rk > 0.01) { const k = this.rk; r.torso.rotation.x -= 0.5 * k; r.chest.rotation.x -= 0.25 * k; r.head.rotation.x -= 0.35 * k; this.rk *= Math.exp(-dt * 9); } // knocked back on its heels by a blow, over whatever it is doing
     if (this.loose) this.springs(dt);
+    if (r.extraL) followLimbs(r, true); // the extra arms, legs and head copy the first ones (villains.js)
     r.root.position.set(this.x, this.y, this.z); r.root.rotation.y = this.yaw; if (this.fly) r.root.position.y += Math.sin((this.bobT = (this.bobT || 0) + dt) * 2.3) * 0.13;
     if (grounded) { r.root.updateMatrixWorld(true); const a = r.legs[0].ank.getWorldPosition(_a).y, b = r.legs[1].ank.getWorldPosition(_b).y; r.root.position.y += top + 0.09 - Math.min(a, b); } // the lower foot on the ground, however the pose bends
     else if (this.state === 'down' || this.state === 'getup') r.root.position.y += 0.3;

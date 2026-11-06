@@ -16,7 +16,8 @@ import { buildVehicle } from './vehicles.js';
 import { sfx } from './audio.js';
 import { SEE } from './see.js';
 import { heroRig } from './heroes.js';
-import { relax, detail, villainRig , S } from './villains.js';
+import { relax, detail, villainRig , S, handAt } from './villains.js';
+import { hdLook } from './hdbody.js';
 import { Interior } from './interior.js';
 import { LAB } from './lab.js';
 import { playClip } from './clips.js';
@@ -55,6 +56,9 @@ const LOAD = { seed: { name: 'Storm seeding', wait: 8 }, small: { name: 'Small b
 const SEED_REACH = 160; // a seeding run passing this close to a tornado weakens it (closer, more)
 const _f = new THREE.Vector3(), _u = new THREE.Vector3(), _v = new THREE.Vector3(), _q = new THREE.Quaternion(), _e = new THREE.Euler(0, 0, 0, 'YZX');
 const HIP = 0.94 * S; // a hero's hips above the feet (the rig's 0.94 at its scale): the hero is flown by the hips
+// the ways round town that are not flying (the wardrobe's Moves; foot()): how much faster than flying each goes, and what the player is told
+const MOVE_K = { run: 1.5, swing: 1.25, jump: 1.15 }, GRAV = 34, UP_Y = new THREE.Vector3(0, 1, 0), _w = new THREE.Vector3(), _w2 = new THREE.Vector3();
+const MOVE_TIP = { run: 'FAST RUNNER: drag to run. Straight up the walls and over the roofs. \u25B2 jumps', swing: 'ROPE SWINGER: drag to swing from roof to roof. \u25B2 \u25BC swing higher or lower', jump: 'SUPER JUMPER: drag to leap a block at a time. \u25B2 leaps on the spot, \u25BC slams down' };
 const SEAT_TURN = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2); // a camera looks down -z; the planes point along +x
 const SHOT = { Blur: { col: 0x6fb8ff, r: 0.7, glow: true }, Tyrant: { col: 0x3a3430, r: 1.1 }, Weaver: { col: 0xf4f1ea, r: 0.8 } }; // what each villain throws at a hero flying in
 const SHOT_GEO = new THREE.SphereGeometry(1, 10, 8), SHOT_BOX = new THREE.BoxGeometry(1.6, 1.2, 1.4);
@@ -131,6 +135,7 @@ export class Flight {
     if (this.active) this.stop(true);
     const g = this.g, { camera, controls, post } = this.ctx;
     this.kind = PLANES[kind] ? kind : 'stunt'; this.P = PLANES[this.kind];
+    this.mv = this.P.hero ? hdLook(this.P.hero, HS.outfit(this.P.hero)).move : 'fly'; this.ft = null; this.ftOn = false; this.camY = null; // how this one gets round town (foot())
     this.saved = { far: camera.far, fov: camera.fov, dof: post.opts.dof, see: SEE.on, pos: camera.position.clone(), tg: controls.target.clone() };
     this.obj = planeModel(this.kind, this.P); this.obj.rotation.order = 'YZX'; g.disasters.ctx.scene.add(this.obj);
     if (this.P.hero) { const c = { Nova: [1.6, 0.5, 1.4], Dragonfly: [0.6, 1.7, 0.7], Tempo: [0.5, 1.2, 1.8] }[this.P.hero] || [1.4, 1.2, 0.8]; this.streak = new Streak(g.disasters.ctx.scene, c); } // the speed streak behind a hero's dashes (streak.js)
@@ -346,6 +351,7 @@ export class Flight {
     if (hr) { hr.cape.g.dispose(); if (hr.smooth && hr.smooth.mesh) { hr.smooth.mesh.geometry.dispose(); const m = hr.smooth.mesh.material; (Array.isArray(m) ? m : [m]).forEach(x => x && x.dispose()); } } else this.obj.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); // its own shapes and paint (a hero's are shared with the rest: only the cape is its own)
     for (const b of this.bombs) g.disasters.ctx.scene.remove(b.m); this.bombs = [];
     g.disasters.ctx.scene.remove(this.tracer); this.tracer.geometry.dispose(); this.tracer.material.dispose();
+    if (this.web) { g.disasters.ctx.scene.remove(this.web); this.web.geometry.dispose(); this.web.material.dispose(); this.web = null; } this.ft = null; this.ftOn = false;
     this.ov.remove(); this.bar.remove(); removeEventListener('keydown', this.onKey); removeEventListener('keyup', this.onKey); clearTimeout(this.tipT); this.tipEl = null;
     if (g.audio) g.audio.engine(null);
     camera.fov = this.saved.fov; camera.far = this.saved.far; camera.up.set(0, 1, 0); camera.updateProjectionMatrix(); post.opts.dof = this.saved.dof; SEE.on = this.saved.see;
@@ -397,12 +403,12 @@ export class Flight {
       const arc0 = this.arcadeOn(), H1 = this.fromHorde, hd = H1 && H1.heldS, en = this.engaged, B1 = (H1 && H1.o.boss) || this.live, foc = !!(B1 && B1.alive && !hd && (this.hovering || this.riding || this.bucked || this.live)), wk = foc ? (this.riding ? 0.8 : 1) : hd ? (hd.legs ? 2.8 : 1.9) : en ? (en.legs ? 1.9 : 1.5) : 1; this.closeK = (this.closeK || 1) + (wk - (this.closeK || 1)) * (1 - Math.exp(-dt * 3)); this.focK = (this.focK || 0) + ((foc ? 1 : 0) - (this.focK || 0)) * (1 - Math.exp(-dt * 3)); const ck = Math.max(0, Math.min(1, (this.closeK - 1) / 0.4)), el0 = ISO_EL + (Math.min(ISO_EL, 0.42) - ISO_EL) * ck, focE = this.focE = (this.focE || 0.36) + ((this.live ? 0.2 : this.surf || (this.pos.y < 18 && !this.riding) ? 1.2 : this.riding && B1.type === 'kaiju' ? 0.62 : 0.36) - (this.focE || 0.36)) * (1 - Math.exp(-dt * 4)), el = el0 + (focE - el0) * this.focK;
       { const fw = FOV_ISO + (36 - FOV_ISO) * this.focK; if (Math.abs(cam.fov - fw) > 0.02) { cam.fov = fw; cam.updateProjectionMatrix(); } } /* the giants (Sean): behind her with the monster always in view, which takes a wider lens than the town's */
       this.ctx.post.opts.dof = !arc0 && this.pos.y < 30 && ck === 0 && this.focK < 0.01; // high up, the whole town stays sharp to steer by
-      const fl = Math.hypot(_f.x, _f.z) || 1, dist = ISO_DIST * 1.35 * this.zoom * this.closeK, ce = Math.cos(el) * dist, cy = this.pos.y + Math.sin(el) * dist; let b0 = Math.atan2(-_f.x / fl, -_f.z / fl); const arc = this.arcadeOn(); if (arc && !foc && !this.goBase) b0 = this.azF == null ? (this.azF = H1 && H1.az != null ? H1.az : b0) : this.azF; /* a fixed view: the stick means the same way on the screen, as on foot */ if (foc && this.riding && B1.type === 'kaiju') b0 = this.focB = Math.atan2(-Math.cos(B1.yaw), -Math.sin(B1.yaw)); else if (foc && this.riding) b0 = this.focB = Math.atan2(-Math.sin(B1.yaw), Math.cos(B1.yaw)); else if (foc) { const q = Math.hypot(this.pos.x - B1.x, this.pos.z - B1.z); if (q > 3) b0 = this.focB = Math.atan2(this.pos.x - B1.x, this.pos.z - B1.z); else if (this.focB != null) b0 = this.focB; } if (this.spinHold) { if (this.spinB == null) this.spinB = b0; b0 = this.spinB; } else this.spinB = null;
+      const fl = Math.hypot(_f.x, _f.z) || 1, dist = ISO_DIST * 1.35 * this.zoom * this.closeK, ce = Math.cos(el) * dist, pyC = this.camYOf(dt), cy = pyC + Math.sin(el) * dist; let b0 = Math.atan2(-_f.x / fl, -_f.z / fl); const arc = this.arcadeOn(); if (arc && !foc && !this.goBase) b0 = this.azF == null ? (this.azF = H1 && H1.az != null ? H1.az : b0) : this.azF; /* a fixed view: the stick means the same way on the screen, as on foot */ if (foc && this.riding && B1.type === 'kaiju') b0 = this.focB = Math.atan2(-Math.cos(B1.yaw), -Math.sin(B1.yaw)); else if (foc && this.riding) b0 = this.focB = Math.atan2(-Math.sin(B1.yaw), Math.cos(B1.yaw)); else if (foc) { const q = Math.hypot(this.pos.x - B1.x, this.pos.z - B1.z); if (q > 3) b0 = this.focB = Math.atan2(this.pos.x - B1.x, this.pos.z - B1.z); else if (this.focB != null) b0 = this.focB; } if (this.spinHold) { if (this.spinB == null) this.spinB = b0; b0 = this.spinB; } else this.spinB = null;
       if (arc) { if (this.azS == null || this.snap) this.azS = b0; const da = b0 - this.azS, st = Math.atan2(Math.sin(da), Math.cos(da)) * (1 - Math.exp(-dt * 2.6)), lim = this.goBase ? 1.5 * dt : 9; this.azS += Math.max(-lim, Math.min(lim, st)); /* flying to the base: an unhurried swing round behind her */ b0 = this.azS; }
       this.swing(dt, (a) => _u.set(this.pos.x + Math.sin(a) * ce, cy, this.pos.z + Math.cos(a) * ce), b0); _v.set(this.pos.x + Math.sin(b0 + this.azOff) * ce, cy, this.pos.z + Math.cos(b0 + this.azOff) * ce);
       if (arc) { const ff = H1 && H1.followF, k = 1 - Math.exp(-dt * (ff ? 3.5 : 2.5)); this.coX = (this.coX || 0) + ((ff ? Math.max(-130, Math.min(130, ff.x - this.pos.x)) : 0) - (this.coX || 0)) * k; this.coZ = (this.coZ || 0) + ((ff ? Math.max(-130, Math.min(130, ff.z - this.pos.z)) : 0) - (this.coZ || 0)) * k; _v.x += this.coX; _v.z += this.coZ; }
       if (this.snap || arc) cam.position.copy(_v); else cam.position.lerp(_v, 1 - Math.exp(-dt * 3)); cam.up.set(0, 1, 0); // in a level no lag at all: a narrow lens and a lag lose her off the screen
-      const ah = this.hovering || this.spinHold || arc ? 0 : 8; _u.set(this.pos.x + _f.x / fl * ah + (arc ? this.coX || 0 : 0), this.pos.y + (hd ? (hd.y - this.pos.y) * 0.4 : 0), this.pos.z + _f.z / fl * ah + (arc ? this.coZ || 0 : 0)); if (B1 && this.focK > 0.001) { const onK = this.riding && B1.type === 'kaiju', tx = onK ? Math.cos(B1.yaw) * 30 : B1.x - this.pos.x, ty = onK ? 4 : (B1.type === 'worm' ? Math.max(B1.y, 0) : 18) - this.pos.y, tz = onK ? Math.sin(B1.yaw) * 30 : B1.z - this.pos.z, s = Math.min(0.5, 40 / (Math.hypot(tx, ty, tz) || 1)) * (this.riding && B1.type === 'worm' ? 0.2 : 1); _u.x += (this.pos.x + tx * s - _u.x) * this.focK; _u.y += (this.pos.y + ty * s - _u.y) * this.focK; _u.z += (this.pos.z + tz * s - _u.z) * this.focK; } cam.lookAt(_u); // floating: she is in the middle of the view
+      const ah = this.hovering || this.spinHold || arc ? 0 : 8; _u.set(this.pos.x + _f.x / fl * ah + (arc ? this.coX || 0 : 0), pyC + (hd ? (hd.y - this.pos.y) * 0.4 : 0), this.pos.z + _f.z / fl * ah + (arc ? this.coZ || 0 : 0)); if (B1 && this.focK > 0.001) { const onK = this.riding && B1.type === 'kaiju', tx = onK ? Math.cos(B1.yaw) * 30 : B1.x - this.pos.x, ty = onK ? 4 : (B1.type === 'worm' ? Math.max(B1.y, 0) : 18) - this.pos.y, tz = onK ? Math.sin(B1.yaw) * 30 : B1.z - this.pos.z, s = Math.min(0.5, 40 / (Math.hypot(tx, ty, tz) || 1)) * (this.riding && B1.type === 'worm' ? 0.2 : 1); _u.x += (this.pos.x + tx * s - _u.x) * this.focK; _u.y += (this.pos.y + ty * s - _u.y) * this.focK; _u.z += (this.pos.z + tz * s - _u.z) * this.focK; } cam.lookAt(_u); // floating: she is in the middle of the view
     } else {
       const fl = Math.hypot(_f.x, _f.z) || 1, back = P.chase[0] * this.zoom, hi = P.chase[1] * Math.pow(this.zoom, 0.8);
       _v.set(this.pos.x - _f.x / fl * back, this.pos.y + hi - _f.y * back * 0.5, this.pos.z - _f.z / fl * back);
@@ -437,7 +443,7 @@ export class Flight {
     if (this.view === 'cockpit') this.hz.style.transform = 'translate(-50%,' + (this.pitch * 260).toFixed(0) + 'px) rotate(' + (-this.roll).toFixed(3) + 'rad)';
   }
   fly(dt) {
-    const g = this.g, P = this.P, K = this.keys;
+    const g = this.g, P = this.P, K = this.keys; this.ftOn = false; this.flyN = (this.flyN || 0) + 1;
     if (this.caught) { // in the tornado's grip: spun round it and up, then spat out in pieces
       const C = this.caught, tw = C.tw; C.t += dt; C.a += dt * (3 + C.t); C.r = Math.max(4, C.r * (1 - dt * 0.3));
       this.pos.set(tw.x + Math.cos(C.a) * C.r, this.pos.y + 16 * dt, tw.z + Math.sin(C.a) * C.r); this.yaw = -C.a - Math.PI / 2; this.roll += dt * 9; this.pitch = Math.sin(C.t * 5) * 0.6;
@@ -514,6 +520,7 @@ export class Flight {
     if (why) this.tip(why);
   }
   tossStep(dt) {
+    this.ft = null; // knocked off whatever line or leap they were on
     const V = this.vel, g = this.g, px = this.pos.x, py = this.pos.y, pz = this.pos.z; V.y -= 22 * dt; this.t += dt;
     this.pos.addScaledVector(V, dt); this.yaw = Math.atan2(-V.z, V.x); this.roll += dt * 7; this.pitch = Math.atan2(V.y, Math.hypot(V.x, V.z)) * 0.5;
     this.plough(px, py, pz);
@@ -556,11 +563,11 @@ export class Flight {
   // one, and the building comes down behind them, leaning the way they went; a low one may go up in a fireball first (a
   // tall tower never does: it only falls, in its dust). Checked every 2 m along the way since the last frame, so a fast
   // hero on a slow phone can't skip a small one. Everyone inside gets out first (spare)
-  plough(px, py, pz) {
+  plough(px, py, pz, R = 0.6, lift = 0) { // lift: how far below the roof the hips must be to count as inside (on foot: well below, not a foot slipping off an edge)
     const city = this.g.city, x = this.pos.x, y = this.pos.y, z = this.pos.z, n = Math.max(1, Math.ceil(Math.hypot(x - px, z - pz) / 2));
     for (let i = 1; i <= n; i++) {
       const sx = px + (x - px) * i / n, sy = py + (y - py) * i / n, sz = pz + (z - pz) * i / n;
-      let inK = -1; city.buildingsNear(sx, sz, 0.6, (k, d, b) => { if (inK < 0 && sy < b.roofY + 0.8) inK = k; });
+      let inK = -1; city.buildingsNear(sx, sz, R, (k, d, b) => { if (inK < 0 && sy < b.roofY + 0.8 - lift) inK = k; });
       if (inK === this.inB) { if (inK >= 0 && this.inside) this.inside.step(sx, sy, sz, Math.cos(this.yaw), -Math.sin(this.yaw)); continue; }
       if (this.inB >= 0) this.burstOut(this.inB, sx, sy, sz);
       if (inK >= 0) this.burstIn(inK, sx, sy, sz);
@@ -746,9 +753,11 @@ export class Flight {
       if (cv === 'iso') { const a = this.azS == null ? 0.7 : this.azS, fx = -Math.sin(a), fz = -Math.cos(a), rx = -fz, rz = fx, dx = fx * -iy + rx * ix, dz = fz * -iy + rz * ix; let da = Math.atan2(-dz, dx) - this.yaw; da = Math.atan2(Math.sin(da), Math.cos(da)); turn = Math.max(-1, Math.min(1, da)); this.yaw += Math.max(-3.6 * dt, Math.min(3.6 * dt, da)); want = P.max * (0.2 + 0.32 * mag); } /* the town is small: about 37 m/s at most, BOOST for more */
       else { turn = -ix * 0.35; this.yaw -= ix * 1.4 * dt; vert = (this.invert ? iy : -iy) * 30; want = P.max * 0.5; } }
     if (this.boosting && !GB) { this.hovering = false; want = P.max * 1.25; }
+    const foot = !!this.mv && this.mv !== 'fly' && this.footOk() && !close && !(this.fromHorde && this.fromHorde.heldS); if (foot && !GB) want *= MOVE_K[this.mv]; // on foot (foot()): the runner a good deal faster than flying
     this.speed += (want - this.speed) * (1 - Math.exp(-dt * (want > this.speed ? 3.5 : 6))); if (!on && !this.boosting && this.speed < 1.5) { this.speed = 0; this.hovering = true; } this.thr = this.speed;
     // far out of town: pushed back
     const B = g.city.bounds, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2, dc = Math.hypot(this.pos.x - cx, this.pos.z - cz) || 1, far = dc - Math.max(B.x1 - B.x0, B.z1 - B.z0) * 0.5; if (far > 40 && !this.goBase && this.speed > 2) { const k = Math.min(1, (far - 40) / 40) * Math.max(this.speed, 10) * dt * 1.1; this.pos.x += (cx - this.pos.x) / dc * k; this.pos.z += (cz - this.pos.z) / dc * k; if (!this.saidFar) { this.saidFar = true; this.tip('That is the edge of town'); } } else if (far < 20) this.saidFar = false;
+    if (foot) { this.foot(dt, on || !!GB, turn); return; }
     const px = this.pos.x, py = this.pos.y, pz = this.pos.z, cy = Math.cos(this.yaw), sy = Math.sin(this.yaw); this.pos.x += cy * this.speed * dt; this.pos.z -= sy * this.speed * dt;
     // height: where she was put, up over any roof near or just ahead
     if (this.arcGap || this.holdY == null) { if (this.holdTo != null) this.climbT = 0; this.holdY = this.holdTo != null ? this.holdTo : this.pos.y; this.holdTo = null; this.arcGap = false; }
@@ -807,6 +816,119 @@ export class Flight {
       if (won) { LAB.stats.won++; delete v.fightHp; v.heroWin = true; for (const e of D.list) if (e.type === 'villains' && e.who.includes(v)) e.beat(v, s.hero); this.tip(v.name + ' is beaten!'); if (v.onWin) v.onWin(); } else { v.fightHp = Math.max(40, foeLeft); if (v.onLose) v.onLose(v.fightHp); this.crash(-1, v.name + ' knocked you out!'); }
     } });
   }
+  // ---------- on foot (Sean, 2026-11-06: a flyer, a fast runner, a rope swinger, a super jumper; the wardrobe's Moves). Only travelling: a lock on, a giant
+  // up close, something held, a ring fight are as flying is (the arcade's own). The floor is the street or a roof; a runner meets a wall and runs up it
+  footOk() { const W = this.g.watchLevel; return !!this.fromHorde && !this.live && !(W && W.round && !W.round.ended); } // the street levels only: a storm's own game is in the air, and Watch flies them
+  floorAt(x, z) { let f = this.g.people.groundY(x, z); this.g.city.buildingsNear(x, z, 0.3, (k, d, b) => { if (b.roofY > f) f = b.roofY; }); return f; }
+  camYOf(dt) { if (!this.ftOn || this.camY == null) return (this.camY = this.pos.y); this.camY += (this.pos.y - this.camY) * (1 - Math.exp(-dt * 4)); this.camY = Math.max(this.pos.y - 3.5, Math.min(this.pos.y + 3.5, this.camY)); return this.camY; } // eased, but never more than a few metres off: she stays in the middle of the screen
+  foot(dt, go, turn) {
+    const g = this.g, F = this.ft || (this.ft = { vy: this.mv === 'jump' ? 22 : 0, gnd: false, ph: 0, crouch: 0, land: 0, sw: null, wall: null, hOff: 0, hop: 0, said: false, n: 0 }), mv = this.goBase && this.goBase.near ? 'run' : this.mv;
+    if (F.n !== this.flyN - 1) { F.sw = null; F.wall = null; F.gnd = false; F.vy = Math.min(F.vy, 0); } F.n = this.flyN; // back from a lock on or a fight: from where they are now
+    this.ftOn = true; if (!F.said) { F.said = true; this.tip(MOVE_TIP[this.mv]); }
+    const px = this.pos.x, py = this.pos.y, pz = this.pos.z, cy = Math.cos(this.yaw), sy = Math.sin(this.yaw), sp = this.speed, ud = this.upDown || 0, feet0 = py - HIP; let pitchTo = 0, plough = mv !== 'run';
+    const zipAt = (top) => ({ top, zip: true, A: new THREE.Vector3(px + cy * 1.5, top, pz - sy * 1.5) }); // the swinger's line to the top of a wall in the way
+    if (mv === 'swing') { F.hOff = Math.max(-6, Math.min(50, F.hOff + ud * 22 * dt)); if (go && !F.wall && !F.sw) this.swingStart(); } else F.sw = null;
+    if (F.sw && !go) { F.vy = F.sw.vy || 0; F.sw = null; F.gnd = false; } // let go of the line: on through the air
+    if (F.sw) { // on the line, or just let go of it on the way to the next
+      const W = F.sw, mul = 0.8 + 0.45 * Math.sin(Math.PI * Math.min(1, W.u)), step = mul * Math.max(sp, 8) * dt, u1 = W.u + step / W.D, y1 = W.y(u1), top = this.wallAhead(px + cy * step, pz - sy * step, y1 - HIP);
+      if (top) { F.sw = null; F.wall = zipAt(top); F.gnd = false; } // a wall in the way: pulled straight up it on the line, then on from the roof
+      else {
+        W.u = u1; this.pos.x += cy * step; this.pos.z -= sy * step; W.vy = (y1 - this.pos.y) / Math.max(dt, 1e-3); this.pos.y = y1; W.on = W.u < 0.72;
+        const fl = this.floorAt(this.pos.x, this.pos.z); if (this.pos.y - HIP < fl + 0.1 && feet0 >= fl - 1) { this.pos.y = fl + HIP + 0.1; this.landFx(Math.max(0, -W.vy)); F.sw = null; F.gnd = true; F.vy = 0; } // come down on a roof or the street
+        else if (W.u >= 1) this.swingStart();
+        if (F.sw && F.sw.on) { const A = F.sw.A, af = (A.x - this.pos.x) * cy - (A.z - this.pos.z) * sy, au = A.y - this.pos.y; pitchTo = -Math.atan2(af, Math.max(1, au)) * 0.85; } // the body along the line
+      }
+    }
+    if (F.wall) { // up a wall: the runner at a run, the swinger pulled up on the line
+      pitchTo = F.wall.zip ? 0 : Math.PI / 2; this.pos.y += (F.wall.zip ? 30 : Math.max(18, sp * 0.85)) * dt; plough = false;
+      if (!go) { F.wall = null; F.gnd = false; F.vy = 0; pitchTo = 0; } // let go: off it
+      else if (this.pos.y - HIP >= F.wall.top) { this.pos.y = F.wall.top + HIP + 0.1; this.pos.x += cy * (HIP + 0.8); this.pos.z -= sy * (HIP + 0.8); F.wall = null; F.gnd = true; F.vy = 0; pitchTo = 0; } // over the top onto the roof
+    } else if (F.gnd) { // on the street or a roof
+      if (mv === 'jump' && (go || ud > 0)) { F.crouch += dt; if (F.crouch >= 0.13) { F.crouch = 0; F.gnd = false; F.vy = this.leapVy(feet0, sp, ud > 0 ? 32 : this.boosting ? 34 : 26); sfx('whoosh', px, py, pz, { gain: 0.9, rate: 1.1 }); this.puffAt(px, feet0, pz, 0.5); } } else F.crouch = 0;
+      if (mv === 'run' && ud > 0 && F.hop <= 0) { F.gnd = false; F.vy = 15; F.hop = 0.45; }
+      const adv = mv === 'jump' || !F.gnd ? 0 : sp * dt;
+      if (adv > 0) { // a step at a time, so a wall is met where it stands: the runner goes up it, anyone else stops at it
+        const n = Math.max(1, Math.ceil(adv / 0.4)), d = adv / n; let x = px, z = pz;
+        for (let i = 0; i < n; i++) { const fx = x + cy * d, fz = z - sy * d, top = this.wallAhead(fx, fz, feet0 + 0.5); if (top) { if (mv === 'run') F.wall = { top }; break; } x = fx; z = fz; }
+        this.pos.x = x; this.pos.z = z; const fl = this.floorAt(x, z); if (!F.wall) { if (fl < feet0 - 0.7) { F.gnd = false; F.vy = 0; } else this.pos.y = fl + HIP + 0.1; }
+      } else if (F.gnd) this.pos.y = this.floorAt(px, pz) + HIP + 0.1;
+    }
+    if (!F.gnd && !F.wall && !F.sw) { // in the air: a leap, a jump, off a roof
+      const ax = cy * sp * dt, az = -sy * sp * dt, top = this.wallAhead(px + ax, pz + az, feet0); const move = !top;
+      if (top && go && mv === 'run') { F.wall = { top }; F.vy = 0; } // the runner onto it and up
+      else if (top && go && mv === 'swing') { F.wall = zipAt(top); F.vy = 0; } // the swinger's line to the top of it
+      else if (top && mv === 'jump' && top - feet0 < 4) F.vy = Math.max(F.vy, Math.sqrt(2 * GRAV * (top - feet0 + 1.2))); // a ledge just missed: up over it
+      if (!F.wall) { // anything else meets a wall and slides up or down it till it is clear
+        if (move) { this.pos.x += ax; this.pos.z += az; }
+        if (mv === 'jump' && ud < 0 && F.vy > -45) F.vy = -45; // the slam
+        F.vy -= GRAV * dt; this.pos.y += F.vy * dt;
+        const x = this.pos.x, z = this.pos.z, roof = this.floorAt(x, z), fl = feet0 >= roof - 1.2 ? roof : g.people.groundY(x, z); // over a roof, onto it; below it, the street
+        if (this.pos.y - HIP <= fl + 0.1 && F.vy <= 0) { const v = -F.vy; this.pos.y = fl + HIP + 0.1; F.gnd = true; F.vy = 0; F.land = Math.min(0.35, 0.06 + v * 0.007); this.landFx(v); }
+      }
+    }
+    F.hop = Math.max(0, F.hop - dt); F.land = Math.max(0, F.land - dt);
+    this.pitch += (pitchTo - this.pitch) * Math.min(1, dt * (F.wall && !F.wall.zip ? 14 : 8)); this.roll += (-turn * 0.3 - this.roll) * Math.min(1, dt * 6); this.holdY = this.pos.y;
+    this.hazards(dt); if (this.state !== 'fly' || this.caught) return;
+    if (sp > 4 && (this.scareT = (this.scareT || 0) - dt) <= 0) { this.scareT = 0.5; g.people.scare(this.pos.x, this.pos.z, 24, 0.4); }
+    if (plough) this.plough(px, Math.max(py, this.pos.y), pz, 0, 2.2); else if (this.inB >= 0) { this.burstOut(this.inB, this.pos.x, this.pos.y, this.pos.z); this.inB = -1; } // only if one ends up inside a building after all (a lock on into one): out through it
+    this.obj.position.copy(this.pos);
+  }
+  // a roof just ahead of where they would be, above their feet: its height (0: the way is clear)
+  wallAhead(x, z, feetY) { const fa = this.floorAt(x + Math.cos(this.yaw) * HIP * 0.8, z - Math.sin(this.yaw) * HIP * 0.8); return fa > feetY + 0.6 ? fa : 0; }
+  // how hard to leap: at least base, and enough to clear the roofs on the way up (coming down they land on them)
+  leapVy(feet, sp, base) { const cy = Math.cos(this.yaw), sy = Math.sin(this.yaw), v0 = Math.max(sp, 6); let vy = base; for (let d = 3; d <= 45; d += 3) { const t = d / v0; if (t > base / GRAV) break; const f = this.floorAt(this.pos.x + cy * d, this.pos.z - sy * d), need = (f - feet + 2.5) / t + GRAV * t / 2; if (need > vy) vy = need; } return Math.min(vy, 55); }
+  // a swing: from here along the way they face, down through a dip and up to the next high point; the line to the tallest roof near the bottom, or to the sky
+  swingStart() {
+    const F = this.ft, g = this.g, x0 = this.pos.x, y0 = this.pos.y, z0 = this.pos.z, cy = Math.cos(this.yaw), sy = Math.sin(this.yaw), D = 30 + Math.min(30, this.speed * 0.3);
+    let fmax = -1e9; for (const u of [0.15, 0.35, 0.5, 0.65, 0.85, 1]) fmax = Math.max(fmax, this.floorAt(x0 + cy * D * u, z0 - sy * D * u)); // the roofs on the way: the swing stays over them
+    const y1 = Math.max(g.people.groundY(x0, z0) + 15 + F.hOff, fmax + HIP + 3), dip = Math.max(0, Math.min(9, Math.min(y0, y1) - (fmax + HIP + 1.5)));
+    const y = (u) => { const q = Math.min(1, u); return y0 + (y1 - y0) * (q * q * (3 - 2 * q)) - dip * Math.sin(Math.PI * q); };
+    const mx = x0 + cy * D / 2, mz = z0 - sy * D / 2, low = y(0.5), s = Math.max(dip, 4), Lr = (D * D / 4 + s * s) / (2 * s); let A = null, best = low + 6;
+    g.city.buildingsNear(mx, mz, 18, (k, d, b) => { if (b.roofY > best) { best = b.roofY; A = new THREE.Vector3(Math.min(Math.max(mx, b.x0), b.x1), b.roofY, Math.min(Math.max(mz, b.z0), b.z1)); } });
+    F.sw = { u: 0, D, y, A: A || new THREE.Vector3(mx, low + Math.min(40, Lr), mz), on: true, vy: 0 }; F.gnd = false; F.wall = null;
+    sfx('whoosh', x0, y0, z0, { gain: 0.55, rate: 1.5 });
+  }
+  puffAt(x, y, z, k) { const D = this.g.disasters; for (let i = 0; i < 6 + 10 * k; i++) { const a = Math.random() * 6.28, s = 0.2 + Math.random() * 0.45 * (0.5 + k); D.debris.add(x, y + 0.2, z, s, s * 0.6, s, 0x9a9184, 'fly', { v: [Math.cos(a) * (4 + 8 * k), 1.5 + Math.random() * 4, Math.sin(a) * (4 + 8 * k)], life: 0.9 }); } }
+  // coming down: the harder, the bigger the dust, the shake and the thump
+  landFx(v) { if (v < 7) return; const g = this.g, x = this.pos.x, z = this.pos.z, y = this.pos.y - HIP, k = Math.min(1, v / 40); this.puffAt(x, y, z, k); if (y - g.people.groundY(x, z) < 2) g.fire.dustCloud(x, z, 2 + k * 6, 1.5 + k * 3); g.shake = Math.max(g.shake || 0, 0.1 + k * 0.5); sfx('thud', x, y, z, { gain: 0.5 + k * 0.7, rate: 1.1 - k * 0.3 }); if (k > 0.55) sfx('crash', x, y, z, { gain: k * 0.6, rate: 0.7 }); g.people.scare(x, z, 10 + 30 * k, 0.7); }
+  // the poses on foot; returns how far the hips drop
+  footPose(r, dt) {
+    const F = this.ft, A = r.arms, L = r.legs, sp = this.speed; let bodyY = 0, lean = 0, flip = false;
+    if ((F.sw && F.sw.on) || (F.wall && F.wall.zip)) { // on the line: the hand up it, the legs together and swinging through (pulled up a wall: hanging from it)
+      const u = F.sw ? F.sw.u : 0.5, s = Math.sin(u * Math.PI * 2);
+      A[1].sh.rotation.set(-3.05, 0, 0.12); A[1].el.rotation.set(-0.1, 0, 0); A[0].sh.rotation.set(-0.4 + 0.3 * s, 0, -1.0); A[0].el.rotation.set(-0.6, 0, 0);
+      for (const q of L) { q.hip.rotation.x = -0.35 + 0.35 * Math.cos(u * Math.PI); q.knee.rotation.x = 0.5 + 0.3 * Math.sin(u * Math.PI); } L[0].hip.rotation.x -= 0.25; L[0].knee.rotation.x += 0.3; r.head.rotation.x = -0.2;
+    } else if (F.sw) { // let go: a forward flip on the way to the next line
+      const q = Math.min(1, (F.sw.u - 0.72) / 0.28), e = q * q * (3 - 2 * q), sn = Math.sin(q * Math.PI); lean = e * Math.PI * 2; flip = true;
+      for (const l of L) { l.hip.rotation.x = -1.3 * sn; l.knee.rotation.x = 2.0 * sn; } for (const a of A) { a.sh.rotation.set(-0.8 - 0.8 * sn, 0, a.sx * 0.3); a.el.rotation.set(-1.2, 0, 0); }
+    } else if (F.wall || (F.gnd && sp > 1.5)) { // running, up a wall too
+      F.ph += dt * (7 + Math.min(16, sp * 0.3)); const k = F.wall ? 1 : Math.min(1, sp / 8), s = Math.sin(F.ph), c = Math.cos(F.ph);
+      L[0].hip.rotation.x = -s * 1.1 * k; L[1].hip.rotation.x = s * 1.1 * k; L[0].knee.rotation.x = (0.2 + Math.max(0, c) * 1.7) * k; L[1].knee.rotation.x = (0.2 + Math.max(0, -c) * 1.7) * k;
+      if (L[0].ank) { L[0].ank.rotation.x = 0.3 * Math.max(0, -s) * k; L[1].ank.rotation.x = 0.3 * Math.max(0, s) * k; }
+      if (this.mv === 'run' && sp > 34) for (const a of A) { if (a.row) continue; a.sh.rotation.set(0.95, 0, a.sx * 0.25); a.el.rotation.set(-0.2, 0, 0); } // flat out: the arms streamed back
+      else { A[0].sh.rotation.set(s * 1.2 * k, 0, -0.12); A[1].sh.rotation.set(-s * 1.2 * k, 0, 0.12); A[0].el.rotation.set(-1.5 * k, 0, 0); A[1].el.rotation.set(-1.5 * k, 0, 0); }
+      lean = 0.18 + 0.32 * Math.min(1, sp / 45); bodyY = -0.06 * k + Math.abs(c) * 0.05 * k; r.chest.rotation.y = s * 0.25 * k; r.head.rotation.x = -lean * 0.7;
+    } else if (F.gnd) { // standing; crouched for a leap, or come down from one
+      const cr = Math.max(Math.min(1, F.crouch / 0.13), F.land > 0 ? Math.min(1, F.land / 0.12) : 0);
+      if (cr > 0) { for (const l of L) { l.hip.rotation.x = -1.1 * cr; l.knee.rotation.x = 2.0 * cr; if (l.ank) l.ank.rotation.x = -0.9 * cr; } for (const a of A) { if (a.row) continue; a.sh.rotation.set(0.7 * cr, 0, a.sx * (0.2 + 0.3 * cr)); a.el.rotation.set(-0.4 * cr, 0, 0); } lean = 0.55 * cr; bodyY = -0.42 * cr; r.head.rotation.x = -0.45 * cr; }
+      else { const br = Math.sin((this.wingT || 0) * 1.6); L[0].hip.rotation.z = -0.1; L[1].hip.rotation.z = 0.1; for (const a of A) { if (a.row) continue; a.sh.rotation.set(0.05 + br * 0.02, 0, a.sx * 0.18); a.el.rotation.set(-0.25, 0, 0); } r.chest.rotation.x = -0.03 * br; }
+    } else { // in the air: going up, the arms up and a knee drawn up; coming down, the arms out and the legs reaching for the ground
+      const up = Math.max(-1, Math.min(1, F.vy / 18));
+      if (up > 0) { for (const a of A) { if (a.row) continue; a.sh.rotation.set(-2.4 * up - 0.3, 0, a.sx * 0.35); a.el.rotation.set(-0.3, 0, 0); } L[0].hip.rotation.x = -1.2 * up; L[0].knee.rotation.x = 1.4 * up; L[1].hip.rotation.x = 0.35 * up; L[1].knee.rotation.x = 0.4; lean = 0.12; }
+      else { const dn = -up; for (const a of A) { if (a.row) continue; a.sh.rotation.set(-0.6, 0, a.sx * (0.5 + 0.8 * dn)); a.el.rotation.set(-0.4, 0, 0); } for (const l of L) { l.hip.rotation.x = -0.45 * dn; l.knee.rotation.x = 0.35 + 0.3 * dn; } lean = -0.05; }
+      if (this.mv === 'jump' && (this.upDown || 0) < 0) { for (const a of A) { if (a.row) continue; a.sh.rotation.set(-3.0, 0, -a.sx * 0.15); a.el.rotation.set(0, 0, 0); } lean = 0.4; } // the slam: fists together over the head
+    }
+    if (flip) this.lean = lean; else { let d = lean - this.lean; d = Math.atan2(Math.sin(d), Math.cos(d)); this.lean += d * Math.min(1, dt * 10); }
+    return bodyY;
+  }
+  // the line from the swinger's hand to where it is fixed, while they hold it
+  lineStep(r) {
+    const F = this.ft, A0 = F && (F.sw && F.sw.on ? F.sw.A : F.wall && F.wall.zip ? F.wall.A : null), on = this.ftOn && !!A0 && this.obj.visible && this.state === 'fly';
+    if (!on) { if (this.web) this.web.visible = false; return; }
+    if (!this.web) { const geo = new THREE.CylinderGeometry(1, 1, 1, 6, 1, true).translate(0, 0.5, 0); this.web = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 2.2, 2.5), fog: false })); this.web.frustumCulled = false; this.g.disasters.ctx.scene.add(this.web); }
+    this.obj.updateMatrixWorld(true); const h = handAt(r.arms[1], _w), d = _w2.subVectors(A0, h), L = d.length(); if (L < 0.5) { this.web.visible = false; return; }
+    this.web.position.copy(h); this.web.quaternion.setFromUnitVectors(UP_Y, d.normalize()); this.web.scale.set(0.05, L, 0.05); this.web.visible = true;
+  }
   // a hero's pose: flat out along the way at speed, one fist ahead; upright and treading air slow or in a fight; a punch;
   // arms out holding on while spinning a villain round. The rig set so the hips are where the hero is
   heroPose(r, dt) {
@@ -814,7 +936,8 @@ export class Flight {
     const u = act ? Math.min(1, act.t / act.T) : 0, k = Math.sin(Math.PI * u); // a move: how far through it; out and back
     relax(r); this.lean = kind === 'dive' ? Math.PI : (this.lean || 0) + ((kind === 'drag' ? 0.9 : 1.35 * fast) - (this.lean || 0)) * Math.min(1, dt * 3); // head first after them in the dive
     const C = this.clip; let bodyY = 0;
-    if (C) { C.t += dt; playClip(r, C.clip, C.t); this.lean = r.body.rotation.x; bodyY = r.hips.position.y - 0.94; r.hips.position.y = 0.94; } // a keyframed move (clips.js): its lean and hip drop are its own
+    if (this.ftOn && !C && !kind) bodyY = this.footPose(r, dt); // running, leaping, on a line (foot())
+    else if (C) { C.t += dt; playClip(r, C.clip, C.t); this.lean = r.body.rotation.x; bodyY = r.hips.position.y - 0.94; r.hips.position.y = 0.94; } // a keyframed move (clips.js): its lean and hip drop are its own
     else if (kind === 'kick') { L[1].hip.rotation.x = -1.7 * k; L[1].knee.rotation.x = 0.9 * (1 - k); L[0].knee.rotation.x = 0.3; r.torso.rotation.x = -0.35 * k; for (const a of A) { a.sh.rotation.set(-0.5, 0, a.sx * (0.6 + 0.4 * k)); a.el.rotation.set(-0.8, 0, 0); } }
     else if (kind === 'laser') { if (this.P.hero === 'Nova') { for (const a of A) { a.sh.rotation.set(0.45, 0, a.sx * 0.25); a.el.rotation.set(-0.9, 0, 0); } r.torso.rotation.x = 0.15; } else for (const a of A) { a.sh.rotation.set(-1.55, 0, -a.sx * 0.12); a.el.rotation.set(0, 0, 0); } } // Nova's from her eyes, fists back; the others' from their hands
     else if (kind === 'crouch') { A[1].sh.rotation.set(0.5, 0, 0.1); A[1].el.rotation.set(-1.4, 0, 0); A[0].sh.rotation.set(-1.0, 0, -0.15); A[0].el.rotation.set(-1.7, 0, 0); r.torso.rotation.x = 0.4; for (const l of L) { l.hip.rotation.x = -0.4; l.knee.rotation.x = 0.8; } } // wound up for the uppercut
@@ -827,11 +950,12 @@ export class Flight {
     else if (this.punch > 0) { A[1].sh.rotation.set(-1.6, 0, 0.1); A[0].sh.rotation.set(0.4, 0, -0.2); A[0].el.rotation.set(-1.4, 0, 0); r.torso.rotation.x = 0.3; }
     else if (fast > 0.5) { A[1].sh.rotation.set(-3.0, 0, 0.1); A[0].sh.rotation.set(0.25, 0, -0.1); }
     else { for (const a of A) a.sh.rotation.set(0.1, 0, a.sx * 0.3); for (const L of r.legs) { L.hip.rotation.x = 0.1; L.knee.rotation.x = 0.25; } }
-    r.body.rotation.x = this.lean; if (!C) r.head.rotation.x = -this.lean * 0.6;
-    r.root.position.set(-Math.sin(this.lean) * HIP, -Math.cos(this.lean) * HIP + bodyY + (fast < 0.5 && !D ? Math.sin((this.wingT || 0) * 2) * 0.15 : 0), 0); // treading air (held still in a fight)
+    r.body.rotation.x = this.lean; if (!C && !this.ftOn) r.head.rotation.x = -this.lean * 0.6;
+    r.root.position.set(-Math.sin(this.lean) * HIP, -Math.cos(this.lean) * HIP + bodyY + (fast < 0.5 && !D && !this.ftOn ? Math.sin((this.wingT || 0) * 2) * 0.15 : 0), 0); // treading air (held still in a fight)
     r.cape.update(dt, this.lean > 0.5 ? 0.12 : Math.min(0.6, this.speed / 30), 0.3 + Math.min(0.7, this.speed / 20));
     this.wingT = (this.wingT || 0) + dt; r.wings.forEach((w, i) => { w.rotation.z = Math.sin(this.wingT * 55 + i * 1.3) * 0.45 + 0.15; });
     if (this.obj.visible) detail(r, null, true);
+    this.lineStep(r);
   }
   killDevil(e, v, why) {
     v.dead = true; if (e.dust) e.dust.emit(v.x, 6, v.z, 30, { up: [6, 20], spread: 14, life: 2.2, size: 7 });

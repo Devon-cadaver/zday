@@ -15,7 +15,7 @@ import { hdLook } from './hdbody.js';
 import { addHeadgear } from './headgear.js';
 import * as THREE from 'three';
 import { clothMat } from './cloth.js';
-import { rig, relax, handsOnHips, tumble, detail, pinPose } from './villains.js';
+import { rig, relax, handsOnHips, tumble, detail, pinPose, limbs, headgearAll } from './villains.js';
 import { tossStep, toss } from './brawl.js';
 import { fightPose } from './melee.js';
 import { alienStep } from './herofight.js';
@@ -458,7 +458,7 @@ export function heroModel(name) { return heroRig(name, undefined, true).root; }
 export function heroRig(name, of, hd = false) { // of: an outfit (herogame.js): colours and extras; hd: the detailed body it dresses
   const K = kit(), base = { ...K, ...K.look[name], hair: K.hair[name] }, ec = new THREE.Color(of && of.suit ? of.suit : '#000000');
   if (of) { if (of.belt) base.belt = new THREE.MeshStandardMaterial({ color: of.belt, metalness: 0.4, roughness: 0.45 }); if (of.suit) base.suit = clothMat(of.suit, { emissive: ec, emissiveIntensity: 0.22 }); if (of.cape) base.cape = clothMat(of.cape, { side: THREE.DoubleSide, repeat: [5, 9] }); if (of.dark) { base.boot = clothMat(of.dark, { bumpScale: 0.15 }); base.glove = clothMat(of.dark, { bumpScale: 0.15 }); } }
-  const look = hd ? hdLook(name, of) : null, r = rig({ mats: base, slim: look ? look.f : name === 'Nova', longHair: !look && name === 'Nova', capeLen: 1.1, extras: of || {}, hd: look }); relax(r); handsOnHips(r); addHeadgear(r, of);
+  const look = hd ? hdLook(name, of) : null, n = limbs(name, of), r = rig({ mats: base, slim: look ? look.f : name === 'Nova', longHair: !look && name === 'Nova', capeLen: 1.1, extras: of || {}, hd: look, arms: n.arms, legs: n.legs, heads: n.heads }); relax(r); handsOnHips(r); headgearAll(r, of);
   const wings = [];
   if (name === 'Dragonfly' && !look) for (const [sx, y, sweep] of [[1, 0.46, 0.25], [-1, 0.46, 0.25], [1, 0.38, 0.7], [-1, 0.38, 0.7]]) {
     const pv = new THREE.Group(); pv.position.set(sx * 0.06, y, -0.12); pv.scale.x = sx; pv.rotation.y = -sweep; r.torso.add(pv);

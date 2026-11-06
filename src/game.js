@@ -130,8 +130,9 @@ body.zd-flying #zd-toast{left:calc(50% + 28px);max-width:calc(100vw - 180px)}
 #zd-menu .rsec h2::after{content:"";flex:1;height:1px;background:rgba(196,128,255,.3)}
 #zd-menu .rsec .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:7px}
 #zd-menu .rsec .tile{aspect-ratio:1/1;position:relative;border-radius:9px;background:rgba(160,90,255,.07);border:1px solid rgba(196,128,255,.16)}
-#zd-menu .rsec .lbl{position:absolute;z-index:3;left:50%;bottom:5px;transform:translateX(-50%);max-width:92%;box-sizing:border-box;text-align:center;background:rgba(38,14,66,.9);
+#zd-menu .rsec .lbl{position:absolute;z-index:3;left:0;right:0;margin:0 auto;bottom:5px;width:-webkit-fit-content;width:fit-content;max-width:92%;box-sizing:border-box;text-align:center;background:rgba(38,14,66,.9);
   border:1px solid rgba(196,128,255,.35);color:#fff;padding:3px 6px;border-radius:5px;font:700 8.5px/1.15 system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase}
+#zd-menu .rsec .lbl small{display:block;font-size:7.5px;font-weight:600;opacity:.7;letter-spacing:.02em}
 #zd-menu .mhead{display:flex;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid rgba(196,128,255,.28);flex:none;background:rgba(40,14,70,.7)}
 #zd-menu .mhead .zd-btn{padding:9px 12px;font-size:12px;min-width:0;min-height:44px;flex:none}
 #zd-menu .own-go{min-width:64px;min-height:44px}

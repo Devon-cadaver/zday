@@ -237,7 +237,7 @@ const sw = (key, list, cur) => '<div class="row">' + list.map(c => '<button type
     draw();
   }
   // her rig again in the costume just picked
-  redress() { const S = this.g.disasters.ctx.scene, o = this.h; S.remove(o.r.root); if (o.r.smooth) o.r.smooth.mesh.geometry.dispose(); if (o.r.flowHair) o.r.flowHair.geo.dispose(); o.r.cape.g.dispose(); const h = this.h = new Body(rigFor(HS.curName(this.side), HS.outfit(HS.curName(this.side))), 100); this.h.near = Infinity; this.h.loose = true; S.add(h.r.root); h.x = o.x; h.z = o.z; h.y = o.y; h.yaw = o.yaw; }
+  redress() { const S = this.g.disasters.ctx.scene, o = this.h; S.remove(o.r.root); if (o.r.smooth) o.r.smooth.mesh.geometry.dispose(); if (o.r.flowHair) o.r.flowHair.geo.dispose(); if (o.r.flowHair2) o.r.flowHair2.geo.dispose(); o.r.cape.g.dispose(); const h = this.h = new Body(rigFor(HS.curName(this.side), HS.outfit(HS.curName(this.side))), 100); this.h.near = Infinity; this.h.loose = true; S.add(h.r.root); h.x = o.x; h.z = o.z; h.y = o.y; h.yaw = o.yaw; }
   retint() { if (!this.rooms) return; for (const r of Object.values(this.rooms)) this.decorate(r); }
   // what is chosen for the inside, made again
   decorate(r) { dropDecor(r.dec); r.dec = buildDecor(r.key, r.w, r.d, this.cfg, 1 + Math.floor(Math.sqrt(HS.load()[this.side].xp / 100))); r.g.add(r.dec); r.wm.color.set(insideOf(this.cfg).walls.c); }

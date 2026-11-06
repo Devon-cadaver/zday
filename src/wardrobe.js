@@ -10,7 +10,7 @@ import { hdLook, WARD } from './hdbody.js';
 import { relax, detail } from './villains.js';
 
 const HAIRC = ['#0e0c0a', '#2a1a10', '#5a3418', '#8a5a26', '#c98a3a', '#e8c878', '#d8d4cc', '#a01c1c', '#2a58c8', '#7a3cff'], FACEC = ['#a8302c', '#3c7a4a', '#3c4450', '#9aa3ae', '#ece6d6', '#101014', '#d01d3a', '#d4a84b', '#2a58c8', '#29e3ff', '#7a3cff', '#ff3fcf'], EYES = ['#3a2a1c', '#6a4a2a', '#3a7ab8', '#3a8a4a', '#7a8a96', '#c0281c', '#ffc838', '#29e3ff', '#b040ff', '#ffffff'], SKINS = ['#fdf8f4', '#f8ece2', '#f5dfd0', '#f2d0b8', '#e8bd9f', '#e0b090', '#d6a47c', '#c8977a', '#b8855f', '#a8765a', '#8a6044', '#7a5238', '#5e3c28', '#4e3222', '#2e1c14'], SKINF = ['#ffffff', '#b8bcc4', '#6a6f78', '#141418', '#d01d3a', '#7a1228', '#e8761c', '#ffd24a', '#7fe04f', '#2f9a48', '#14684a', '#29c3e3', '#8fb4e8', '#2a58c8', '#16286e', '#7a3cff', '#b04ae0', '#ff5ac8'];
-const TABS = [['head', 'Head'], ['face', 'Face'], ['hair', 'Hair'], ['body', 'Body'], ['armor', 'Armor'], ['back', 'Back'], ['col', 'Colours'], ['name', 'Name']], CLOSE_TABS = new Set(['head', 'face', 'hair']);
+const TABS = [['head', 'Head'], ['face', 'Face'], ['hair', 'Hair'], ['body', 'Body'], ['moves', 'Moves'], ['armor', 'Armor'], ['back', 'Back'], ['col', 'Colours'], ['name', 'Name']], CLOSE_TABS = new Set(['head', 'face', 'hair']);
 const CSS = `
 body.zd-ward #zd-base{display:none}
 #zd-ward{position:fixed;inset:0;z-index:40;touch-action:none;user-select:none;-webkit-user-select:none;font:700 13px/1.1 system-ui,-apple-system,sans-serif;color:#fff}
@@ -41,8 +41,11 @@ body.zd-ward #zd-base{display:none}
 #zd-ward .own{display:flex;align-items:center;gap:10px;padding:0 10px}
 #zd-ward .own input{width:64px;height:38px;padding:0;border:0;background:none}
 #zd-ward .nm{padding:0 10px;touch-action:auto;user-select:text;-webkit-user-select:text}
+#zd-ward .say{padding:2px 12px 6px;font:600 12px/1.35 system-ui,sans-serif;opacity:.85}
 @media (orientation:landscape) and (max-height:520px){#zd-ward .sheet{left:auto;top:0;bottom:0;width:min(50vw,420px);max-height:none;border-radius:16px 0 0 16px}#zd-ward .top{right:min(50vw,420px)}#zd-ward .zoom,#zd-ward .drag{right:calc(min(50vw,420px) + 8px)}}
 `;
+// what each way of getting round does (flight.js arcade: in a town, between the fights)
+const MOVE_SAY = { fly: 'Flies over the town and smashes straight through buildings. \u25B2 \u25BC go up and down.', run: 'Runs faster than anything, up the walls and over the roofs. \u25B2 jumps.', swing: 'Shoots a line to the roofs and swings from one to the next. \u25B2 \u25BC swing higher or lower.', jump: 'Leaps a block at a time and lands on the roofs or the street, hard. \u25B2 leaps, \u25BC slams down.' };
 // a lamp in the room, in the wardrobe: enough to shape, too little to colour
 const i0 = (o) => Math.min(o.intensity, 26);
 function canvasTex(w, h, paint) { const c = document.createElement('canvas'); c.width = w; c.height = h; paint(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; }
@@ -73,7 +76,8 @@ export function openWardrobe(B, L) {
     if (tab === 'head') { const hg = O.hg || 'none', own = HEADGEAR.find((q) => q[0] === hg) || HEADGEAR[0], HGS = B.lair ? [HEADGEAR[0], ...HEADGEAR.filter((q) => q[4]), ...HEADGEAR.filter((q) => !q[4] && q[0] !== 'none')] : HEADGEAR.filter((q) => !q[4]); W.HGS = HGS.filter((q) => q[0] === hg || unlockAt('hg', q[0]) <= lv).map((q) => q[0]); /* the arrows go round what is open */ html = '<div class="wr" data-k="hg"><div class="h">On the head</div><div class="pick"><button type="button" class="ar" data-hgn="-1" aria-label="Previous">◀</button><div class="strip">' + HGS.map((q) => (unlockAt('hg', q[0]) > lv && q[0] !== hg ? lockB(unlockAt('hg', q[0]), q[1]) : '<button type="button" data-hg="' + q[0] + '"' + (q[0] === hg ? ' class="on"' : '') + '>' + q[1] + '</button>')).join('') + '</div><button type="button" class="ar" data-hgn="1" aria-label="Next">▶</button></div></div>' + (hg !== 'none' ? sw('hgc', L.HATS, O.hgc || own[2], own[1] + ' colour') : ''); }
     else if (tab === 'face') html = opt('face', 'Face') + (Lk.face !== 'natural' ? sw('facea', FACEC, Lk.facea, 'Face colour') + sw('faceb', FACEC, Lk.faceb, 'Second colour') : '') + sw('eyec', EYES, Lk.eyec, 'Eyes');
     else if (tab === 'hair') html = opt('hair', 'Hair') + sw('hairc', HAIRC, Lk.hairc, 'Hair colour') + (Lk.f ? '' : opt('beard', 'Beard'));
-    else if (tab === 'body') html = opt('body', 'Body') + sw('skin', SKINS, Lk.skin, 'Skin: pale to dark') + sw('skin', SKINF, Lk.skin, 'Skin: any colour') + '<div class="wr own"><span>Choose your own skin</span><input type="color" data-skinp value="' + Lk.skin + '" aria-label="Choose your own skin colour"></div>';
+    else if (tab === 'body') html = opt('body', 'Body') + opt('arms', 'Arms') + opt('legs', 'Legs') + opt('heads', 'Heads') + sw('skin', SKINS, Lk.skin, 'Skin: pale to dark') + sw('skin', SKINF, Lk.skin, 'Skin: any colour') + '<div class="wr own"><span>Choose your own skin</span><input type="color" data-skinp value="' + Lk.skin + '" aria-label="Choose your own skin colour"></div>';
+    else if (tab === 'moves') html = opt('move', 'Getting round town') + '<div class="say">' + MOVE_SAY[Lk.move] + (Lk.move !== 'fly' ? ' Storms and giants are still fought in the air.' : '') + '</div>';
     else if (tab === 'armor') html = opt('sh', 'Shoulders') + opt('chest', 'Chest') + opt('arm', 'Forearms') + opt('leg', 'Legs');
     else if (tab === 'back') html = opt('back', 'On the back') + sw('cape', B.lair ? L.VSUITS : L.SUITS, Lk.cape, 'Cape and wing colour');
     else if (tab === 'col') { const SU = B.lair ? L.VSUITS : L.SUITS; html = sw('suit', SU, Lk.suit, 'Suit') + sw('cape', SU, Lk.cape, 'Cape') + sw('belt', L.BELTS, Lk.trim, 'Belt and trim') + sw('dark', L.DARKS, Lk.dark, 'Boots and gloves'); }

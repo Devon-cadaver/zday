@@ -19,7 +19,8 @@ h2{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#d8c49e;ma
 h2::after{content:"";flex:1;height:1px;background:rgba(255,236,200,.18)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:7px}
 .tile{aspect-ratio:1/1;position:relative;border-radius:9px;background:rgba(255,236,200,.04);border:1px solid rgba(255,236,200,.08)}
-.tile .lbl{position:absolute;z-index:3;left:50%;bottom:5px;transform:translateX(-50%);max-width:92%;box-sizing:border-box;text-align:center;background:rgba(28,20,12,.88);border:1px solid rgba(255,236,200,.2);color:#f6ead2;padding:3px 6px;border-radius:5px;font:700 8.5px/1.15 system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase}
+.tile .lbl{position:absolute;z-index:3;left:0;right:0;margin:0 auto;bottom:5px;width:-webkit-fit-content;width:fit-content;max-width:92%;box-sizing:border-box;text-align:center;background:rgba(28,20,12,.88);border:1px solid rgba(255,236,200,.2);color:#f6ead2;padding:3px 6px;border-radius:5px;font:700 8.5px/1.15 system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase}
+.tile .lbl small{display:block;font-size:7.5px;font-weight:600;opacity:.7;letter-spacing:.02em}
 </style>
 </head>
 <body>

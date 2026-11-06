@@ -208,6 +208,8 @@ Fear tips over at Villain: the next city sends heroes after you (rival heroes, o
 
 Each of the three gets: suit colours (main, trim, emblem, cape, boots and gloves), cape or no cape, mask or hood, armour plates, jet wings (Dragonfly's), a trench coat, a crest, a few emblems. Palettes and parts unlock with levels and towns saved; some are rewards (the Far Isles' suit). Saved per hero in the profile. The heroes are built from a kit (heroes.js: materials per look, cape, hair), so the outfit is a data object the kit reads: colours per part, which parts are on.
 
+**Body and moves (Sean, 2026-11-06), done.** The Body tab also has Arms (two, four, six), Legs (two, four) and Heads (one, two); every move plays on them, the extra limbs following the first pair. A Moves tab picks how they get round a town between the fights: Flyer, Fast runner (up the walls and over the roofs), Rope swinger (a line to the roofs), Super jumper (a block a leap). Storms and giants are still fought in the air. The roster in the menu shows the six as you made them: names, outfits and sides.
+
 ## 7. Progression and the campaign
 
 - XP from saves (town clean bonus), villains beaten, people rescued, minus collateral.
