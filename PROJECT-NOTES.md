@@ -1025,3 +1025,10 @@ Defend only. Captain Deluge (Body with a tinted Blur rig at 2.6 times size, a ha
 - A HERO: flies up behind her (flat, arms ahead), 2.5 s, then grabs: three arrows one at a time (left, right or up: never down, the tablet's full-screen swipe), 1.3 s each to swipe that way. All three: JUKED!, they swerve into the nearest building and bring it down, SHAKEN OFF! (+600). A wrong one or too slow: caught for 16, they drop back 4 s and come again.
 - Points go on Destroy's score (StormWar) where there is one.
 - Test: chase-test.cjs (three locks dodged, a hero juked, one lock left alone, lost low).
+
+## The earthquake level's boss, options (Sean, 2026-11-05; golems.html, golemkit.js)
+- Sean's design: a giant of rock with lava in its cracks, as big as a big building. It quakes and throws big stones; throw a few back and it falls, little stone men come out of the ground to be beaten, then it splits into two half its size, which do the same; those split into four a quarter the size, fought hand to hand; each of those breaks into a crowd that goes down in one hit.
+- golemkit.js golem(design): a figure 10 units tall on the ground with joints to pose (hips, torso, head, arms sh/el/fist, legs hip/knee/foot) and tick(t) for the idle and the lava's glow. Rough stones are icosahedra with their corners pushed in and out by a hash of the corner (stoneGeo), flat shaded; lava is a bright basic material showing through the gaps.
+- Four looks: A Basalt Brute (hunched, dark basalt plates, long arms), B Magma Core (boulders round a glowing core, lava at the joints), C Obsidian Titan (tall, black glassy crystals, a lava fault line, horns), D Living Mountain (a hill with grass, trees, a lamp post and a car on its back).
+- Building heights measured: most 10 to 16 m; the tallest in a small town 16 to 34 m; Metro City has towers of 123 and 148 m. Options shown: 30, 50 and 80 m, beside 13 and 34 m buildings and the hero. The split card: 50, 2 x 25, 4 x 12.5, a crowd at 2 m.
+- Waiting on Sean's pick before the level is built.
