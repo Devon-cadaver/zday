@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Disaster TV scripts</title>
+<style>
+:root{--bg:#160a26;--card:#22123a;--ink:#f4eee4;--dim:#bfb2cf;--pink:#ff4fa3;--gold:#ffd27a;--line:rgba(255,255,255,.14)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-text-size-adjust:100%}
+main{max-width:720px;margin:0 auto;padding:calc(14px + env(safe-area-inset-top)) 16px 120px}
+h1{font-size:24px;line-height:1.2;margin:4px 0 6px;color:#ffd6ef}
+h2{font-size:20px;margin:0 0 4px;color:var(--pink)}
+.sub{color:var(--dim);font-size:14px;margin:0 0 14px}
+.how{background:var(--card);border-radius:14px;padding:12px 14px;margin:0 0 16px}
+.how ol{margin:6px 0 0;padding-left:20px}.how li{margin:4px 0}
+section{background:var(--card);border-radius:14px;padding:14px;margin:0 0 16px;border:1px solid var(--line)}
+.tag{display:inline-block;font:800 11px system-ui,sans-serif;letter-spacing:.08em;color:var(--gold);margin-bottom:6px}
+.beat{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}
+.beat:first-of-type{border-top:0}
+.beat p{flex:1 1 auto;margin:0}
+.beat button.pic{flex:0 0 96px;width:96px;height:163px;padding:0;border:2px solid var(--line);border-radius:10px;overflow:hidden;background:#000;cursor:zoom-in}
+.beat button.pic img{width:100%;height:100%;object-fit:cover;display:block}
+.beat .none{flex:0 0 96px;width:96px;font-size:12px;color:var(--dim);text-align:center;padding-top:8px}
+label{display:block;font:800 12px system-ui,sans-serif;letter-spacing:.06em;color:var(--gold);margin:12px 0 4px}
+textarea{width:100%;min-height:88px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:#120820;color:var(--ink);font:15px/1.4 system-ui,sans-serif;padding:10px;resize:vertical}
+textarea:focus{outline:2px solid var(--pink);border-color:transparent}
+.saved{font-size:12px;color:#a6ff4d;opacity:0;transition:opacity .3s;margin-top:4px}
+.saved.on{opacity:1}
+.bar{position:fixed;left:0;right:0;bottom:0;padding:10px 16px calc(10px + env(safe-area-inset-bottom));background:rgba(22,10,38,.94);border-top:1px solid var(--line);display:flex;gap:8px;justify-content:center}
+.bar button{flex:1 1 0;max-width:340px;min-height:48px;border:0;border-radius:12px;background:linear-gradient(#ff5ad5,#a0168a);color:#fff;font:900 15px system-ui,sans-serif;letter-spacing:.04em;cursor:pointer}
+#out{display:none;margin:0 0 16px}
+#out.on{display:block}
+#out textarea{min-height:180px}
+#view{position:fixed;inset:0;background:rgba(0,0,0,.94);display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;z-index:9;padding:calc(12px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom));cursor:zoom-out}
+#view.on{display:flex}
+#view img{max-width:100%;max-height:calc(100% - 96px);border-radius:10px}
+#view p{margin:0;max-width:520px;text-align:center;font-size:14px;line-height:1.35;color:var(--ink)}
+</style>
+</head>
+<body>
+<main>
+<h1>Disaster TV: what happens in each disaster</h1>
+<p class="sub">Each picture is from Watch itself, taken at that point of the fight to show which enemy appears. For the pictures the camera was handed back to the game for a moment and the blur turned off, so the enemy is clear; on TV the same moment is filmed from the helicopters. Tap a picture to see it full size. Your notes save on this device as you type; when you're done, tap Copy all my notes and paste them to Claude.</p>
+<div class="how"><b>How each town goes</b>
+<ol>
+<li>WHAT HITS THE TOWN? Bet on three disasters at their odds; the one that comes is drawn at those odds.</li>
+<li>Then a second slip: the hero wins or the disaster wins, and under or over a line of buildings down.</li>
+<li>One of your heroes plays it by computer, with one life. The result is drawn at the odds you saw and the fight is steered to it.</li>
+<li>The result card, then the next town.</li>
+</ol>
+<label for="n-general">NOTES ON THE WHOLE SHOW</label><textarea id="n-general" data-k="general" data-name="The whole show" placeholder="Anything about the slips, the cameras, the order..."></textarea><div class="saved">Saved</div>
+</div>
+<div id="out"><label for="outText">YOUR NOTES (COPY AND PASTE TO CLAUDE)</label><textarea id="outText" readonly></textarea></div>
+<div id="list"></div>
+</main>
+<div class="bar"><button type="button" id="copy">Copy all my notes</button></div>
+<div id="view"><img alt=""><p></p></div>
+<script>
+// the disasters, in the order Watch draws them from; each beat with the picture that shows it (tv-scripts/<kind>-<n>.jpg)
+var D = [
+  { k: 'aliens', name: 'Aliens', tag: 'ON FOOT', beats: [
+    ['The fleet arrives and drops about 100 alien soldiers into the streets.', 1],
+    ['The hero fights them on foot and dodges the tripods’ red marks.', 2],
+    ['When the crowd is down to 25, the alien general flies in for a fight in the air.', 3],
+    ['Any saucers left are shot down by the team.', 4] ] },
+  { k: 'zombies', name: 'Zombies', tag: 'ON FOOT', beats: [
+    ['140 zombies fill the streets and the hero dusts them on foot, in daylight.', 1],
+    ['Near the end, the zombie general flies in for a fight in the air.', 2] ] },
+  { k: 'worm', name: 'Giant worm', tag: 'ON FOOT', beats: [
+    ['It surfaces and arcs at the hero. She dodges the red marks and punches it when it breaks out.', 1],
+    ['Beaten, it retreats and THE BURROWER, who was driving it, comes out for a fight in the air.', 2] ] },
+  { k: 'kaiju', name: 'Kaiju', tag: 'ON FOOT', beats: [
+    ['It stomps at the hero. She dodges the red marks and punches it down.', 1],
+    ['Beaten, it retreats and THE BEAST KEEPER comes for her in the air.', 2] ] },
+  { k: 'riot', name: 'Riot', tag: 'ON FOOT', beats: [
+    ['A mob of about 40. She knocks rioters flat and they go home.', 1],
+    ['Then three instigators (the Ringleader, the Agitator, the Firebrand), fought in the street one at a time.', 2],
+    ['The last one down breaks up the riot: whoever is still rioting goes home.', 3] ] },
+  { k: 'quake', name: 'Earthquake', tag: 'ON FOOT', beats: [
+    ['The 50 m Faultline rises (the Living Mountain in western towns, the Basalt Brute in Asian ones), sends out quake rings and throws boulders.', 1],
+    ['She throws the boulders back. Three hits and it falls, and stone men climb out of the ground.', 2],
+    ['Once they are dust it splits into two giants half the size, who do the same.', 3],
+    ['Then four small ones, fought by hand, each crumbling into a crowd of stone men.', 4],
+    ['No villain after it (there is none in story mode either).', 0] ] },
+  { k: 'tornado', name: 'Tornado', tag: 'IN THE AIR', beats: [
+    ['The tornado with the face throws cars and rubble at her. She punches them back, grabs and hurls them, and uses the laser when it is charged. Between moves she circles it.', 1],
+    ['Beaten, it ropes out and TWISTER steps out for a fight in the air.', 2] ] },
+  { k: 'flood', name: 'Flood', tag: 'IN THE AIR', beats: [
+    ['CAPTAIN DELUGE floods the town with his hose.', 1],
+    ['She rams him, and when the water gets too high she dives to drain it.', 2],
+    ['Once he drops the hose, she fights him by hand.', 3] ] },
+  { k: 'tsunami', name: 'Tsunami', tag: 'IN THE AIR', beats: [
+    ['The wave with the face crosses the town and throws things at her. She punches and grabs them, and uses the laser.', 1],
+    ['When it rears up she holds it back (the tap-tap moment).', 2],
+    ['Beaten in time, RIPTIDE steps out to fight.', 3],
+    ['If it crosses the whole town first, the heroes lose.', 0] ] },
+  { k: 'haboob', name: 'Dust storm', tag: 'IN THE AIR', beats: [
+    ['The storm with the face throws debris and sends out dust devils, which she grabs and hurls back.', 1],
+    ['Beaten, THE DUST DEVIL steps out to fight.', 2] ] },
+  { k: 'coldwave', name: 'Cold wave', tag: 'IN THE AIR', beats: [
+    ['The cold front with the face throws ice at her.', 1],
+    ['It meets her laser beam to beam; she wins it with the tap-tap moment.', 2],
+    ['Beaten, JACK FROST steps out to fight.', 3] ] }
+];
+var KEY = 'zday_tvscript_notes', notes = {};
+try { notes = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { notes = {}; }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(notes)); } catch (e) { /* no storage */ } }
+var list = document.getElementById('list'), view = document.getElementById('view');
+D.forEach(function (d) {
+  var s = document.createElement('section'), h = '<span class="tag">' + d.tag + '</span><h2>' + d.name + '</h2>';
+  d.beats.forEach(function (b) {
+    var src = 'tv-scripts/' + d.k + '-' + b[1] + '.jpg';
+    h += '<div class="beat"><p>' + b[0] + '</p>' + (b[1] ? '<button type="button" class="pic" data-src="' + src + '" data-cap="' + d.name + ': ' + b[0].replace(/"/g, '&quot;') + '"><img loading="lazy" src="' + src + '" alt="' + d.name + ' ' + b[1] + '"></button>' : '<span class="none">no picture</span>') + '</div>';
+  });
+  h += '<label for="n-' + d.k + '">NOTES ON THE ' + d.name.toUpperCase() + '</label><textarea id="n-' + d.k + '" data-k="' + d.k + '" data-name="' + d.name + '" placeholder="What should change?"></textarea><div class="saved">Saved</div>';
+  s.innerHTML = h; list.appendChild(s);
+});
+var boxes = document.querySelectorAll('textarea[data-k]');
+boxes.forEach(function (t) {
+  t.value = notes[t.dataset.k] || ''; var tm = 0, ok = t.nextElementSibling;
+  t.addEventListener('input', function () { notes[t.dataset.k] = t.value; save(); ok.classList.add('on'); clearTimeout(tm); tm = setTimeout(function () { ok.classList.remove('on'); }, 900); });
+});
+document.querySelectorAll('button.pic').forEach(function (b) { b.onclick = function () { view.querySelector('img').src = b.dataset.src; view.querySelector('p').textContent = b.dataset.cap; view.classList.add('on'); }; });
+view.onclick = function () { view.classList.remove('on'); };
+document.getElementById('copy').onclick = function () {
+  var out = 'DISASTER TV NOTES\n', any = false;
+  boxes.forEach(function (t) { var v = (notes[t.dataset.k] || '').trim(); if (v) { any = true; out += '\n' + t.dataset.name + ':\n' + v + '\n'; } });
+  if (!any) out += '\n(no notes yet)\n';
+  var o = document.getElementById('out'), ta = document.getElementById('outText'); ta.value = out; o.classList.add('on');
+  var btn = this, done = function (msg) { btn.textContent = msg; setTimeout(function () { btn.textContent = 'Copy all my notes'; }, 2200); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(out).then(function () { done('Copied: paste it to Claude'); }, function () { ta.focus(); ta.select(); done('Select the text above and copy'); });
+  else { ta.focus(); ta.select(); try { document.execCommand('copy'); done('Copied: paste it to Claude'); } catch (e) { done('Select the text above and copy'); } }
+  window.scrollTo({ top: o.offsetTop - 10, behavior: 'smooth' });
+};
+</script>
+</body>
+</html>
