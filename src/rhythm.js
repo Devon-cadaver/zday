@@ -304,5 +304,6 @@ export class BandGame {
     camera.position.copy(this.saved.pos); controls.target.copy(this.saved.tg); camera.fov = this.saved.fov; camera.updateProjectionMatrix(); camera.up.set(0, 1, 0); post.opts.dof = this.saved.dof;
     controls.enabled = true; controls.update(); g.focusAt = null;
     if (why) g.toast(why, 3000);
+    if (this.onStop) { const f = this.onStop; this.onStop = null; f(); } // free flight's band (freefly.js): back up over the stage
   }
 }
