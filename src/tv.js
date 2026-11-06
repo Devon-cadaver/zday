@@ -249,7 +249,7 @@ export class DisasterTV {
     document.body.classList.remove('zd-tvfight', 'zd-tvlevel', 'zd-flying'); g.post.opts.dof = this.dof; cam.up.set(0, 1, 0); cam.fov = this.cam.fov0; cam.updateProjectionMatrix(); g.controls.enabled = false; this.cam.pick(true);
     if (!P) return; noteLine(P.kind, n);
     const key = won ? 'heroes' : 'threat', who = won ? P.name : THE[P.kind], w1 = this.settle(m, key), key2 = n > P.line ? 'over' : 'under', w2 = m && m.b ? this.settle(m.b, key2) : 0;
-    this.card(won ? 'Saved by ' + P.name : THE[P.kind] + ' wins', n + ' building' + (n === 1 ? '' : 's') + ' down: ' + key2.toUpperCase()); this.cardT = 6;
+    { const top = won ? 'Saved by ' + P.name : THE[P.kind] + ' wins', big = n + ' building' + (n === 1 ? '' : 's') + ' down: ' + key2.toUpperCase(); setTimeout(() => { if (this.leaving < 0) { this.card(top, big); this.cardT = 5; } }, 1800); } // after the YOU CALLED IT flash, not over it
     this.say(won ? P.name + ' saved ' + this.town + '! ' + n + ' buildings down' : (why || THE[P.kind] + ' was too much') + ': ' + P.name + ' is down. ' + n + ' buildings lost in ' + this.town);
     const w = w1 + w2, lost = [m, m && m.b].filter(q => q && q.bet && q.pick && q.pick !== (q === m ? key : key2)).reduce((a, q) => a + q.bet, 0);
     if (w) this.hits.say('You called it! +' + w.toLocaleString() + ' coins', 'combo'); else if (lost) this.hits.say(who + ' won: ' + lost.toLocaleString() + ' coins lost', 'small'); else this.hits.say(who + ' won', 'small');
