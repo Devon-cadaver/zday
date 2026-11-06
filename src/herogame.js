@@ -20,6 +20,7 @@ import { LiveFront, LiveFlood } from './livestorm.js';
 import { finish as stormOver } from './heropower.js';
 import { openMap, villainsLeft } from './storymap.js';
 import { FreeFly } from './freefly.js';
+import { Chase } from './chase.js';
 
 
 const KEY = 'zday_hero';
@@ -190,7 +191,7 @@ export class HeroGame {
     for (const n of vs) { const e = D.start('villains', cx + (Math.random() - 0.5) * 160, cz + (Math.random() - 0.5) * 160, { only: n, quiet: true }); if (e) evs.push(e); }
     if (rivals.length) { const e = D.start('villains', cx, cz, { rivals, quiet: true }); if (e) { evs.push(e); this.rivalEv = e; } }
     this.flyUp(cx, cz); // Sean: every level starts floating over the town
-    const need = hero ? 0 : Math.min(25 + 15 * ix, Math.floor(g.city.buildings.length * 0.6)); this.round = { evs, allies, need, t: 0, downs: 0, wasDown: false, hero, hunted, rivals, key, ended: false, nothing: !evs.length };
+    const need = hero ? 0 : Math.min(25 + 15 * ix, Math.floor(g.city.buildings.length * 0.6)); this.round = { evs, allies, need, t: 0, downs: 0, wasDown: false, hero, hunted, rivals, key, ended: false, nothing: !evs.length }; if (!hero) this.chase = new Chase(this, { HS, rigFor }); // Destroy: jets and heroes on your tail (chase.js)
     this.rep = document.createElement('div'); this.rep.id = 'zd-rep'; document.body.appendChild(this.rep);
     const town = PLACES[key].name, seen = s.towns[key]; F.tip(hero ? (hunted ? 'You have gone too far. The other heroes are coming for you!' : seen && seen.fear > 200 ? 'The people of ' + town + ' remember you. They run' : s.rep >= 60 ? 'The people of ' + town + ' cheer as you fly in. Use your powers and Lock on' : wave[0] === 'tornado' ? 'Defend ' + town + '. Lock on to go round the tornado against its spin' : 'Defend ' + town + '. Use your powers and Lock on') : 'Bring down ' + need + ' buildings in ' + town + ' and beat the heroes who come');
     if (hero && (s.rep < 35 || (seen && seen.fear > 200))) g.people.scare(cx, cz, 400, 0.5);
@@ -247,6 +248,7 @@ export class HeroGame {
   update() {
     const R = this.round; if (!R || R.ended) return; const F = this.g.flight, S = LAB.stats; R.t += 1 / 60; if (!this.squad) this.squad = new Squad(this); this.squad.step(1 / 60); if (R.ended) return;
     if (this.g.base && this.g.base.level === this) { if (this.rep) this.rep.style.display = 'none'; return; } // in the lair: nothing ends till you come out
+    if (this.chase) this.chase.step(S);
     if (R.zombie) { const H = this.g.horde; if (!H.active && !H.flying) return this.finish(false, 'You left the town'); if (R.riot && R.evs[0] && !R.evs[0].alive && !H.over && !H.instLeft()) { H.finish(true); return; } if (R.boss && (R.boss.heroHp <= 0 || !R.boss.alive) && !H.over) { if (!R.ctrl) { R.ctrl = H.ctrlMake(R.boss); R.ctrlAt = performance.now() + 2000; if (R.boss.alive) endDisaster(R.boss); R.noun = ' to beat'; } if (R.ctrl.gone) { H.finish(true); return; } if (R.ctrlAt && performance.now() > R.ctrlAt) { R.ctrlAt = 0; if (H.genFree()) H.genFight(R.ctrl); } return; } this.rep.style.display = 'none'; this.rep.innerHTML = 'Hero · ' + H.left + R.noun + '<div class="bar"><i style="width:' + Math.max(0, 100 - H.left / R.n * 100) + '%"></i></div>'; return; }
     const live = R.evs.filter(e => e.alive && (e.type !== 'villains' || e.who.some(w => !w.gone && !w.beaten))).length;
     const fear = LAB.fear(), rep = R.hero ? Math.max(0, Math.min(100, this.s.rep - fear / 30)) : 0;
@@ -261,7 +263,7 @@ export class HeroGame {
   cross(s) { const n = HS.shown(s.flyer); if (s.side === 'hero' && s.rep < 15) { s.side = 'villain'; s.rep = 14; return '<br><b style="color:#ff8a7a">' + n + ' has gone too far: now a villain. You will find them under Destroy</b>'; } if (s.side === 'villain' && s.rep >= 60) { s.side = 'hero'; s.rep = 60; return '<br><b style="color:#6cff8a">' + n + ' has done too much good: now a hero. You will find them under Defend</b>'; } return ''; }
   finish(won, why) {
     { const F0 = this.g.flight, H0 = this.g.horde; this.homeAt = F0 && F0.active ? [F0.pos.x, F0.pos.y, F0.pos.z] : H0 && H0.active && H0.h ? [H0.h.x, H0.h.y, H0.h.z] : null; } // where the flight home starts (flyHome)
-    const R = this.round, s = this.s, S = LAB.stats, F = this.g.flight, g = this.g; R.ended = true; if (this.squad) { this.squad.end(); this.squad = null; } if (F.storm) { if (F.storm.war) R.score = F.storm.score; F.storm.dispose(); F.storm = null; } const fear = LAB.fear(); if (this.rep) { this.rep.remove(); this.rep = null; }
+    if (this.chase) { this.chase.dispose(); this.chase = null; } const R = this.round, s = this.s, S = LAB.stats, F = this.g.flight, g = this.g; R.ended = true; if (this.squad) { this.squad.end(); this.squad = null; } if (F.storm) { if (F.storm.war) R.score = F.storm.score; F.storm.dispose(); F.storm = null; } const fear = LAB.fear(); if (this.rep) { this.rep.remove(); this.rep = null; }
     if (R.zombie) {
       const H = R.horde || g.horde, xp = won ? 300 + (R.boss ? 300 : H.kills) + (H.bitten < 10 ? 100 : 0) : 20 + Math.round(H.kills / 4); if (g.base && g.base.active) { g.base.level = null; g.base.stop(true); } if (H.active) H.stop(true); if (H.flying) { H.flying = false; if (H.el) H.el.remove(); if (g.flight.active) g.flight.stop(true); }
       for (const e of R.evs) if (e.alive) endDisaster(e); g.flight.heroGame = false; if (this.labWas) Object.assign(LAB, this.labWas, { spotK: 1, toughK: 1, powerK: 1, energyK: 1, teamK: 1 });
