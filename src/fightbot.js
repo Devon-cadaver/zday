@@ -7,7 +7,7 @@ import { FIN_SCRIPTS } from './finishers.js';
 
 const WINDS = ['wind', 'strike', 'rush'];
 // the stick that walks her towards (wx, wz) in the world, in the screen's frame the way stickDir reads it
-function stickTo(T, wx, wz) {
+export function stickTo(T, wx, wz) {
   const m = T.ctx.camera.matrixWorld.elements, al = Math.hypot(m[0], m[2]) || 1, ax = m[0] / al, az = m[2] / al, fl = Math.hypot(m[8], m[10]) || 1, fx = -m[8] / fl, fz = -m[10] / fl, l = Math.hypot(wx, wz) || 1;
   T.stick = [(wx * ax + wz * az) / l, -(wx * fx + wz * fz) / l];
 }
@@ -58,7 +58,7 @@ export function botStep(T, dt) {
   if (B.tap <= 0 && ['idle', 'attack', 'lunge', 'land', 'dodge', 'jugWait'].includes(h.state) && !['down', 'getup'].includes(v.state)) { B.tap = (0.24 + (1 - sk) * 0.18 + Math.random() * 0.12) * (coast ? 1.5 : 1); T.tap(); }
 }
 // a swipe that sends her (wx, wz) in the world: the inverse of swipe()'s screen to world
-function dashWorld(T, wx, wz) {
+export function dashWorld(T, wx, wz) {
   const m = T.ctx.camera.matrixWorld.elements, al = Math.hypot(m[0], m[2]) || 1, ax = m[0] / al, az = m[2] / al, bl = Math.hypot(m[8], m[10]) || 1, bx = -m[8] / bl, bz = -m[10] / bl;
   T.swipe((wx * ax + wz * az) * 40, -(wx * bx + wz * bz) * 40);
 }

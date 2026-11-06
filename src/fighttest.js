@@ -253,7 +253,7 @@ export class FightTest {
   // o.foe {name, hp, hpMax, dmgK}, o.who, o.hp, o.street, o.onEnd(won, this): a story fight (flight.js fightFoe): that villain or hero, in the town's street, handed back at the end
   // o.ring {x, z, y, r}: fought there (the base's ring, base.js) with no plaza raised; o.robot {level, jab, grab, charge, laser}: the robot in Tyrant's frame
   start(o = {}) {
-    this.o = o; const g = this.g, D = g.disasters; for (const p of [g.flight, g.drive, g.takeover, g.bandGame, g.horde, g.base]) if (p && p.active) p.stop(true, !!o.ring); if (g.base && !o.ring) g.base.hideAll(); if (g.takeover && g.takeover.picking) g.takeover.endPick();
+    if (!o.watch && this.g.watchLevel && this.g.watchLevel.round) o.watch = this.g.watchLevel.fightWatch(o); this.o = o; const g = this.g, D = g.disasters; for (const p of [g.flight, g.drive, g.takeover, g.bandGame, g.horde, g.base]) if (p && p.active) p.stop(true, !!o.ring); if (g.base && !o.ring) g.base.hideAll(); if (g.takeover && g.takeover.picking) g.takeover.endPick();
     const B = g.city.bounds, cx = this.cx = o.ring ? o.ring.x : (B.x0 + B.x1) / 2, cz = this.cz = o.ring ? o.ring.z : (B.z0 + B.z1) / 2, { camera, controls, post } = this.ctx, S = D.ctx.scene; this.R = o.air ? AIR_R : o.ring ? o.ring.r : ARENA; this.dmgK = o.foe ? o.foe.dmgK : o.robot ? 0.6 + 0.2 * o.robot.level : 1; this.nearB = null; this.nearT = 0;
     this.active = true; controls.enabled = false; g.setFollow(-1); document.body.classList.add('zd-flying'); post.opts.dof = !o.street;
     // clear a district and raise a bare plaza over its streets, so the people and cars of the town are out of the fight
