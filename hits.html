@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>My Little Disaster · punch hits</title>
+<style>
+html,body{margin:0;min-height:100%;background:#0d0a16;color:#f6ead2;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:720px;margin:0 auto;padding:calc(12px + env(safe-area-inset-top)) 12px 40px;box-sizing:border-box}
+h1{margin:0 0 2px;font:900 22px Impact,'Arial Black',sans-serif;letter-spacing:.03em;color:#ff9a3a}
+p{margin:0 0 10px;font-size:13px;opacity:.85;line-height:1.35}
+h2{margin:16px 0 8px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#d8c49e}
+#view{position:sticky;top:0;z-index:3;margin:0 -12px;background:#0d0a16;padding-bottom:6px}
+#gl{display:block;width:100%;aspect-ratio:4/3;max-height:52vh;background:#141a33;touch-action:pan-y}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.opt{cursor:pointer;text-align:left;border-radius:10px;background:#1b1530;border:2px solid rgba(255,255,255,.12);padding:8px 9px;color:#f6ead2;font:12px/1.3 system-ui,-apple-system,sans-serif;touch-action:manipulation}
+.opt b{display:block;font-size:13.5px;color:#ffe2a0;margin-bottom:2px}
+.opt.on{border-color:#ff9a3a;box-shadow:0 0 12px rgba(255,154,58,.5)}
+.opt.on b{color:#ff9a3a}
+.row{display:flex;gap:6px;flex-wrap:wrap;margin:8px 12px 0}
+.row button{flex:1 1 0;min-width:0;padding:9px 6px;border-radius:9px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.07);color:#fff;font:700 12px system-ui,sans-serif;touch-action:manipulation}
+.row button.on{border-color:#a6ff4d;color:#a6ff4d;background:rgba(166,255,77,.12)}
+.snd{display:flex;gap:8px;align-items:center;border-radius:10px;background:#1b1530;border:2px solid rgba(255,255,255,.12);padding:8px 9px;margin-bottom:8px;cursor:pointer}
+.snd.on{border-color:#ff9a3a;box-shadow:0 0 12px rgba(255,154,58,.5)}
+.snd .t{flex:1 1 auto;min-width:0;font-size:12px;line-height:1.3}
+.snd .t b{display:block;font-size:13.5px;color:#ffe2a0}
+.snd.on .t b{color:#ff9a3a}
+.snd button{flex:none;width:62px;padding:10px 0;border-radius:9px;border:1px solid rgba(255,194,51,.6);background:rgba(255,194,51,.15);color:#ffe2a0;font:800 12px system-ui,sans-serif;touch-action:manipulation}
+a{color:#ffc233}
+</style>
+</head>
+<body>
+<main>
+  <h1>PUNCH HITS</h1>
+  <p>Sounds and sparks for the hits, to pick from. Nova throws jab, jab, cross at Tyrant over and over. Tap a spark to see it on her punches. Tap a sound's buttons to hear it; tap the row to use it with the punches (turn Sound on below the picture). <a href="./">Back to the game</a></p>
+  <div id="view"><canvas id="gl"></canvas><div class="row" id="tog"></div></div>
+  <h2>Sparks</h2><div class="grid" id="fx"></div>
+  <h2>Punch sounds</h2><div id="snd"></div>
+</main>
+<script type="module" src="/src/hitspage.js"></script>
+</body>
+</html>
