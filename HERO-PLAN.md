@@ -106,7 +106,7 @@ Build order (one thing at a time, each tested in the Sandbox and pushed). The ch
   - [x] The on-foot levels' grab gets the same choice of moves: throw, spin or drag by stroke (Sean, 2026-11-05).
   - [x] The riot (Sean, 2026-11-05): rioters are the enemy, knocked back when punched; three instigators to beat on the street, the last one down breaks it up.
   - [x] After a win, a third choice: fly around the town for fun, with mini games: a ring course against the clock, fires to put out, cats off roofs, help rebuild, sing with the band (Sean, 2026-11-05).
-  - [ ] A looseness pass over all moves, with the Pose Lab.
+  - [x] A looseness pass over all moves (Sean, 2026-11-06): hands up only near a foe, a looser walk and a real run; every move followed through by springs on the upper body. Single moves can still be reshaped in the Pose Lab.
   - [x] The story's globe (Sean, 2026-11-03): Defend or Destroy opens the globe with disasters on cities (1 villains, 1 aliens, 2 worm, 2 weather, 1-2 rotating), danger follows your level; after a city, Back to base lit, or wake by the regeneration pod if you lost; the Map station flashes for new threats.
   - [ ] Tune the story's mix once played. Story beats that hung on the old level order (who you meet when) need new triggers.
   - [x] Fight feel from Sean's video (2026-11-03): white flash, smack and clang, sparks and a star on the blow, a health bar over the foe, a lean back on every hit, soot marks in place of blood, a proper fall; punches in three poses with a deep lunge; camera nearer.

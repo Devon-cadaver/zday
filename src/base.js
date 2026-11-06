@@ -164,7 +164,7 @@ export class HomeBase {
       basement: this.buildRoom('basement', Bm.w, Bm.d, this.hx, this.hz + 400, [
         { id: 'ring', name: 'Ring console', act: 'The robot: set it up, fight', x: 17, z: 2 }, { id: 'elevator', name: 'Elevator', act: lr ? 'Up to the throne room' : 'Elevator up to the office', x: 0, z: 13.2 }]),
     };
-    this.h = new Body(rigFor(HS.curName(this.side), HS.outfit(HS.curName(this.side))), 100); this.h.near = Infinity; S.add(this.h.r.root); this.h.y = this.floorY; this.goal = null; this.nearS = null; this.panel = null; this.autoOpen = null;
+    this.h = new Body(rigFor(HS.curName(this.side), HS.outfit(HS.curName(this.side))), 100); this.h.near = Infinity; this.h.loose = true; S.add(this.h.r.root); this.h.y = this.floorY; this.goal = null; this.nearS = null; this.panel = null; this.autoOpen = null;
     camera.fov = innerWidth < innerHeight ? 44 : 24; camera.up.set(0, 1, 0); camera.updateProjectionMatrix(); this.look = new THREE.Vector3(); this.goFloor('office', true, o.at || 'door');
     const el = this.el = document.createElement('div'); el.id = 'zd-base'; el.innerHTML = '<div class="hint">Drag anywhere to walk &middot; tap to go there</div><div class="threat"><b>BASE THREAT</b><i><s></s></i></div><div class="act"><button type="button"></button></div><div class="row4"></div><div class="stick"><i></i></div><div class="fade"></div>'; document.body.appendChild(el);
     // the joystick (Sean, for whoever would rather not tap): the knob's offset from the pad's centre, up to 40 px, is her walking direction on the screen
@@ -237,7 +237,7 @@ const sw = (key, list, cur) => '<div class="row">' + list.map(c => '<button type
     draw();
   }
   // her rig again in the costume just picked
-  redress() { const S = this.g.disasters.ctx.scene, o = this.h; S.remove(o.r.root); if (o.r.smooth) o.r.smooth.mesh.geometry.dispose(); if (o.r.flowHair) o.r.flowHair.geo.dispose(); o.r.cape.g.dispose(); const h = this.h = new Body(rigFor(HS.curName(this.side), HS.outfit(HS.curName(this.side))), 100); this.h.near = Infinity; S.add(h.r.root); h.x = o.x; h.z = o.z; h.y = o.y; h.yaw = o.yaw; }
+  redress() { const S = this.g.disasters.ctx.scene, o = this.h; S.remove(o.r.root); if (o.r.smooth) o.r.smooth.mesh.geometry.dispose(); if (o.r.flowHair) o.r.flowHair.geo.dispose(); o.r.cape.g.dispose(); const h = this.h = new Body(rigFor(HS.curName(this.side), HS.outfit(HS.curName(this.side))), 100); this.h.near = Infinity; this.h.loose = true; S.add(h.r.root); h.x = o.x; h.z = o.z; h.y = o.y; h.yaw = o.yaw; }
   retint() { if (!this.rooms) return; for (const r of Object.values(this.rooms)) this.decorate(r); }
   // what is chosen for the inside, made again
   decorate(r) { dropDecor(r.dec); r.dec = buildDecor(r.key, r.w, r.d, this.cfg, 1 + Math.floor(Math.sqrt(HS.load()[this.side].xp / 100))); r.g.add(r.dec); r.wm.color.set(insideOf(this.cfg).walls.c); }

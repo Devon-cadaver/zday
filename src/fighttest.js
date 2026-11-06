@@ -206,6 +206,11 @@ function atEase(r, k) {
   L(r.body, 0, 0, 0); L(r.torso, 0.02, 0, 0); L(r.chest, 0, 0, 0); L(r.head, 0, 0, 0);
   for (const l of r.legs) { L(l.hip, 0, 0, 0); L(l.knee, 0.05, 0, 0); L(l.ank, 0, 0, 0); }
 }
+// the looseness (Sean, 2026-11-06): the torso, chest, head and arms follow the pose through springs instead of sitting on it, so every move has a
+// little lag and follow-through: a punch's arm overshoots and settles, the head snaps back further on a blow and rocks, the chest keeps turning
+// after the hips. [stiffness (rad/s), damping (1 = no overshoot)] by joint, in Body.joints' order; the hips, legs and feet stay exact (the feet
+// have to stay planted). Only bodies in play (street, crowd, base: body.loose); the Pose Lab shows the poses as made
+const LOOSE = [null, [26, 0.72], [19, 0.52], [13, 0.42], [34, 0.6], [40, 0.6], [24, 0.55], [34, 0.6], [40, 0.6], [24, 0.55]];
 export class Body {
   constructor(r, hpMax) {
     this.r = r; this.hp = this.hpMax = hpMax; this.x = 0; this.y = 0; this.z = 0; this.vx = 0; this.vz = 0; this.vy = 0; this.yaw = 0; this.state = 'idle'; this.t = 0; this.clip = C.guard; this.ct = 0; this.blend = 1; this.phase = 0; this.walkK = 0;
@@ -222,6 +227,23 @@ export class Body {
   unpaint() { this.unflash(); if (!this.pm) return; for (const [o, m] of this.pm) o.material = m; this.pm = null; }
   // the hands a key has pinned go there, each only as far as the key says
   pins() { const r = this.r; r.root.updateMatrixWorld(true); for (let i = 0; i < 2; i++) { const q = pinAt(this.clip, this.ct, i ? 'R' : 'L', _pin), P = q && PINS[q.on]; if (!P || q.w <= 0 || !r.arms[i]) continue; const on = P[4] ? r : this.foe && this.foe.r; if (!on) continue; const T = pinPart(on, P[0]).localToWorld(_ik.set(P[1], P[2], P[3])); if (q.w < 1) T.lerp(r.arms[i].wr.getWorldPosition(_c), 1 - q.w); reachArm(r.arms[i], T); } }
+  // the upper body after its pose (LOOSE): each axis a damped spring toward where the pose puts it, a few small steps a frame so it stays steady
+  springs(dt) {
+    const J = this.joints, S = this.sp || (this.sp = new Float32Array(J.length * 6)), init = !this.spOn || dt > 0.25; this.spOn = true;
+    const steps = Math.max(1, Math.ceil(dt / 0.01)), h = dt / steps, swing = this.armsA != null;
+    for (let i = 1; i < LOOSE.length && i < J.length; i++) {
+      const P = LOOSE[i], j = J[i]; if (!P || !j) continue; const R = j.rotation, o = i * 6;
+      if (init || (swing && i >= 4)) { S[o] = R.x; S[o + 1] = R.y; S[o + 2] = R.z; S[o + 3] = S[o + 4] = S[o + 5] = 0; continue; } // a whirl drives the arms itself
+      const w = P[0], z = P[1];
+      for (let k = 0; k < 3; k++) {
+        const t = k === 0 ? R.x : k === 1 ? R.y : R.z; let q = S[o + k], v = S[o + 3 + k];
+        if (!(Math.abs(t - q) < 2.5)) { q = t; v = 0; } // a jump of more than a half turn (a pose snapped by a script): no long way round
+        for (let s = 0; s < steps; s++) { v += (w * w * (t - q) - 2 * z * w * v) * h; q += v * h; }
+        S[o + k] = q; S[o + 3 + k] = v;
+      }
+      R.set(S[o], S[o + 1], S[o + 2]);
+    }
+  }
   // the pose: the clip, walking legs over it, eased from the last pose so nothing snaps
   pose(dt, top, grounded) {
     const r = this.r; this.ct += dt; relax(r); playClip(r, this.clip, this.ct);
@@ -247,6 +269,7 @@ export class Body {
     if (this.fl) { const a = this.fl, t = (this.flT = (this.flT || 0) + dt) * 11, L = r.legs; L[0].hip.rotation.x += Math.sin(t) * 0.4 * a; L[1].hip.rotation.x += Math.sin(t + 2.4) * 0.4 * a; L[0].knee.rotation.x += (0.5 + 0.5 * Math.sin(t + 1)) * 0.7 * a; L[1].knee.rotation.x += (0.5 + 0.5 * Math.sin(t + 3.4)) * 0.7 * a; r.chest.rotation.z += Math.sin(t * 0.6) * 0.1 * a; } // legs going in the wind of it
     if (this.tw) { r.chest.rotation.y += this.tw; r.torso.rotation.y += this.tw * 0.5; } // the shoulders turning into a blow
     if (this.rk > 0.01) { const k = this.rk; r.torso.rotation.x -= 0.5 * k; r.chest.rotation.x -= 0.25 * k; r.head.rotation.x -= 0.35 * k; this.rk *= Math.exp(-dt * 9); } // knocked back on its heels by a blow, over whatever it is doing
+    if (this.loose) this.springs(dt);
     r.root.position.set(this.x, this.y, this.z); r.root.rotation.y = this.yaw; if (this.fly) r.root.position.y += Math.sin((this.bobT = (this.bobT || 0) + dt) * 2.3) * 0.13;
     if (grounded) { r.root.updateMatrixWorld(true); const a = r.legs[0].ank.getWorldPosition(_a).y, b = r.legs[1].ank.getWorldPosition(_b).y; r.root.position.y += top + 0.09 - Math.min(a, b); } // the lower foot on the ground, however the pose bends
     else if (this.state === 'down' || this.state === 'getup') r.root.position.y += 0.3;
@@ -381,7 +404,7 @@ export class FightTest {
       { const W = this.o.watch; if (W && !W.wait) botStep(this, ft); this.heroStep(ft); const sl = v.slowT > 0 ? 0.45 : 1; if (sl < 1) v.slowT -= ft; if (W && W.wait) { this.face(v, h, ft, 6); this.vft = ft; } else { this.vilStep(ft * sl); this.vft = ft * sl; } } this.mateStep(dt); if (this.finRun && !this.finRun.step(this.rdt)) this.finRun = null; this.teamEls.forEach((q, i) => { q.querySelector('i').style.width = (this.team || 0) + '%'; q.classList.toggle('ok', this.team >= 100 && !this.mateR && !mateDown(this.g, this.mates[i])); }); this.separate(); this.clamp(h); this.clamp(v);
       if (!(h.state === 'idle' && this.stick)) h.walkK = Math.max(0, h.walkK - ft * 8);
       this.streetStep(ft); this.airStep(ft); this.watchdog(ft);
-      h.near = v.near = this.dist(); if (h.state === 'drag') v.pose(ft, this.top, this.grounded(v)); h.pose(ft, this.top, this.grounded(h)); if (h.state === 'attack' && ATK[this.atk] && ATK[this.atk].spin) h.r.root.rotation.y += Math.min(1, h.t / ATK[this.atk].end) * 6.283; if (h.state !== 'drag') v.pose(v.state === 'frozen' && !this.stunLive ? 0 : this.vft, this.top, this.grounded(v)); if (v.state === 'dazed' || (this.stLook && this.stLook.wob)) this.wobble(v); if (h.state === 'dazed') this.wobble(h); this.fxStep(dt); this.fxa.step(ft); this.lookStep(ft); this.guard.step(dt, h.x, h.y + 1, h.z); ghost(h.r); ghost(v.r, '#ff6a50'); this.scuff(h); this.scuff(v);
+      h.near = v.near = this.dist(); h.loose = v.loose = true; if (h.state === 'drag') v.pose(ft, this.top, this.grounded(v)); h.pose(ft, this.top, this.grounded(h)); if (h.state === 'attack' && ATK[this.atk] && ATK[this.atk].spin) h.r.root.rotation.y += Math.min(1, h.t / ATK[this.atk].end) * 6.283; if (h.state !== 'drag') v.pose(v.state === 'frozen' && !this.stunLive ? 0 : this.vft, this.top, this.grounded(v)); if (v.state === 'dazed' || (this.stLook && this.stLook.wob)) this.wobble(v); if (h.state === 'dazed') this.wobble(h); this.fxStep(dt); this.fxa.step(ft); this.lookStep(ft); this.guard.step(dt, h.x, h.y + 1, h.z); ghost(h.r); ghost(v.r, '#ff6a50'); this.scuff(h); this.scuff(v);
       this.ee.style.width = this.energy + '%'; this.chkFrame(); for (const k in this.pwBtn) this.pwBtn[k].classList.toggle('ok', this.energy >= this.COST[k]); this.holdStep(dt);
       this.hh.style.width = Math.max(0, h.hp / h.hpMax * 100) + '%'; this.vh.style.width = Math.max(0, v.hp / v.hpMax * 100) + '%';
       this.heroStreak.update(_c.set(h.x, h.y + 0.92, h.z), ['lunge', 'dodge', 'skyRise', 'skyDive', 'finRun'].includes(h.state), this.ctx.camera, ft); this.vilStreak.update(_c.set(v.x, v.y + 0.92, v.z), v.state === 'rush' || v.state === 'vrise' || v.state === 'vdive', this.ctx.camera, ft); dt /= pace;
