@@ -973,3 +973,14 @@ Defend only. Captain Deluge (Body with a tinted Blur rig at 2.6 times size, a ha
 - A dazed foe: check is Finisher 1, caret Finisher 2, the key large and gold. Neck drag and spin have no finger held now: the stick steers the drag, a tap punches, any stroke flings or lets go; the drag ends by itself at 8 s. Sky runs on its own with holds optional. A power from a stroke is one shot (no holding to charge); the kick is fixed at 0.6.
 - Foes' fixed joystick and the settings: stick and dash timing saved in zday_stick_side, zday_dash_mode; their buttons only where the fight's top buttons show (robot, Sandbox).
 - Not strokes: flying (a drag is the stick there) and the storm fights' PUNCH, GRAB, LASER.
+
+## The flight home after a win (Sean, 2026-11-05; herogame.js flyHome)
+- BACK TO BASE on the win card no longer cuts straight inside. finish() keeps where the hero was (homeAt: the flight's position, or the hero on foot in a crowd level); flyHome starts the flight there and runs the BASE button's autopilot (flight.baseGo, baseRun): up to cruising height, round to the front of the base at full boost, down to the door, the fade, then the office at the door as before. About 5 s from the middle of town.
+- On the way: the bar, the HUD and the TEAM buttons hidden (F.homing, heropower teamUiStep), no army; the owner has no side so no storm game starts. A tap anywhere goes straight in; a 20 s watchdog gets her home whatever happens. A loss still wakes you by the pod, a crossed-over or empty team goes straight to the hub.
+- Test: home-test.cjs (crowd level win, flying level win, a tap to skip).
+
+## Stuck on sidewalks in the crowd fights (Sean, 2026-11-05, in the riot; horde.js openAt)
+- The 2026-11-03 fix (fighttest.js open) only covered the one-on-one fights. The crowd fights (riot, zombies, aliens, worm, kaiju, the base's robot army) still stepped on the people's walking grid, which blocks rubble, trees and the edges of things. horde.move now uses openAt: anywhere in the town's grid but inside a standing building, sliding along walls; caught somewhere that is not open, any step gets her out. Measured: 60 of 60 spots the grid blocked walked through, no building centre open.
+
+## The dust storm's throws without wire (Sean, 2026-11-05: "a mesh around them, it looks unfinished")
+- Its rocks had bright wire edges so they read against the dust. Now a darker rock (7a5530) with a dark rim, an inside-out shell 1.14 times its size (livestorm outline). Its dust devils are a lathed funnel with pale slanting streaks wrapped round it (swirlTex in foepower.js), turning with it; the villains' twisters and devils on foot got the same streaks in place of their wire layer. The flash on the face before a throw was a sprite with no texture, a square; now the soft round glow (glowTex).
