@@ -21,6 +21,7 @@ export function botStep(T, dt) {
   const slack = W.win === 'v' && fh > fv - 0.1; // drawn to lose and not behind: no shield, no team, a guard that is mostly down, slow to break free
   const coast = W.win === 'h' && fh > fv + 0.3; // drawn to win and well clear: she eases off and lets them back in it
   W.t = (W.t || 0) + dt; B.cd -= dt; B.tap -= dt; fateFloor(T);
+  if (W.t > 130 && !T.over && !T.fin && !T.hDazed && T.v.hp > 0) { if (W.win === 'v') T.hurtH(999); else T.hurtV(9999); } // still going after two minutes (a state it cannot get out of): ended as drawn
   if (B.up && (B.up.t -= dt) <= 0) { T.castUp(B.up.id); B.up = null; } // a charged power let go
   if (T.over || T.hDazed) { T.stick = null; return; }
   if (h.state === 'grabbed') { if (B.tap <= 0) { B.tap = slack ? 0.3 : 0.1 + (1 - sk) * 0.12 + Math.random() * 0.05; T.tap(); } return; } // held: mash to break free

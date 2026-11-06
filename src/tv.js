@@ -13,7 +13,7 @@ import { Responders } from './response.js';
 import { Site } from './rebuild.js';
 import { damageOf, rememberDamage } from './world.js';
 import { HS, levelOf } from './herogame.js';
-import { WatchLevel, AFTER } from './watchlevel.js';
+import { WatchLevel, AFTER, FOOT, AIR } from './watchlevel.js';
 import { sfx } from './audio.js';
 
 const CSS = `
@@ -73,20 +73,19 @@ body.zd-tvfight #zd-mkt{bottom:calc(var(--zd-bar-h, 64px) + 40px)}
 body.zd-tvfight #zd-frame,body.zd-tvfight #zd-score{display:none}
 #zd-fight.watch{pointer-events:none}
 body.zd-tvlevel #zd-fight{pointer-events:none}
-html body.zd-tvlevel #zd-fight .stk.fix,body.zd-tvlevel #zd-fight .row4,body.zd-tvlevel #zd-fight .hint,body.zd-tvlevel #zd-fight .stk,body.zd-tvlevel #zd-fight .fin,body.zd-tvlevel #zd-fight .swbox,body.zd-tvlevel #zd-fight .swkey,body.zd-tvlevel #zd-fight .acts,body.zd-tvlevel #zd-fight [data-t],body.zd-tvlevel #zd-squad,body.zd-tvlevel #zd-rep,body.zd-tvlevel #zd-flybar{display:none!important}
+html body.zd-tvlevel #zd-fight .stk.fix,body.zd-tvlevel #zd-fight .row4,body.zd-tvlevel #zd-fight .hint,body.zd-tvlevel #zd-fight .stk,body.zd-tvlevel #zd-fight .fin,body.zd-tvlevel #zd-fight .swbox,body.zd-tvlevel #zd-fight .swkey,body.zd-tvlevel #zd-fight .acts,body.zd-tvlevel #zd-fight [data-t],body.zd-tvlevel #zd-parry,body.zd-tvlevel #zd-catch,body.zd-tvlevel #zd-laser,body.zd-tvlevel #zd-mash,body.zd-tvlevel #zd-drain,body.zd-tvlevel #zd-squad,body.zd-tvlevel #zd-rep,body.zd-tvlevel #zd-flybar{display:none!important}
 body.zd-tvlevel #zd-fly{pointer-events:none}
 html body #zd-fight.watch .stk.fix,#zd-fight.watch .row4,#zd-fight.watch .hint,#zd-fight.watch .stk,#zd-fight.watch .fin,#zd-fight.watch .swbox,#zd-fight.watch .swkey,#zd-fight.watch .acts{display:none!important}
 `;
 
-const FOOT_K = ['aliens', 'zombies', 'worm', 'kaiju', 'riot', 'quake'];
-const POOL = FOOT_K.slice(); // what hits next: the disasters as they are in Defend (watchlevel.js)
+const POOL = FOOT.concat(AIR); // what hits next: the disasters as they are in Defend (watchlevel.js), on foot and in the air
 const TOWN_T = 170, PICK_T = 12, TICK_SPEED = 60; // s in a town at most; s to make a call; ticker px a second
 const STAKES = [50, 100, 250, 'all'];
 const KIND = { aliens: 'Aliens', zombies: 'Zombies', worm: 'Giant worm', kaiju: 'Kaiju', riot: 'Riot', quake: 'Earthquake', tornado: 'Tornado', flood: 'Flood', tsunami: 'Tsunami', haboob: 'Dust storm', coldwave: 'Cold wave' };
 const THE = { aliens: 'The invasion', zombies: 'The horde', worm: 'The worm', kaiju: 'The kaiju', riot: 'The mob', quake: 'The Faultline', tornado: 'The tornado', flood: 'The flood', tsunami: 'The wave', haboob: 'The dust storm', coldwave: 'The cold front' };
 const NEWS = { aliens: 'An alien invasion lands in', zombies: 'A zombie outbreak tears through', worm: 'A giant worm surfaces in', kaiju: 'A kaiju stomps into', riot: 'A riot breaks out in', quake: 'The Faultline rises in', tornado: 'A tornado touches down in', flood: 'Floods hit', tsunami: 'A tsunami heads for', haboob: 'A dust storm rolls into', coldwave: 'A cold front freezes' };
 const WIN_P = { aliens: 0.62, zombies: 0.66, worm: 0.56, kaiju: 0.5, riot: 0.7, quake: 0.52, tornado: 0.56, flood: 0.62, tsunami: 0.5, haboob: 0.56, coldwave: 0.56 }; // how often the heroes win each, before the night's form
-const LINE0 = { aliens: 30, zombies: 8, worm: 40, kaiju: 35, riot: 10, quake: 18, tornado: 9, flood: 2, tsunami: 7, haboob: 4, coldwave: 3 }; // buildings down, the bookmaker's first guess; then the median of what this device has seen
+const LINE0 = { aliens: 30, zombies: 8, worm: 40, kaiju: 35, riot: 10, quake: 18, tornado: 9, flood: 1, tsunami: 12, haboob: 6, coldwave: 5 }; // buildings down, the bookmaker's first guess; then the median of what this device has seen
 const FORM = ['is in form tonight', 'trained all week', 'is coming off a win', 'looks rested']; // said of the one the odds favour
 const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
@@ -96,7 +95,7 @@ let CLOCK = 0.16; // the broadcast's time of day: one day and night every 12 min
 let TOWNS = 0; // towns this broadcast: every third one has a Fight Night after its disaster
 
 // the viewer's coins and calls, kept on this device; lines: the buildings brought down by each kind, the last nine
-function calls() { let c = null; try { c = JSON.parse(localStorage.getItem('zday_tvcalls')); } catch (e) { /* no storage */ } return { right: 0, total: 0, points: 0, coins: 1000, stake: 100, lines: {}, ...(c || {}) }; }
+function calls() { let c = null; try { c = JSON.parse(localStorage.getItem('zday_tvcalls')); } catch (e) { /* no storage */ } const o = { right: 0, total: 0, points: 0, coins: 1000, stake: 100, lines: {}, ...(c || {}) }; for (const k of ['right', 'total', 'points', 'coins']) if (!Number.isFinite(o[k])) o[k] = k === 'coins' ? 1000 : 0; return o; }
 function saveCalls(c) { try { localStorage.setItem('zday_tvcalls', JSON.stringify(c)); } catch (e) { /* no storage */ } }
 function lineOf(kind) { const L = (calls().lines || {})[kind]; if (!L || L.length < 3) return LINE0[kind] + 0.5; const s = L.slice().sort((a, b) => a - b); return s[Math.floor(s.length / 2)] + 0.5; }
 function noteLine(kind, n) { const c = calls(); c.lines = c.lines || {}; const L = c.lines[kind] = (c.lines[kind] || []).concat(n); if (L.length > 9) L.shift(); saveCalls(c); }
@@ -195,7 +194,7 @@ export class DisasterTV {
   // the result: a right call pays the stake back x100/odds; returns what it paid
   settle(m, key) {
     if (!m || !m.pick || !m.bet) return 0; const c = calls(); c.total++; let won = 0;
-    if (m.pick === key) { won = Math.round(m.bet * 100 / m.pct[m.opts.indexOf(key)]); c.right++; c.coins += won; c.points += won - m.bet; }
+    if (m.pick === key) { won = Math.round(m.bet * 100 / Math.max(1, m.pct[m.opts.indexOf(key)])); c.right++; c.coins += won; c.points += won - m.bet; }
     saveCalls(c); this.showCalls(!!won); return won;
   }
   // no result (the broadcast moved on, it never came to anything): the stakes back
