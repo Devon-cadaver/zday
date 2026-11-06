@@ -35,7 +35,8 @@ const CSS = `
 #zd-tick .m{position:absolute;left:0;top:0;white-space:nowrap;will-change:transform}
 #zd-next{position:fixed;left:0;right:0;top:30%;text-align:center;z-index:6;pointer-events:none;font:900 15px/1.2 system-ui,-apple-system,"Segoe UI",sans-serif;
   color:#f6ead2;text-shadow:0 1px 3px rgba(0,0,0,.9);letter-spacing:.06em;text-transform:uppercase;transition:opacity .4s;opacity:0}
-body.zd-tv #zd-radio{bottom:calc(var(--zd-bar-h, 64px) + 42px)}
+html body.zd-tv #zd-radio{top:auto;bottom:calc(var(--zd-bar-h, 64px) + 42px)} /* the announcer over the ticker; top:auto so a flying rule (radio.js) cannot stretch it down the whole screen (Sean, 2026-11-05, from his iPhone) */
+body.zd-tv #zd-minimap,body.zd-tv #zd-compass{display:none!important} /* a broadcast, not a game: no map, no compass */
 #zd-next b{display:block;font-size:30px;color:#ffe08a;letter-spacing:.02em;margin-top:4px}
 #zd-mkt{position:fixed;left:0;right:0;bottom:calc(var(--zd-bar-h, 64px) + 96px);z-index:8;display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none;
   font:700 12px/1.1 system-ui,-apple-system,"Segoe UI",sans-serif;color:#f6ead2}
