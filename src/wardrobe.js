@@ -3,7 +3,8 @@
 // Each row of choices scrolls sideways, so the sheet never grows. The camera frames what the tab is about: the head for Head, Face and Hair, the whole figure otherwise, and turns the fighter round for Back. Drag to turn.
 // The room is hidden while it is open (its lights stay, so the fighter is lit as in the room); a backdrop closes off everything else. The outfit is saved as before, in HS.
 import * as THREE from 'three';
-import { HS } from './herogame.js';
+import { HS, levelOf } from './herogame.js';
+import { unlockAt } from './unlocks.js';
 import { HEADGEAR } from './headgear.js';
 import { hdLook, WARD } from './hdbody.js';
 import { relax, detail } from './villains.js';
@@ -33,6 +34,8 @@ body.zd-ward #zd-base{display:none}
 #zd-ward .strip{display:flex;gap:6px;overflow-x:auto;touch-action:pan-x;overscroll-behavior:contain;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding:1px 8px}
 #zd-ward .pick .strip{flex:1 1 auto;min-width:0;padding:1px 2px}
 #zd-ward .strip button{flex:0 0 auto}
+#zd-ward button.lk{opacity:.5;background:#2a2340}
+#zd-ward button small{display:block;font-size:10px;font-weight:700;opacity:.9;margin-top:2px}
 #zd-ward .strip button.sw{flex:0 0 40px;width:40px;padding:0;border-radius:10px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.2)}
 #zd-ward .strip button.sw.on{box-shadow:0 0 0 3px #fff inset,0 0 0 2px #000 inset}
 #zd-ward .own{display:flex;align-items:center;gap:10px;padding:0 10px}
@@ -61,12 +64,13 @@ export function openWardrobe(B, L) {
   const row = (k, label, inner) => '<div class="wr" data-k="' + k + '">' + (label ? '<div class="h">' + label + '</div>' : '') + '<div class="strip">' + inner + '</div></div>';
   const sw = (key, list, cur, label) => row(key + (label || ''), label, list.map((c) => '<button type="button" class="sw' + (c === cur ? ' on' : '') + '" data-' + key + '="' + c + '" style="background:' + c + '" aria-label="' + c + '"></button>').join(''));
   function draw() {
-    const who = HS.curName(side), O = outfit(), Lk = hdLook(who, O), tab = W.tab; B.wardTab = tab;
+    const who = HS.curName(side), O = outfit(), Lk = hdLook(who, O), tab = W.tab, lv = levelOf((HS.load().chars[HS.cur(side)] || {}).xp || 0); B.wardTab = tab;
+    const lockB = (L, t) => '<button type="button" class="lk" data-lk="' + L + '" data-lkn="' + t + '">' + t + '<small>\u{1F512} Level ' + L + '</small></button>'; // not yet: the level it opens at (unlocks.js); what is worn stays on whatever its level
     for (const q of bodyEl.querySelectorAll('.wr')) { const st = q.querySelector('.strip'); if (st) scrolls[tab + q.dataset.k] = st.scrollLeft; } const top0 = bodyEl.dataset.tab === tab ? bodyEl.scrollTop : 0;
     whoEl.innerHTML = HS.team(side).map((i) => '<button type="button" data-dress="' + i + '"' + (i === HS.cur(side) ? ' class="on"' : '') + '>' + HS.shown(i) + '</button>').join('');
     tabsEl.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.wt === tab));
-    const opt = (k, n) => row(k, n, WARD[k].map(([v, t]) => '<button type="button" data-opt="' + k + ':' + v + '"' + (Lk[k] === v ? ' class="on"' : '') + '>' + t + '</button>').join('')); let html = '';
-    if (tab === 'head') { const hg = O.hg || 'none', own = HEADGEAR.find((q) => q[0] === hg) || HEADGEAR[0], HGS = B.lair ? [HEADGEAR[0], ...HEADGEAR.filter((q) => q[4]), ...HEADGEAR.filter((q) => !q[4] && q[0] !== 'none')] : HEADGEAR.filter((q) => !q[4]); W.HGS = HGS.map((q) => q[0]); html = '<div class="wr" data-k="hg"><div class="h">On the head</div><div class="pick"><button type="button" class="ar" data-hgn="-1" aria-label="Previous">◀</button><div class="strip">' + HGS.map((q) => '<button type="button" data-hg="' + q[0] + '"' + (q[0] === hg ? ' class="on"' : '') + '>' + q[1] + '</button>').join('') + '</div><button type="button" class="ar" data-hgn="1" aria-label="Next">▶</button></div></div>' + (hg !== 'none' ? sw('hgc', L.HATS, O.hgc || own[2], own[1] + ' colour') : ''); }
+    const opt = (k, n) => row(k, n, WARD[k].map(([v, t]) => { const L = unlockAt(k, v); return L > lv && Lk[k] !== v ? lockB(L, t) : '<button type="button" data-opt="' + k + ':' + v + '"' + (Lk[k] === v ? ' class="on"' : '') + '>' + t + '</button>'; }).join('')); let html = '';
+    if (tab === 'head') { const hg = O.hg || 'none', own = HEADGEAR.find((q) => q[0] === hg) || HEADGEAR[0], HGS = B.lair ? [HEADGEAR[0], ...HEADGEAR.filter((q) => q[4]), ...HEADGEAR.filter((q) => !q[4] && q[0] !== 'none')] : HEADGEAR.filter((q) => !q[4]); W.HGS = HGS.filter((q) => q[0] === hg || unlockAt('hg', q[0]) <= lv).map((q) => q[0]); /* the arrows go round what is open */ html = '<div class="wr" data-k="hg"><div class="h">On the head</div><div class="pick"><button type="button" class="ar" data-hgn="-1" aria-label="Previous">◀</button><div class="strip">' + HGS.map((q) => (unlockAt('hg', q[0]) > lv && q[0] !== hg ? lockB(unlockAt('hg', q[0]), q[1]) : '<button type="button" data-hg="' + q[0] + '"' + (q[0] === hg ? ' class="on"' : '') + '>' + q[1] + '</button>')).join('') + '</div><button type="button" class="ar" data-hgn="1" aria-label="Next">▶</button></div></div>' + (hg !== 'none' ? sw('hgc', L.HATS, O.hgc || own[2], own[1] + ' colour') : ''); }
     else if (tab === 'face') html = opt('face', 'Face') + (Lk.face !== 'natural' ? sw('facea', FACEC, Lk.facea, 'Face colour') + sw('faceb', FACEC, Lk.faceb, 'Second colour') : '') + sw('eyec', EYES, Lk.eyec, 'Eyes');
     else if (tab === 'hair') html = opt('hair', 'Hair') + sw('hairc', HAIRC, Lk.hairc, 'Hair colour') + (Lk.f ? '' : opt('beard', 'Beard'));
     else if (tab === 'body') html = opt('body', 'Body') + sw('skin', SKINS, Lk.skin, 'Skin: pale to dark') + sw('skin', SKINF, Lk.skin, 'Skin: any colour') + '<div class="wr own"><span>Choose your own skin</span><input type="color" data-skinp value="' + Lk.skin + '" aria-label="Choose your own skin colour"></div>';
@@ -77,6 +81,7 @@ export function openWardrobe(B, L) {
     bodyEl.innerHTML = html; bodyEl.dataset.tab = tab; bodyEl.scrollTop = top0; if (tab === 'name') HS.namer(bodyEl.querySelector('[data-nm]'), HS.cur(side));
     for (const q of bodyEl.querySelectorAll('.wr')) { const st = q.querySelector('.strip'); if (!st) continue; const k = tab + q.dataset.k, on = st.querySelector('.on'); if (centre || scrolls[k] == null) { if (on) st.scrollLeft = on.offsetLeft - st.offsetLeft - st.clientWidth / 2 + on.offsetWidth / 2; } else st.scrollLeft = scrolls[k]; } centre = false;
     bodyEl.querySelectorAll('[data-opt]').forEach((b) => { b.onclick = () => { const [k, v] = b.dataset.opt.split(':'); wear(k, v); }; });
+    bodyEl.querySelectorAll('[data-lk]').forEach((b) => { b.onclick = () => { const g = B.g; if (g && g.toast) g.toast(b.dataset.lkn + ' opens at level ' + b.dataset.lk + '. Win levels to get there', 2200); }; });
     bodyEl.querySelectorAll('.sw').forEach((b) => { b.onclick = () => { const k = Object.keys(b.dataset)[0]; wear(k, b.dataset[k]); }; });
     bodyEl.querySelectorAll('[data-skinp]').forEach((b) => { b.onchange = () => wear('skin', b.value); });
     bodyEl.querySelectorAll('[data-hg]').forEach((b) => { b.onclick = () => wearAll((o) => { o.hg = b.dataset.hg; delete o.hgc; }); });

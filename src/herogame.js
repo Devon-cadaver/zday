@@ -21,6 +21,8 @@ import { finish as stormOver } from './heropower.js';
 import { openMap, villainsLeft } from './storymap.js';
 import { FreeFly } from './freefly.js';
 import { Chase } from './chase.js';
+import { opened } from './unlocks.js';
+const newIn = (a, b, lair) => { const o = opened(a, b, lair); return o.length ? '<br>New in the wardrobe: ' + o.join(', ') : ''; }; // a level up's line (unlocks.js)
 
 
 const KEY = 'zday_hero';
@@ -278,7 +280,7 @@ export class HeroGame {
       const H = R.horde || g.horde, xp = won ? 300 + (R.boss ? 300 : H.kills) + (H.bitten < 10 ? 100 : 0) : 20 + Math.round(H.kills / 4); if (g.base && g.base.active) { g.base.level = null; g.base.stop(true); } if (H.active) H.stop(true); if (H.flying) { H.flying = false; if (H.el) H.el.remove(); if (g.flight.active) g.flight.stop(true); }
       for (const e of R.evs) if (e.alive) endDisaster(e); g.flight.heroGame = false; if (this.labWas) Object.assign(LAB, this.labWas, { spotK: 1, toughK: 1, powerK: 1, energyK: 1, teamK: 1 });
       const lv0 = this.level, was = s.rep, fear2 = LAB.fear(); s.xp += xp; this.shareXp(xp); if (won) s.threat = Math.min(100, (s.threat || 0) + 20); const up = this.level - lv0; if (won) s.idx = Math.min(WAVES.length - 1, s.idx + 1); s.towns[R.key] = { won: (s.towns[R.key] && s.towns[R.key].won) || won, fear: Math.round(fear2) }; s.rep = Math.max(0, Math.min(100, s.rep + (won ? 6 : 0) - fear2 / 30)); const cross = this.cross(s); HS.save(); this.round = null; g.heroGo = false;
-      this.ended(won, '<b>' + (won ? 'TOWN SAVED' : (why || 'NOT THIS TIME')) + '</b> · +' + xp + ' XP' + (up ? ' · <b>LEVEL UP!</b> A skill point to spend' : '') + '<br>' + (R.boss ? 'Hit ' + H.bitten.toFixed(0) + ' times' : (R.noun.trim() + ' down ' + H.kills + ' · hit ') + H.bitten + ' times') + ' · ' + Math.round(H.time) + ' s · reputation ' + Math.round(was) + ' to ' + Math.round(s.rep) + cross); return;
+      this.ended(won, '<b>' + (won ? 'TOWN SAVED' : (why || 'NOT THIS TIME')) + '</b> · +' + xp + ' XP' + (up ? ' · <b>LEVEL UP!</b> A skill point to spend' + newIn(lv0, this.level, this.side === 'villain') : '') + '<br>' + (R.boss ? 'Hit ' + H.bitten.toFixed(0) + ' times' : (R.noun.trim() + ' down ' + H.kills + ' · hit ') + H.bitten + ' times') + ' · ' + Math.round(H.time) + ' s · reputation ' + Math.round(was) + ' to ' + Math.round(s.rep) + cross); return;
     }
     F.onStopped = null; for (const e of R.evs) if (e.type === 'villains') for (const w of e.who) { if (w.beaten && !s.trophies.includes(w.name)) s.trophies.push(w.name); }
     if (won && R.hero && this.threat && !S.stopped && !S.won) { won = false; why = 'It passed without you'; } // it ended by itself: nobody stopped it, nothing is won, and the city is still yours to try
@@ -291,6 +293,6 @@ export class HeroGame {
     F.heroGame = false; F.inLevel = false; Object.assign(LAB, this.labWas, { spotK: 1, toughK: 1, powerK: 1, energyK: 1, teamK: 1 });
     for (const e of R.evs) { if (!e.alive) continue; if (e.own) { e.alive = false; if (e.cleanup) { e.cleanup(); e.cleanup = null; } continue; } if (e.type === 'villains') { for (const w of e.who) if (!w.gone) { w.state = 'gone'; w.rig.root.visible = false; } } else endDisaster(e); } // what is left of the trouble goes with you
     if (R.score != null) lines.unshift('Score ' + Math.round(R.score)); const head = won ? (R.hero ? 'TOWN SAVED' : 'TOWN WRECKED') : (why || 'NOT THIS TIME');
-    this.round = null; this.ended(won, '<b>' + head + '</b> · +' + xp + ' XP' + (up ? ' · <b>LEVEL UP!</b> A skill point to spend' : '') + '<br>Buildings down ' + S.buildings + ' · people scared ' + S.scared + ' · hurt ' + S.hurt + ' · saved ' + S.saved + ' · fear ' + Math.round(fear) + (lines.length ? '<br>' + lines.join('<br>') : ''));
+    this.round = null; this.ended(won, '<b>' + head + '</b> · +' + xp + ' XP' + (up ? ' · <b>LEVEL UP!</b> A skill point to spend' + newIn(lv0, this.level, this.side === 'villain') : '') + '<br>Buildings down ' + S.buildings + ' · people scared ' + S.scared + ' · hurt ' + S.hurt + ' · saved ' + S.saved + ' · fear ' + Math.round(fear) + (lines.length ? '<br>' + lines.join('<br>') : ''));
   }
 }
