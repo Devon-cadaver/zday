@@ -218,7 +218,7 @@ export class DisasterTV {
     this.pend = { kind, vNames, vShow, line, ph };
     this.say('BREAKING: ' + NEWS[kind] + ' ' + this.town + '! ' + vShow + ' are behind it. The hero signal is lit');
     this.card('', '');
-    this.slip('battle', THE[kind].toUpperCase() + ' AND ' + vShow.toUpperCase(), vShow + ' are behind it. The heroes ' + (ph >= 50 ? pick(FORM) : 'are up against it') + '; the rescue services and the army roll in. Who wins, and the damage?',
+    this.slip('battle', THE[kind].toUpperCase() + ', ' + vShow.toUpperCase(), vShow + ' are behind it. The heroes ' + (ph >= 50 ? pick(FORM) : 'are up against it') + '; the rescue services and the army roll in. Who wins, and the damage?',
       [{ key: 'heroes', name: 'The heroes win', pct: ph }, { key: 'villain', name: 'The villains win', pct: 100 - ph }], {},
       [{ key: 'under', name: 'Under ' + line + ' down', pct: 50 }, { key: 'over', name: 'Over ' + line + ' down', pct: 50 }]);
     this.calm = PICK_T;
