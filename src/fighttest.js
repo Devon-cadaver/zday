@@ -212,6 +212,15 @@ function atEase(r, k) {
 // after the hips. [stiffness (rad/s), damping (1 = no overshoot)] by joint, in Body.joints' order; the hips, legs and feet stay exact (the feet
 // have to stay planted). Only bodies in play (street, crowd, base: body.loose); the Pose Lab shows the poses as made
 const LOOSE = [null, [26, 0.72], [19, 0.52], [13, 0.42], [34, 0.6], [40, 0.6], [24, 0.55], [34, 0.6], [40, 0.6], [24, 0.55]];
+// the first time each of your fighters meets each foe (Sean, 2026-11-06: story beats on new triggers, not the old level order): a card with their name and a line
+const MEET = {
+  tyrant: 'Muscle and a temper. He wants this town on its knees', blur: 'Too fast to see. Stand still and Blur is already behind you', weaver: 'Webs and patience. She ties a town up before it knows',
+  nova: 'The strongest of the heroes, and she does not quit', dragonfly: 'Wings, wind and a quick temper', tempo: 'Time bends round her. Hit her while you can',
+  'alien general': 'He leads the invasion from a jet pack', 'zombie general': 'A zombie that still thinks. The horde does what he says',
+  twister: 'He rides the tornado. Beat the storm and he comes for you', riptide: 'She drives the wave', 'the dust devil': 'Hidden in the dust storm, throwing it at you', 'jack frost': 'The cold front has a face, and a grudge',
+  'the burrower': 'He was steering the worm from under the town', 'the beast keeper': 'The kaiju was on his leash',
+  'the ringleader': 'He started the riot and he keeps it going', 'the agitator': 'Every shove in the crowd starts with her', 'the firebrand': 'He lit the first fire',
+};
 export class Body {
   constructor(r, hpMax) {
     this.r = r; this.hp = this.hpMax = hpMax; this.x = 0; this.y = 0; this.z = 0; this.vx = 0; this.vz = 0; this.vy = 0; this.yaw = 0; this.state = 'idle'; this.t = 0; this.clip = C.guard; this.ct = 0; this.blend = 1; this.phase = 0; this.walkK = 0;
@@ -314,6 +323,7 @@ export class FightTest {
     this.foePow = (o.foe && o.foe.power) || null; this.powT = 1.5; this.guard = new GuardFx(S); this.fxa = new ShotList(S); this.css(); this.ui(); this.restart(); this.chkFrame(); this.chkStick();
     if (o.street) { for (const f of [this.h, this.v]) { const q = g.people.snapWalkable(f.x, f.z, 12); if (q) { f.x = q[0]; f.z = q[1]; } f.px = f.x; f.pz = f.z; } this.el.querySelector('.acts').style.display = 'none'; } if (o.hp != null) this.h.hp = o.hp; if (o.foe) this.v.hp = o.foe.hp;
     camera.fov = innerWidth < innerHeight ? 28 : 18; camera.up.set(0, 1, 0); camera.updateProjectionMatrix(); this.place(1); camera.position.copy(this.camTo);
+    if (!o.watch && !o.robot) this.meet();
   }
   css() { if (document.getElementById('zd-fight-css')) return; const s = document.createElement('style'); s.id = 'zd-fight-css'; s.textContent = CSS; document.head.appendChild(s); }
   ui() {
@@ -394,6 +404,14 @@ export class FightTest {
   // the screen held: in a finisher its holds; otherwise the block (Sean: hold to block), kept up until the finger lifts
   hold() { const h = this.h; if (this.hDazed || this.over) return false; if (this.finKind) return this.finHold(); if (['spin', 'ankles', 'smash', 'charge', 'glide'].includes(h.state) || this.atk === 'seize' || this.atk === 'neck') return false; this.blockOn(); return h.state === 'block'; }
   release(p) { const h = this.h; if (p && p.blk) { this.blockOff(); return; } this.blkEl.classList.remove('on'); if (this.hDazed) { if (h.state === 'charge') { this.charging = false; h.go('idle', C.guard); } return; } if (this.finKind) { this.finRelease(); return; } if (h.state === 'block') { this.blockOff(); return; } if (this.atk === 'neck') { this.spinLet = true; return; } if (h.state !== 'charge') return; this.charging = false; this.heavyK = this.k; this.startAtk('heavy'); }
+  // a first meeting: once a fighter, each foe; kept with the fighter (HS chars[id].met)
+  meet() {
+    const D = HS.load(), c = D.chars[String(this.who).toLowerCase()], k = String(this.foeName).toLowerCase(), line = MEET[k]; if (!c || !line) return; const met = c.met || (c.met = []); if (met.includes(k)) return; met.push(k); HS.save();
+    const six = !!D.chars[k], name = (six ? HS.disp(this.foeName) : this.foeName).toUpperCase(), e = document.createElement('div');
+    e.style.cssText = 'position:absolute;left:50%;top:calc(132px + env(safe-area-inset-top));transform:translateX(-50%);width:min(320px,86vw);box-sizing:border-box;padding:9px 12px 10px;border-radius:12px;background:rgba(14,10,26,.86);border:1px solid rgba(255,138,122,.55);text-align:center;color:#fff;pointer-events:none;transition:opacity .6s;font:600 12.5px/1.3 system-ui,-apple-system,sans-serif';
+    e.innerHTML = '<div style="font:800 10px system-ui,sans-serif;letter-spacing:.14em;color:#ff8a7a">FIRST MEETING</div><div style="font:900 20px Impact,\'Arial Black\',sans-serif;letter-spacing:.04em;margin:2px 0 3px">' + name + '</div>' + line;
+    this.el.appendChild(e); setTimeout(() => { e.style.opacity = '0'; }, 4200); setTimeout(() => e.remove(), 5000);
+  }
   // ---------- each frame
   dist() { return Math.hypot(this.v.x - this.h.x, this.v.z - this.h.z); }
   face(f, o, dt, k = 14) { let a = Math.atan2(o.x - f.x, o.z - f.z) - f.yaw; a = Math.atan2(Math.sin(a), Math.cos(a)); f.yaw += a * Math.min(1, dt * k); }

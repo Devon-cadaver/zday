@@ -75,7 +75,6 @@ const START_MOVES = ['spin', 'kick', 'laser', 'drag', 'wind', 'fire']; // and tw
 export const WAVES = [['aliens'], ['zombies'], ['worm'], ['kaiju'], ['tornado'], ['riot'], ['flood', 'blur'], ['quake', 'tyrant'], ['aliens'], ['haboob', 'weaver'], ['kaiju'], ['worm', 'blur'], ['plant', 'tyrant'], ['volcano', 'weaver'], ['tsunami', 'blur'], ['rift', 'tyrant'], ['sinkhole', 'weaver', 'blur'], ['blackhole', 'tyrant'], ['spill', 'blur', 'weaver'], ['coldwave', 'tyrant', 'weaver'], ['kaiju', 'blur', 'tyrant', 'weaver']];
 const LEVEL = { aliens: 'The alien invasion', zombies: 'The zombie outbreak', worm: 'The giant worm', kaiju: 'The kaiju', tornado: 'The tornado', riot: 'The riot' }, VILLAINS = ['blur', 'tyrant', 'weaver'];
 export { VILLAINS }; // the names of the first levels (Sean: the main action fights; the weather levels come after)
-const levelName = (s) => LEVEL[WAVES[s.idx % WAVES.length][0]] || 'Level ' + (s.idx + 1);
 const REP = (r) => (r >= 60 ? 'Hero' : r >= 35 ? 'Vigilante' : r >= 15 ? 'Menace' : 'Villain');
 const SW = ['#ff3fcf', '#3dff5c', '#29e3ff', '#ffd23d', '#ff5a2a', '#8f5bff', '#f4f1ea', '#20242e'];
 const CSS = `
@@ -115,7 +114,7 @@ function turning(cv, name) {
   return () => { cancelAnimationFrame(P.raf); ren.dispose(); if (ren.forceContextLoss) ren.forceContextLoss(); };
 }
 const repBar = (s) => '<div class="bar" style="height:6px"><i style="width:' + s.rep + '%;background:linear-gradient(90deg,#ff4040,#ffd27a,#6cff8a)"></i></div>';
-const cardsHtml = (side, on) => HS.team(side).map(id => { const c = HS.load().chars[id]; return '<button type="button" class="card' + (id === on ? ' on' : '') + '" data-who="' + id + '"><b>' + HS.shown(id) + '</b><span>Level ' + levelOf(c.xp) + ' &middot; ' + REP(c.rep) + '</span>' + repBar(c) + '<span>Next: ' + levelName(c) + '</span></button>'; }).join('');
+const cardsHtml = (side, on) => HS.team(side).map(id => { const c = HS.load().chars[id]; return '<button type="button" class="card' + (id === on ? ' on' : '') + '" data-who="' + id + '"><b>' + HS.shown(id) + '</b><span>Level ' + levelOf(c.xp) + ' &middot; ' + REP(c.rep) + '</span>' + repBar(c) + '<span>Towns saved: ' + Object.values(c.towns || {}).filter((t) => t && t.won).length + '</span></button>'; }).join('');
 const emptyHtml = (side) => '<div style="margin:14px 0;padding:12px;border-radius:12px;background:rgba(255,255,255,.08)">' + (side === 'hero' ? 'All three heroes have gone bad. Win one back under Destroy: a villain who does too well comes home.' : 'All three villains have turned good. Bring one down under Defend: a hero who falls comes here.') + '</div>';
 // the first screen of Defend and Destroy (Sean): who you play, not what they wear. onGo(id), onBack()
 export function pickScreen(side, onGo, onBack) {

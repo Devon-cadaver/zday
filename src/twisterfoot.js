@@ -19,7 +19,7 @@ export class TwisterFoot {
   // it touches down 60 m off, steered from then on
   start() {
     const h = this.H.h, D = this.g.disasters, a = Math.random() * 6.28, x = h.x + Math.cos(a) * 60, z = h.z + Math.sin(a) * 60; this.ev = D.start('tornado', x, z, { life: 99999, size: 1.9 });
-    if (!this.ev || !this.ev.tw) { this.done = true; return; } const tw = this.tw = this.ev.tw; tw.player = true; tw.speed = 7; this.size0 = tw.size; this.started = true;
+    if (!this.ev || !this.ev.tw) { this.done = true; return; } const tw = this.tw = this.ev.tw; tw.player = true; tw.speed = 7; tw.grow = () => {}; /* steered, but not growing by what it eats (Be The Disaster's way): its size is ours to shrink */ this.size0 = tw.size; this.started = true;
     this.giants = [{ alive: true, get x() { return tw.x; }, get z() { return tw.z; }, size: 24 }]; // for the hero's guard (her nearest foe)
     this.H.say('THE TORNADO!', 1.8, '#9fd8ff'); this.g.shake = Math.max(this.g.shake || 0, 0.5); sfx('whoosh', x, 20, z, { gain: 1.2, rate: 0.5 });
   }
@@ -63,7 +63,7 @@ export class TwisterFoot {
   homing(f, dt) { if (!this.funnel) return false; const tw = this.tw, cy = this.P.groundY(tw.x, tw.z) + 10, tx = tw.x - f.x, ty = cy - f.y, tz = tw.z - f.z, dd = Math.hypot(tx, ty, tz) || 1, sp = 46, k = Math.min(1, dt * 6); f.vx += (tx / dd * sp - f.vx) * k; f.vy += (ty / dd * sp - f.vy) * k; f.vz += (tz / dd * sp - f.vz) * k; if (dd > 6) return false; this.hit(f.x, f.y, f.z); return true; }
   hit(x, y, z) {
     const D = this.g.disasters, tw = this.tw; this.hits++; D.ctx.fire.burst(x, y, z, 12, 2); D.flash && D.flash(0.12); this.g.shake = Math.max(this.g.shake || 0, 0.9); this.g.hitStop = Math.max(this.g.hitStop || 0, 0.1); sfx('crash', x, y, z, { gain: 1.2, rate: 0.7 }); this.H.hits++; this.H.hitsT = 1.5;
-    tw.size = this.size0 * (1 - 0.45 * this.hits / this.need); // smaller each time
+    tw.size = this.size0 * (1 - 0.45 * this.hits / this.need); if (tw.applySize) tw.applySize(); // smaller each time, the funnel made again to the size
     if (this.hits >= this.need) { this.down = true; this.downT = 0; tw.player = false; tw.phase = 'rope'; tw.ropeT = 0; this.giants[0].alive = false; this.H.say('IT\'S BREAKING UP!', 1.8, '#ffd27a'); for (const b of this.flying) { this.unmark(b.mk); this.S.remove(b.m); } this.flying = []; }
     else this.H.say('INTO THE FUNNEL! ' + this.hits + '/' + this.need, 1.2, '#ffd27a');
   }

@@ -6,8 +6,10 @@
 import { PATH, PLACES } from './places.js';
 
 const KEY = 'zday_threats';
-export const SLOTS = { villains: 1, aliens: 1, worm: 2, weather: 2 };
-const WEATHER = ['tornado', 'flood', 'haboob', 'tsunami', 'coldwave'], RANDOM = ['zombies', 'kaiju', 'riot', 'quake', 'plant', 'volcano', 'rift', 'sinkhole', 'blackhole', 'spill'];
+// The mix tuned (Sean, 2026-11-06): the two giant cities one worm and one kaiju (they were two worms, the kaiju only now and then); the rotating one a level of
+// its own (zombies, the riot, the earthquake) three times in four, else one of the older disasters with a villain
+export const SLOTS = { villains: 1, aliens: 1, giant: 2, weather: 2 };
+const GIANTS = ['worm', 'kaiju'], WEATHER = ['tornado', 'flood', 'haboob', 'tsunami', 'coldwave'], MAIN = ['zombies', 'riot', 'quake'], OLDER = ['plant', 'volcano', 'rift', 'sinkhole', 'blackhole', 'spill'];
 const COAST = ['harbor', 'bayview', 'umihama', 'minato', 'metro', 'lakeside']; // where the sea can come in
 const NEEDS = { tsunami: COAST };
 export const VILLAIN_IDS = ['blur', 'tyrant', 'weaver'];
@@ -23,15 +25,16 @@ function pick(B, pool) { const on = B.list.map((t) => t.kind), a = pool.filter((
 // each slot made up to its number. villainsLeft: who is still a villain, for Defend; Destroy's villains slot is the heroes standing guard
 function fill(B, side, villainsLeft) {
   const count = (s) => B.list.filter((t) => t.slot === s).length;
-  while (count('villains') < SLOTS.villains) { const v = side === 'hero' ? rnd(villainsLeft) : null; if (side === 'hero' && !v) { if (!add(B, 'villains', 'kaiju')) break; continue; } if (!add(B, 'villains', 'villains', v ? { v } : {})) break; }
+  while (count('villains') < SLOTS.villains) { const v = side === 'hero' ? rnd(villainsLeft) : null; if (side === 'hero' && !v) { if (!add(B, 'villains', pick(B, MAIN))) break; continue; } if (!add(B, 'villains', 'villains', v ? { v } : {})) break; }
   while (count('aliens') < SLOTS.aliens) if (!add(B, 'aliens', 'aliens')) break;
-  while (count('worm') < SLOTS.worm) if (!add(B, 'worm', 'worm')) break;
+  while (count('giant') < SLOTS.giant) if (!add(B, 'giant', pick(B, GIANTS))) break;
   while (count('weather') < SLOTS.weather) if (!add(B, 'weather', pick(B, WEATHER))) break;
-  while (count('random') < B.randomN) if (!add(B, 'random', pick(B, RANDOM))) break;
+  while (count('random') < B.randomN) if (!add(B, 'random', pick(B, Math.random() < 0.75 ? MAIN : OLDER))) break;
 }
 export function board(side, villainsLeft = []) {
   const all = load(); if (all[side] && !Array.isArray(all[side].list)) delete all[side];
   const B = all[side] || (all[side] = { list: [], fresh: [], recent: [], n: 0, randomN: 1 + Math.floor(Math.random() * 2), cur: null });
+  for (const t of B.list || []) if (t && t.slot === 'worm') t.slot = 'giant'; // a board from before: its worm cities are the giants'
   B.fresh = B.fresh || []; B.recent = B.recent || []; B.n = B.n || 1000; B.randomN = B.randomN || 1; B.list = B.list.filter((t) => t && PLACES[t.key] && KIND_NAME[t.kind]);
   B.list = B.list.filter((t) => t.slot !== 'villains' || t.kind !== 'villains' || side !== 'hero' || villainsLeft.includes(t.v)); // a villain who has crossed over is not attacking anyone
   fill(B, side, villainsLeft); save(); return B;
