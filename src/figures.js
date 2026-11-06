@@ -346,6 +346,8 @@ ZTYPES.push(
   { ...ZTYPES[0], id: 'soldier', name: 'Silver commander', alien: true, w: 0, hp: 2, anim: 7, tilt: 0, chase: 2.6, lunge: 3.8, scale: 1, torso: 0.95, look: (L) => ALIEN(L, { shirt: C('#9fb0c4'), pants: C('#7a8a9c') }) });
 // the rest of the invasion on the ground (creaturekit.js draws them; the figure stays as the people system's handle): how fast each comes for her
 for (const [creature, name, chase, lunge] of [['grey', 'Grey', 2.4, 3.6], ['mantis', 'Mantis drone', 3.0, 5.0], ['squid', 'Dome walker', 1.9, 3.2], ['hound', 'Silver hound', 5.0, 7.5], ['maw', 'Maw', 3.6, 6.0], ['stalker', 'Stalker', 4.2, 6.5], ['plated', 'Plated runner', 4.4, 6.0]]) ZTYPES.push({ ...ZTYPES[1], id: creature, name, creature, alien: true, w: 0, hp: 1, anim: 7, tilt: 0, scale: 1, torso: 1, chase, lunge, look: (L) => ALIEN(L) });
+// the Faultline's stone men (faultline.js): grey stone, no glow, one hit; w 0, so no town's zombies roll them
+ZTYPES.push({ ...ZTYPES[0], id: 'stoneman', name: 'Stone man', w: 0, hp: 1, chase: 2.3, lunge: 3.4, tilt: -0.1, scale: 0.95, torso: 1.2, look: (L) => ({ ...L, shirt: C('#5a524c'), pants: C('#463f39'), skin: C('#6e665e'), hat: 0, flags: FLAG.BALD, accent: C('#3a3430'), accent2: C('#3a3430'), blood: 0, bones: 0 }) });
 export const ALIEN_TYPES = ZTYPES.map((z, i) => (z.alien ? i : -1)).filter((i) => i >= 0);
 export const ROBOT_TYPES = ZTYPES.map((z, i) => (z.robot ? i : -1)).filter((i) => i >= 0);
 export const RADIOACTIVE = ZTYPES.findIndex(z => z.rad);

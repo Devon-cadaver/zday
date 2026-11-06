@@ -183,6 +183,7 @@ export class HeroGame {
     if (hero && (wave[0] === 'worm' || wave[0] === 'kaiju') && wave.length === 1 && g.horde) { this.bossLevel(key, wave[0]); return; }
     if (hero && wave[0] === 'zombies' && g.horde) { this.zombieLevel(key); return; }
     if (hero && wave[0] === 'riot' && wave.length === 1 && g.horde) { this.riotLevel(key); return; }
+    if (hero && wave[0] === 'quake' && g.horde) { this.quakeLevel(key); return; }
     if (hero && (wave[0] === 'tsunami' || wave[0] === 'haboob' || wave[0] === 'coldwave' || wave[0] === 'flood')) { this.wallLevel(key, wave[0], cx, cz); return; }
     for (const e of D.list) if (e.type === 'villains' && e.alive) for (const w of e.who) if (!w.gone) w.state = 'gone';
     const allies = []; if (!hero) { const P = g.people; for (const w of wave) { if (VILLAINS.includes(w)) continue; if (w === 'zombies') { for (let i = 0; i < 120; i++) P.drop(B.x0 + Math.random() * (B.x1 - B.x0), B.z0 + Math.random() * (B.z1 - B.z0), -1); } else { const e = D.start(w, cx + (Math.random() - 0.5) * 120, cz + (Math.random() - 0.5) * 120, { life: 99999 }); if (e) allies.push(e); } } } // Destroy: the disaster is on your side, the heroes come for you both
@@ -242,6 +243,15 @@ export class HeroGame {
     g.horde.start({ mode: 'riot', riot: e, level: true, hitK: 1 + 0.05 * this.ix, onEnd: (won, H) => { this.round.horde = H; if (won) e.end(true); this.finish(won, won ? null : 'The mob got the better of you'); } });
     this.rep = document.createElement('div'); this.rep.id = 'zd-rep'; document.body.appendChild(this.rep);
     g.toast ? g.toast('Defend ' + PLACES[key].name + ': a riot of ' + e.members.length + '. Knock them flat and they go home') : 0;
+  }
+  // the earthquake (Sean, 2026-11-05): the Faultline, a giant of rock and lava that splits as it is beaten, fought on foot (faultline.js); the Basalt Brute in the Far Isles, the Living Mountain elsewhere, 50 m
+  quakeLevel(key) {
+    const g = this.g, P = g.people, B = g.city.bounds, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2, pool = []; LAB.reset();
+    for (let j = 0; j < P.active && pool.length < 140; j++) { if (P.kind[j] === 0 && P.isCivilian(j) && P.lvl[j] === -1 && Math.hypot(P.x[j] - cx, P.z[j] - cz) > 60 && P.hide(j)) pool.push(j); }
+    const asia = !!(PLACES[key] && PLACES[key].style); this.round = { evs: [], need: 0, t: 0, downs: 0, hero: true, key, ended: false, zombie: true, n: 100, noun: ' left' };
+    g.horde.start({ n: 100, pool, level: true, ground: true, label: 'FAULTLINE', verb: ' DOWN', hitK: 1 + 0.05 * this.ix, quake: { design: asia ? 'brute' : 'mountain', size: 50, tough: 1 + 0.1 * this.ix }, onEnd: (won, H) => { this.round.horde = H; this.finish(won, won ? null : 'The Faultline was too much'); } });
+    this.rep = document.createElement('div'); this.rep.id = 'zd-rep'; document.body.appendChild(this.rep);
+    g.toast ? g.toast('Defend ' + PLACES[key].name + ': the Faultline rises. Dash through its quakes; GRAB its boulders and throw them back', 5000) : 0;
   }
   zombieNight() { return false; } // Sean's levels are played in the daylight: the zombies' night made everything too dark to see
   placeNow() { try { return new URLSearchParams(location.search).get('place') || null; } catch (e) { return null; } }
