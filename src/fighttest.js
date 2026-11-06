@@ -199,6 +199,13 @@ export function reachArm(arm, T) { const sh = arm.sh, a = arm.el.position.length
 export const PINS = { neck: ['head', 0, -0.13, 0.04], face: ['head', 0, -0.02, 0.08], chest: ['chest', 0, 0.11, 0.1], waist: ['torso', 0, 0.05, 0.1], ankL: ['ankL', 0, 0, 0], ankR: ['ankR', 0, 0, 0], ownNeck: ['head', -0.05, -0.17, 0.1, true], ownHead: ['head', 0.05, 0.1, 0.05, true] };
 const pinPart = (r, p) => (p === 'ankL' ? r.legs[0].ank : p === 'ankR' ? r.legs[1].ank : r[p]), _pin = { w: 0, on: null };
 const WHITE = new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false, toneMapped: false }); // a body that has just been hit
+// at ease (Sean, 2026-11-06: the hands up only with a foe near): the guard eased toward arms hanging a little bent, a body standing easy
+function atEase(r, k) {
+  if (k <= 0.001) return; const L = (o, x, y, z) => { if (!o) return; o.rotation.x += (x - o.rotation.x) * k; o.rotation.y += (y - o.rotation.y) * k; o.rotation.z += (z - o.rotation.z) * k; };
+  for (const q of r.arms) { L(q.sh, 0.06, 0, q.sx * 0.1); L(q.el, -0.2, 0, 0); L(q.wr, 0, 0, 0); }
+  L(r.body, 0, 0, 0); L(r.torso, 0.02, 0, 0); L(r.chest, 0, 0, 0); L(r.head, 0, 0, 0);
+  for (const l of r.legs) { L(l.hip, 0, 0, 0); L(l.knee, 0.05, 0, 0); L(l.ank, 0, 0, 0); }
+}
 export class Body {
   constructor(r, hpMax) {
     this.r = r; this.hp = this.hpMax = hpMax; this.x = 0; this.y = 0; this.z = 0; this.vx = 0; this.vz = 0; this.vy = 0; this.yaw = 0; this.state = 'idle'; this.t = 0; this.clip = C.guard; this.ct = 0; this.blend = 1; this.phase = 0; this.walkK = 0;
@@ -218,9 +225,22 @@ export class Body {
   // the pose: the clip, walking legs over it, eased from the last pose so nothing snaps
   pose(dt, top, grounded) {
     const r = this.r; this.ct += dt; relax(r); playClip(r, this.clip, this.ct);
+    // the guard only with a foe near: this.near, the nearest foe's distance, set each frame by whoever runs the body (unset: the guard, as the Pose Lab shows it). Up fast, down slowly
+    const ease = this.clip === C.guard && !this.fly; { const want = this.near == null || this.near < 4.5 ? 0 : this.near > 7.5 ? 1 : (this.near - 4.5) / 3, c0 = this.calm ?? want; this.calm = c0 + (want - c0) * Math.min(1, dt * (want < c0 ? 9 : 2.2)); }
+    const calm = ease ? this.calm : 0; if (calm > 0) atEase(r, calm);
+    { const mv = this.lx == null ? 0 : Math.min(20, Math.hypot(this.x - this.lx, this.z - this.lz) / Math.max(dt, 1e-4)); this.lx = this.x; this.lz = this.z; this.spd = (this.spd || 0) + (mv - (this.spd || 0)) * Math.min(1, dt * 8); }
     if (this.fly && this.clip === C.guard) { const L = r.legs, k = this.leanK || 0; L[0].hip.rotation.x = 0.1 + 0.35 * k; L[1].hip.rotation.x = 0.35 + 0.4 * k; L[0].knee.rotation.x = 0.3 + 0.2 * k; L[1].knee.rotation.x = 0.55 + 0.3 * k; L[0].ank.rotation.x = L[1].ank.rotation.x = 0.5; r.body.rotation.x += 0.15 + 0.85 * k; r.chest.rotation.x -= 0.25 * k; r.head.rotation.x -= 0.5 * k; }
-    else if (this.walkK > 0.02) { const s = Math.sin(this.phase) * this.walkK, c = Math.cos(this.phase); r.legs[0].hip.rotation.x += s * 0.7; r.legs[1].hip.rotation.x -= s * 0.7; r.legs[0].knee.rotation.x += Math.max(0, c) * 0.8 * this.walkK; r.legs[1].knee.rotation.x += Math.max(0, -c) * 0.8 * this.walkK; r.chest.rotation.y += s * 0.14; r.torso.rotation.x += 0.08 * this.walkK; }
-    else if (this.clip === C.guard) { const b = Math.sin(this.ct * 3); r.chest.rotation.x += b * 0.03; r.arms[0].sh.rotation.x += b * 0.03; r.arms[1].sh.rotation.x -= b * 0.03; }
+    else if (this.walkK > 0.02) {
+      const w = this.walkK, s0 = Math.sin(this.phase), s = s0 * w, c = Math.cos(this.phase), L = r.legs, A = r.arms, run = Math.max(0, Math.min(1, ((this.spd || 0) - 3.5) / 3)); // run: 0 a walk, 1 a run (6.5 m/s and up)
+      L[0].hip.rotation.x += s * 0.72; L[1].hip.rotation.x -= s * 0.72;
+      L[0].knee.rotation.x += (0.08 + Math.max(0, c) * 0.95) * w; L[1].knee.rotation.x += (0.08 + Math.max(0, -c) * 0.95) * w; // the swinging leg folds, the standing one is never locked straight
+      if (L[0].ank) { L[0].ank.rotation.x += (-0.22 * Math.max(0, -s0) + 0.3 * Math.max(0, s0) * Math.max(0, -c)) * w; L[1].ank.rotation.x += (-0.22 * Math.max(0, s0) + 0.3 * Math.max(0, -s0) * Math.max(0, c)) * w; }
+      r.body.rotation.y -= s * 0.08; r.chest.rotation.y += s * 0.2; r.head.rotation.y -= s * 0.14; // hips one way, shoulders the other, the eyes ahead
+      r.body.rotation.z += Math.sin(this.phase + 1.57) * 0.035 * w; r.chest.rotation.z -= Math.sin(this.phase + 1.57) * 0.025 * w; // from foot to foot
+      r.torso.rotation.x += (0.06 + 0.06 * w + 0.14 * run) * w; r.head.rotation.x -= 0.08 * run * w; // leaning into a run, the eyes up
+      for (let i = 0; i < 2; i++) { const q = A[i], sg = i ? 1 : -1; if (!q) continue; q.sh.rotation.x += sg * s * (0.08 + (0.8 + 0.3 * run) * calm); q.el.rotation.x -= (0.22 + 1.15 * run + 0.35 * Math.max(0, -sg * s0)) * w * calm; q.sh.rotation.z += q.sx * 0.06 * run * calm; } // at ease the arms swing against the legs, more bend going forward; in the guard they bob
+    }
+    else if (this.clip === C.guard) { const b = Math.sin(this.ct * 3), br = Math.sin(this.ct * 1.7); r.chest.rotation.x += b * 0.03 * (1 - calm) + br * 0.018 * calm; r.arms[0].sh.rotation.x += b * 0.03 * (1 - calm) + br * 0.02 * calm; r.arms[1].sh.rotation.x -= b * 0.03 * (1 - calm) - br * 0.02 * calm; r.head.rotation.y += Math.sin(this.ct * 0.4) * 0.12 * calm; } // the guard bounces; at ease, breathing and a look about
     if (this.blend < 1) { this.blend = Math.min(1, this.blend + dt / 0.08); const k = this.blend; this.joints.forEach((j, i) => { const s = this.snap[i]; j.rotation.x = s.x + (j.rotation.x - s.x) * k; j.rotation.y = s.y + (j.rotation.y - s.y) * k; j.rotation.z = s.z + (j.rotation.z - s.z) * k; }); }
     if (this.armsA != null) { const a = this.armsA; for (const q of r.arms) { q.sh.rotation.set(-a, 0, -q.sx * 0.15); q.el.rotation.set(0, 0, 0); } r.torso.rotation.x = Math.sin(a) * 0.4; r.head.rotation.x = -Math.sin(a) * 0.3; } // both arms driven by the swing
     if (this.bodyX != null) r.body.rotation.x = this.bodyX; // held by the feet: the whole body swung as one
@@ -361,7 +381,7 @@ export class FightTest {
       { const W = this.o.watch; if (W && !W.wait) botStep(this, ft); this.heroStep(ft); const sl = v.slowT > 0 ? 0.45 : 1; if (sl < 1) v.slowT -= ft; if (W && W.wait) { this.face(v, h, ft, 6); this.vft = ft; } else { this.vilStep(ft * sl); this.vft = ft * sl; } } this.mateStep(dt); if (this.finRun && !this.finRun.step(this.rdt)) this.finRun = null; this.teamEls.forEach((q, i) => { q.querySelector('i').style.width = (this.team || 0) + '%'; q.classList.toggle('ok', this.team >= 100 && !this.mateR && !mateDown(this.g, this.mates[i])); }); this.separate(); this.clamp(h); this.clamp(v);
       if (!(h.state === 'idle' && this.stick)) h.walkK = Math.max(0, h.walkK - ft * 8);
       this.streetStep(ft); this.airStep(ft); this.watchdog(ft);
-      if (h.state === 'drag') v.pose(ft, this.top, this.grounded(v)); h.pose(ft, this.top, this.grounded(h)); if (h.state === 'attack' && ATK[this.atk] && ATK[this.atk].spin) h.r.root.rotation.y += Math.min(1, h.t / ATK[this.atk].end) * 6.283; if (h.state !== 'drag') v.pose(v.state === 'frozen' && !this.stunLive ? 0 : this.vft, this.top, this.grounded(v)); if (v.state === 'dazed' || (this.stLook && this.stLook.wob)) this.wobble(v); if (h.state === 'dazed') this.wobble(h); this.fxStep(dt); this.fxa.step(ft); this.lookStep(ft); this.guard.step(dt, h.x, h.y + 1, h.z); ghost(h.r); ghost(v.r, '#ff6a50'); this.scuff(h); this.scuff(v);
+      h.near = v.near = this.dist(); if (h.state === 'drag') v.pose(ft, this.top, this.grounded(v)); h.pose(ft, this.top, this.grounded(h)); if (h.state === 'attack' && ATK[this.atk] && ATK[this.atk].spin) h.r.root.rotation.y += Math.min(1, h.t / ATK[this.atk].end) * 6.283; if (h.state !== 'drag') v.pose(v.state === 'frozen' && !this.stunLive ? 0 : this.vft, this.top, this.grounded(v)); if (v.state === 'dazed' || (this.stLook && this.stLook.wob)) this.wobble(v); if (h.state === 'dazed') this.wobble(h); this.fxStep(dt); this.fxa.step(ft); this.lookStep(ft); this.guard.step(dt, h.x, h.y + 1, h.z); ghost(h.r); ghost(v.r, '#ff6a50'); this.scuff(h); this.scuff(v);
       this.ee.style.width = this.energy + '%'; this.chkFrame(); for (const k in this.pwBtn) this.pwBtn[k].classList.toggle('ok', this.energy >= this.COST[k]); this.holdStep(dt);
       this.hh.style.width = Math.max(0, h.hp / h.hpMax * 100) + '%'; this.vh.style.width = Math.max(0, v.hp / v.hpMax * 100) + '%';
       this.heroStreak.update(_c.set(h.x, h.y + 0.92, h.z), ['lunge', 'dodge', 'skyRise', 'skyDive', 'finRun'].includes(h.state), this.ctx.camera, ft); this.vilStreak.update(_c.set(v.x, v.y + 0.92, v.z), v.state === 'rush' || v.state === 'vrise' || v.state === 'vdive', this.ctx.camera, ft); dt /= pace;
