@@ -92,7 +92,8 @@ export class TvCam {
   // the camera to cut to: SKY 7 or SKY 4 if one is still flying (alternating with the roofs), else the roof camera best placed
   pick(sky) {
     const a = this.L, live = this.cams.filter(c => c.alive && c !== this.cur && (c.kind === 'heli' || !this.g.city.dead[c.k]));
-    const heli = live.find(c => c.kind === 'heli'), roofs = live.filter(c => c.kind === 'roof');
+    let heli = live.find(c => c.kind === 'heli'); const roofs = live.filter(c => c.kind === 'roof');
+    if (sky && !heli && !(this.cur && this.cur.kind === 'heli' && this.cur.alive)) { heli = { kind: 'heli', name: 'SKY ' + (5 + this.cams.length), alive: true }; this.cams.push(heli); } // both helicopters lost: the station sends up another (Sean: mostly the helicopters)
     roofs.sort((p, q) => Math.abs(Math.hypot(p.x - a.x, p.z - a.z) - 170) - Math.abs(Math.hypot(q.x - a.x, q.z - a.z) - 170)); // not too close, not too far
     let next = (sky && heli) || (!sky && roofs[0]) || heli || roofs[0] || (this.cur && this.cur.alive ? this.cur : null);
     if (!next) { next = { kind: 'heli', name: 'SKY ' + (5 + this.cams.length), alive: true }; this.cams.push(next); } // every camera lost: the station sends up another helicopter
@@ -135,7 +136,7 @@ export class TvCam {
     if (!this.attack) {
       this.onAirT += sdt;
       if (c.kind === 'roof' && g.city.dead[c.k]) { this.signalLost(c, 'VIEWER VIDEO LOST'); return; } // the building went down by itself
-      if ((this.cutT -= dt) <= 0) this.pick(c.kind !== 'heli' || Math.random() < 0.6); // mostly the helicopters; a viewer's video now and then (Sean: less often)
+      if ((this.cutT -= dt) <= 0) this.pick(c.kind !== 'heli' || Math.random() < 0.8); // the helicopters, pulled back; a viewer's video only sometimes (Sean, 2026-11-05)
       else if (c.kind === 'roof' && this.L.y > 40 && this.onAirT > 2 && this.cams.some(q => q.alive && q.kind === 'heli')) this.pick(true); // a roof camera looking up at something high sees only sky: over to the helicopter
       this.maybeAttack(sdt);
     }
@@ -144,7 +145,7 @@ export class TvCam {
     if (c.kind === 'heli') {
       const h = this.heli;
       if (!look) { if (this.frontDir != null) { let da = this.frontDir + 0.55 - h.ang; da = Math.atan2(Math.sin(da), Math.cos(da)); h.ang += da * Math.min(1, dt * 0.25); } else h.ang += dt * 0.07; } // out ahead of a front, looking back at it as it comes
-      this.dd = this.dd == null ? Math.max(220, Math.min(700, (this.dist || 260) * 1.2)) : this.dd + (Math.max(220, Math.min(700, (this.dist || 260) * 1.2)) - this.dd) * Math.min(1, dt * 0.6); // closing in or standing off, gently
+      this.dd = this.dd == null ? Math.max(300, Math.min(700, (this.dist || 260) * 1.4)) : this.dd + (Math.max(300, Math.min(700, (this.dist || 260) * 1.4)) - this.dd) * Math.min(1, dt * 0.6); // closing in or standing off, gently
       const dd = this.dd, R = dd * 0.82, H = Math.max(dd * 0.57 + a.y * 0.5, (a.y > 25 ? a.y : a.y / 0.6) + dd * 0.5), sx = Math.sin(this.t * 0.6) * 3, sy = Math.sin(this.t * 0.9) * 2; // further off for a kaiju than a villain; always above what it films, looking down with the town behind (level with a high flyer it showed only sky)
       this.P.set(a.x + Math.cos(h.ang) * R + sx, H + sy, a.z + Math.sin(h.ang) * R);
       this.F.set(a.x + Math.sin(this.t * 1.3) * 1.5, a.y + Math.sin(this.t * 1.7) * 1.2, a.z);

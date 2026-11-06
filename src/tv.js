@@ -1,10 +1,10 @@
-// Disaster TV: the end of the world, live. Lean back and watch, and bet. Each town the broadcast lands in gets one disaster, the way it is in
-// Defend (watchlevel.js): one of the heroes answers it with nobody at the controls and can lose, and the villain behind it is fought in the
-// street after. The viewers bet three ways, coins on the device and a stake on every slip: what hits the town (three kinds at their odds,
-// drawn at them), then the heroes win or lose (odds by the kind, the hero's level and the night's form; drawn at them and played to), and
-// the damage (over or under a line of buildings down, the median of what this device has seen of that kind). Every third town a Fight Night
-// follows: one of the heroes against one of the villains, nobody at the controls (fightbot.js). Filmed from the news helicopters and
-// viewers' phones between (tvcam.js), the level's own camera during it. Then on to the next town, often one it has hit before.
+// Disaster TV: the end of the world, live, in the town's own look: the tilt-shift miniature, filmed from the news helicopters (SKY 7, SKY 4)
+// and now and then a viewer's phone on a rooftop (tvcam.js). Sean (2026-11-05): close shots are for playing; on TV the fights are big, the
+// heroes, the villains, the disaster, the rescue services and the army. Each town the broadcast lands in gets one battle: what hits it is
+// bet on (three kinds at their odds, drawn at them); then the disaster, one of the villains behind it, the heroes on the hero signal, the
+// rescue services and the army rolling, and two bets: do the heroes beat the villain (drawn at the odds, set on the heroes' own rolls,
+// heroes.js heroesWin) and how much comes down (over or under a line of buildings, the median of what this device has seen of that kind).
+// Coins on the device, a stake on every slip. Then on to the next town, often one the broadcast has hit before, the crews still rebuilding.
 import { Hits } from './hits.js';
 import { Chain } from './chain.js';
 import { PLACES, placeKey } from './places.js';
@@ -12,9 +12,8 @@ import { TvCam } from './tvcam.js';
 import { Responders } from './response.js';
 import { Site } from './rebuild.js';
 import { damageOf, rememberDamage } from './world.js';
-import { HS, levelOf } from './herogame.js';
-import { WatchLevel, AFTER, FOOT, AIR } from './watchlevel.js';
-import { sfx } from './audio.js';
+import { HS } from './herogame.js';
+import { HAZARDS } from './disasters.js';
 
 const CSS = `
 #zd-live{position:fixed;left:max(10px, env(safe-area-inset-left));top:calc(8px + env(safe-area-inset-top));z-index:6;pointer-events:none;display:flex;gap:6px;align-items:center;
@@ -66,43 +65,35 @@ body.zd-tv #zd-radio{bottom:calc(var(--zd-bar-h, 64px) + 42px)}
   font:800 11px/1.2 system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:.04em;color:#f6ead2;text-align:center;max-width:calc(100vw - 32px);box-sizing:border-box}
 #zd-bet[hidden]{display:none}
 #zd-bet b{color:#a6ff4d}
-body.zd-tvfight #zd-fight .bars{top:calc(56px + env(safe-area-inset-top));right:12px}
-body.zd-tvfight #zd-fight .say{top:calc(100px + env(safe-area-inset-top))!important}
-body.zd-tvfight #zd-fight .cmb{top:calc(134px + env(safe-area-inset-top))}
-body.zd-tvfight #zd-mkt{bottom:calc(var(--zd-bar-h, 64px) + 40px)}
-body.zd-tvfight #zd-frame,body.zd-tvfight #zd-score{display:none}
-#zd-fight.watch{pointer-events:none}
-body.zd-tvlevel #zd-fight{pointer-events:none}
-html body.zd-tvlevel #zd-fight .stk.fix,body.zd-tvlevel #zd-fight .row4,body.zd-tvlevel #zd-fight .hint,body.zd-tvlevel #zd-fight .stk,body.zd-tvlevel #zd-fight .fin,body.zd-tvlevel #zd-fight .swbox,body.zd-tvlevel #zd-fight .swkey,body.zd-tvlevel #zd-fight .acts,body.zd-tvlevel #zd-fight [data-t],body.zd-tvlevel #zd-parry,body.zd-tvlevel #zd-catch,body.zd-tvlevel #zd-laser,body.zd-tvlevel #zd-mash,body.zd-tvlevel #zd-drain,body.zd-tvlevel #zd-squad,body.zd-tvlevel #zd-rep,body.zd-tvlevel #zd-flybar{display:none!important}
-body.zd-tvlevel #zd-fly{pointer-events:none}
-html body #zd-fight.watch .stk.fix,#zd-fight.watch .row4,#zd-fight.watch .hint,#zd-fight.watch .stk,#zd-fight.watch .fin,#zd-fight.watch .swbox,#zd-fight.watch .swkey,#zd-fight.watch .acts{display:none!important}
 `;
 
-const POOL = FOOT.concat(AIR); // what hits next: the disasters as they are in Defend (watchlevel.js), on foot and in the air
-const TOWN_T = 170, PICK_T = 12, TICK_SPEED = 60; // s in a town at most; s to make a call; ticker px a second
+const POOL = ['aliens', 'zombies', 'worm', 'kaiju', 'riot', 'quake', 'tornado', 'flood', 'tsunami', 'haboob', 'coldwave']; // what hits next (zombies: the chemical spill that starts an outbreak)
+const START = { zombies: 'spill' }; // the town's own disaster for each kind
+const LIFE = { aliens: 150, worm: 150, kaiju: 150, riot: 150, tornado: 120 }; // the ones that would otherwise stay for minutes, or leave too soon
+const VILLAINS = ['Tyrant', 'Blur', 'Weaver']; // the ones the town's villains (villains.js) can be
+const TOWN_T = 170, PICK_T = 12, TICK_SPEED = 60, SETTLE_T = 150, AFTER_T = 25; // s in a town at most; s to make a call; ticker px a second; s the heroes have to settle it; s the damage goes on counting after
 const STAKES = [50, 100, 250, 'all'];
 const KIND = { aliens: 'Aliens', zombies: 'Zombies', worm: 'Giant worm', kaiju: 'Kaiju', riot: 'Riot', quake: 'Earthquake', tornado: 'Tornado', flood: 'Flood', tsunami: 'Tsunami', haboob: 'Dust storm', coldwave: 'Cold wave' };
-const THE = { aliens: 'The invasion', zombies: 'The horde', worm: 'The worm', kaiju: 'The kaiju', riot: 'The mob', quake: 'The Faultline', tornado: 'The tornado', flood: 'The flood', tsunami: 'The wave', haboob: 'The dust storm', coldwave: 'The cold front' };
-const NEWS = { aliens: 'An alien invasion lands in', zombies: 'A zombie outbreak tears through', worm: 'A giant worm surfaces in', kaiju: 'A kaiju stomps into', riot: 'A riot breaks out in', quake: 'The Faultline rises in', tornado: 'A tornado touches down in', flood: 'Floods hit', tsunami: 'A tsunami heads for', haboob: 'A dust storm rolls into', coldwave: 'A cold front freezes' };
-const WIN_P = { aliens: 0.62, zombies: 0.66, worm: 0.56, kaiju: 0.5, riot: 0.7, quake: 0.52, tornado: 0.56, flood: 0.62, tsunami: 0.5, haboob: 0.56, coldwave: 0.56 }; // how often the heroes win each, before the night's form
-const LINE0 = { aliens: 30, zombies: 8, worm: 40, kaiju: 35, riot: 10, quake: 18, tornado: 9, flood: 1, tsunami: 12, haboob: 6, coldwave: 5 }; // buildings down, the bookmaker's first guess; then the median of what this device has seen
-const FORM = ['is in form tonight', 'trained all week', 'is coming off a win', 'looks rested']; // said of the one the odds favour
+const THE = { aliens: 'The invasion', zombies: 'The outbreak', worm: 'The worm', kaiju: 'The kaiju', riot: 'The riot', quake: 'The earthquake', tornado: 'The tornado', flood: 'The flood', tsunami: 'The tsunami', haboob: 'The dust storm', coldwave: 'The cold wave' };
+const NEWS = { aliens: 'An alien invasion lands in', zombies: 'A chemical spill starts a zombie outbreak in', worm: 'A giant worm surfaces in', kaiju: 'A kaiju stomps into', riot: 'A riot breaks out in', quake: 'An earthquake shakes', tornado: 'A tornado touches down in', flood: 'Floods hit', tsunami: 'A tsunami heads for', haboob: 'A dust storm rolls into', coldwave: 'A cold wave freezes' };
+const WIN_P = { aliens: 0.6, zombies: 0.64, worm: 0.55, kaiju: 0.5, riot: 0.66, quake: 0.6, tornado: 0.58, flood: 0.62, tsunami: 0.55, haboob: 0.6, coldwave: 0.6 }; // how often the heroes beat the villain in each, before the night's form
+const LINE0 = { aliens: 40, zombies: 10, worm: 30, kaiju: 35, riot: 10, quake: 25, tornado: 40, flood: 10, tsunami: 30, haboob: 15, coldwave: 12 }; // buildings down, the bookmaker's first guess; then the median of what this device has seen
+const FORM = ['are in form tonight', 'trained all week', 'are coming off a win', 'look rested']; // said of the heroes when the odds favour them
 const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 let FIRST = true; // the very first town of a broadcast gets the opening title
 let CLOCK = 0.16; // the broadcast's time of day: one day and night every 12 minutes, carried on from town to town
-let TOWNS = 0; // towns this broadcast: every third one has a Fight Night after its disaster
 
-// the viewer's coins and calls, kept on this device; lines: the buildings brought down by each kind, the last nine
-function calls() { let c = null; try { c = JSON.parse(localStorage.getItem('zday_tvcalls')); } catch (e) { /* no storage */ } const o = { right: 0, total: 0, points: 0, coins: 1000, stake: 100, lines: {}, ...(c || {}) }; for (const k of ['right', 'total', 'points', 'coins']) if (!Number.isFinite(o[k])) o[k] = k === 'coins' ? 1000 : 0; return o; }
+// the viewer's coins and calls, kept on this device; lines: the buildings brought down in each kind's battle, the last nine (lines2: the town's battles; lines was the story levels')
+function calls() { let c = null; try { c = JSON.parse(localStorage.getItem('zday_tvcalls')); } catch (e) { /* no storage */ } const o = { right: 0, total: 0, points: 0, coins: 1000, stake: 100, lines2: {}, ...(c || {}) }; for (const k of ['right', 'total', 'points', 'coins']) if (!Number.isFinite(o[k])) o[k] = k === 'coins' ? 1000 : 0; return o; }
 function saveCalls(c) { try { localStorage.setItem('zday_tvcalls', JSON.stringify(c)); } catch (e) { /* no storage */ } }
-function lineOf(kind) { const L = (calls().lines || {})[kind]; if (!L || L.length < 3) return LINE0[kind] + 0.5; const s = L.slice().sort((a, b) => a - b); return s[Math.floor(s.length / 2)] + 0.5; }
-function noteLine(kind, n) { const c = calls(); c.lines = c.lines || {}; const L = c.lines[kind] = (c.lines[kind] || []).concat(n); if (L.length > 9) L.shift(); saveCalls(c); }
+function lineOf(kind) { const L = (calls().lines2 || {})[kind]; if (!L || L.length < 3) return LINE0[kind] + 0.5; const s = L.slice().sort((a, b) => a - b); return s[Math.floor(s.length / 2)] + 0.5; }
+function noteLine(kind, n) { const c = calls(); c.lines2 = c.lines2 || {}; const L = c.lines2[kind] = (c.lines2[kind] || []).concat(n); if (L.length > 9) L.shift(); saveCalls(c); }
 
 export class DisasterTV {
   constructor(g) {
-    this.g = g; this.D = g.disasters; this.msgs = {}; this.kind = null; this.recent = []; this.fight = null; this.lv = null;
+    this.g = g; this.D = g.disasters; this.msgs = {}; this.kind = null; this.recent = []; this.bt = null;
     if (g.profile) g.profile.mode = null;
     if (!document.getElementById('zd-tv-css')) { const s = document.createElement('style'); s.id = 'zd-tv-css'; s.textContent = CSS; document.head.appendChild(s); }
     const live = this.live = document.createElement('div'); live.id = 'zd-live';
@@ -121,8 +112,8 @@ export class DisasterTV {
     this.stakeUi();
     this.hits = new Hits(g, null, { quiet: true }); // no points on TV: just the big moments
     this.chain = new Chain(this.D, (text, slow) => this.hits.moment(text, slow));
-    this.cam = new TvCam(this); // the helicopter and viewers' videos from the rooftops
-    this.auto = new Responders(g); this.auto.on = false; // the crews rebuild between disasters
+    this.cam = new TvCam(this); // the helicopters and viewers' videos from the rooftops
+    this.auto = new Responders(g); this.auto.on = false; // the rescue services and the army roll in a battle; the crews rebuild between
     document.body.classList.add('zd-tv'); // the radio's words sit over the ticker
     g.addButton('zd-tvcam', 'Change camera', () => this.cam.change());
     g.addButton('zd-tvnext', 'Next disaster', () => this.skip());
@@ -131,16 +122,11 @@ export class DisasterTV {
     this.showCalls();
     this.start();
   }
-  // what the engines ask of the mode in a story level (squad.js, flight.js, heropower.js): the level running inside the TV
-  get squad() { return this.lv && this.lv.squad; }
-  get side() { return this.lv ? 'hero' : undefined; }
-  get round() { return this.lv && this.lv.round; }
-  placeStyle() { const p = PLACES[placeKey()]; return p && p.style; }
 
   start() {
     const g = this.g, D = this.D, city = g.city, people = g.people;
     g.resetWorld(); g.setSpeed && g.setSpeed(1); D.boats.auto = false;
-    this.n = 0; this.t = 0; this.cur = null; this.curT = 0; this.leaving = -1; this.mkt = null; this.fight = null; this.lv = null; this.after = -1; this.stage = 'market'; TOWNS++;
+    this.n = 0; this.t = 0; this.cur = null; this.curT = 0; this.leaving = -1; this.mkt = null; this.bt = null; this.pend = null; this.after = -1; this.helped = false; this.helpT = 0;
     this.news = []; this.mx = 0; this.statT = 20;
     this.hits.reset(); this.chain.reset(); this.auto.reset();
     this.town = PLACES[placeKey()] ? PLACES[placeKey()].name : 'the city';
@@ -189,25 +175,23 @@ export class DisasterTV {
     saveCalls(c); this.showCalls(); return m;
   }
   betLine(q) { const i = q.opts.indexOf(q.pick); return q.names[i] + ': ' + q.bet.toLocaleString(); }
-  // what is riding on what is on now (and, in a level, the buildings down so far against the line)
-  showBet(m, extra) { const parts = []; for (const q of [m, m && m.b]) if (q && q.bet) parts.push(this.betLine(q)); if (!parts.length && !extra) { this.betEl.hidden = true; return; } this.betEl.innerHTML = (parts.length ? 'BETS · ' + parts.join(' · ') : '') + (extra ? (parts.length ? '<br>' : '') + extra : ''); this.betEl.hidden = false; }
-  // the result: a right call pays the stake back x100/odds; returns what it paid
+  // what is riding on what is on now (and, in a battle, the buildings down so far against the line)
+  showBet(m, extra) { const parts = []; for (const q of [m, m && m.b]) if (q && q.bet && q.pick && !q.done) parts.push(this.betLine(q)); if (!parts.length && !extra) { this.betEl.hidden = true; return; } this.betEl.innerHTML = (parts.length ? 'BETS · ' + parts.join(' · ') : '') + (extra ? (parts.length ? '<br>' : '') + extra : ''); this.betEl.hidden = false; }
+  // the result: a right call pays the stake back x100/odds; returns what it paid. Settled once
   settle(m, key) {
-    if (!m || !m.pick || !m.bet) return 0; const c = calls(); c.total++; let won = 0;
+    if (!m || !m.pick || !m.bet || m.done) return 0; m.done = true; const c = calls(); c.total++; let won = 0;
     if (m.pick === key) { won = Math.round(m.bet * 100 / Math.max(1, m.pct[m.opts.indexOf(key)])); c.right++; c.coins += won; c.points += won - m.bet; }
     saveCalls(c); this.showCalls(!!won); return won;
   }
-  // no result (the broadcast moved on, it never came to anything): the stakes back
-  refund(m, why) { this.betEl.hidden = true; let n = 0; for (const q of [m, m && m.b]) if (q && q.bet) { n += q.bet; q.bet = 0; } if (!n) return; const c = calls(); c.coins += n; saveCalls(c); this.showCalls(); if (why) this.hits.say(why, 'small'); }
-  // the bet's end, said: won, lost, or none placed
-  told(m, key, winner, won) { if (won) this.hits.say('You called it! +' + won.toLocaleString() + ' coins', 'combo'); else if (m && m.pick && m.bet) this.hits.say(winner + ' won: ' + m.bet.toLocaleString() + ' coins lost', 'small'); else this.hits.say(winner + ' won', 'small'); }
+  // no result (the broadcast moved on): the stakes not yet settled back
+  refund(m, why) { this.betEl.hidden = true; let n = 0; for (const q of [m, m && m.b]) if (q && q.bet && !q.done) { n += q.bet; q.bet = 0; q.done = true; } if (!n) return; const c = calls(); c.coins += n; saveCalls(c); this.showCalls(); if (why) this.hits.say(why, 'small'); }
   showCalls(pop) {
     const c = calls(); this.scoreEl.innerHTML = '<div>CALLS<b>' + c.right + ' / ' + c.total + '</b></div><div class="pts">COINS<b>' + c.coins.toLocaleString() + '</b></div>';
     if (pop) { this.scoreEl.classList.remove('pop'); void this.scoreEl.offsetWidth; this.scoreEl.classList.add('pop'); }
   }
   // the slip's countdown has run out, or Next disaster
-  go() { const m = this.mkt; if (m && m.kind === 'fight') this.fightGo(); else if (m && m.kind === 'level') this.levelGo(); else this.next(); }
-  skip() { if (this.leaving >= 0 || this.fight || this.lv) return; if (this.mkt) { this.calm = -1; this.go(); } } // a level or a fight is seen through
+  go() { const m = this.mkt; if (m && m.kind === 'battle') this.battleGo(); else this.next(); }
+  skip() { if (this.leaving >= 0 || this.bt) return; if (this.mkt) { this.calm = -1; this.go(); } } // a battle is seen through
 
   // ---------- what hits next: three disasters at their odds; the next one is drawn at those odds
   openMarket() {
@@ -216,97 +200,71 @@ export class DisasterTV {
     this.slip('market', 'WHAT HITS ' + this.town.toUpperCase() + '?', 'Then bet on the heroes and on the damage', opts.map((k, i) => ({ key: k, name: KIND[k], pct: pct[i] })));
   }
   draw(m) { let r = Math.random() * 100; for (let i = 0; i < m.opts.length; i++) { if ((r -= m.pct[i]) <= 0) return m.opts[i]; } return m.opts[m.opts.length - 1]; }
-  // the market closes: the disaster drawn, and the slip on how it goes
+  // the market closes: the disaster drawn, and the slip on how the battle goes
   next() {
     if (this.leaving >= 0) return; const m = this.closeMarket(), type = m && m.kind === 'market' ? this.draw(m) : pick(POOL.filter(k => !this.recent.includes(k)));
     this.recent.push(type); if (this.recent.length > 3) this.recent.shift();
     if (m && m.pick) { const won = this.settle(m, type); if (won) this.hits.say('You called it! +' + won.toLocaleString() + ' coins', 'combo'); else if (m.bet) this.hits.say('Missed it: ' + KIND[type] + ', ' + m.bet.toLocaleString() + ' coins lost', 'small'); }
-    this.openLevel(type);
+    this.openBattle(type);
   }
 
-  // ---------- the disaster, Defend's own version, played by one of the heroes (watchlevel.js): the heroes win or lose, and the damage
-  openLevel(kind) {
-    const D = HS.load(), hs = HS.team('hero'), who = hs.length ? pick(hs) : 'nova', L = levelOf(D.chars[who].xp), name = HS.shown(who), ix = Math.floor(Math.random() * 3);
-    const ph = Math.round(clamp(WIN_P[kind] + 0.025 * (L - 2 - ix) + (Math.random() - 0.5) * 0.16, 0.22, 0.8) * 100), line = lineOf(kind), after = AFTER[kind];
-    this.pend = { kind, who, name, ix, L, line, ph }; this.card('', '');
-    this.say('BREAKING: ' + NEWS[kind] + ' ' + this.town + '! ' + name + ' answers the call' + (after ? '; behind it, ' + after : ''));
-    this.slip('level', THE[kind].toUpperCase() + ' vs ' + name.toUpperCase(), name + ' (level ' + L + ')' + (after ? ', then ' + after : '') + '. ' + (ph >= 50 ? name + ' ' + pick(FORM) : THE[kind] + ' looks strong') + '. And the damage?',
-      [{ key: 'heroes', name: name + ' wins', pct: ph }, { key: 'threat', name: THE[kind] + ' wins', pct: 100 - ph }], {},
+  // ---------- the battle for the town (Sean, 2026-11-05: the original look, filmed from the helicopters; big fights between the heroes, the
+  // villains, the disaster and the rescue services and the army): the disaster, one of the villains with it, the heroes on the hero signal,
+  // the rescue services and the army rolling. Bets: do the heroes beat the villain (drawn at the odds, set on the heroes' rolls, heroes.js
+  // heroesWin), and the buildings down by the time it is over
+  openBattle(kind) {
+    const vs = HS.team('villain').map((id) => HS.name(id)).filter((n) => VILLAINS.includes(n)), vName = pick(vs.length ? vs : VILLAINS), v2 = pick(VILLAINS.filter((n) => n !== vName)), vNames = [vName, v2], vShow = HS.disp(vName) + ' and ' + HS.disp(v2), line = lineOf(kind); // two of them: two fights at once, three heroes
+    const ph = Math.round(clamp(WIN_P[kind] + (Math.random() - 0.5) * 0.2, 0.25, 0.78) * 100);
+    this.pend = { kind, vNames, vShow, line, ph };
+    this.say('BREAKING: ' + NEWS[kind] + ' ' + this.town + '! ' + vShow + ' are behind it. The hero signal is lit');
+    this.card('', '');
+    this.slip('battle', THE[kind].toUpperCase() + ' AND ' + vShow.toUpperCase(), vShow + ' are behind it. The heroes ' + (ph >= 50 ? pick(FORM) : 'are up against it') + '; the rescue services and the army roll in. Who wins, and the damage?',
+      [{ key: 'heroes', name: 'The heroes win', pct: ph }, { key: 'villain', name: 'The villains win', pct: 100 - ph }], {},
       [{ key: 'under', name: 'Under ' + line + ' down', pct: 50 }, { key: 'over', name: 'Over ' + line + ' down', pct: 50 }]);
-    this.calm = PICK_T; this.stage = 'level';
+    this.calm = PICK_T;
   }
-  levelGo() {
-    const P = this.pend, m = this.closeMarket(), g = this.g; if (!P) return; this.pend = null;
-    const win = Math.random() * 100 < (m ? m.pct[0] : P.ph), lossAt = !win && AFTER[P.kind] && P.kind !== 'riot' && Math.random() < 0.45 ? 'villain' : 'disaster';
-    this.card('', ''); this.dof = g.post.opts.dof; this.base0 = this.D.stats.buildings; this.lvM = m; this.lvP = P;
-    const lv = this.lv = new WatchLevel(g, this); g.watchLevel = lv; document.body.classList.add('zd-tvfight', 'zd-tvlevel');
-    if (!lv.go(P.kind, { who: P.who, ix: P.ix, win, lossAt })) { this.lv = null; g.watchLevel = null; document.body.classList.remove('zd-tvfight', 'zd-tvlevel'); this.refund(m, 'No show tonight: your bets are back'); this.after = 3; return; }
-    this.cam.label.innerHTML = '<i></i>HERO CAM · ' + P.name.toUpperCase(); this.cur = null; this.curT = 0; this.kind = P.kind; this.n++;
+  battleGo() {
+    const P = this.pend, m = this.closeMarket(), g = this.g, D = this.D, B = g.city.bounds; if (!P) return; this.pend = null;
+    const win = Math.random() * 100 < (m ? m.pct[0] : P.ph), type = START[P.kind] || P.kind, H = HAZARDS[type] || {};
+    const x = B.x0 + (B.x1 - B.x0) * (0.3 + Math.random() * 0.4), z = B.z0 + (B.z1 - B.z0) * (0.3 + Math.random() * 0.4);
+    const tap = H.tap || type === 'spill', ev = D.start(type, tap ? x : null, tap ? z : null, LIFE[P.kind] ? { life: LIFE[P.kind] } : {});
+    const ves = P.vNames.map((n, i) => D.start('villains', x + (i ? -50 : 50), z + 50, { only: n.toLowerCase(), quiet: true, life: 999 })).filter((e) => e && e.who && e.who[0]), vs = ves.map((e) => e.who[0]), v = vs[0];
+    if (!v) { this.refund(m, 'No show tonight: your bets are back'); this.after = 3; return; }
+    const holds = win ? null : pick(vs); for (const q of vs) { q.hp = q.hpMax = 600; q.heroWin = q !== holds; } // the heroes' last blows land, or one of them shrugs it off (villains.js beat)
+    if (ev && (ev.type === 'kaiju' || ev.type === 'worm')) ev.heroWin = win || Math.random() < 0.5; // the monster too: driven off, or the heroes swatted away
+    this.bt = { P, m, ev, ve: ves[0], ves, vs, v, holds, win, t: 0, key: null, endT: -1, base0: D.stats.buildings, heroT: 6, camT: 14, onV: false };
+    this.cur = ev || ves[0]; this.curT = 0; this.kind = P.kind; this.n++; this.helped = true; this.helpT = 0; D.boats.auto = true; // the rescue services and the army roll at once
+    this.showBet(m, this.downLine());
   }
-  // the level is over (watchlevel.js finish): the bets settled, back to the cameras
-  levelEnd(won, why) {
-    const g = this.g, P = this.lvP, m = this.lvM, cam = g.camera, n = Math.max(0, this.D.stats.buildings - this.base0); this.lv = null; CLOCK = 0.3; /* the day goes on from the level's daylight */ g.watchLevel = null; this.lvM = null;
-    document.body.classList.remove('zd-tvfight', 'zd-tvlevel', 'zd-flying'); g.post.opts.dof = this.dof; cam.up.set(0, 1, 0); cam.fov = this.cam.fov0; cam.updateProjectionMatrix(); g.controls.enabled = false; this.cam.pick(true);
-    if (!P) return; noteLine(P.kind, n);
-    const key = won ? 'heroes' : 'threat', who = won ? P.name : THE[P.kind], w1 = this.settle(m, key), key2 = n > P.line ? 'over' : 'under', w2 = m && m.b ? this.settle(m.b, key2) : 0;
-    { const top = won ? 'Saved by ' + P.name : THE[P.kind] + ' wins', big = n + ' building' + (n === 1 ? '' : 's') + ' down: ' + key2.toUpperCase(); setTimeout(() => { if (this.leaving < 0) { this.card(top, big); this.cardT = 5; } }, 1800); } // after the YOU CALLED IT flash, not over it
-    this.say(won ? P.name + ' saved ' + this.town + '! ' + n + ' buildings down' : (why || THE[P.kind] + ' was too much') + ': ' + P.name + ' is down. ' + n + ' buildings lost in ' + this.town);
-    const w = w1 + w2, lost = [m, m && m.b].filter(q => q && q.bet && q.pick && q.pick !== (q === m ? key : key2)).reduce((a, q) => a + q.bet, 0);
-    if (w) this.hits.say('You called it! +' + w.toLocaleString() + ' coins', 'combo'); else if (lost) this.hits.say(who + ' won: ' + lost.toLocaleString() + ' coins lost', 'small'); else this.hits.say(who + ' won', 'small');
-    this.betEl.hidden = true; this.after = 7; this.stage = TOWNS % 3 === 0 ? 'fightnext' : 'leave';
+  downLine() { const b = this.bt; return b ? 'BUILDINGS DOWN <b>' + Math.max(0, this.D.stats.buildings - b.base0) + '</b> · LINE ' + b.P.line : ''; }
+  battleStep(dt, sdt) {
+    const b = this.bt, D = this.D, v = b.v; b.t += sdt;
+    if (b.heroT > 0 && (b.heroT -= sdt) <= 0) { const H = D.start('heroes', v.x, v.z); if (H) { H.holds = () => { H.hold = 0; H.vHold = 0; }; H.holds(); for (const hr of H.who) hr.waitT = Math.min(hr.waitT, 1.5); } this.say('The heroes are here! They go for ' + b.P.vShow); }
+    // the director: the disaster, then the fight with the villain, and back (the helicopters and viewers' phones film whichever)
+    if ((b.camT -= sdt) <= 0) { const fights = b.ves.filter((e, i) => !b.vs[i].gone && !b.vs[i].beaten); b.onV = !b.onV || !(b.ev && b.ev.alive); b.camT = b.onV ? 16 : 12; this.cur = b.onV && fights.length ? pick(fights) : b.ev && b.ev.alive ? b.ev : fights[0] || this.cur; } // the helicopter pans across, no cut
+    if (!b.key) {
+      let k = b.vs.every((q) => q.beaten) ? 'heroes' : b.vs.some((q) => q.heroLost) || (b.ev && b.ev.heroLost) ? 'villain' : null;
+      if (!k && b.t > SETTLE_T) { b.vs.forEach((q, i) => { if (q.beaten || q.gone) return; if (q === b.holds) { q.heroLost = true; D.emit({ type: 'herolost', x: q.x, z: q.z, text: HS.disp(q.name) + ' was too strong for the heroes! They are falling back' }); } else b.ves[i].beat(q, 'Nova'); }); k = b.win ? 'heroes' : 'villain'; } // the heroes never got to them all: the draw stands
+      if (k) { b.key = k; b.endT = AFTER_T; const w = this.settle(b.m, k); this.cur = b.ve;
+        const who = b.holds ? HS.disp(b.holds.name) : b.P.vShow; this.card(k === 'heroes' ? 'The heroes win' : who + ' wins', k === 'heroes' ? b.P.vShow + ' are beaten' : 'The heroes fall back'); this.cardT = 4;
+        this.say(k === 'heroes' ? 'The heroes beat ' + b.P.vShow + ' in ' + this.town + '!' : who + ' was too much for the heroes in ' + this.town + '!');
+        if (w) this.hits.say('You called it! +' + w.toLocaleString() + ' coins', 'combo'); else if (b.m && b.m.pick && b.m.bet) this.hits.say((k === 'heroes' ? 'The heroes' : 'The villains') + ' won: ' + b.m.bet.toLocaleString() + ' coins lost', 'small'); }
+    } else if ((b.endT -= sdt) <= 0 || !D.list.some((e) => e.alive && e.type !== 'heroes' && e.type !== 'villains' && e.type !== 'player')) this.battleEnd(); // the damage counted a while longer, or till the disaster is over
+    if (this.bt && (this.betT = (this.betT || 0) - dt) <= 0) { this.betT = 0.5; this.showBet(b.m, this.downLine()); }
   }
-  levelAbort() { if (!this.lv) return; const lv = this.lv; this.refund(this.lvM); this.lvP = null; this.lvM = null; lv.abort(); this.lv = null; this.g.watchLevel = null; document.body.classList.remove('zd-tvfight', 'zd-tvlevel', 'zd-flying'); }
-
-  openFight() {
-    const g = this.g, T = g.fightTest, P = g.people, D = HS.load(); if (!T || T.active) return false;
-    const hs = HS.team('hero'), vs = HS.team('villain'), hId = hs.length ? pick(hs) : 'nova', vId = pick(vs.filter(q => q !== hId).length ? vs.filter(q => q !== hId) : ['tyrant', 'blur', 'weaver'].filter(q => q !== hId));
-    const Lh = levelOf(D.chars[hId].xp), Lv = levelOf(D.chars[vId].xp), hShow = HS.shown(hId), vShow = HS.shown(vId);
-    const ph = Math.round(clamp(0.5 + 0.07 * (Lh - Lv) + (Math.random() - 0.5) * 0.26, 0.22, 0.78) * 100);
-    const B = g.city.bounds; let at = null; for (let i = 0; i < 16 && !at; i++) at = P.snapWalkable(B.x0 + (B.x1 - B.x0) * (0.3 + Math.random() * 0.4), B.z0 + (B.z1 - B.z0) * (0.3 + Math.random() * 0.4), 40);
-    if (!at) return false;
-    const dist = this.D.district(at[0], at[1]), hp = 400 + 10 * Lv; // tougher than in story mode: the bot hits faster than a thumb
-    this.dof = g.post.opts.dof; document.body.classList.add('zd-tvfight');
-    T.start({ ring: { x: at[0], z: at[1], y: P.groundY(at[0], at[1]), r: 26 }, street: true, who: HS.name(hId), hp: 100, foe: { name: HS.name(vId), hpMax: hp, hp, dmgK: 0.8 + 0.04 * Lv, lv: 2 + 0.25 * Lv }, watch: { wait: true, win: null, skill: clamp(0.5 + 0.03 * Lh, 0.5, 0.9) }, onEnd: (won) => this.fightEnd(won) });
-    for (const [f, s] of [[T.h, -1], [T.v, 1]]) { f.x = T.cx + s * 1.8; f.z = T.cz - s * 1.1; f.px = f.x; f.pz = f.z; } // close, face to face, both above the slip
-    { const bars = T.el.querySelectorAll('.bars > div'); if (bars[0] && bars[0].firstChild) bars[0].firstChild.textContent = hShow.toUpperCase() + ' · LV ' + Lh; if (bars[1] && bars[1].firstChild) bars[1].firstChild.textContent = vShow.toUpperCase() + ' · LV ' + Lv; } // the names the viewer gave them
-    this.cam.label.innerHTML = '<i></i>FIGHT CAM · ' + dist.toUpperCase();
-    this.fight = { T, hShow, vShow, t: 0, end: -1, m: null };
-    const fav = ph >= 50 ? hShow : vShow;
-    this.slip('fight', 'FIGHT NIGHT', hShow + ' (level ' + Lh + ') vs ' + vShow + ' (level ' + Lv + '). ' + fav + ' ' + pick(FORM) + '. Who wins?', [{ key: 'h', name: hShow, pct: ph }, { key: 'v', name: vShow, pct: 100 - ph }]);
-    this.say('FIGHT NIGHT in ' + this.town + ': ' + hShow + ' takes on ' + vShow + ' in the ' + dist + ' district. Place your bets');
-    this.card('', ''); return true;
+  battleEnd() {
+    const b = this.bt; if (!b) return; this.bt = null; const n = Math.max(0, this.D.stats.buildings - b.base0), key2 = n > b.P.line ? 'over' : 'under', w = b.m && b.m.b ? this.settle(b.m.b, key2) : 0; noteLine(b.P.kind, n);
+    this.betEl.hidden = true; this.helped = false; this.D.boats.auto = false;
+    if (w) this.hits.say('You called it! +' + w.toLocaleString() + ' coins', 'combo'); else if (b.m && b.m.b && b.m.b.pick && b.m.b.bet) this.hits.say(key2.toUpperCase() + ': ' + b.m.b.bet.toLocaleString() + ' coins lost', 'small');
+    { const top = b.key === 'heroes' ? 'Saved by the heroes' : 'The villains win', big = n + ' building' + (n === 1 ? '' : 's') + ' down: ' + key2.toUpperCase(); setTimeout(() => { if (this.leaving < 0) { this.card(top, big); this.cardT = 5; } }, 1800); } // after the YOU CALLED IT flash, not over it
+    this.say(this.town + ' counts the cost: ' + n + ' buildings down'); this.after = 8;
   }
-  fightGo() {
-    const F = this.fight, m = this.closeMarket(); if (!F) return;
-    F.m = m; const W = F.T.o.watch; W.win = Math.random() * 100 < (m ? m.pct[0] : 50) ? 'h' : 'v'; W.wait = false; // drawn at the odds on the slip
-    F.T.say('FIGHT!', 1.2, '#ffd27a'); sfx('chime', F.T.h.x, F.T.h.y, F.T.h.z, { gain: 0.8, rate: 0.8 });
-    this.showBet(m); this.cur = null; this.curT = 0; this.kind = 'fight'; this.calm = -1; this.n++;
-  }
-  // the fight is over (fighttest.js finish): the bet settled; a few seconds on the winner, then back to the cameras
-  fightEnd(won) {
-    const F = this.fight; if (!F || F.end >= 0) return; F.end = 3.2;
-    const name = won ? F.hShow : F.vShow, w = this.settle(F.m, won ? 'h' : 'v');
-    F.T.say(name.toUpperCase() + ' WINS!', 3, won ? '#ffd27a' : '#ff8a7a'); this.told(F.m, won ? 'h' : 'v', name, w);
-    this.say(name + ' wins Fight Night in ' + this.town + '!');
-  }
-  fightStep(dt, sdt) {
-    const F = this.fight; F.t += sdt;
-    if (F.end >= 0) { if ((F.end -= dt) <= 0) this.fightClose(); return; }
-    if (!F.T.active) { this.fightClose(); return; } // ended some other way
-    if (!F.T.over && !F.T.o.watch.wait && F.t > PICK_T + 150) { F.T.say('ON POINTS', 1.2, '#ffd27a'); F.T.finish(F.T.o.watch.win === 'h'); } // too long: the judges give it to the one it was going to
-  }
-  fightClose() {
-    const F = this.fight; if (!F) return; this.fight = null; const g = this.g, cam = g.camera;
-    if (F.T.active) F.T.stop(true);
-    document.body.classList.remove('zd-tvfight'); g.post.opts.dof = this.dof; cam.up.set(0, 1, 0); cam.fov = this.cam.fov0; cam.updateProjectionMatrix(); g.controls.enabled = false;
-    this.cam.pick(true); this.cur = null; this.curT = 0; this.after = 4; this.stage = 'leave';
-  }
-  fightAbort() { const F = this.fight; if (!F) return; if (F.m) this.refund(F.m); if (this.mkt && this.mkt.kind === 'fight') { this.mktEl.hidden = true; this.mkt = null; } F.end = 0; this.fightClose(); }
+  battleAbort() { const b = this.bt; if (!b) return; this.bt = null; this.refund(b.m); this.helped = false; }
 
   // on to another town (up to the globe and down to it): half the time back to one the broadcast has hit before
   moveOn() {
     if (this.leaving >= 0) return;
-    this.fightAbort(); this.levelAbort();
+    this.battleAbort();
     const here = placeKey(), all = Object.keys(PLACES).filter(k => k !== here), hit = all.filter(k => damageOf(k).length);
     const key = hit.length && Math.random() < 0.5 ? hit[Math.floor(Math.random() * hit.length)] : all[Math.floor(Math.random() * all.length)];
     this.leaving = 3; this.toKey = key; if (this.mkt) { this.mktEl.hidden = true; this.mkt = null; } this.betEl.hidden = true;
@@ -323,8 +281,7 @@ export class DisasterTV {
 
   busy() { return false; }
   tap() {}
-  phase() { return this.lv ? 0.3 : CLOCK; } // a level in the daylight, as in Defend
-  zombieNight() { return !this.lv && !!this.g.people && this.g.people.stats.zombies >= 8; } // the zombie night (game.js), but not over a level: too dark to follow (Sean)
+  phase() { return CLOCK; }
 
   onEvent(e) {
     const c = this.g.city;
@@ -332,7 +289,7 @@ export class DisasterTV {
     if (e.type === 'collapse') { const b = c.buildings[e.k]; if (b) this.hits.hit('b', e.x, b.top, e.z, 1, { big: b.top - b.baseY >= 40 }); this.chain.collapse(e.k, e.fall); }
     else if (e.type === 'fire') { this.hits.hit('fire', 0, 0, 0, 1); this.chain.fire(e.k); }
     else if (e.type === 'carland' || e.type === 'carfire' || e.type === 'crash') { if (e.car) this.hits.hit('car', 0, 0, 0, 1); }
-    if (e.text && (e.type === 'warn' || e.hazard)) { this.say(e.text); return true; } // warnings go on the ticker, not over the picture
+    if (e.text && (e.type === 'warn' || e.hazard || e.type === 'herolost' || e.type === 'villainbeaten')) { this.say(e.text); return true; } // warnings and the heroes' news go on the ticker, not over the picture
     return false;
   }
 
@@ -340,29 +297,30 @@ export class DisasterTV {
     const g = this.g, D = this.D;
     this.t += sdt; this.curT += sdt; CLOCK = (CLOCK + sdt / 720) % 1;
     this.hits.frame(dt, sdt); this.chain.step(sdt);
-    this.auto.update(sdt); if ((this.helpT = (this.helpT || 0) - sdt) <= 0) { this.helpT = 1; if (!this.lv) this.auto.rebuild(); } // the crews rebuild between disasters
+    // in a battle the rescue services and the army roll; between, the crews rebuild
+    this.auto.update(sdt);
+    if ((this.helpT -= sdt) <= 0) { this.helpT = 1; this.auto.rebuild(); if (this.helped) { this.auto.respond(); this.auto.sendHome(); } }
     // the ticker crawls right to left, round again once it has gone by
     const w = this.mEl.offsetWidth || 400, W = this.mEl.parentNode.offsetWidth || 300;
     this.mx -= dt * TICK_SPEED; if (this.mx < -w) this.mx = W; this.mEl.style.transform = 'translateX(' + this.mx.toFixed(1) + 'px)';
-    if (!this.fight && !this.lv) this.cam.update(dt, sdt); // a fight and a level have their own cameras
+    this.cam.update(dt, sdt); // the helicopters and the viewers' videos, all the time (Sean: close shots are for playing, not for watching)
     if (this.cardT > 0 && (this.cardT -= dt) <= 0) this.card('', '');
     if (this.leaving >= 0) { if ((this.leaving -= dt) < 0) { this.leaving = 1e9; this.dead = true; g.journey(this.toKey); } return; }
-    if (this.lv) { this.lv.update(); if (this.lv && (this.betT = (this.betT || 0) - dt) <= 0) { this.betT = 0.5; const n = Math.max(0, D.stats.buildings - this.base0); this.showBet(this.lvM, 'BUILDINGS DOWN <b>' + n + '</b> · LINE ' + this.lvP.line); } }
-    if (this.fight) this.fightStep(dt, sdt);
+    if (this.bt) this.battleStep(dt, sdt);
     if (this.mkt) this.cdEl.textContent = Math.max(0, Math.ceil(this.calm));
     if (this.calm >= 0 && (this.calm -= sdt) <= 0) { this.calm = -1; this.go(); }
-    // after the disaster: a Fight Night now and then, else on to the next town
-    if (this.after >= 0 && !this.lv && !this.fight && !this.mkt && (this.after -= sdt) <= 0) { this.after = -1; if (this.stage === 'fightnext' && this.openFight()) { this.calm = PICK_T; this.stage = 'fight'; } else this.moveOn(); }
-    if (this.t > TOWN_T * 4 && !this.lv && !this.fight && !this.mkt && this.after < 0) this.moveOn(); // never stuck in a town
+    if (this.after >= 0 && !this.bt && !this.mkt && (this.after -= sdt) <= 0) { this.after = -1; this.moveOn(); } // the battle over: on to the next town
+    if (this.t > TOWN_T * 3 && !this.bt && !this.mkt && this.after < 0) this.moveOn(); // never stuck in a town
     // now and then the tally
     if ((this.statT -= sdt) <= 0) {
       this.statT = 20;
       let fires = 0, cars = 0; for (let k = 0; k < g.fire.bFire.length; k++) if (g.fire.bFire[k] && !g.city.dead[k]) fires++;
       for (const c of g.traffic.cars) if (!c.mission && (c.gone || c.mode !== 0 || c.frozen)) cars++;
       for (const pc of g.traffic.parkedList) if (!pc.alive || pc.burnt) cars++;
-      this.say(this.town + ' so far: ' + D.stats.buildings + ' buildings down, ' + cars + ' cars wrecked, ' + fires + ' fires burning');
+      const crews = this.auto.works.length;
+      this.say(this.town + ' so far: ' + D.stats.buildings + ' buildings down, ' + cars + ' cars wrecked, ' + fires + ' fires burning' + (crews ? ', ' + crews + ' crews rebuilding' : ''));
     }
   }
 
-  dispose() { this.fightAbort(); this.levelAbort(); this.live.remove(); this.tick.remove(); this.nextEl.remove(); this.mktEl.remove(); this.betEl.remove(); this.scoreEl.remove(); this.hits.dispose(); this.cam.dispose(); this.auto.reset(); document.body.classList.remove('zd-tv', 'zd-tvfight', 'zd-tvlevel'); }
+  dispose() { this.battleAbort(); this.live.remove(); this.tick.remove(); this.nextEl.remove(); this.mktEl.remove(); this.betEl.remove(); this.scoreEl.remove(); this.hits.dispose(); this.cam.dispose(); this.auto.reset(); document.body.classList.remove('zd-tv'); }
 }
