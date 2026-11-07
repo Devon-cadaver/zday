@@ -45,7 +45,7 @@ body.zd-ward #zd-base{display:none}
 @media (orientation:landscape) and (max-height:520px){#zd-ward .sheet{left:auto;top:0;bottom:0;width:min(50vw,420px);max-height:none;border-radius:16px 0 0 16px}#zd-ward .top{right:min(50vw,420px)}#zd-ward .zoom,#zd-ward .drag{right:calc(min(50vw,420px) + 8px)}}
 `;
 // what each way of getting round does (flight.js arcade: in a town, between the fights)
-const MOVE_SAY = { fly: 'Flies over the town and smashes straight through buildings. \u25B2 \u25BC go up and down.', run: 'Runs faster than anything, up the walls and over the roofs. \u25B2 jumps.', swing: 'Shoots a line to the roofs and swings from one to the next. \u25B2 \u25BC swing higher or lower.', jump: 'Leaps a block at a time and lands on the roofs or the street, hard. \u25B2 leaps, \u25BC slams down.' };
+const MOVE_SAY = { fly: 'Flies over the town and smashes straight through buildings. \u25B2 \u25BC go up and down.', run: 'Runs faster than anything, up the walls and over the roofs. \u25B2 jumps.', swing: 'Swings on a line. Hold to swing, let go to fly off it the way you were going, or hold on and swing back. Short holds for speed, hold to the top for height. \u25B2 \u25BC climb or slide on the line.', jump: 'Leaps a block at a time and lands on the roofs or the street, hard. \u25B2 leaps, \u25BC slams down.' };
 // a lamp in the room, in the wardrobe: enough to shape, too little to colour
 const i0 = (o) => Math.min(o.intensity, 26);
 function canvasTex(w, h, paint) { const c = document.createElement('canvas'); c.width = w; c.height = h; paint(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; }

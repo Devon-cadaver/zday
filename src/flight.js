@@ -58,7 +58,7 @@ const _f = new THREE.Vector3(), _u = new THREE.Vector3(), _v = new THREE.Vector3
 const HIP = 0.94 * S; // a hero's hips above the feet (the rig's 0.94 at its scale): the hero is flown by the hips
 // the ways round town that are not flying (the wardrobe's Moves; foot()): how much faster than flying each goes, and what the player is told
 const MOVE_K = { run: 1.5, swing: 1.25, jump: 1.15 }, GRAV = 34, UP_Y = new THREE.Vector3(0, 1, 0), _w = new THREE.Vector3(), _w2 = new THREE.Vector3();
-const MOVE_TIP = { run: 'FAST RUNNER: drag to run. Straight up the walls and over the roofs. \u25B2 jumps', swing: 'ROPE SWINGER: drag to swing from roof to roof. \u25B2 \u25BC swing higher or lower', jump: 'SUPER JUMPER: drag to leap a block at a time. \u25B2 leaps on the spot, \u25BC slams down' };
+const MOVE_TIP = { run: 'FAST RUNNER: drag to run. Straight up the walls and over the roofs. \u25B2 jumps', swing: 'ROPE SWINGER: hold to swing, let go to fly off the line. Hold on to swing back. \u25B2 \u25BC climb or slide on the line', jump: 'SUPER JUMPER: drag to leap a block at a time. \u25B2 leaps on the spot, \u25BC slams down' };
 const SEAT_TURN = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2); // a camera looks down -z; the planes point along +x
 const SHOT = { Blur: { col: 0x6fb8ff, r: 0.7, glow: true }, Tyrant: { col: 0x3a3430, r: 1.1 }, Weaver: { col: 0xf4f1ea, r: 0.8 } }; // what each villain throws at a hero flying in
 const SHOT_GEO = new THREE.SphereGeometry(1, 10, 8), SHOT_BOX = new THREE.BoxGeometry(1.6, 1.2, 1.4);
@@ -822,30 +822,19 @@ export class Flight {
   floorAt(x, z) { let f = this.g.people.groundY(x, z); this.g.city.buildingsNear(x, z, 0.3, (k, d, b) => { if (b.roofY > f) f = b.roofY; }); return f; }
   camYOf(dt) { if (!this.ftOn || this.camY == null) return (this.camY = this.pos.y); this.camY += (this.pos.y - this.camY) * (1 - Math.exp(-dt * 4)); this.camY = Math.max(this.pos.y - 3.5, Math.min(this.pos.y + 3.5, this.camY)); return this.camY; } // eased, but never more than a few metres off: she stays in the middle of the screen
   foot(dt, go, turn) {
-    const g = this.g, F = this.ft || (this.ft = { vy: this.mv === 'jump' ? 22 : 0, gnd: false, ph: 0, crouch: 0, land: 0, sw: null, wall: null, hOff: 0, hop: 0, said: false, n: 0 }), mv = this.goBase && this.goBase.near ? 'run' : this.mv;
+    const g = this.g, F = this.ft || (this.ft = { vy: this.mv === 'jump' ? 22 : 0, gnd: false, ph: 0, crouch: 0, land: 0, sw: null, wall: null, hop: 0, said: false, n: 0, v: null, vN: -9, cool: 0, flip: null, flipD: 1, yawL: 0 }), mv = this.goBase && this.goBase.near ? 'run' : this.mv;
     if (F.n !== this.flyN - 1) { F.sw = null; F.wall = null; F.gnd = false; F.vy = Math.min(F.vy, 0); } F.n = this.flyN; // back from a lock on or a fight: from where they are now
     this.ftOn = true; if (!F.said) { F.said = true; this.tip(MOVE_TIP[this.mv]); }
     const px = this.pos.x, py = this.pos.y, pz = this.pos.z, cy = Math.cos(this.yaw), sy = Math.sin(this.yaw), sp = this.speed, ud = this.upDown || 0, feet0 = py - HIP; let pitchTo = 0, plough = mv !== 'run';
-    const zipAt = (top) => ({ top, zip: true, A: new THREE.Vector3(px + cy * 1.5, top, pz - sy * 1.5) }); // the swinger's line to the top of a wall in the way
-    if (mv === 'swing') { F.hOff = Math.max(-6, Math.min(50, F.hOff + ud * 22 * dt)); if (go && !F.wall && !F.sw) this.swingStart(); } else F.sw = null;
-    if (F.sw && !go) { F.vy = F.sw.vy || 0; F.sw = null; F.gnd = false; } // let go of the line: on through the air
-    if (F.sw) { // on the line, or just let go of it on the way to the next
-      const W = F.sw, mul = 0.8 + 0.45 * Math.sin(Math.PI * Math.min(1, W.u)), step = mul * Math.max(sp, 8) * dt, u1 = W.u + step / W.D, y1 = W.y(u1), top = this.wallAhead(px + cy * step, pz - sy * step, y1 - HIP);
-      if (top) { F.sw = null; F.wall = zipAt(top); F.gnd = false; } // a wall in the way: pulled straight up it on the line, then on from the roof
-      else {
-        W.u = u1; this.pos.x += cy * step; this.pos.z -= sy * step; W.vy = (y1 - this.pos.y) / Math.max(dt, 1e-3); this.pos.y = y1; W.on = W.u < 0.72;
-        const fl = this.floorAt(this.pos.x, this.pos.z); if (this.pos.y - HIP < fl + 0.1 && feet0 >= fl - 1) { this.pos.y = fl + HIP + 0.1; this.landFx(Math.max(0, -W.vy)); F.sw = null; F.gnd = true; F.vy = 0; } // come down on a roof or the street
-        else if (W.u >= 1) this.swingStart();
-        if (F.sw && F.sw.on) { const A = F.sw.A, af = (A.x - this.pos.x) * cy - (A.z - this.pos.z) * sy, au = A.y - this.pos.y; pitchTo = -Math.atan2(af, Math.max(1, au)) * 0.85; } // the body along the line
-      }
-    }
+    if (mv === 'swing') { if (!F.wall && !F.gnd) pitchTo = this.swingFly(dt, go, F, ud); } else F.sw = null; // the rope swinger off the ground: a swing of its own (swingFly)
     if (F.wall) { // up a wall: the runner at a run, the swinger pulled up on the line
       pitchTo = F.wall.zip ? 0 : Math.PI / 2; this.pos.y += (F.wall.zip ? 30 : Math.max(18, sp * 0.85)) * dt; plough = false;
-      if (!go) { F.wall = null; F.gnd = false; F.vy = 0; pitchTo = 0; } // let go: off it
+      if (!go) { F.wall = null; F.gnd = false; F.vy = 0; pitchTo = 0; if (F.v) F.v.set(0, 0, 0); F.vN = this.flyN; } // let go: off it, straight down
       else if (this.pos.y - HIP >= F.wall.top) { this.pos.y = F.wall.top + HIP + 0.1; this.pos.x += cy * (HIP + 0.8); this.pos.z -= sy * (HIP + 0.8); F.wall = null; F.gnd = true; F.vy = 0; pitchTo = 0; } // over the top onto the roof
     } else if (F.gnd) { // on the street or a roof
       if (mv === 'jump' && (go || ud > 0)) { F.crouch += dt; if (F.crouch >= 0.13) { F.crouch = 0; F.gnd = false; F.vy = this.leapVy(feet0, sp, ud > 0 ? 32 : this.boosting ? 34 : 26); sfx('whoosh', px, py, pz, { gain: 0.9, rate: 1.1 }); this.puffAt(px, feet0, pz, 0.5); } } else F.crouch = 0;
       if (mv === 'run' && ud > 0 && F.hop <= 0) { F.gnd = false; F.vy = 15; F.hop = 0.45; }
+      if (mv === 'swing' && go && !(F.cool > 0)) { const h = Math.max(14, Math.min(30, sp)); F.gnd = false; F.v = (F.v || new THREE.Vector3()).set(cy * h, 17, -sy * h); F.vN = this.flyN; F.yawL = this.yaw; F.hop = 0.22; sfx('whoosh', px, py, pz, { gain: 0.7, rate: 1.3 }); this.puffAt(px, feet0, pz, 0.3); } // held on the ground: a spring up, and the line goes up on the way
       const adv = mv === 'jump' || !F.gnd ? 0 : sp * dt;
       if (adv > 0) { // a step at a time, so a wall is met where it stands: the runner goes up it, anyone else stops at it
         const n = Math.max(1, Math.ceil(adv / 0.4)), d = adv / n; let x = px, z = pz;
@@ -853,10 +842,9 @@ export class Flight {
         this.pos.x = x; this.pos.z = z; const fl = this.floorAt(x, z); if (!F.wall) { if (fl < feet0 - 0.7) { F.gnd = false; F.vy = 0; } else this.pos.y = fl + HIP + 0.1; }
       } else if (F.gnd) this.pos.y = this.floorAt(px, pz) + HIP + 0.1;
     }
-    if (!F.gnd && !F.wall && !F.sw) { // in the air: a leap, a jump, off a roof
+    if (!F.gnd && !F.wall && mv !== 'swing') { // in the air: a leap, a jump, off a roof
       const ax = cy * sp * dt, az = -sy * sp * dt, top = this.wallAhead(px + ax, pz + az, feet0); const move = !top;
       if (top && go && mv === 'run') { F.wall = { top }; F.vy = 0; } // the runner onto it and up
-      else if (top && go && mv === 'swing') { F.wall = zipAt(top); F.vy = 0; } // the swinger's line to the top of it
       else if (top && mv === 'jump' && top - feet0 < 4) F.vy = Math.max(F.vy, Math.sqrt(2 * GRAV * (top - feet0 + 1.2))); // a ledge just missed: up over it
       if (!F.wall) { // anything else meets a wall and slides up or down it till it is clear
         if (move) { this.pos.x += ax; this.pos.z += az; }
@@ -877,16 +865,56 @@ export class Flight {
   wallAhead(x, z, feetY) { const fa = this.floorAt(x + Math.cos(this.yaw) * HIP * 0.8, z - Math.sin(this.yaw) * HIP * 0.8); return fa > feetY + 0.6 ? fa : 0; }
   // how hard to leap: at least base, and enough to clear the roofs on the way up (coming down they land on them)
   leapVy(feet, sp, base) { const cy = Math.cos(this.yaw), sy = Math.sin(this.yaw), v0 = Math.max(sp, 6); let vy = base; for (let d = 3; d <= 45; d += 3) { const t = d / v0; if (t > base / GRAV) break; const f = this.floorAt(this.pos.x + cy * d, this.pos.z - sy * d), need = (f - feet + 2.5) / t + GRAV * t / 2; if (need > vy) vy = need; } return Math.min(vy, 55); }
-  // a swing: from here along the way they face, down through a dip and up to the next high point; the line to the tallest roof near the bottom, or to the sky
+  // the rope swinger off the ground (Sean, 2026-11-06: let go and fly on the way you were going; hold on and you swing back). Held: a line up ahead and a real swing on it,
+  // down, up the far side and back again for as long as it is held, a push on each time down so a few swings build up. Let go: off it and on the way they were going, a flick
+  // on for it and higher if let go on the way up; held again, the next line. Short holds for speed, a long one to the top for height. \u25B2 climbs the line, \u25BC slides down it
+  swingFly(dt, go, F, ud) {
+    const P = this.pos, cy = Math.cos(this.yaw), sy = Math.sin(this.yaw), px = P.x, py = P.y, pz = P.z, feet0 = py - HIP;
+    if (!F.v || F.vN !== this.flyN - 1) { F.v = (F.v || new THREE.Vector3()).set(cy * this.speed, F.vy || 0, -sy * this.speed); F.yawL = this.yaw; F.sw = null; } // just off a roof, or back from a fight: on from how they were going
+    F.vN = this.flyN; const v = F.v; let dy = this.yaw - F.yawL; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); F.yawL = this.yaw;
+    if (dy) { const k = dy * (F.sw ? 0.85 : 0.5), c = Math.cos(k), s = Math.sin(k), x = v.x; v.x = x * c + v.z * s; v.z = v.z * c - x * s; } // the stick turns the swing round with them
+    F.cool = Math.max(0, F.cool - dt); if (F.flip != null && (F.flip += dt) >= 0.6) F.flip = null;
+    const hold = go && !(this.goBase && F.sw && F.sw.u > 0.75); // flown to the base: let go past the bottom of each swing, as one would
+    if (F.sw && !hold) { // let go: a flick on the way they are going; high up the far side of the swing (near its top), up off it too
+      const hf = v.x * cy - v.z * sy, far = (F.sw.u - 0.5) * 2 * (hf >= 0 ? 1 : -1), up = Math.max(0, Math.min(1, (far - 0.45) / 0.4)); F.sw = null; F.cool = 0.12;
+      const s = v.length() || 1, e = up * up * (3 - 2 * up); v.multiplyScalar(1 + 3 / s); if (v.y > -3 && e > 0) { v.y += 20 * e; v.x += cy * 8 * e * Math.sign(hf || 1); v.z -= sy * 8 * e * Math.sign(hf || 1); } /* the launch: up and on */
+      F.flip = s > 16 || up > 0.5 ? 0 : null; F.flipD = hf >= 0 ? 1 : -1; sfx('whoosh', px, py, pz, { gain: 0.5 + 0.3 * up, rate: 1.8 - 0.4 * up });
+    }
+    if (!F.sw && hold && F.cool <= 0 && F.hop <= 0) this.swingStart();
+    const W = F.sw; v.y -= GRAV * dt;
+    if (W) { W.L = Math.max(4, W.L - ud * 16 * dt); const s = v.length() || 1; if (v.y < 0 && v.x * cy - v.z * sy > 0 && (s < 44 || this.boosting) && P.y < this.g.people.groundY(P.x, P.z) + 45) v.multiplyScalar(1 + (this.boosting ? 16 : 7) * dt / s); } // on the line: up or down it; a push on, going down the way they face (low down: high up it is the drop that does it)
+    const cap = this.boosting ? 70 : 50, s0 = v.length(); if (s0 > cap) v.multiplyScalar(cap / s0);
+    P.addScaledVector(v, dt);
+    let hv = Math.hypot(v.x, v.z), pitchTo = 0; const ux = hv > 0.5 ? v.x / hv : cy, uz = hv > 0.5 ? v.z / hv : -sy;
+    if (W) {
+      let fl = -1e9; for (const d of [0, 3, 6]) fl = Math.max(fl, this.floorAt(P.x + ux * d, P.z + uz * d)); W.L = Math.max(3, Math.min(W.L, W.A.y - fl - HIP - 0.8)); // a roof or the street just ahead: the line taken in, so the swing goes over it
+      const n = _w.subVectors(P, W.A), d = n.length(); if (d > W.L) { n.multiplyScalar(1 / d); P.copy(W.A).addScaledVector(n, W.L); const vr = v.dot(n); if (vr > 0) v.addScaledVector(n, -vr); } // the line tight: on round the end of it
+      v.multiplyScalar(1 - 0.1 * dt);
+      const af = (W.A.x - P.x) * cy - (W.A.z - P.z) * sy, au = W.A.y - P.y; W.u = 0.5 - 0.5 * Math.max(-1, Math.min(1, af / W.L)); pitchTo = -Math.atan2(af, Math.max(1, au)) * 0.85; // the body along the line
+    }
+    hv = Math.hypot(v.x, v.z); const top = hv > 0.5 ? this.wallTo(P.x, P.z, ux, uz, P.y - HIP) : 0;
+    if (top) { P.x = px; P.z = pz; // a wall the way they are going
+      if (hold && ux * cy - uz * sy > 0.3) { F.sw = null; F.wall = { top, zip: true, A: new THREE.Vector3(px + cy * 1.5, top, pz - sy * 1.5) }; F.flip = null; return 0; } // held and going at it: pulled straight up it on the line, then on from the roof
+      v.x *= -0.25; v.z *= -0.25; // off it
+    }
+    const roof = this.floorAt(P.x, P.z), fl = feet0 >= roof - 1.2 ? roof : this.g.people.groundY(P.x, P.z); // come down on a roof or the street
+    if (P.y - HIP <= fl + 0.1 && v.y <= 0) { const vd = -v.y; P.y = fl + HIP + 0.1; F.sw = null; F.gnd = true; F.flip = null; F.vy = 0; F.land = Math.min(0.35, 0.06 + vd * 0.007); this.landFx(vd); this.speed = Math.hypot(v.x, v.z); return 0; }
+    this.speed = Math.hypot(v.x, v.z); F.vy = v.y;
+    return pitchTo;
+  }
+  wallTo(x, z, ux, uz, feetY) { const fa = this.floorAt(x + ux * HIP * 0.8, z + uz * HIP * 0.8); return fa > feetY + 0.6 ? fa : 0; }
+  // a new line: up ahead at right angles to the way they are going (tight at once, no jolt), steeper when low over the roofs so the swing never dips into them; to a roof if it ends in one
   swingStart() {
-    const F = this.ft, g = this.g, x0 = this.pos.x, y0 = this.pos.y, z0 = this.pos.z, cy = Math.cos(this.yaw), sy = Math.sin(this.yaw), D = 30 + Math.min(30, this.speed * 0.3);
-    let fmax = -1e9; for (const u of [0.15, 0.35, 0.5, 0.65, 0.85, 1]) fmax = Math.max(fmax, this.floorAt(x0 + cy * D * u, z0 - sy * D * u)); // the roofs on the way: the swing stays over them
-    const y1 = Math.max(g.people.groundY(x0, z0) + 15 + F.hOff, fmax + HIP + 3), dip = Math.max(0, Math.min(9, Math.min(y0, y1) - (fmax + HIP + 1.5)));
-    const y = (u) => { const q = Math.min(1, u); return y0 + (y1 - y0) * (q * q * (3 - 2 * q)) - dip * Math.sin(Math.PI * q); };
-    const mx = x0 + cy * D / 2, mz = z0 - sy * D / 2, low = y(0.5), s = Math.max(dip, 4), Lr = (D * D / 4 + s * s) / (2 * s); let A = null, best = low + 6;
-    g.city.buildingsNear(mx, mz, 18, (k, d, b) => { if (b.roofY > best) { best = b.roofY; A = new THREE.Vector3(Math.min(Math.max(mx, b.x0), b.x1), b.roofY, Math.min(Math.max(mz, b.z0), b.z1)); } });
-    F.sw = { u: 0, D, y, A: A || new THREE.Vector3(mx, low + Math.min(40, Lr), mz), on: true, vy: 0 }; F.gnd = false; F.wall = null;
-    sfx('whoosh', x0, y0, z0, { gain: 0.55, rate: 1.5 });
+    const F = this.ft, g = this.g, P = this.pos, v = F.v, cy = Math.cos(this.yaw), sy = Math.sin(this.yaw);
+    if (P.y < g.people.groundY(P.x, P.z) + 60) { const d = Math.max(0, Math.min(6, 44 - (v.x * cy - v.z * sy))); v.x += cy * d; v.z -= sy * d; } // the pull of it: on faster the way they face (low down: high up the drop does it)
+    const s = v.length(), L = 20 + Math.min(12, s * 0.25), hf = v.x * cy - v.z * sy;
+    let fmax = -1e9; for (const k of [0, 0.25, 0.5, 0.75, 1, 1.25]) fmax = Math.max(fmax, this.floorAt(P.x + cy * L * k, P.z - sy * L * k)); // the roofs under the swing
+    const c = P.y - (fmax + HIP + 1.5), lo = Math.asin(Math.min(0.97, Math.max(0.77, 1 - Math.max(0, c) / L))), perp = Math.PI / 2 - Math.atan2(-v.y, Math.max(hf, 1)), dive = hf > 5 && v.y < 6, ph = dive ? Math.max(lo, 0.96) : Math.max(lo, Math.min(1.48, perp));
+    const A = new THREE.Vector3(P.x + cy * L * Math.cos(ph), Math.min(P.y + L * Math.sin(ph), g.people.groundY(P.x, P.z) + 110), P.z - sy * L * Math.cos(ph));
+    g.city.buildingsNear(A.x, A.z, 0.3, (k, d, b) => { if (b.roofY > A.y - 3 && b.roofY < A.y + 12) A.y = Math.max(A.y, b.roofY); }); // ending in a building: on its roof
+    F.sw = { A, L: A.distanceTo(P), on: true, u: 0.5 - 0.5 * Math.cos(ph) }; F.flip = null; F.gnd = false; F.wall = null;
+    if (dive) { const r = _w2.subVectors(P, A).normalize(), t = _w.set(cy, 0, -sy), k = t.dot(r); t.addScaledVector(r, -k).normalize(); v.copy(t).multiplyScalar(s); } // going on: down into the swing along the line's way round (as fast, so no jolt), up the far side as high again
+    sfx('whoosh', P.x, P.y, P.z, { gain: 0.55, rate: 1.5 });
   }
   puffAt(x, y, z, k) { const D = this.g.disasters; for (let i = 0; i < 6 + 10 * k; i++) { const a = Math.random() * 6.28, s = 0.2 + Math.random() * 0.45 * (0.5 + k); D.debris.add(x, y + 0.2, z, s, s * 0.6, s, 0x9a9184, 'fly', { v: [Math.cos(a) * (4 + 8 * k), 1.5 + Math.random() * 4, Math.sin(a) * (4 + 8 * k)], life: 0.9 }); } }
   // coming down: the harder, the bigger the dust, the shake and the thump
@@ -898,8 +926,8 @@ export class Flight {
       const u = F.sw ? F.sw.u : 0.5, s = Math.sin(u * Math.PI * 2);
       A[1].sh.rotation.set(-3.05, 0, 0.12); A[1].el.rotation.set(-0.1, 0, 0); A[0].sh.rotation.set(-0.4 + 0.3 * s, 0, -1.0); A[0].el.rotation.set(-0.6, 0, 0);
       for (const q of L) { q.hip.rotation.x = -0.35 + 0.35 * Math.cos(u * Math.PI); q.knee.rotation.x = 0.5 + 0.3 * Math.sin(u * Math.PI); } L[0].hip.rotation.x -= 0.25; L[0].knee.rotation.x += 0.3; r.head.rotation.x = -0.2;
-    } else if (F.sw) { // let go: a forward flip on the way to the next line
-      const q = Math.min(1, (F.sw.u - 0.72) / 0.28), e = q * q * (3 - 2 * q), sn = Math.sin(q * Math.PI); lean = e * Math.PI * 2; flip = true;
+    } else if (F.flip != null && !F.gnd && !F.wall) { // let go of the line at speed: a flip, forward or back the way they are going
+      const q = Math.min(1, F.flip / 0.6), e = q * q * (3 - 2 * q), sn = Math.sin(q * Math.PI); lean = (F.flipD || 1) * e * Math.PI * 2; flip = true;
       for (const l of L) { l.hip.rotation.x = -1.3 * sn; l.knee.rotation.x = 2.0 * sn; } for (const a of A) { a.sh.rotation.set(-0.8 - 0.8 * sn, 0, a.sx * 0.3); a.el.rotation.set(-1.2, 0, 0); }
     } else if (F.wall || (F.gnd && sp > 1.5)) { // running, up a wall too
       F.ph += dt * (7 + Math.min(16, sp * 0.3)); const k = F.wall ? 1 : Math.min(1, sp / 8), s = Math.sin(F.ph), c = Math.cos(F.ph);
