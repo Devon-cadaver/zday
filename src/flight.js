@@ -876,9 +876,9 @@ export class Flight {
     F.cool = Math.max(0, F.cool - dt); if (F.flip != null && (F.flip += dt) >= 0.6) F.flip = null;
     const hold = go && !(this.goBase && F.sw && F.sw.u > 0.75); // flown to the base: let go past the bottom of each swing, as one would
     if (F.sw && !hold) { // let go: a flick on the way they are going; high up the far side of the swing (near its top), up off it too
-      const hf = v.x * cy - v.z * sy, far = (F.sw.u - 0.5) * 2 * (hf >= 0 ? 1 : -1), up = Math.max(0, Math.min(1, (far - 0.45) / 0.4)); F.sw = null; F.cool = 0.12;
-      const s = v.length() || 1, e = up * up * (3 - 2 * up); v.multiplyScalar(1 + 3 / s); if (v.y > -3 && e > 0) { v.y += 20 * e; v.x += cy * 8 * e * Math.sign(hf || 1); v.z -= sy * 8 * e * Math.sign(hf || 1); } /* the launch: up and on */
-      F.flip = s > 16 || up > 0.5 ? 0 : null; F.flipD = hf >= 0 ? 1 : -1; sfx('whoosh', px, py, pz, { gain: 0.5 + 0.3 * up, rate: 1.8 - 0.4 * up });
+      const hf = v.x * cy - v.z * sy, dir = Math.abs(hf) < 4 ? (F.sw.u >= 0.5 ? 1 : -1) : Math.sign(hf), far = (F.sw.u - 0.5) * 2 * dir, /* at the very top, still: by the side of the swing they are on */ up = Math.max(0, Math.min(1, (far - 0.45) / 0.4)); F.sw = null; F.cool = 0.12;
+      const s = v.length() || 1, e = up * up * (3 - 2 * up); v.multiplyScalar(1 + 3 / s); if (v.y > -3 && e > 0) { v.y += 20 * e; v.x += cy * 8 * e * dir; v.z -= sy * 8 * e * dir; } /* the launch: up and on */
+      F.flip = s > 16 || up > 0.5 ? 0 : null; F.flipD = dir; sfx('whoosh', px, py, pz, { gain: 0.5 + 0.3 * up, rate: 1.8 - 0.4 * up });
     }
     if (!F.sw && hold && F.cool <= 0 && F.hop <= 0) this.swingStart();
     const W = F.sw; v.y -= GRAV * dt;
