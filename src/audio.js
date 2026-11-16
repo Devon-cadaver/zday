@@ -366,10 +366,10 @@ export class Audio {
     const now = c.currentTime;
     if (now - (this.last[name] || -9) < (GAP[name] || 0.03) || this.voices >= MAXV || (this.live[name] || 0) >= (CAP[name] || 8)) return;
     const P = this.place(x, y, z, (REACH[name] || 300) * (o.reach || 1)), g = P.g * (VOL[name] || 0.6) * (o.gain ?? 1);
-    if (g < 0.025) return;
+    if (!(g >= 0.025) || !Number.isFinite(g) || !Number.isFinite(P.lp) || !Number.isFinite(P.pan)) return; // too quiet to hear; or a number that is not one (a place, a loudness): dropped, since setting it throws in the middle of the game step that asked
     this.last[name] = now;
     const src = c.createBufferSource(), f = c.createBiquadFilter(), gn = c.createGain(), p = c.createStereoPanner ? c.createStereoPanner() : null;
-    src.buffer = list[Math.floor(Math.random() * list.length)]; src.playbackRate.value = (o.rate || 1) * (0.93 + Math.random() * 0.14);
+    src.buffer = list[Math.floor(Math.random() * list.length)]; src.playbackRate.value = (Number.isFinite(o.rate) && o.rate > 0 ? o.rate : 1) * (0.93 + Math.random() * 0.14);
     f.type = 'lowpass'; f.frequency.value = P.lp; gn.gain.value = g;
     src.connect(f); f.connect(gn); if (p) { p.pan.value = P.pan; gn.connect(p); p.connect(this.bus); } else gn.connect(this.bus);
     this.voices++; this.live[name] = (this.live[name] || 0) + 1;
