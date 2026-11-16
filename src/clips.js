@@ -13,6 +13,7 @@ const EASE = {
   in: (u) => u * u, // slow then fast: an anticipation gathering
   snap: (u) => 1 - Math.pow(1 - u, 4), // all at once
   soft: (u) => u * u * (3 - 2 * u),
+  whip: (u) => (u < 0.4 ? 0 : 1 - Math.pow(1 - (u - 0.4) / 0.6, 3)), // held, then all at once: a blow that keeps its wind-up a moment (so it is seen: the pose is eased in from the last one over 0.07 s) and still lands on its key
 };
 const J = (r, name) => { // the joint object for a pose name, or null
   const A = r.arms, L = r.legs;
@@ -60,15 +61,15 @@ export const CLIPS = {
   cross: { keys: [key(0, { ...mirror(JAB_L_WOUND), torso: { x: 0.15, y: 0.35 }, bodyY: -0.06 }), key(0.1, { torso: { x: 0.1, y: -0.5 }, chest: { y: -0.55 }, shR: { x: -1.75, z: 0.05 }, elR: 0, wrR: -0.15, shL: { x: -0.6, z: -0.3 }, elL: -1.7, hipR: 0.25, kneeR: 0.3, hipL: -0.45, kneeL: 0.35, bodyY: -0.1, head: { y: -0.3 } }, 'snap'), key(0.4, GUARD, 'out')] },
   // the uppercut: coiled low, exploding up through the chin (contact at 0.28), the follow-through overhead
   uppercut: { keys: [
-    key(0, { bodyY: -0.22, torso: 0.55, chest: 0.25, head: -0.35, shR: { x: 0.9, z: 0.3 }, elR: -1.7, wrR: -0.3, shL: { x: -0.9, z: -0.2 }, elL: -1.5, hipL: -0.55, hipR: -0.75, kneeL: 1.0, kneeR: 1.2, ankL: 0.3, ankR: 0.4 }),
-    key(0.28, { bodyY: 0.12, torso: -0.3, chest: -0.3, head: -0.5, shR: { x: -3.0, z: 0.15 }, elR: -0.2, wrR: -0.5, shL: { x: 0.3, z: -0.3 }, elL: -1.2, hipL: 0.1, hipR: -0.3, kneeL: 0.15, kneeR: 0.5, ankR: -0.3 }, 'in'),
-    key(0.55, { bodyY: 0.05, torso: -0.2, chest: -0.15, head: -0.3, shR: { x: -3.1, z: 0.3 }, elR: -0.1, shL: { x: 0.1, z: -0.2 }, elL: -0.9, kneeL: 0.2, kneeR: 0.3 }, 'out'),
+    key(0, { bodyY: -0.22, torso: { x: 0.52, y: 0.45 }, chest: { x: 0.22, y: 0.3 }, head: { x: -0.35, y: -0.5 }, shR: { x: 0.7, z: 0.3 }, elR: -1.6, wrR: -0.3, shL: { x: -0.9, z: -0.2 }, elL: -1.6, hipL: -0.55, hipR: -0.75, kneeL: 1.0, kneeR: 1.2, ankL: 0.3, ankR: 0.4 }),
+    key(0.28, { bodyY: 0.1, torso: { x: 0.02, y: -0.45 }, chest: { x: -0.12, y: -0.35 }, head: { x: -0.3, y: 0.5 }, shR: { x: -1.25, z: -0.12 }, elR: -1.55, wrR: -0.4, shL: { x: -0.3, z: -0.35 }, elL: -1.5, hipL: 0.1, hipR: -0.3, kneeL: 0.15, kneeR: 0.5, ankR: -0.3 }, 'whip'),
+    key(0.55, { bodyY: 0.06, torso: { x: -0.22, y: -0.6 }, chest: { x: -0.18, y: -0.4 }, head: { x: -0.3, y: 0.6 }, shR: { x: -2.9, z: 0.2 }, elR: -0.3, shL: { x: 0.1, z: -0.2 }, elL: -0.9, kneeL: 0.2, kneeR: 0.3 }, 'out'),
   ] },
   // in the air over them: pulled right back, then the dash down after them head first, fist ahead
   windup: { keys: [key(0, { shR: { x: -3.0, z: 0.2 }, shL: { x: 0.2, z: -0.2 }, elL: -0.9 }), key(0.3, { body: -0.45, torso: -0.25, chest: -0.2, head: 0.25, shL: { x: 1.0, z: -0.6 }, shR: { x: 1.0, z: 0.6 }, elL: -0.8, elR: -0.8, hipL: -0.9, hipR: -0.9, kneeL: 1.4, kneeR: 1.4 }, 'in')] },
   dash: { keys: [key(0, { body: -0.45, torso: -0.25, chest: -0.2, head: 0.25, shL: { x: 1.0, z: -0.6 }, shR: { x: 1.0, z: 0.6 }, elL: -0.8, elR: -0.8, hipL: -0.9, hipR: -0.9, kneeL: 1.4, kneeR: 1.4 }), key(0.18, { body: 2.7, torso: -0.1, chest: -0.1, head: -0.4, shR: { x: -3.0, z: 0.1 }, elR: 0, shL: { x: 0.6, z: -0.3 }, elL: -1.3, kneeL: 0.1, kneeR: 0.1 }, 'snap')] },
   // a flying kick: the knee up, the leg driven out (contact at 0.22), back to the guard
-  kick: { keys: [key(0, { body: -0.15, torso: 0.1, chest: 0.1, hipR: -1.4, kneeR: 1.6, shR: { x: 0.4, z: 0.3 }, elR: -0.9, shL: { x: -0.8, z: -0.3 }, elL: -1.2, kneeL: 0.3 }), key(0.22, { body: -0.3, torso: -0.3, chest: -0.2, head: -0.1, hipR: -1.75, kneeR: 0.1, ankR: -0.4, hipL: 0.3, kneeL: 0.6, shL: { x: -0.5, z: -0.9 }, shR: { x: 0.3, z: 0.9 }, elL: -0.3, elR: -0.3 }, 'snap'), key(0.55, GUARD, 'out')] },
+  kick: { keys: [key(0, { body: -0.05, bodyY: -0.03, torso: 0.15, chest: 0.1, hipR: -1.5, kneeR: 1.75, shR: { x: 0.4, z: 0.3 }, elR: -0.9, shL: { x: -0.8, z: -0.3 }, elL: -1.2, hipL: -0.1, kneeL: 0.35 }), key(0.22, { body: -0.1, torso: -0.38, chest: -0.15, head: 0.3, hipR: -1.74, kneeR: 0.05, ankR: -0.45, hipL: 0.38, kneeL: 0.3, shL: { x: -0.5, z: -0.9 }, shR: { x: 0.3, z: 0.9 }, elL: -0.3, elR: -0.3 }, 'snap'), key(0.55, GUARD, 'out')] },
   // fists together overhead, the back arched (held while a circle is held); and the hammer blow down from it (contact at 0.12)
   hammerUp: { keys: [key(0, { torso: -0.2, chest: -0.3, head: -0.3, shL: { x: -3.0, z: -0.1 }, shR: { x: -3.0, z: 0.1 }, elL: 0, elR: 0, kneeL: 0.2, kneeR: 0.2 }), key(0.8, { torso: -0.25, chest: -0.35, head: -0.35, shL: { x: -3.08, z: -0.12 }, shR: { x: -3.08, z: 0.12 }, elL: 0, elR: 0, kneeL: 0.25, kneeR: 0.25 }, 'soft')] },
   hammerDown: { keys: [key(0, { torso: -0.25, chest: -0.35, head: -0.35, shL: { x: -3.08, z: -0.12 }, shR: { x: -3.08, z: 0.12 }, elL: 0, elR: 0, kneeL: 0.25, kneeR: 0.25 }), key(0.12, { torso: 0.55, chest: 0.35, head: 0.2, shL: { x: -0.9, z: -0.15 }, shR: { x: -0.9, z: 0.15 }, elL: -0.2, elR: -0.2, kneeL: 0.6, kneeR: 0.6, hipL: -0.3, hipR: -0.3, bodyY: -0.15 }, 'snap'), key(0.45, { torso: 0.2, chest: 0.1, shL: { x: -0.6, z: -0.3 }, shR: { x: -0.6, z: 0.3 }, elL: -0.8, elR: -0.8, kneeL: 0.3, kneeR: 0.3 }, 'out')] },

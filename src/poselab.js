@@ -13,7 +13,7 @@ import { loadLocal, saveLocal, warp } from './poses.js';
 const $ = (id) => document.getElementById(id);
 const FRAME = 1 / 60, MOVE_BY = {}; for (const m of MOVES) MOVE_BY[m.id] = m;
 const clone = (x) => JSON.parse(JSON.stringify(x)), round3 = (v) => Math.round(v * 1000) / 1000;
-const EASES = [['soft', 'Smooth'], ['out', 'Fast, then slow'], ['in', 'Slow, then fast'], ['snap', 'Snap'], ['linear', 'Even']];
+const EASES = [['soft', 'Smooth'], ['out', 'Fast, then slow'], ['in', 'Slow, then fast'], ['snap', 'Snap'], ['whip', 'Held, then snap'], ['linear', 'Even']];
 const PIN_NAMES = [['', 'Free'], ['neck', 'Neck'], ['face', 'Face'], ['chest', 'Chest'], ['waist', 'Waist'], ['ankL', 'Left ankle'], ['ankR', 'Right ankle'], ['ownNeck', 'Own neck'], ['ownHead', 'Own head']];
 
 // ---------- the stage

@@ -10,7 +10,7 @@
 import * as THREE from 'three';
 import { heroRig } from './heroes.js';
 import { CLIPS } from './clips.js';
-import { Body, C, CSS, ghost, STYLES } from './fighttest.js';
+import { Body, C, CSS, ghost, STYLES, spinAt } from './fighttest.js';
 import { follows } from './motion.js';
 import { Streak } from './streak.js';
 import { sfx } from './audio.js';
@@ -23,7 +23,7 @@ const RANGED_TEAM = new Set(['laser', 'gust', 'water', 'firejet', 'bolt', 'air',
 import { GuardFx, GUARD as SHIELD } from './guard.js';
 import { ShotList, runShot, addProp, meleeFx } from './powerfx.js';
 import { STROKES } from './strokes.js';
-import { MELEE_ATK } from './fightclips.js';
+import { MELEE_ATK, BLOW } from './fightclips.js';
 import { HS, rigFor, matesOf, mateDown, mateRig } from './herogame.js';
 import { hdLook } from './hdbody.js';
 const TAKEOFF = { fly: '\u2708 TAKE OFF', run: '\uD83D\uDCA8 SPRINT', swing: '\uD83D\uDD78 SWING', jump: '\u2934 LEAP' }; // the button off the street into the town, by how they get round it (the wardrobe's Moves)
@@ -40,20 +40,20 @@ const ATK = {
   jabL: { clip: CLIPS.jabL, at: 0.08, end: 0.24, r: 2.9, arc: 0.25 },
   jabR: { clip: CLIPS.jabR, at: 0.08, end: 0.24, r: 2.9, arc: 0.25 },
   cross: { clip: CLIPS.cross, at: 0.1, end: 0.42, r: 3.3, arc: -0.2, daze: true },
-  heavy: { clip: CLIPS.hammerDown, at: 0.12, end: 0.45, r: 5, arc: -1 },
-  hamA: { clip: CLIPS.hammerDown, at: 0.14, end: 0.5, r: 3.2, arc: 0 },
-  hamB: { clip: CLIPS.hammerUp, at: 0.16, end: 0.55, r: 3.6, arc: -0.3, daze: true },
+  heavy: { clip: BLOW.hamHeavy, at: 0.12, end: 0.45, r: 5, arc: -1 },
+  hamA: { clip: BLOW.hamA, at: 0.14, end: 0.5, r: 3.2, arc: 0 },
+  hamB: { clip: BLOW.riseFists, at: 0.16, end: 0.55, r: 3.6, arc: -0.3, daze: true },
   kick: { clip: CLIPS.kick, at: 0.22, end: 0.5, r: 3.5, arc: 0.2, kick: true },
-  hook: { clip: CLIPS.cross, at: 0.1, end: 0.32, r: 3.1, arc: 0 },
+  hook: { clip: BLOW.hookLc, at: 0.1, end: 0.32, r: 3.1, arc: 0 },
   boxUp: { clip: CLIPS.uppercut, at: 0.28, end: 0.56, r: 3.2, arc: 0, daze: true },
   snapKick: { clip: CLIPS.kick, at: 0.2, end: 0.42, r: 3.4, arc: 0.1 },
   palm: { clip: CLIPS.cross, at: 0.1, end: 0.42, r: 3.3, arc: -0.2, daze: true },
-  elbowU: { clip: CLIPS.elbowUp, at: 0.15, end: 0.4, r: 2.9, arc: 0 },
-  elbowD: { clip: CLIPS.elbowDrop, at: 0.18, end: 0.46, r: 3.1, arc: 0 },
-  slam: { clip: CLIPS.hammerDown, at: 0.16, end: 0.55, r: 3.8, arc: -0.4, daze: true },
-  highKick: { clip: CLIPS.kick, at: 0.22, end: 0.5, r: 3.6, arc: 0, daze: true },
-  spinKick: { clip: CLIPS.kick, at: 0.22, end: 0.42, r: 3.6, arc: -1, spin: true },
-  highSpin: { clip: CLIPS.kick, at: 0.24, end: 0.5, r: 4, arc: -1, daze: true, spin: true },
+  elbowU: { clip: BLOW.elbowL, at: 0.15, end: 0.4, r: 2.9, arc: 0 },
+  elbowD: { clip: BLOW.elbowDn, at: 0.18, end: 0.46, r: 3.1, arc: 0 },
+  slam: { clip: BLOW.hamSlam, at: 0.16, end: 0.55, r: 3.8, arc: -0.4, daze: true },
+  highKick: { clip: BLOW.highKick, at: 0.22, end: 0.5, r: 3.6, arc: 0, daze: true },
+  spinKick: { clip: BLOW.spinKick, at: 0.22, end: 0.42, r: 3.6, arc: -1, spin: true },
+  highSpin: { clip: BLOW.spinHi, at: 0.24, end: 0.5, r: 4, arc: -1, daze: true, spin: true },
   seize: { clip: C.seize, at: 0.12, end: 0.3, r: 2.6, arc: 0.3, seize: true },
   neck: { clip: C.seize, at: 0.1, end: 0.3, r: 2.2, arc: -1, neck: true },
   upper: { clip: CLIPS.uppercut, at: 0.28, end: 0.56, r: 2.4, arc: -1, launch: true },
@@ -148,7 +148,7 @@ export class Horde {
       // the horde rains down round her, a few at a time
       this.dropStep(dt);
       if (!P.heroTg) return; /* the level ended a moment ago */ P.heroTg.x = h.x; P.heroTg.z = h.z; P.heroTg.air = h.y > P.groundY(h.x, h.z) + 0.9 || ['skyRise', 'skyTop', 'skyGrab', 'skyDive', 'glide'].includes(h.state); const b = P.heroTg.bites; if (b > this.bitesSeen && !this.over) { this.bite(b - this.bitesSeen); this.bitesSeen = b; }
-      this.genStep(dt); this.bossStep(dt); this.fleetStep(dt); if (this.o.bot) this.o.bot(ft); this.heroStep(ft); this.flyStep(ft); this.dazeStep(dt); this.spitStep(dt); this.boomStep(dt); if (this.fl) this.fl.step(dt); this.mateStep(dt); if (this.finRun && !this.finRun.step(dt)) this.finRun = null; this.teamEls.forEach((q, i) => { q.querySelector('i').style.width = this.team + '%'; q.classList.toggle('ok', this.team >= 100 && !this.mateR && !mateDown(this.g, this.mates[i])); }); this.guard.step(dt, h.x, h.y + 1, h.z); this.fxa.step(dt); if (!(h.state === 'idle' && this.stick)) h.walkK = Math.max(0, h.walkK - ft * 8); if ((this.nearT = (this.nearT || 0) - ft) <= 0) { this.nearT = 0.2; const q = this.nearest(9); let d = q ? q[2] : Infinity; const bp = this.o.boss ? this.bossPt() : null; if (bp) d = Math.min(d, Math.hypot(bp[0] - h.x, bp[1] - h.z) - (bp[2] || 0) * 0.5); for (const g0 of this.gens || []) if (!g0.gone) d = Math.min(d, Math.hypot(g0.x - h.x, g0.z - h.z)); if (this.fl) for (const G of this.fl.giants) if (G.alive) d = Math.min(d, Math.hypot(G.x - h.x, G.z - h.z) - G.size * 0.3); h.near = d; } { const gi = !!(this.o.boss || (this.fl && this.fl.focus && this.fl.focus())), far = gi ? this.ctx.camera.position.distanceTo(_c.set(h.x, h.y + 1, h.z)) : 0, to = far > 50 ? Math.min(2, 1 + (far - 50) / 60) : 1; this.bigK = (this.bigK || 1) + (to - (this.bigK || 1)) * Math.min(1, dt * 2); h.r.root.scale.setScalar(this.bigK); } /* against a giant the camera is 80 to 120 m off and she was 12 to 19 px tall (2026-11-15): drawn bigger the further off it is, up to twice; only her look, nothing she can reach or be hit by changes */ h.loose = true; h.pose(ft, h.y, !['down', 'skyRise', 'skyTop', 'skyGrab', 'skyDive', 'drag'].includes(h.state)); if (h.state === 'attack' && ATK[this.atk] && ATK[this.atk].spin) h.r.root.rotation.y += Math.min(1, h.t / ATK[this.atk].end) * 6.283; this.streak.update(_c.set(h.x, h.y + 1, h.z), ['lunge', 'dodge', 'skyRise', 'skyDive', 'drag'].includes(h.state), this.ctx.camera, ft); this.fxStep(dt); this.thrownStep(dt); ghost(h.r);
+      this.genStep(dt); this.bossStep(dt); this.fleetStep(dt); if (this.o.bot) this.o.bot(ft); this.heroStep(ft); this.flyStep(ft); this.dazeStep(dt); this.spitStep(dt); this.boomStep(dt); if (this.fl) this.fl.step(dt); this.mateStep(dt); if (this.finRun && !this.finRun.step(dt)) this.finRun = null; this.teamEls.forEach((q, i) => { q.querySelector('i').style.width = this.team + '%'; q.classList.toggle('ok', this.team >= 100 && !this.mateR && !mateDown(this.g, this.mates[i])); }); this.guard.step(dt, h.x, h.y + 1, h.z); this.fxa.step(dt); if (!(h.state === 'idle' && this.stick)) h.walkK = Math.max(0, h.walkK - ft * 8); if ((this.nearT = (this.nearT || 0) - ft) <= 0) { this.nearT = 0.2; const q = this.nearest(9); let d = q ? q[2] : Infinity; const bp = this.o.boss ? this.bossPt() : null; if (bp) d = Math.min(d, Math.hypot(bp[0] - h.x, bp[1] - h.z) - (bp[2] || 0) * 0.5); for (const g0 of this.gens || []) if (!g0.gone) d = Math.min(d, Math.hypot(g0.x - h.x, g0.z - h.z)); if (this.fl) for (const G of this.fl.giants) if (G.alive) d = Math.min(d, Math.hypot(G.x - h.x, G.z - h.z) - G.size * 0.3); h.near = d; } { const gi = !!(this.o.boss || (this.fl && this.fl.focus && this.fl.focus())), far = gi ? this.ctx.camera.position.distanceTo(_c.set(h.x, h.y + 1, h.z)) : 0, to = far > 50 ? Math.min(2, 1 + (far - 50) / 60) : 1; this.bigK = (this.bigK || 1) + (to - (this.bigK || 1)) * Math.min(1, dt * 2); h.r.root.scale.setScalar(this.bigK); } /* against a giant the camera is 80 to 120 m off and she was 12 to 19 px tall (2026-11-15): drawn bigger the further off it is, up to twice; only her look, nothing she can reach or be hit by changes */ h.loose = true; h.pose(ft, h.y, !['down', 'skyRise', 'skyTop', 'skyGrab', 'skyDive', 'drag'].includes(h.state)); if (h.state === 'attack' && ATK[this.atk] && ATK[this.atk].spin) h.r.root.rotation.y += spinAt(ATK[this.atk], h.t); this.streak.update(_c.set(h.x, h.y + 1, h.z), ['lunge', 'dodge', 'skyRise', 'skyDive', 'drag'].includes(h.state), this.ctx.camera, ft); this.fxStep(dt); this.thrownStep(dt); ghost(h.r);
       this.countStep(dt);
       this.hh.style.width = Math.max(0, h.hp / h.hpMax * 100) + '%'; this.ee.style.width = this.energy + '%'; this.chkFrame(); for (const k in this.pwBtn) this.pwBtn[k].classList.toggle('ok', this.energy >= this.COST[k]); this.holdStep(dt);
     }
@@ -163,7 +163,7 @@ export class Horde {
     switch (h.state) {
       case 'idle': { h.t += dt; if (!this.finKind) { const w = this.stick ? this.stickDir() : null, sp = 5 * this.sty.run, st = h.drive(dt, w ? w[0] * sp * w[2] : 0, w ? w[1] * sp * w[2] : 0, !!w && w[2] > 0.9); if (st[2] > 0) { this.move(st[0], st[1]); h.walkK = Math.min(1, h.walkK + dt * (w ? 6 : 16)); } } /* 2026-11-15: her speed built up and braked (fighttest.js Body.drive), a sprint worked up to by running flat out in a line; the legs keep time with the ground in Body.pose */ if (this.finKind && !this.over && (this.finStage === 'run' || this.finStage === 'up')) { h.go('finRun', C.guard); break; } this.move(h.vx * dt, h.vz * dt); const k = Math.exp(-7 * dt); h.vx *= k; h.vz *= k; const n = this.nearest(14); if (n) { let a = Math.atan2(n[0] - h.x, n[1] - h.z) - h.yaw; a = Math.atan2(Math.sin(a), Math.cos(a)); h.yaw += a * Math.min(1, dt * 10); } if (h.clip !== C.guard) h.play(C.guard); break; }
       case 'lunge': { h.t += dt; const A = ATK[this.atk], dx = this.lx - h.x, dz = this.lz - h.z, d = Math.hypot(dx, dz) || 1; if (d <= A.r - 0.6 || h.t > 0.5) { h.go('attack', A.clip); break; } this.move(dx / d * 22 * dt, dz / d * 22 * dt); h.phase += dt * 30; h.walkK = 0.6; break; }
-      case 'attack': { h.t += dt * this.sty.spd; h.ct += (this.sty.spd - 1) * dt; const A = ATK[this.atk]; h.atkAt = A.at; h.atkEnd = A.end; h.atkW = A.heavy || A.knock ? 1.4 : 0.85; /* her weight into the blow (fighttest.js Body.blowStep) */ if (A.dash && h.t < A.at) this.move(Math.sin(h.yaw) * A.dash * dt, Math.cos(h.yaw) * A.dash * dt); if (!this.landed && h.t >= A.at) { this.landed = true; this.contact(A); if (h.state !== 'attack') break; } if (h.t >= A.end) this.afterAtk(); else if (this.buffer && this.landed && h.t >= A.at + 0.09 && COMBO.includes(this.atk)) this.afterAtk(); break; }
+      case 'attack': { h.t += dt * this.sty.spd; h.ct += (this.sty.spd - 1) * dt; const A = ATK[this.atk]; h.atkAt = A.spin ? 0 : A.at; h.atkEnd = A.end; h.atkW = A.heavy || A.knock ? 1.4 : 0.85; /* her weight into the blow (fighttest.js Body.blowStep) */ if (A.dash && h.t < A.at) this.move(Math.sin(h.yaw) * A.dash * dt, Math.cos(h.yaw) * A.dash * dt); if (!this.landed && h.t >= A.at) { this.landed = true; this.contact(A); if (h.state !== 'attack') break; } if (h.t >= A.end) this.afterAtk(); else if (this.buffer && this.landed && h.t >= A.at + 0.09 && COMBO.includes(this.atk)) this.afterAtk(); break; }
       case 'charge': h.t += dt; this.k = Math.min(1, this.k + dt / 0.9); if (Math.random() < 0.3 * this.k) this.g.disasters.brawl.stunts.ring(h.x, h.y + 0.3, h.z, 1.6 + 2 * this.k, 0.25, new THREE.Color(1.6, 0.5, 1.4), 0.6); break;
       case 'carry': { h.t += dt; this.carryStep(dt); break; }
       case 'liftoff': { h.t += dt; const gy = P.groundY(h.x, h.z); h.y = gy + (h.t < 0.22 ? 0 : 16 * (h.t - 0.22) * (h.t - 0.22)); if (h.t > 0.55) this.liftNow(); break; }

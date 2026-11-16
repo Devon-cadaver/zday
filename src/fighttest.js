@@ -17,7 +17,7 @@ import { foeShot } from './foepower.js';
 import { STROKES, STROKE_CSS } from './strokes.js';
 import { GuardFx, GUARD as SHIELD } from './guard.js';
 import { stunLook, ShotList, runShot, addProp, meleeFx } from './powerfx.js';
-import { STUN_POSE, MELEE_ATK, MELEE_MOVES, FIN_POSE } from './fightclips.js';
+import { STUN_POSE, MELEE_ATK, MELEE_MOVES, FIN_POSE, BLOW, BLOW_MOVES } from './fightclips.js';
 // the neck drag: where the feet of the one dragged sit against the feet of the one dragging, and how far back they hang, so the two make a V with the neck under the shoulder and neither lies on the other
 const KB = 0.65; // how far blows and beams send them (Sean: they flew out of the fight and had to run back)
 import { HS, rigFor, matesOf, mateDown, mateRig } from './herogame.js';
@@ -65,7 +65,7 @@ export const C = {
   stumble: still({ body: 0.25, torso: 0.5, head: 0.3, shL: { x: -0.2, z: -0.6 }, shR: { x: -0.2, z: 0.6 }, elL: -0.7, elR: -0.7, kneeL: 0.5, kneeR: 0.3 }),
 };
 // the hero's blows: the clip, when in it the blow lands, when it can be followed, what it does
-const ATK = {
+export const ATK = {
   dashBlow: { clip: CLIPS.cross, at: 0.07, end: 0.34, dmg: 20, react: 'blownBack', knock: [24, 6], keep: true, stop: 0.11, shake: 0.5, reach: 2.4 },
   jabL: { clip: CLIPS.jabL, at: 0.08, end: 0.3, dmg: 10, react: 'hitHeadR', kb: 4, stop: 0.05, shake: 0.12, reach: 1.9 },
   jabR: { clip: CLIPS.jabR, at: 0.08, end: 0.3, dmg: 10, react: 'hitHeadL', kb: 4, stop: 0.05, shake: 0.12, reach: 3.3 },
@@ -74,20 +74,20 @@ const ATK = {
   seize: { clip: C.seize, at: 0.12, end: 0.3, dmg: 5, react: 'hitBody', seize: true, stop: 0.05, shake: 0.15, reach: 3.5 },
   ankle: { clip: C.seize, at: 0.1, end: 0.3, dmg: 0, react: 'hitBody', ankle: true, stop: 0.04, shake: 0.1, reach: 2.1 },
   neck: { clip: C.seize, at: 0.1, end: 0.3, dmg: 0, react: 'hitBody', neck: true, stop: 0.04, shake: 0.1, reach: 3.7 },
-  heavy: { clip: CLIPS.hammerDown, at: 0.12, end: 0.45, dmg: 15, react: 'blownBack', knock: [14, 6], stop: 0.1, shake: 0.5, reach: 2.1 },
-  hamA: { clip: CLIPS.hammerDown, at: 0.14, end: 0.5, dmg: 18, react: 'hitBody', kb: 5, stop: 0.08, shake: 0.3, reach: 2.0 },
-  hamB: { clip: CLIPS.hammerUp, at: 0.16, end: 0.55, dmg: 22, react: 'blownBack', knock: [15, 6], stop: 0.1, shake: 0.45, reach: 2.0 },
+  heavy: { clip: BLOW.hamHeavy, at: 0.12, end: 0.45, dmg: 15, react: 'blownBack', knock: [14, 6], stop: 0.1, shake: 0.5, reach: 2.1 },
+  hamA: { clip: BLOW.hamA, at: 0.14, end: 0.5, dmg: 18, react: 'hitBody', kb: 5, stop: 0.08, shake: 0.3, reach: 2.0 },
+  hamB: { clip: BLOW.riseFists, at: 0.16, end: 0.55, dmg: 22, react: 'blownBack', knock: [15, 6], stop: 0.1, shake: 0.45, reach: 2.0 },
   kick: { clip: CLIPS.kick, at: 0.22, end: 0.5, dmg: 8, react: 'blownBack', knock: [14, 6], stop: 0.09, shake: 0.4, reach: 2.3, kick: true },
-  hook: { clip: CLIPS.cross, at: 0.1, end: 0.32, dmg: 14, react: 'hitHeadL', kb: 6, stop: 0.06, shake: 0.2, reach: 2.0 },
+  hook: { clip: BLOW.hookL, at: 0.19, end: 0.47, dmg: 14, react: 'hitHeadR', kb: 6, stop: 0.07, shake: 0.2, reach: 2.0 },
   boxUp: { clip: CLIPS.uppercut, at: 0.28, end: 0.56, dmg: 24, react: 'blownBack', knock: [15, 9], stop: 0.1, shake: 0.4, reach: 2.2 },
   snapKick: { clip: CLIPS.kick, at: 0.2, end: 0.42, dmg: 12, react: 'hitBody', kb: 6, stop: 0.06, shake: 0.18, reach: 2.4 },
   palm: { clip: CLIPS.cross, at: 0.1, end: 0.42, dmg: 20, react: 'blownBack', knock: [18, 5], stop: 0.09, shake: 0.35, reach: 2.1 },
-  elbowU: { clip: CLIPS.elbowUp, at: 0.15, end: 0.4, dmg: 13, react: 'hitHeadR', kb: 4, stop: 0.07, shake: 0.2, reach: 1.9 },
-  elbowD: { clip: CLIPS.elbowDrop, at: 0.18, end: 0.46, dmg: 15, react: 'hitBody', kb: 5, stop: 0.08, shake: 0.28, reach: 1.9 },
-  slam: { clip: CLIPS.hammerDown, at: 0.16, end: 0.55, dmg: 26, react: 'blownBack', knock: [13, 8], stop: 0.12, shake: 0.55, reach: 2.0 },
-  highKick: { clip: CLIPS.kick, at: 0.22, end: 0.5, dmg: 20, react: 'blownBack', knock: [16, 7], stop: 0.1, shake: 0.4, reach: 2.5 },
-  spinKick: { clip: CLIPS.kick, at: 0.22, end: 0.42, dmg: 12, react: 'hitHeadL', kb: 6, stop: 0.06, shake: 0.2, reach: 2.6, spin: true },
-  highSpin: { clip: CLIPS.kick, at: 0.24, end: 0.5, dmg: 20, react: 'blownBack', knock: [16, 7], stop: 0.1, shake: 0.4, reach: 2.7, spin: true },
+  elbowU: { clip: BLOW.elbowL, at: 0.15, end: 0.4, dmg: 13, react: 'hitHeadR', kb: 4, stop: 0.07, shake: 0.2, reach: 1.9 },
+  elbowD: { clip: BLOW.elbowDn, at: 0.18, end: 0.46, dmg: 15, react: 'hitBody', kb: 5, stop: 0.08, shake: 0.28, reach: 1.9 },
+  slam: { clip: BLOW.hamSlam, at: 0.16, end: 0.55, dmg: 26, react: 'blownBack', knock: [13, 8], stop: 0.12, shake: 0.55, reach: 2.0 },
+  highKick: { clip: BLOW.highKick, at: 0.22, end: 0.5, dmg: 20, react: 'blownBack', knock: [16, 7], stop: 0.1, shake: 0.4, reach: 2.5 },
+  spinKick: { clip: BLOW.spinKick, at: 0.22, end: 0.42, dmg: 12, react: 'hitHeadL', kb: 6, stop: 0.06, shake: 0.2, reach: 2.6, spin: true },
+  highSpin: { clip: BLOW.spinHi, at: 0.24, end: 0.5, dmg: 20, react: 'blownBack', knock: [16, 7], stop: 0.1, shake: 0.4, reach: 2.7, spin: true },
   counter: { clip: CLIPS.cross, at: 0.08, end: 0.4, dmg: 40, react: 'blownBack', knock: [22, 7], stop: 0.12, shake: 0.6, reach: 2.3 },
 };
 // a punch in three poses you can read (Sean's reference video): wound up away from the foe, a deep lunge on the blow (lead knee bent, back leg long, the whole body behind the arm), that lunge held a moment, then back to guard
@@ -113,6 +113,12 @@ export const STYLES = {
 };
 const REACT = { ...CLIPS, hitHeadL: stag(CLIPS.hitHeadL), hitHeadR: stag(CLIPS.hitHeadR) };
 ATK.jabL2 = ATK.jabL; ATK.elbowU2 = ATK.elbowU; ATK.spinKick2 = ATK.spinKick; // a move used twice in a combo needs a second name: the next blow is found by name, and the same name twice went round before the finisher
+// The distance each blow is drawn for (FightTest.stepIn brings her to it): where its fist, foot or elbow is when it counts and 0.2 m for half a body, or where her head is and 0.42, whichever is more; never
+// under 0.9, as near as the two of them are let (measured on a plain stage with nothing held back: clip-sheet.cjs, mode fit; to be measured again when a blow's clip is changed). None: a blow that makes its own
+// way there (a charge, a dropkick), a thing thrown (sand), the ground pound's ring, a blade, staff, tail or lamp post, which have their own length
+const FIT = { jabL: 1.14, jabR: 1.14, cross: 1.29, dashBlow: 1.26, counter: 1.28, palm: 1.29, hook: 0.9, upper: 0.9, boxUp: 0.9, checkUp: 0.9, popA: 0.9, heavy: 0.9, hamA: 0.98, hamB: 1.03, slam: 1.05, hayBig: 1.05, rockA: 1.15, rockB: 0.96, kick: 1.04, snapKick: 1.09, dkSnap: 1.09, highKick: 0.9, spinKick: 0.9, highSpin: 0.9, elbowU: 0.9, cheap: 0.9, elbowD: 0.9,
+  hayR: 1.11, hayL: 1.11, shockL: 1.12, shockR: 1.12, shockL2: 1.12, shockC: 1.29, flameL: 1.15, flameR: 1.15, flameC: 1.29, iceL: 1.14, iceR: 1.14, iceC: 1.26, dkJab: 1.12, poundA: 0.97, shove: 1.12, clawA: 1.25, clawB: 1.25, clawA2: 1.25, clawC: 1.5 };
+for (const n in FIT) { if (!ATK[n]) throw new Error('no blow ' + n); ATK[n].fit = FIT[n]; }
 let COMBO = ['jabL', 'jabR', 'cross']; // the melee slot's (loadKit)
 // every move the Pose Lab can open (poselab.js): an id, a name, a group, the clip, who it is done to (their move, how far, and whether their clock starts on the blow)
 const mv = (id, name, group, clip, o = {}) => ({ id, name, group, clip, ...o });
@@ -132,6 +138,7 @@ export const MOVES = [
   mv('C.jabWind', 'Foe: jab wind up', "The foe's moves", C.jabWind), mv('FOE_JAB', 'Foe: jab', "The foe's moves", FOE_JAB, FOE('REACT.hitHeadL')), mv('C.chargeWind', 'Foe: charge wind up', "The foe's moves", C.chargeWind), mv('C.rush', 'Foe: rushing', "The foe's moves", C.rush), mv('C.grabWind', 'Foe: grab wind up', "The foe's moves", C.grabWind), mv('C.grab', 'Foe: grabbing', "The foe's moves", C.grab),
   mv('CLIPS.jabL', 'Jab, left, in crowds', 'Crowd fights', CLIPS.jabL), mv('CLIPS.jabR', 'Jab, right, in crowds', 'Crowd fights', CLIPS.jabR), mv('CLIPS.cross', 'Cross, in crowds', 'Crowd fights', CLIPS.cross),
   ...MELEE_MOVES.map(([id, name, clip]) => mv(id, name, 'Weapons and styles', clip, FOE('CLIPS.hitBody'))),
+  ...BLOW_MOVES.map(([id, name, clip, partner, dist]) => mv(id, name, /Kick/.test(name) ? 'Kicks and throws' : /crowds/.test(name) ? 'Crowd fights' : 'Punches', clip, FOE(partner, dist))),
   ...Object.entries(FIN_POSE).map(([id, clip]) => mv('FP.' + id, 'Finisher: ' + id, 'Finishers', clip)), ...Object.entries(STUN_POSE).map(([id, clip]) => mv('SP.' + id, 'Stunned: ' + id, 'Getting hit', clip)),
 ];
 applyPoses(MOVES, new Set(Object.values(ATK)));
@@ -197,7 +204,10 @@ let STAR = null; // the flash on the very spot a blow lands: a four-pointed star
 const starTex = () => { if (STAR) return STAR; const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'); x.fillStyle = '#fff'; x.beginPath(); for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, r = i % 2 ? 7 : 31; x.lineTo(32 + Math.cos(a) * r, 32 + Math.sin(a) * r); } x.closePath(); x.fill(); STAR = new THREE.CanvasTexture(c); STAR.colorSpace = THREE.SRGBColorSpace; return STAR; };
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _p = new THREE.Vector3(), _q = new THREE.Vector3();
 
-const _t = new THREE.Vector3(), _hd = new THREE.Vector3(), _ik = new THREE.Vector3(), XAXIS = new THREE.Vector3(1, 0, 0);
+const _t = new THREE.Vector3(), _hd = new THREE.Vector3(), _ik = new THREE.Vector3(), XAXIS = new THREE.Vector3(1, 0, 0), YAXIS = new THREE.Vector3(0, 1, 0), _hq = new THREE.Quaternion(), _hq2 = new THREE.Quaternion();
+// A spinning blow turns her once round: half way when it counts (her back to them: the clip drives the leg straight back into them then, fightclips.js spinKick), the rest by its end. It was an even turn over the
+// whole blow, so where she faced when it counted went by the blow's own times and the leg pointed anywhere
+export const spinAt = (A, t) => Math.PI * (t < A.at ? t / A.at : 1 + Math.min(1, (t - A.at) / Math.max(0.01, A.end - A.at)));
 // a hand to a place in the world: the elbow bent to make the distance, then the shoulder turned to point the arm there. Out of reach, the arm goes straight at it
 export function reachArm(arm, T) { const sh = arm.sh, a = arm.el.position.length(), b = arm.wr.position.length(); sh.parent.worldToLocal(_t.copy(T)).sub(sh.position); const d = Math.max(Math.abs(a - b) + 0.01, Math.min(a + b - 0.01, _t.length())), elx = -(Math.PI - Math.acos((a * a + b * b - d * d) / (2 * a * b))); arm.el.rotation.set(elx, 0, 0); arm.wr.rotation.set(0, 0, 0); _hd.set(0, -b, 0).applyAxisAngle(XAXIS, elx).add(arm.el.position); sh.quaternion.setFromUnitVectors(_hd.normalize(), _t.normalize()); }
 // where a pinned hand can go (a key's pin, clips.js pinAt): a part of the other fighter, or of yourself
@@ -229,10 +239,10 @@ let SHADOW_TEX = null; const shadowTex = () => { if (SHADOW_TEX) return SHADOW_T
 export class Body {
   constructor(r, hpMax) {
     this.r = r; this.hp = this.hpMax = hpMax; this.x = 0; this.y = 0; this.z = 0; this.vx = 0; this.vz = 0; this.vy = 0; this.yaw = 0; this.state = 'idle'; this.sm = stateOf('idle'); this.t = 0; this.clip = C.guard; this.ct = 0; this.blend = 1; this.phase = 0; this.walkK = 0;
-    this.joints = [r.body, r.torso, r.chest, r.head]; for (const a of r.arms) this.joints.push(a.sh, a.el, a.wr); for (const l of r.legs) this.joints.push(l.hip, l.knee, l.ank); this.snap = this.joints.map(() => new THREE.Euler());
+    this.joints = [r.body, r.torso, r.chest, r.head]; for (const a of r.arms) this.joints.push(a.sh, a.el, a.wr); for (const l of r.legs) this.joints.push(l.hip, l.knee, l.ank); this.snap = this.joints.map(() => new THREE.Euler()); this.hipJ = [1, ...r.legs.map((_, i) => 4 + r.arms.length * 3 + i * 3)]; // the waist and each leg's hip: the joints the hips' turn is taken back out of (pose)
   }
   // a clip, eased in from the pose the body is in over T seconds on a curve (0 straight, 1 eased at both ends, 2 fast then easing): go() gives its state's own (motion.js); played on its own, 0.08 s straight as it always was
-  play(clip, T = 0.08, curve = 0) { this.clip = clip; this.ct = 0; this.blend = 0; this.blendT = T; this.blendC = curve; this.joints.forEach((j, i) => this.snap[i].copy(j.rotation)); }
+  play(clip, T = 0.08, curve = 0) { this.clip = clip; this.ct = 0; this.blend = 0; this.blendT = T; this.blendC = curve; this.joints.forEach((j, i) => this.snap[i].copy(j.rotation)); if (this.hy) { _hq.setFromAxisAngle(YAXIS, this.hy); for (const i of this.hipJ) { _hq2.setFromEuler(this.snap[i]).premultiply(_hq); this.snap[i].setFromQuaternion(_hq2); } } }
   // the stick on the ground: her speed is built up and braked, not switched on and off, and she turns to the way she goes fast but not in one frame. tx, tz: the speed wanted in m/s (0, 0: brake to a stop);
   // sprint: held flat out in a line she works up to 1.35 times it over 1.4 s. Gives this frame's step and her speed: [dx, dz, v]
   drive(dt, tx, tz, sprint = false, turn = 60) {
@@ -243,7 +253,7 @@ export class Body {
   }
   // a change of state: every one, in every mode, comes through here and through the one table (motion.js): sm is the state's entry there (its family, what the body may show in it, how its pose comes in)
   // fresh: a new start (the fight begun again), not a change from what it was doing
-  go(state, clip, fresh) { if (!fresh) note(this.state, state); this.state = state; this.sm = stateOf(state); this.t = 0; if (state !== 'idle') this.dvx = this.dvz = 0; this.armsA = null; this.bodyX = null; this.ik = null; this.fl = 0; this.tw = 0; this.pT = null; this.pHit = false; this.pWait = 0; if (!this.sm.legs) this.walkK = 0; /* no walking legs in a blow, a hit, a hold or on the floor: cut here, the blend carries the body over */ if (clip) this.play(clip, this.sm.blend, this.sm.curve); }
+  go(state, clip, fresh) { if (!fresh) note(this.state, state); this.state = state; this.sm = stateOf(state); this.t = 0; if (state !== 'idle') this.dvx = this.dvz = 0; this.armsA = null; this.bodyX = null; this.ik = null; this.fl = 0; this.tw = 0; this.pT = null; this.pHit = false; this.pWait = 0; this.skipY = 0; if (!this.sm.legs) this.walkK = 0; /* no walking legs in a blow, a hit, a hold or on the floor: cut here, the blend carries the body over */ if (clip) this.play(clip, this.sm.blend, this.sm.curve); }
   // hit: the whole body solid white for a few frames (every mesh on the rig, the ghost outlines left out)
   flash(ms = 130) { this.flashTo = performance.now() + ms; }
   flashStep() { const on = (this.flashTo || 0) > performance.now(); if (on && !this.fm) { this.fm = []; this.r.root.traverse((o) => { if (o.isMesh && !o.userData.ghost) { this.fm.push([o, o.material]); o.material = WHITE; } }); } else if (!on && this.fm) this.unflash(); }
@@ -317,7 +327,7 @@ export class Body {
   // which stay planted where they were, the trunk going into it; it carries on through the first part of the recovery, then comes back. Heavier blows go further (atkW, from the blow's damage). Close in it is held back,
   // so she does not push through whoever she is hitting. In the air only the drive forward. The engines give atkAt, atkEnd and atkW while a blow is on (their attack case)
   blowStep(r, dt, grounded) {
-    let to = 0; if (this.state === 'attack' && this.atkAt > 0) { const u = Math.min(1, this.t / this.atkAt), f = Math.max(0, (this.t - this.atkAt) / Math.max(0.05, this.atkEnd - this.atkAt)), near = this.near == null ? 9 : this.near; to = u * u * (f < 0.4 ? 1 : Math.max(0, 1 - (f - 0.4) / 0.6)) * (this.atkW || 1) * Math.max(0, Math.min(1, (near - 0.9) / 0.6)); }
+    let to = 0; if (this.state === 'attack' && this.atkAt > 0) { const u = Math.min(1, this.t / this.atkAt), f = Math.max(0, (this.t - this.atkAt) / Math.max(0.05, this.atkEnd - this.atkAt)), near = this.near == null ? 9 : this.near; to = u * u * (f < 0.4 ? 1 : Math.max(0, 1 - (f - 0.4) / 0.6)) * (this.atkW || 1) * (this.atkFit ? Math.max(0, Math.min(1, (near - this.atkFit + 0.5) / 0.35)) : Math.max(0, Math.min(1, (near - 0.9) / 0.6))); } // held back close in: by the distance the blow is drawn for when the fight gives it (atkFit: she is brought to it), else inside 1.5 m
     const k0 = this.bwK || 0, k = this.bwK = k0 + (to - k0) * Math.min(1, dt * (to > k0 ? 45 : 14)); if (k < 0.004) { this.bwK = 0; this.bwX = 0; return; }
     this.bwX = 0.2 * k; r.torso.rotation.x += 0.14 * k; r.head.rotation.x -= 0.08 * k; if (grounded && !this.fly) this.plant(r, 0.2 * k, 0.06 * k);
   }
@@ -358,9 +368,15 @@ export class Body {
     if (this.tw) { r.chest.rotation.y += this.tw; r.torso.rotation.y += this.tw * 0.5; } // the shoulders turning into a blow
     if (this.rk > 0.01) { const k = this.rk; r.torso.rotation.x -= 0.5 * k; r.chest.rotation.x -= 0.25 * k; r.head.rotation.x -= 0.35 * k; this.rk *= Math.exp(-dt * 9); } // knocked back on its heels by a blow, over whatever it is doing
     if (this.loose) this.springs(dt);
+    // The hips turn with the shoulders (2026-11-16, the blows' own shapes). A clip turns her at the waist and the chest; the pelvis stayed square to her feet whatever she threw. Now two fifths of that turn is made
+    // by the pelvis, and taken back out of the waist (so the shoulders are where the clip put them) and out of each leg (so the feet stay where they are). Only standing on both feet and not walking (there the
+    // shoulders turn against the legs): a kick turns its own hips. And only on bodies in play (loose, as the springs are): in the Pose Lab a pose looks exactly as it was made, and what is dragged there is read back from the joints
+    { const fam = this.sm.fam, L = r.legs, up = (q) => Math.abs(q.hip.rotation.z) < 0.5 && Math.cos(q.hip.rotation.x) + Math.cos(q.hip.rotation.x + q.knee.rotation.x) > 1.44 /* its foot is down (as plant() asks) */, on = this.loose && grounded && !this.fly && !this.legsOn && this.bodyX == null && this.armsA == null && fam !== 'thrown' && fam !== 'floor' && fam !== 'held' && fam !== 'rise' && up(L[0]) && up(L[1]);
+      const to = on ? Math.max(-0.5, Math.min(0.5, 0.4 * (r.torso.rotation.y + r.chest.rotation.y))) : 0, h0 = this.hy || 0, hy = this.hy = Math.abs(to - h0) < 0.003 ? to : h0 + (to - h0) * Math.min(1, dt * 30); r.hips.rotation.y = hy;
+      if (hy) { _hq.setFromAxisAngle(YAXIS, -hy); r.torso.quaternion.premultiply(_hq); for (const q of L) q.hip.quaternion.premultiply(_hq); } }
     if (r.extraL) followLimbs(r, true); // the extra arms, legs and head copy the first ones (villains.js)
     r.root.position.set(this.x + Math.sin(this.yaw) * (this.bwX || 0), this.y, this.z + Math.cos(this.yaw) * (this.bwX || 0)); r.root.rotation.y = this.yaw; if (this.fly) this.floatRoot(dt);
-    if (grounded) { r.root.updateMatrixWorld(true); const a = r.legs[0].ank.getWorldPosition(_a).y, b = r.legs[1].ank.getWorldPosition(_b).y; r.root.position.y += top + 0.09 - Math.min(a, b) + (this.hopY || 0); } // the lower foot on the ground, however the pose bends
+    if (grounded) { r.root.updateMatrixWorld(true); const a = r.legs[0].ank.getWorldPosition(_a).y, b = r.legs[1].ank.getWorldPosition(_b).y; r.root.position.y += top + 0.09 - Math.min(a, b) + (this.hopY || 0) + (this.skipY || 0); } // the lower foot on the ground, however the pose bends
     else if (this.state === 'down' || this.state === 'getup') r.root.position.y += 0.3;
     if (this.koT != null) { this.koT += dt; r.root.position.y += Math.abs(Math.sin(this.koT * 9)) * Math.exp(-this.koT * 5) * 0.55; } // the bounce
     if (this.ik) { r.root.updateMatrixWorld(true); for (const q of this.ik) { q.at(_ik); reachArm(q.arm, _ik); } }
@@ -470,7 +486,7 @@ export class FightTest {
   sigGo() { const h = this.h, v = this.v, G = this.sty.sig; if (v.state === 'frozen' && this.ice) this.dropIce(); this.atk = null; this.buffer = false; this.tellOff(); v.armor = false; h.vx = h.vz = 0; v.vx = v.vz = 0; v.go('stun', REACT.hitHeadL); v.t = -9; h.go('sig', G.clips[0]); this.sigN = 0; this.sigT = G.wind; this.sigCd = 15; this.say(G.name + '!', 1.2, this.sty.col); this.g.disasters.flash(0.12); sfx('whoosh', h.x, h.y, h.z, { gain: 1.2, rate: 0.7 }); this.dist0 = (this.dist0 || 23) * 0.9; }
   sigStep(dt) { const h = this.h, v = this.v, G = this.sty.sig; v.t = -9; h.walkK = 0; if ((this.sigT -= dt) > 0) { this.face(h, v, dt, 22); return; } const n = this.sigN++, last = n >= G.n - 1, col = G.rgb; if (G.circle) { const a = n * 2.4 + 0.6; h.x = v.x + Math.sin(a) * 1.5; h.z = v.z + Math.cos(a) * 1.5; if (G.ghost) this.spark(h.x, h.y + 1.2, h.z, 1, col); } else { const d = this.dist() || 1; if (d > 1.7) { h.x += (v.x - h.x) / d * (d - 1.5); h.z += (v.z - h.z) / d * (d - 1.5); } } h.yaw = Math.atan2(v.x - h.x, v.z - h.z); h.play(G.clips[n % G.clips.length]); h.ct = 0.04; h.blend = 1; this.hurtV(G.dmg * this.sty.dmg); this.gain(6); this.addHit(); this.took(v); v.rk = 1; this.star(v.x, v.y + 1.2, v.z, last ? 3.2 : 1.6, col); sfx('smack', v.x, v.y + 0.84, v.z, { gain: 1, rate: 0.9 + n * 0.05 }); this.g.hitStop = Math.max(this.g.hitStop || 0, last ? 0.16 : 0.05); this.g.shake = Math.max(this.g.shake || 0, last ? G.shake : 0.3); this.sigT = G.gap; if (!last) return; const d = this.dist() || 1, nx = (v.x - h.x) / d, nz = (v.z - h.z) / d; v.go('flung', CLIPS.blownBack); v.vx = nx * G.knock[0]; v.vz = nz * G.knock[0]; v.vy = G.knock[1]; if (G.burst) { this.g.disasters.flash(0.3); this.g.disasters.brawl.stunts.ring(h.x, h.y + 1, h.z, 14, 0.6, new THREE.Color(...col), 0.85); sfx('boomBig', h.x, h.y, h.z, { gain: 0.9 }); } h.go('land', CLIPS.throw); this.hits = 0; }
   nextAtk() { if (this.comboT <= 0) this.combo = 0; this.startAtk(COMBO[this.combo % COMBO.length]); }
-  startAtk(name) { const h = this.h, v = this.v; this.spinLet = false; if (name !== 'heavy' && name !== 'counter' && name !== 'seize' && name !== 'dashBlow' && ['idle', 'close'].includes(v.state) && !this.over && (this.gap || 0) <= 0 && this.combo === 0 && Math.random() < 0.08 + 0.2 * this.kAI) { v.go('block', C.block); v.vx = 0; v.vz = 0; v.blkN = 0; } this.atk = name; this.landed = false; this.buffer = false; this.comboT = 0; if (this.dist() > ATK[name].reach - 0.5) { h.go('lunge', ATK[name].clip === CLIPS.hammerDown ? C.charge : C.guard); sfx('whoosh', h.x, h.y, h.z, { gain: 0.5, rate: 1.5 }); } else { h.go('attack', ATK[name].clip); } }
+  startAtk(name) { const h = this.h, v = this.v; this.spinLet = false; if (name !== 'heavy' && name !== 'counter' && name !== 'seize' && name !== 'dashBlow' && ['idle', 'close'].includes(v.state) && !this.over && (this.gap || 0) <= 0 && this.combo === 0 && Math.random() < 0.08 + 0.2 * this.kAI) { v.go('block', C.block); v.vx = 0; v.vz = 0; v.blkN = 0; } this.atk = name; this.landed = false; this.buffer = false; this.comboT = 0; this.skN = 0; if (this.dist() > ATK[name].reach - 0.5) { h.go('lunge', ATK[name].clip.ham ? C.charge : C.guard); sfx('whoosh', h.x, h.y, h.z, { gain: 0.5, rate: 1.5 }); } else { h.go('attack', ATK[name].clip); } }
   // a swipe: the dash (12 power); none to spare, a glide instead (Sean): she lifts just off the ground and drifts that way, slower, for nothing (and it counters nothing)
   swipe(dx, dy) {
     if (this.over || this.hDazed) return; const h = this.h, v = this.v; if (!['idle', 'attack', 'lunge', 'charge', 'glide'].includes(h.state)) return; const glide = this.energy < DASH_COST; if (!glide) this.energy -= DASH_COST;
@@ -503,7 +519,7 @@ export class FightTest {
       { const W = this.o.watch; if (W && !W.wait) botStep(this, ft); this.heroStep(ft); const sl = v.slowT > 0 ? 0.45 : 1; if (sl < 1) v.slowT -= ft; if (W && W.wait) { this.face(v, h, ft, 6); this.vft = ft; } else { this.vilStep(ft * sl); this.vft = ft * sl; } } this.mateStep(dt); if (this.finRun && !this.finRun.step(this.rdt)) this.finRun = null; this.teamEls.forEach((q, i) => { q.querySelector('i').style.width = (this.team || 0) + '%'; q.classList.toggle('ok', this.team >= 100 && !this.mateR && !mateDown(this.g, this.mates[i])); }); this.separate(); this.clamp(h); this.clamp(v);
       if (!(h.state === 'idle' && this.stick)) h.walkK = Math.max(0, h.walkK - ft * 8);
       this.streetStep(ft); this.airStep(ft); this.watchdog(ft);
-      h.near = v.near = this.dist(); h.loose = v.loose = true; if (h.state === 'drag') v.pose(ft, this.top, this.grounded(v)); h.pose(ft, this.top, this.grounded(h)); if (h.state === 'attack' && ATK[this.atk] && ATK[this.atk].spin) h.r.root.rotation.y += Math.min(1, h.t / ATK[this.atk].end) * 6.283; if (h.state !== 'drag') v.pose(v.state === 'frozen' && !this.stunLive ? 0 : this.vft, this.top, this.grounded(v)); if (v.state === 'dazed' || (this.stLook && this.stLook.wob)) this.wobble(v); if (h.state === 'dazed') this.wobble(h); this.fxStep(dt); this.fxa.step(ft); this.lookStep(ft); this.guard.step(dt, h.x, h.y + 1, h.z); ghost(h.r); ghost(v.r, '#ff6a50'); this.scuff(h); this.scuff(v);
+      h.near = v.near = this.dist(); h.loose = v.loose = true; if (h.state === 'drag') v.pose(ft, this.top, this.grounded(v)); h.pose(ft, this.top, this.grounded(h)); if (h.state === 'attack' && ATK[this.atk] && ATK[this.atk].spin) h.r.root.rotation.y += spinAt(ATK[this.atk], h.t); if (h.state !== 'drag') v.pose(v.state === 'frozen' && !this.stunLive ? 0 : this.vft, this.top, this.grounded(v)); if (v.state === 'dazed' || (this.stLook && this.stLook.wob)) this.wobble(v); if (h.state === 'dazed') this.wobble(h); this.fxStep(dt); this.fxa.step(ft); this.lookStep(ft); this.guard.step(dt, h.x, h.y + 1, h.z); ghost(h.r); ghost(v.r, '#ff6a50'); this.scuff(h); this.scuff(v);
       this.ee.style.width = this.energy + '%'; this.chkFrame(); for (const k in this.pwBtn) this.pwBtn[k].classList.toggle('ok', this.energy >= this.COST[k]); this.holdStep(dt);
       this.hh.style.width = Math.max(0, h.hp / h.hpMax * 100) + '%'; this.vh.style.width = Math.max(0, v.hp / v.hpMax * 100) + '%';
       this.heroStreak.update(_c.set(h.x, h.y + 0.92, h.z), ['lunge', 'dodge', 'skyRise', 'skyDive', 'finRun'].includes(h.state), this.ctx.camera, ft); this.vilStreak.update(_c.set(v.x, v.y + 0.92, v.z), v.state === 'rush' || v.state === 'vrise' || v.state === 'vdive', this.ctx.camera, ft); dt /= pace;
@@ -512,7 +528,7 @@ export class FightTest {
   }
   grounded(f) { if (this.o.air && !this.airDown) return false; return f.y <= this.top + 0.01 && !['fdo', 'fget', 'shotMove', 'juggle', 'jugWait', 'sig', 'down', 'getup', 'flung', 'air', 'slammed', 'grabbed', 'held', 'swung', 'pinned', 'dragged', 'drag', 'hang', 'dived', 'skyRise', 'skyTop', 'skyGrab', 'skyDive', 'glide', 'vdragged', 'vdrag', 'vair', 'vhang', 'vdived', 'vrise', 'vgrab', 'vdive'].includes(f.state); }
   clamp(f) { for (const b of this.boxes) { if (!b.up) continue; const ox = f.x - b.x, oz = f.z - b.z, m = b.hw + 1.1; if (Math.abs(ox) < m && Math.abs(oz) < m) { if (Math.abs(ox) > Math.abs(oz)) f.x = b.x + Math.sign(ox) * m; else f.z = b.z + Math.sign(oz) * m; } } const dx = f.x - this.cx, dz = f.z - this.cz, d = Math.hypot(dx, dz); if (d > this.R) { f.x = this.cx + dx / d * this.R; f.z = this.cz + dz / d * this.R; f.vx *= 0.3; f.vz *= 0.3; } }
-  separate() { const h = this.h, v = this.v; if (this.finRun || this.hDazed || Math.abs(h.y - v.y) > 3 || v.state === 'swung' || v.state === 'pinned' || v.state === 'dragged' || h.state === 'vdragged' || h.state === 'grabbed' || h.state === 'dodge' || v.state === 'rush') return; const dx = v.x - h.x, dz = v.z - h.z, d = Math.hypot(dx, dz) || 0.01; if (d < 0.9) { const p = (0.9 - d) / 2, nx = dx / d, nz = dz / d; h.x -= nx * p; h.z -= nz * p; v.x += nx * p; v.z += nz * p; } }
+  separate() { const h = this.h, v = this.v; if (this.finRun || this.hDazed || Math.abs(h.y - v.y) > 3 || v.state === 'swung' || v.state === 'pinned' || v.state === 'dragged' || h.state === 'vdragged' || h.state === 'grabbed' || h.state === 'dodge' || v.state === 'rush' || (h.state === 'attack' && ATK[this.atk] && ATK[this.atk].hop) /* a dropkick: her feet are over where she is, so she is let right up to them */) return; const dx = v.x - h.x, dz = v.z - h.z, d = Math.hypot(dx, dz) || 0.01; if (d < 0.9) { const p = (0.9 - d) / 2, nx = dx / d, nz = dz / d; h.x -= nx * p; h.z -= nz * p; v.x += nx * p; v.z += nz * p; } }
   walk(f, tx, tz, sp, dt) { if (this.o.air) sp *= 1.35; const dx = tx - f.x, dz = tz - f.z, d = Math.hypot(dx, dz) || 1; if (f.fly) { const e = 1 - Math.exp(-dt * 7); f.gx = (f.gx || 0) + (dx / d * sp - (f.gx || 0)) * e; f.gz = (f.gz || 0) + (dz / d * sp - (f.gz || 0)) * e; f.gOn = true; f.x += f.gx * dt; f.z += f.gz * dt; } else { f.x += dx / d * sp * dt; f.z += dz / d * sp * dt; } f.phase += sp * dt * 1.1; f.walkK += (1 - f.walkK) * Math.min(1, dt * 10); } /* in the air: a glide that builds up and curves */
   // what is left of a glide when the stick is let go or a foe stops coming: on a little way and to a stop (the air only)
   glide(f, dt, air) { if (f.gOn) { f.gOn = false; return; } if (!f.gx && !f.gz) return; if (!air || f.state !== 'idle' || this.over) { f.gx = f.gz = 0; return; } f.x += f.gx * dt; f.z += f.gz * dt; const k = Math.exp(-dt * 5); f.gx *= k; f.gz *= k; if (Math.hypot(f.gx, f.gz) < 0.25) f.gx = f.gz = 0; this.clamp(f); }
@@ -524,7 +540,7 @@ export class FightTest {
     switch (h.state) {
       case 'idle': if (this.hDazed && !this.over) { this.dazeHero(); break; } h.dOn = false; if (this.stick && !this.finKind) { const w = this.stickDir(); if (w) { { const sp = (this.o.air ? AIR_RUN : RUN) * this.sty.run; if (h.fly) { const e = 1 - Math.exp(-dt * 8); h.gx = (h.gx || 0) + (w[0] * sp * w[2] - (h.gx || 0)) * e; h.gz = (h.gz || 0) + (w[1] * sp * w[2] - (h.gz || 0)) * e; h.gOn = true; h.x += h.gx * dt; h.z += h.gz * dt; } else { const st = h.drive(dt, w[0] * sp * w[2], w[1] * sp * w[2]); h.x += st[0]; h.z += st[1]; h.dOn = true; } } { const ex = h.x - this.cx, ez = h.z - this.cz, el = Math.hypot(ex, ez); if (el > this.R - 1) { h.x = this.cx + ex / el * (this.R - 1); h.z = this.cz + ez / el * (this.R - 1); } } if (h.fly) h.yaw = Math.atan2(w[0], w[1]); h.walkK = Math.min(1, h.walkK + dt * 16); h.phase += dt * 9 * w[2]; } } if (!h.fly && !h.dOn && !this.finKind) { const st = h.drive(dt, 0, 0); if (st[2] > 0) { h.x += st[0]; h.z += st[1]; h.walkK = Math.min(1, h.walkK + dt * 16); } } /* on the ground, the stick let go: she brakes over about half a metre */ if (this.finKind && !this.over && (this.finStage === 'run' || this.finStage === 'up')) { h.go('finRun', C.guard); break; } this.slide(h, dt); if (!(this.o.air && this.stick)) this.face(h, v, dt); if (h.clip !== C.guard) h.play(C.guard); break; // a tap from far off still gets there: the lunge. Flying, she looks the way she goes
       case 'lunge': { this.face(h, v, dt, 22); const A = ATK[this.atk], gap = A.reach - 0.6, sp = 30; if (v.state === 'air') { h.go('idle', C.guard); break; } if (d <= gap || h.t > 1.8) { h.go('attack', A.clip); break; } h.x += (v.x - h.x) / d * sp * dt; h.z += (v.z - h.z) / d * sp * dt; h.phase += dt * 30; h.walkK = 0.6; break; }
-      case 'attack': { const A = ATK[this.atk]; h.atkAt = A.at; h.atkEnd = A.end; h.atkW = Math.max(0.6, Math.min(1.5, (A.dmg || 10) / 12)); { const q = (this.sty.spd - 1) * dt; h.t += q; h.ct += q; } this.face(h, v, dt, 18); this.slide(h, dt); if (A.dash && h.t < A.at) { h.x += Math.sin(h.yaw) * A.dash * dt; h.z += Math.cos(h.yaw) * A.dash * dt; } if (A.hop) h.y = this.top + A.hop * Math.sin(Math.PI * Math.min(1, h.t / A.end)); if (!this.landed && h.t >= A.at) { this.landed = true; this.contact(A); if (h.state !== 'attack') break; } if (h.t >= A.end) this.afterAtk(); else if (this.buffer && this.landed && h.t >= Math.max(A.at + 0.09, A.end * 0.85) && COMBO.includes(this.atk)) this.afterAtk(); break; }
+      case 'attack': { const A = ATK[this.atk]; h.atkAt = A.spin ? 0 : A.at; h.atkFit = A.fit || 0; h.atkEnd = A.end; h.atkW = Math.max(0.6, Math.min(1.5, (A.dmg || 10) / 12)); { const q = (this.sty.spd - 1) * dt; h.t += q; h.ct += q; } this.face(h, v, dt, 18); this.slide(h, dt); this.stepIn(A, dt); if (A.dash && h.t < A.at && !(A.hop && this.dist() < 0.4)) { h.x += Math.sin(h.yaw) * A.dash * dt; h.z += Math.cos(h.yaw) * A.dash * dt; } if (A.hop) h.y = this.top + A.hop * Math.sin(Math.PI * Math.min(1, h.t / A.end)); if (!this.landed && h.t >= A.at) { this.landed = true; this.contact(A); if (h.state !== 'attack') break; } if (h.t >= A.end) this.afterAtk(); else if (this.buffer && this.landed && h.t >= Math.max(A.at + 0.09, A.end * 0.85) && COMBO.includes(this.atk)) this.afterAtk(); break; }
       case 'charge': this.face(h, v, dt); this.k = Math.min(1, this.k + dt / 0.9); h.r.root.position.y += 0; if (Math.random() < 0.3 * this.k) this.g.disasters.brawl.stunts.ring(h.x, this.top + 0.13, h.z, 1.6 + 2 * this.k, 0.25, new THREE.Color(1.6, 0.5, 1.4), 0.6); break;
       case 'suplex': { const k = Math.min(1, h.t / 0.55), a = Math.PI * k, fx = Math.sin(h.yaw), fz = Math.cos(h.yaw); v.x = h.x + fx * Math.cos(a) * 0.8; v.z = h.z + fz * Math.cos(a) * 0.8; v.y = this.top + 1.2 + Math.sin(a) * 1.6; v.yaw = h.yaw + Math.PI; if (k >= 1) this.grabSlam('suplex'); break; }
       case 'slamH': { const k = Math.min(1, h.t / 0.4), fx = Math.sin(h.yaw), fz = Math.cos(h.yaw); v.x = h.x + fx * 0.45; v.z = h.z + fz * 0.45; v.y = this.top + 1.5 + 1.3 * k; v.yaw = h.yaw + Math.PI; if (k >= 1) this.grabSlam('slam'); break; }
@@ -560,6 +576,11 @@ export class FightTest {
       default: break;
     }
   }
+  // She steps in with the blow (2026-11-16): each blow has the distance it is drawn for (fit: where its fist, foot or elbow is when it counts, and a body's half width), and a blow counts from further off than that
+  // (reach), so most landed short of the foe (measured in real fights, blow-game.cjs: a jab 0.45 to 0.85 m from the middle of their body, a kick 0.9, an uppercut 1.2 to 1.5). Through the wind-up she is carried
+  // to that distance, there as the blow counts; never back, and not after someone who cannot be hit
+  stepIn(A, dt) { const h = this.h, v = this.v; h.skipY = 0; if (!A.fit || this.landed || h.t >= A.at) { this.skN = 0; return; } const d = this.dist(), over = d - A.fit; if (over < 0.03 || over > 2.2 || Math.abs(v.y - h.y) > 1 || ['down', 'getup', 'flung', 'air', 'slammed', 'swung', 'pinned', 'dragged'].includes(v.state)) { this.skN = 0; return; } const st = Math.min(over, 14 * dt, over * dt / Math.max(dt, A.at - h.t)); h.x += (v.x - h.x) / d * st; h.z += (v.z - h.z) / d * st;
+    if (!(this.skN > 0)) this.skN = over; if (this.skN > 0.25 && !this.o.air) h.skipY = 0.07 * Math.min(1, this.skN / 0.7) * Math.sin(Math.PI * Math.max(0, Math.min(1, 1 - (over - st) / this.skN))); } // more than a shuffle: a skip, both feet off the ground a moment, so nothing slides
   afterAtk() { const h = this.h; const was = this.atk; if (ATK[was] && ATK[was].hop) h.y = this.top; if (COMBO.includes(was)) { const i = COMBO.indexOf(was), last = i === COMBO.length - 1; this.combo = last ? 0 : i + 1; this.comboT = last ? 0 : COMBO_T; } this.atk = null; const b = this.buffer; this.buffer = false; h.go('idle', C.guard); if (b && this.combo > 0) this.nextAtk(); }
   // the blow, if the bodies really meet
   contact(A) {
