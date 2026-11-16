@@ -115,9 +115,11 @@ const REACT = { ...CLIPS, hitHeadL: stag(CLIPS.hitHeadL), hitHeadR: stag(CLIPS.h
 ATK.jabL2 = ATK.jabL; ATK.elbowU2 = ATK.elbowU; ATK.spinKick2 = ATK.spinKick; // a move used twice in a combo needs a second name: the next blow is found by name, and the same name twice went round before the finisher
 // The distance each blow is drawn for (FightTest.stepIn brings her to it): where its fist, foot or elbow is when it counts and 0.2 m for half a body, or where her head is and 0.42, whichever is more; never
 // under 0.9, as near as the two of them are let (measured on a plain stage with nothing held back: clip-sheet.cjs, mode fit; to be measured again when a blow's clip is changed). None: a blow that makes its own
-// way there (a charge, a dropkick), a thing thrown (sand), the ground pound's ring, a blade, staff, tail or lamp post, which have their own length
+// way there (a charge, a dropkick), a thing thrown (sand), the ground pound's ring. A blade, staff, tail, lamp post or claw has the distance at which the weapon itself, about two thirds of the way along it, lies
+// across the middle of the foe as the blow counts (measured in the fight's own frames: weapon-sheet.cjs; the weapon touches any foe nearer than that too, so she is only ever brought in, as with the rest)
 const FIT = { jabL: 1.14, jabR: 1.14, cross: 1.29, dashBlow: 1.26, counter: 1.28, palm: 1.29, hook: 0.9, upper: 0.9, boxUp: 0.9, checkUp: 0.9, popA: 0.9, heavy: 0.9, hamA: 0.98, hamB: 1.03, slam: 1.05, hayBig: 1.05, rockA: 1.15, rockB: 0.96, kick: 1.04, snapKick: 1.09, dkSnap: 1.09, highKick: 0.9, spinKick: 0.9, highSpin: 0.9, elbowU: 0.9, cheap: 0.9, elbowD: 0.9,
-  hayR: 1.11, hayL: 1.11, shockL: 1.12, shockR: 1.12, shockL2: 1.12, shockC: 1.29, flameL: 1.15, flameR: 1.15, flameC: 1.29, iceL: 1.14, iceR: 1.14, iceC: 1.26, dkJab: 1.12, poundA: 0.97, shove: 1.12, clawA: 1.25, clawB: 1.25, clawA2: 1.25, clawC: 1.5 };
+  hayR: 1.11, hayL: 1.11, shockL: 1.12, shockR: 1.12, shockL2: 1.12, shockC: 1.29, flameL: 1.15, flameR: 1.15, flameC: 1.29, iceL: 1.14, iceR: 1.14, iceC: 1.26, dkJab: 1.12, poundA: 0.97, shove: 1.12, clawA: 1.25, clawB: 1.25, clawA2: 1.25, clawC: 1.25,
+  slashA: 1.75, slashB: 1.75, slashC: 1.7, staffA: 1.85, staffB: 1.85, staffC: 2.2, tailA: 1.7, tailB: 1.7, tailC: 1.7, lampA: 3, lampB: 3, lampC: 2.8 };
 for (const n in FIT) { if (!ATK[n]) throw new Error('no blow ' + n); ATK[n].fit = FIT[n]; }
 let COMBO = ['jabL', 'jabR', 'cross']; // the melee slot's (loadKit)
 // every move the Pose Lab can open (poselab.js): an id, a name, a group, the clip, who it is done to (their move, how far, and whether their clock starts on the blow)
@@ -138,7 +140,7 @@ export const MOVES = [
   mv('C.jabWind', 'Foe: jab wind up', "The foe's moves", C.jabWind), mv('FOE_JAB', 'Foe: jab', "The foe's moves", FOE_JAB, FOE('REACT.hitHeadL')), mv('C.chargeWind', 'Foe: charge wind up', "The foe's moves", C.chargeWind), mv('C.rush', 'Foe: rushing', "The foe's moves", C.rush), mv('C.grabWind', 'Foe: grab wind up', "The foe's moves", C.grabWind), mv('C.grab', 'Foe: grabbing', "The foe's moves", C.grab),
   mv('CLIPS.jabL', 'Jab, left, in crowds', 'Crowd fights', CLIPS.jabL), mv('CLIPS.jabR', 'Jab, right, in crowds', 'Crowd fights', CLIPS.jabR), mv('CLIPS.cross', 'Cross, in crowds', 'Crowd fights', CLIPS.cross),
   ...MELEE_MOVES.map(([id, name, clip]) => mv(id, name, 'Weapons and styles', clip, FOE('CLIPS.hitBody'))),
-  ...BLOW_MOVES.map(([id, name, clip, partner, dist]) => mv(id, name, /Kick/.test(name) ? 'Kicks and throws' : /crowds/.test(name) ? 'Crowd fights' : 'Punches', clip, FOE(partner, dist))),
+  ...BLOW_MOVES.map(([id, name, clip, partner, dist]) => mv(id, name, /^(Sword|Staff|Lamp post|Tail|Claws):/.test(name) ? 'Weapons and styles' : /Kick/.test(name) ? 'Kicks and throws' : /crowds/.test(name) ? 'Crowd fights' : 'Punches', clip, FOE(partner, dist))),
   ...Object.entries(FIN_POSE).map(([id, clip]) => mv('FP.' + id, 'Finisher: ' + id, 'Finishers', clip)), ...Object.entries(STUN_POSE).map(([id, clip]) => mv('SP.' + id, 'Stunned: ' + id, 'Getting hit', clip)),
 ];
 applyPoses(MOVES, new Set(Object.values(ATK)));
