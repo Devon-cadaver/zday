@@ -3,6 +3,7 @@
   "configurations": [
     {"name":"zday","runtimeExecutable":"npx","runtimeArgs":["vite","--port","5191","--strictPort"],"port":5191},
     {"name":"zday-built","runtimeExecutable":"npx","runtimeArgs":["vite","preview","--port","4191","--strictPort"],"port":4191},
-    {"name":"zday-check","runtimeExecutable":"npx","runtimeArgs":["vite","preview","--outDir","C:/Users/sean_/AppData/Local/Temp/claude/84f2be7014915070/effb54b5-3147-46c3-9e12-f36dde2e71b0/scratchpad/check-build","--port","5192","--strictPort","--host","127.0.0.1"],"port":5192}
+    {"name":"zday-check","runtimeExecutable":"npx","runtimeArgs":["vite","preview","--outDir","C:/Users/sean_/AppData/Local/Temp/claude/84f2be7014915070/effb54b5-3147-46c3-9e12-f36dde2e71b0/scratchpad/check-build","--port","5192","--strictPort","--host","127.0.0.1"],"port":5192},
+    {"name":"zday-check2","runtimeExecutable":"npx","runtimeArgs":["vite","preview","--outDir","C:/Users/sean_/AppData/Local/Temp/claude/84f2be7014915070/effb54b5-3147-46c3-9e12-f36dde2e71b0/scratchpad/check-build-b","--port","5193","--strictPort","--host","127.0.0.1"],"port":5193}
   ]
 }
