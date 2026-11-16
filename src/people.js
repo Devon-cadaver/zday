@@ -31,7 +31,7 @@ const pileH = (n) => 1.7 * Math.sqrt(n) + 0.5;
 const pileR = (n) => pileH(n) * 0.65 + 1.0;
 
 const S = ST;
-const BODY_T = 3.6; // s: how long a body is drawn (people.vanish with body)
+const BODY_T = 5, BODY_HOP = 0.45, BODY_END = 1.3; // s: how long a body is drawn (people.vanish with body), its tumble through the air, its crumbling at the end
 const CIV = new Uint8Array(32); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.ROOF, S.COP, S.FIREMAN, S.BOARD, S.RIOT, S.FILM, S.PRAY, S.FIGHT, S.STEAL].forEach(s => { CIV[s] = 1; });
 const INHASH = new Uint8Array(32); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.ROOF, S.COP, S.FIREMAN, S.BOARD, S.RIOT, S.GRABBED, S.TURNING, S.ZOMBIE, S.ALIEN, S.FROZEN, S.FILM, S.HELD, S.PRAY, S.FIGHT, S.STEAL].forEach(s => { INHASH[s] = 1; });
 const HITTABLE = new Uint8Array(32); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.COP, S.FIREMAN, S.BOARD, S.RIOT, S.GRABBED, S.TURNING, S.ZOMBIE, S.ALIEN, S.FROZEN, S.FILM, S.HELD, S.PRAY, S.FIGHT, S.STEAL].forEach(s => { HITTABLE[s] = 1; });
@@ -1934,7 +1934,8 @@ export class People {
   // a rioter knocked flat and calmed: they come to, and go home (never hurt)
   calm(j) { if (this.st[j] !== S.RIOT && this.st[j] !== S.EXT) return false; const m = this.mobs[this.bt[j]]; this.st[j] = S.FLEE; this.bt[j] = -1; this.target[j] = -1; this.inf[j] = 0; this.lvl[j] = -1; this.fx[j] = 0; this.t1[j] = 0; this.y[j] = this.groundY(this.x[j], this.z[j]); this.dirty[j] = 1; if (m) m.calmed = (m.calmed || 0) + 1; return true; }
   // body: it is out of the game at once, but is drawn falling over, lying, then sinking into the ground (sync), not gone on the spot (Sean, 2026-11-16: "it feels weird when they just disappear")
-  vanish(j, body) { const s = this.st[j]; if (s !== S.ZOMBIE && s !== S.FALLING && s !== S.TURNING) return false; this.body[j] = body ? 0.001 : 0; this.y[j] = this.groundY(this.x[j], this.z[j]); this.st[j] = S.EVAC; this.lvl[j] = -1; this.inf[j] = 0; this.target[j] = -1; this.bt[j] = -1; this.dirty[j] = 1; return true; }
+  // vx, vz: the way the blow sends it (m/s): it tumbles that way in a hop, lands on its side and slides to a stop; at the end it crumbles into a puff of dust
+  vanish(j, body, vx = 0, vz = 0) { const s = this.st[j]; if (s !== S.ZOMBIE && s !== S.FALLING && s !== S.TURNING) return false; this.body[j] = body ? 0.001 : 0; this.tx[j] = vx; this.tz[j] = vz; this.y[j] = this.groundY(this.x[j], this.z[j]); this.st[j] = S.EVAC; this.lvl[j] = -1; this.inf[j] = 0; this.target[j] = -1; this.bt[j] = -1; this.dirty[j] = 1; return true; }
   bite(i, j, Z) {
     if (Z.alien || Z.robot || Z.army) { this.t1[i] = Z.biteT + Z.recover; this.target[i] = -1; this.panic(j, this.x[i], this.z[i], i); return; } // the invasion's soldiers and the robots scatter people; only a zombie's bite makes a zombie (Sean: level 1 just aliens)
     this.st[j] = S.GRABBED; this.t1[j] = Z.biteT; this.target[j] = i;
@@ -1992,7 +1993,7 @@ export class People {
       if (s === S.GO && (this.fx[i] === 8 || this.fx[i] === 7)) an = 0; // standing about at a park or a square, waiting at the kerb
       if (s === S.EVAC && this.body[i] > 0 && (this.body[i] += dts) > BODY_T) this.body[i] = 0; if (s === S.INSIDE || (s === S.EVAC && !(this.body[i] > 0))) { arr.fill(0, o, o + 16); if (s === S.INSIDE) { if (this.inf[i]) infected++; else if (this.kind[i] === KIND.CIVILIAN) humans++; } continue; } // sheltering indoors still counts as alive
       if (s === S.ALIEN) aliens++;
-      let tilt = 0, y = this.y[i];
+      let tilt = 0, y = this.y[i], bk = 1;
       if (s === S.ZOMBIE) {
         const Z = ZTYPES[this.zt[i]];
         if (this.fx[i] === 2) { tilt = this.t1[i] > 0.6 ? Math.PI / 2 : Math.PI / 2 * this.t1[i] / 0.6; an = 4; }
@@ -2006,7 +2007,10 @@ export class People {
       else if (s === S.EXT && this.fx[i] === 3) an = 12; // on a rescue rope, holding on with both hands
       else if (s === S.EXT || s === S.AIR) tilt = t * (5 + (i % 5)) + i;
       else if (s === S.DEAD) { tilt = Math.PI / 2; y += 0.17; }
-      else if (s === S.EVAC) { const T = this.body[i], f = Math.min(1, T / 0.35), sink = Math.max(0, (T - (BODY_T - 1.4)) / 1.4); tilt = (i % 2 ? 1 : -1) * Math.PI / 2 * (1 - (1 - f) * (1 - f)); y += 0.17 * f - sink * sink * 1.6 * (ZTYPES[this.zt[i]].creature ? 1.5 : 1); an = 0; } // a body: over in a third of a second, lying, then down into the street
+      else if (s === S.EVAC) { const T = this.body[i], f = Math.min(1, T / BODY_HOP), c = Math.max(0, (T - (BODY_T - BODY_END)) / BODY_END), sp = Math.hypot(this.tx[i], this.tz[i]); // a body: thrown back in a tumbling hop, down on its side, sliding to a stop, lying, then crumbling small into dust
+        if (sp > 0.05) { const nx = this.x[i] + this.tx[i] * dts, nz = this.z[i] + this.tz[i] * dts; if (this.walkable(nx, nz)) { this.x[i] = nx; this.z[i] = nz; this.y[i] = this.groundY(nx, nz); } const k = Math.exp(-dts * (f < 1 ? 1.5 : 7)); this.tx[i] *= k; this.tz[i] *= k; } else this.tx[i] = this.tz[i] = 0;
+        tilt = (i % 2 ? 1 : -1) * Math.PI * 2.5 * f; y = this.y[i] + 0.17 * f + 0.9 * Math.sin(Math.PI * f) - c * c * 0.25; bk = 1 - 0.8 * c * c; an = 0; this.gx[i] = this.x[i]; this.gz[i] = this.z[i];
+        if ((T >= BODY_T - BODY_END && T - dts < BODY_T - BODY_END) || (T >= BODY_T - 0.15 && T - dts < BODY_T - 0.15)) this.puff(this.x[i], this.z[i]); }
       else if (s === S.ROOF) an = this.t1[i] > 0 || this.fx[i] === 2 ? 2 : this.fx[i] === 1 ? 1 : this.fx[i] === 3 ? 6 : 0;
       else if (s === S.FILM) { an = this.films(i) ? 6 : 0; film++; }
       else if (s === S.HELD) an = this.t1[i] > 0 ? (this.t1[i] > 5 ? 2 : 1) : 0;
@@ -2025,6 +2029,7 @@ export class People {
       arr[o + 4] = -c * stt; arr[o + 5] = ct; arr[o + 6] = sn * stt; arr[o + 7] = 0;
       arr[o + 8] = sn; arr[o + 9] = 0; arr[o + 10] = c; arr[o + 11] = 0;
       arr[o + 12] = this.x[i]; arr[o + 13] = y; arr[o + 14] = this.z[i]; arr[o + 15] = 1;
+      if (bk !== 1) for (let q = 0; q < 11; q++) arr[o + q] *= bk; // a body crumbling: smaller and smaller
       if (!GAIT[an] && gd === 0 && this.ga[i] === 0 && this.gv[i] === 0) anim[i] = an; // standing, as most of the town is: no stride to work out
       else { const air = s === S.JUMP || s === S.EXT || s === S.AIR; let g = 0, k = 0; // the stride. In the air (thrown, falling) the legs go by the clock, as they did
         if (!air) { if (dts > 0) { const v = this.gv[i] + ((gJump ? 0 : gd / dts) - this.gv[i]) * kV; this.gv[i] = v < 0.02 && gd === 0 ? 0 : v; } if (GAIT[an]) { this.gl[i] = g = an; k = this.gv[i] > 0.12 ? strideK(an, this.gv[i]) : 0; } else if (an === 0 && this.ga[i] > 0.05 && this.gl[i]) g = this.gl[i]; /* stopped: the last of the stride dies away */ } else this.gv[i] = 0;
