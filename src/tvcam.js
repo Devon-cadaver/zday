@@ -1,7 +1,6 @@
-// Disaster TV's cameras: the news helicopter (SKY 7, and SKY 4 to fall back on)
-// circling the action with a little sway, and now and then a viewer's video, shot
-// on a phone from the roof of one of the town's tallest buildings (held by hand:
-// it wobbles, never quite level). The pans ease in and out, a moving target is led
+// Disaster TV's cameras: the news helicopters (SKY 7, and SKY 4 to fall back on)
+// circling the action with a little sway, always up in the air (Sean, 2026-11-15: no
+// viewers' rooftop videos any more; in a level tvdirector.js flies them). The pans ease in and out, a moving target is led
 // a little so it stays in the middle of a phone's screen (a wave or a storm front:
 // the wall itself), and now and then the shot slowly zooms in and back out. The
 // director cuts between them now and then. A disaster can notice a camera and go for it - a beam from a kaiju, a
@@ -61,18 +60,9 @@ export class TvCam {
 
   // a new town: two helicopters, and cameras on the roofs of its tallest buildings, well apart
   setup() {
-    const city = this.g.city, B = city.buildings, Bd = city.bounds, mid = [(Bd.x0 + Bd.x1) / 2, (Bd.z0 + Bd.z1) / 2];
+    const Bd = this.g.city.bounds, mid = [(Bd.x0 + Bd.x1) / 2, (Bd.z0 + Bd.z1) / 2];
     this.clearFx(); this.cams = [{ kind: 'heli', name: 'SKY 7', alive: true }, { kind: 'heli', name: 'SKY 4', alive: true }];
-    const order = B.map((b, k) => k).filter(k => !city.dead[k] && B[k].landmark !== 'Stadium').sort((a, b) => (B[b].top - B[b].baseY) - (B[a].top - B[a].baseY));
-    const span = Math.max(50, Math.min(Bd.x1 - Bd.x0, Bd.z1 - Bd.z0) * 0.2);
-    for (const k of order) {
-      if (this.cams.filter(c => c.kind === 'roof').length >= 5) break;
-      const b = B[k], x = (b.x0 + b.x1) / 2, z = (b.z0 + b.z1) / 2;
-      if (this.cams.some(c => c.kind === 'roof' && Math.hypot(c.x - x, c.z - z) < span)) continue;
-      // at the corner of the roof nearest the middle of town, looking in
-      const cx = mid[0] < x ? b.x0 + 1 : b.x1 - 1, cz = mid[1] < z ? b.z0 + 1 : b.z1 - 1;
-      this.cams.push({ kind: 'roof', k, x: cx, z: cz, y: b.top + 2.5, alive: true, name: 'VIEWER VIDEO ' + (this.cams.length - 1) + ' · ' + this.g.disasters.district(x, z).toUpperCase() });
-    }
+    // no rooftop cameras (Sean, 2026-11-15: "the camera angles in disaster tv should always stay up in the air, from a helicopter view")
     this.cur = null; this.attack = null; this.lost = 0; this.cutT = 3; this.calmT = 0; this.heli = { ang: Math.random() * 6.28 }; this.L.set(mid[0], 0, mid[1]); this.have = false;
     this.pick(true);
   }
@@ -186,7 +176,7 @@ export class TvCam {
     if (f) { o.bandK += (f.bandK - o.bandK) * k; o.rangeK += (f.rangeK - o.rangeK) * k; o.blurFrac += (this.dof0.blurFrac * 0.55 - o.blurFrac) * k; this.focusD = f.d; this.focusPt = (this.focusPt || new THREE.Vector3()).copy(this.F).sub(this.P).normalize().multiplyScalar(f.d).add(this.P); g.focusAt = this.focusPt; }
     if (this.cur && this.cur.kind === 'heli' && (this.labT = (this.labT || 0) - dt) <= 0) { this.labT = 0.5; this.show(); }
   }
-  // the director cut to a new shot: a helicopter (SKY 7 wide and from the side, SKY 4 over a shoulder) or a viewer's rooftop video
+  // the director cut to a new shot: a helicopter (SKY 7 wide and from the side, SKY 4 over a shoulder)
   onShot(s) {
     if (s.k === 'roof') this.cur = s.cam;
     else { const H = this.cams.filter((c) => c.kind === 'heli' && c.alive); if (!H.length) { const h = { kind: 'heli', name: 'SKY ' + (5 + this.cams.length), alive: true }; this.cams.push(h); H.push(h); } this.cur = H[['side', 'high', 'top'].includes(s.k) ? 0 : Math.min(1, H.length - 1)]; }

@@ -1,7 +1,7 @@
 // Disaster TV: the end of the world, live. Lean back, watch, and call it. Each town the broadcast lands in gets one disaster, the way it is in
 // Defend (watchlevel.js): one of the heroes answers it with nobody at the controls and can lose, and the villain behind it is fought in the
-// street after. Filmed from the helicopters (tvdirector.js keeps both fighters on screen and clear of the buildings; a viewer's rooftop video
-// now and then), with the broadcast's own name tags over the hero and what she fights, never the game's close cameras or its own screen.
+// street after. Filmed from the helicopters, always up in the air (tvdirector.js keeps both fighters on screen, the hero in plain view, and
+// the lens over the roofs), with the broadcast's own name tags over the hero and what she fights, never the game's close cameras or its own screen.
 // Sean (2026-11-15): betting that is interactive but casual, the fights always visible, more action, more of the town wrecked. So the
 // viewer calls it all through the show (tvcalls.js): what hits the town, who wins (riding the whole show), and quick calls every few seconds
 // in the fight (the next big hit, a building down in ten seconds...), each a tap, a stake and a result there and then; and the fights bring
@@ -89,7 +89,7 @@ export class DisasterTV {
     this.chEl = live.querySelector('.ch'); this.mEl = tick.querySelector('.m');
     this.hits = new Hits(g, null, { quiet: true }); // no points on TV: just the big moments
     this.chain = new Chain(this.D, (text, slow) => this.hits.moment(text, slow));
-    this.cam = new TvCam(this); // the helicopter and viewers' videos from the rooftops
+    this.cam = new TvCam(this); // the helicopters
     this.calls = new LiveCalls(this); // the viewer's calls (tvcalls.js)
     this.wreck = new Wreck(this); // more of the town down in a fight (tvwreck.js)
     this.auto = new Responders(g); this.auto.on = false; // the crews rebuild between disasters
