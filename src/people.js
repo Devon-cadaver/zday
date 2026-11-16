@@ -40,6 +40,14 @@ const GRABBABLE = new Uint8Array(32); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK,
 const DISASTER_CAUSE = new Set(['fling', 'crush', 'drown', 'zap', 'bolt', 'freeze', 'burn', 'impact', 'rad']);
 const ZSTATE = new Uint8Array(32); [S.ZOMBIE, S.TURNING, S.PILE, S.CLIMB, S.FALLING].forEach(s => { ZSTATE[s] = 1; });
 const ANIM = new Float32Array(32);
+// The stride of a figure on foot (2026-11-15, the movement overhaul's section 8). GAIT, per walking animation of the figures' shader: its leg swing (hipA there) and the speed its legs were drawn for (at the
+// shader's old clock rate). The stride grows with the root of the speed (strideK: 1 at the animation's own speed), and one whole stride (two steps) covers strideLen metres: the leg (0.84 m) x the sine of the swing x 4.3 (the
+// steady part of the planted foot's way back), so the planted foot stays on its spot of ground (npc-slip: it slides 8% of their speed, from 25 to 216%). gaitCode packs it into the animation number for the shader: the animation, plus (how far through the stride, 0 to
+// 999, x 64 + how big, 0 to 63, + 256) / 65536. A whole number means no stride given: the shader runs it by the clock (figures in the air, the band's crowd, the roster)
+export const GAIT = []; GAIT[1] = GAIT[7] = [0.4, 1.35]; GAIT[2] = [0.72, 4.25]; GAIT[9] = [0.78, 4.83]; GAIT[3] = [0.26, 0.47];
+export const strideK = (an, v) => Math.max(0.55, Math.min(1.9, Math.sqrt(v / GAIT[an][1])));
+export const strideLen = (an, k, scale) => 3.62 * Math.sin(GAIT[an][0] * k) * (scale || 1);
+export const gaitCode = (an, gp, k) => an + (Math.min(999, Math.floor(gp * 1000)) * 64 + Math.min(63, Math.round(k * 31.5)) + 256) / 65536;
 ANIM[S.WALK] = 1; ANIM[S.FLEE] = 2; ANIM[S.RETURN] = 1; ANIM[S.TURNING] = 5; ANIM[S.ZOMBIE] = 3; ANIM[S.FALLING] = 5;
 // afloat in deep water (SWIM): in the hash, can be pulled out (hittable, grabbable), waving for help (anim 12); not
 // a civilian on foot, so crowds, zombies and sirens leave them be
@@ -1971,6 +1979,10 @@ export class People {
     let humans = 0, infected = 0, zombies = 0, dead = 0, roof = 0, officers = 0, aliens = 0, rioters = 0, colDirty = this.lookDirty, film = 0, afloat = 0;
     this.bRoof.fill(0); this.bRoofAll.fill(0);
     const t = this.time;
+    // 2026-11-15 (the movement overhaul, section 8): each figure's stride (gp, 0 to 1) is advanced by the ground it really covered since the last frame (gx, gz: where it was), its size (ga) follows its speed (gv)
+    // and dies away over a third of a second when it stops (gl: the walk it was in), and the way it is drawn facing (dhx, dhz) follows the way it faces (hx, hz) over a moment instead of snapping round a corner
+    if (!this.gp || this.gp.length < this.st.length) { const n = this.st.length, F = () => new Float32Array(n); this.gp = F(); this.gx = F(); this.gz = F(); this.dhx = F(); this.dhz = F(); this.gv = F(); this.ga = F(); this.gl = new Uint8Array(n); for (let i = 0; i < n; i++) { this.gp[i] = (i * 0.6180339) % 1; this.gx[i] = this.x[i] || 0; this.gz[i] = this.z[i] || 0; } }
+    const dts = Math.min(0.1, Math.max(0, t - (this.syncT0 == null ? t : this.syncT0))), kH = 1 - Math.exp(-dts * 10), kV = 1 - Math.exp(-dts * 14), kA = 1 - Math.exp(-dts * 9), kit = this.fa.arrays.kit; this.syncT0 = t;
     for (let i = 0; i < this.active; i++) {
       const s = this.st[i];
       const o = i * 16;
@@ -2002,13 +2014,19 @@ export class People {
       else if (s === S.FIREMAN) an = this.fx[i] === 1 ? 1 : this.fx[i] === 2 ? 6 : 0;
       if (this.braceT[i] > 0 && BRACE[s]) an = 13; // curled up
       // rotation Ry(yaw) * Rz(tilt), column major
-      const hx = this.hx[i], hz = this.hz[i], hl = Math.hypot(hx, hz) || 1;
+      let gd = 0, gJump = false; { const ddx = this.x[i] - this.gx[i], ddz = this.z[i] - this.gz[i]; if (ddx !== 0 || ddz !== 0) { gd = Math.sqrt(ddx * ddx + ddz * ddz); gJump = gd > 1.2; this.gx[i] = this.x[i]; this.gz[i] = this.z[i]; } } // the ground covered since the last frame (over 1.2 m: put somewhere else, or someone new in this slot)
+      let hx = this.dhx[i], hz = this.dhz[i]; { const tx = this.hx[i], tz = this.hz[i], cr = hx * tz - hz * tx; // turning to the way they face over a moment (an about-turn goes round by the side, not through nothing); nothing to do once they face it
+        if ((cr > 0.002 || cr < -0.002 || hx * tx + hz * tz <= 0) && (tx !== 0 || tz !== 0)) { const tl = Math.sqrt(tx * tx + tz * tz), ux = tx / tl, uz = tz / tl; if ((hx === 0 && hz === 0) || gJump) { hx = ux; hz = uz; } else { hx += (ux - hx) * kH; hz += (uz - hz) * kH; const l2 = hx * hx + hz * hz; if (l2 < 0.0625) { hx = -uz; hz = ux; } else { const l = Math.sqrt(l2); hx /= l; hz /= l; } } this.dhx[i] = hx; this.dhz[i] = hz; } } const hl = 1;
       const c = hx / hl, sn = -hz / hl, ct = Math.cos(tilt), stt = Math.sin(tilt);
       arr[o] = c * ct; arr[o + 1] = stt; arr[o + 2] = -sn * ct; arr[o + 3] = 0;
       arr[o + 4] = -c * stt; arr[o + 5] = ct; arr[o + 6] = sn * stt; arr[o + 7] = 0;
       arr[o + 8] = sn; arr[o + 9] = 0; arr[o + 10] = c; arr[o + 11] = 0;
       arr[o + 12] = this.x[i]; arr[o + 13] = y; arr[o + 14] = this.z[i]; arr[o + 15] = 1;
-      anim[i] = an;
+      if (!GAIT[an] && gd === 0 && this.ga[i] === 0 && this.gv[i] === 0) anim[i] = an; // standing, as most of the town is: no stride to work out
+      else { const air = s === S.JUMP || s === S.EXT || s === S.AIR; let g = 0, k = 0; // the stride. In the air (thrown, falling) the legs go by the clock, as they did
+        if (!air) { if (dts > 0) { const v = this.gv[i] + ((gJump ? 0 : gd / dts) - this.gv[i]) * kV; this.gv[i] = v < 0.02 && gd === 0 ? 0 : v; } if (GAIT[an]) { this.gl[i] = g = an; k = this.gv[i] > 0.12 ? strideK(an, this.gv[i]) : 0; } else if (an === 0 && this.ga[i] > 0.05 && this.gl[i]) g = this.gl[i]; /* stopped: the last of the stride dies away */ } else this.gv[i] = 0;
+        if (dts > 0) { const a = this.ga[i] + (k - this.ga[i]) * kA; this.ga[i] = k === 0 && a < 0.05 ? 0 : a; }
+        if (g) { if (!gJump && gd > 0) this.gp[i] = (this.gp[i] + gd / strideLen(g, Math.max(0.55, k || this.ga[i]), kit[i * 4 + 3])) % 1; anim[i] = gaitCode(g, this.gp[i], this.ga[i]); } else { anim[i] = an; if (air || an !== 0) this.ga[i] = 0; } }
       if (this.crLayer && this.crLayer.put(i, this.zt[i], arr, o, t)) arr.fill(0, o, o + 16); // drawn by the creature layer instead
       if (s === S.DEAD) { dead++; continue; }
       if (s === S.ALIEN) continue;

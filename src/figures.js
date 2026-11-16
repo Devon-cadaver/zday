@@ -143,7 +143,10 @@ vec3 rotZ(vec3 p, float py, float a) {
 }`)
       .replace('#include <begin_vertex>', /* glsl */`#include <begin_vertex>
 {
-  float limb = aTag.y, prop = aTag.z, an = aAnim, ht = aKit.x;
+  float limb = aTag.y, prop = aTag.z, an = floor(aAnim + 0.00002), gcode = floor(fract(aAnim) * 65536.0 + 0.5) - 256.0, ht = aKit.x;
+  // an: the animation. gcode: under 0 when no stride is given (a whole number: the stride then runs by the clock, as for the band's crowd and the roster); else how far through the stride (0 to 999) x 64 + how big
+  // it is (0 to 63: 31.5 is the animation's own, 0 none, 63 twice it), from people.js gaitCode
+  bool gGiven = gcode >= 0.0; float gk = gGiven ? mod(gcode, 64.0) / 31.5 : 1.0, gk1 = min(gk, 1.0), gPh = floor(gcode / 64.0) * 0.0062832;
   int flags = int(aKit.y + 0.5);
   bool hide = (prop == 1.0 && ht < 0.5) || (prop == 2.0 && (flags & 1) == 0) || (prop == 3.0 && (flags & 2) == 0)
     || (prop == 4.0 && (flags & 4) == 0) || (prop == 5.0 && ((flags & 8) != 0 || ht > 0.5));
@@ -176,15 +179,19 @@ vec3 rotZ(vec3 p, float py, float a) {
     bool zombie = (an == 3.0 || an == 5.0 || an == 9.0);
     bool kneel = (an == 10.0), swing = (an == 11.0), swim = (an == 12.0), curl = (an == 13.0);
     float chop = swing ? max(0.0, sin(uTime * 7.0 + ph)) : 0.0; // the weapon comes down hard, then back up
-    // gait: stride rate, hip swing, knee fold in the swing, arm swing, elbow bend, bounce, forward lean
-    float freq = 0.0, hipA = 0.0, kneeA = 0.0, armA = 0.0, el0 = 0.12, elA = 0.0, bob = 0.0, lean = 0.0;
-    if (an == 1.0 || an == 7.0) { freq = 6.0; hipA = 0.4; kneeA = 0.8; armA = 0.42; el0 = 0.22; elA = 0.35; bob = 0.035; lean = 0.04; }
-    else if (an == 2.0) { freq = 10.5; hipA = 0.72; kneeA = 1.6; armA = 0.8; el0 = 1.35; elA = 0.3; bob = 0.075; lean = 0.22; }
-    else if (an == 9.0) { freq = 11.0; hipA = 0.78; kneeA = 1.55; bob = 0.08; lean = 0.3; }
-    else if (an == 3.0) { freq = 3.2; hipA = 0.26; kneeA = 0.45; bob = 0.025; }
+    // gait: stride rate (when it goes by the clock), hip swing, knee fold in the swing, arm swing, elbow bend, forward lean
+    float freq = 0.0, hipA = 0.0, kneeA = 0.0, armA = 0.0, el0 = 0.12, elA = 0.0, lean = 0.0;
+    if (an == 1.0 || an == 7.0) { freq = 6.0; hipA = 0.4; kneeA = 0.8; armA = 0.42; el0 = 0.22; elA = 0.35; lean = 0.04; }
+    else if (an == 2.0) { freq = 10.5; hipA = 0.72; kneeA = 1.6; armA = 0.8; el0 = 1.35; elA = 0.3; lean = 0.22; }
+    else if (an == 9.0) { freq = 11.0; hipA = 0.78; kneeA = 1.55; lean = 0.3; }
+    else if (an == 3.0) { freq = 3.2; hipA = 0.26; kneeA = 0.45; }
     else if (swim) { freq = 2.6; hipA = 0.45; kneeA = 0.9; }
+    if (gGiven) { hipA *= gk; kneeA *= mix(gk1, gk, 0.5); armA *= gk; elA *= gk1; lean *= gk1; el0 = mix(0.12, el0, gk1); } // a longer or shorter stride than the animation's own, by how fast they really go; none as they stand
     bool sideA = (limb == 1.0 || limb == 3.0 || limb == 6.0 || limb == 8.0);
-    float phs = uTime * freq + ph + (sideA ? 0.0 : 3.14159), sn = sin(phs);
+    float phs = (gGiven ? gPh : uTime * freq + ph) + (sideA ? 0.0 : 3.14159), sn = sin(phs); // the stride by the ground covered when it is given (2026-11-15: at a fixed rate the feet of a walker went 2 m/s and of a runner 6.3, whatever their speed)
+    // the leg's swing is a rounded saw tooth, not a sine, and it is the foot's place that follows it, not the hip's angle: the planted foot goes straight back under the body at a steady rate, so it can stay on its spot
+    // of ground for the whole step (people.js sets the rate). footX: how far forward the foot is, as a share of the leg
+    float footX = asin(0.985 * sn) * 0.7156 * sin(hipA);
     bool leg = (limb == 1.0 || limb == 2.0 || limb == 6.0 || limb == 7.0), arm = (limb == 3.0 || limb == 4.0 || limb == 8.0 || limb == 9.0);
     if (leg) {
       float hip, knee;
@@ -193,9 +200,9 @@ vec3 rotZ(vec3 p, float py, float a) {
       else if (curl) { hip = 0.25; knee = -1.9; } // down on the heels, knees tucked
       else if (swing) { hip = sideA ? 0.28 : -0.22; knee = -0.25; } // feet planted wide
       else {
-        hip = sn * hipA;
-        // the knee folds just after toe-off and straightens for the heel strike
-        knee = freq > 0.0 ? -(0.05 + kneeA * pow(max(0.0, cos(phs + 0.785)), 1.5)) : -0.04;
+        hip = asin(footX);
+        // the knee folds as the foot leaves the ground and is straight again just before it lands (through the leg's swing forward only: it used to start an eighth of a stride early, in the planted leg)
+        knee = freq > 0.0 ? -(0.05 + kneeA * pow(max(0.0, cos(phs + 0.3)), 1.5)) : -0.04;
       }
       if (limb >= 6.0) transformed = rotZ(transformed, ${KNEE}, knee);
       transformed = rotZ(transformed, ${HIP}, hip);
@@ -219,7 +226,7 @@ vec3 rotZ(vec3 p, float py, float a) {
     if (swing && !leg) transformed = rotZ(transformed, ${HIP}, -0.25 * chop); // putting their weight behind it
     if (kneel || curl) transformed.y -= ${KNEE} * (curl ? 1.15 : 1.0);
     if (lean > 0.0 && !leg) transformed = rotZ(transformed, ${HIP}, -lean); // lean into a run
-    if (freq > 0.0) transformed.y += (abs(cos(phs)) - 0.5) * bob; // highest as each leg passes under the body
+    if (freq > 0.0 && !swim) transformed.y -= ${HIP} * (1.0 - sqrt(1.0 - footX * footX)); // the body rides on the planted leg: highest as it passes under, down as the legs spread, so that foot stays on the ground
     transformed *= aKit.w;
   }
   vGlow = (flags & 16) != 0 ? 1.0 : 0.0;
