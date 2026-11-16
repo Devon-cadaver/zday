@@ -58,7 +58,8 @@ export class WatchLevel extends HeroGame {
     // the hero's health and the disaster's, held to the draw
     if (this.keepUp()) { if (H.active && H.h && H.h.hp < 15) H.h.hp = 15; if (F.active && F.fromHorde && F.hull < (F.hullMax || 100) * 0.15) F.hull = (F.hullMax || 100) * 0.15; }
     if (!this.W.win && this.W.lossAt === 'disaster' && R.boss && R.boss.heroHp < 20) R.boss.heroHp = 20; // she falls before it does
-    if (!this.keepUp() && H.active && H.h && !H.over && !H.fl && (R.boss ? R.boss.heroHp <= 20.5 : this.t > 75) && (this.wearT = (this.wearT || 0) + 1 / 60) > 6 && (this.wearN = (this.wearN || 0) - 1 / 60) <= 0) { this.wearN = 1.6; H.bite(7); } // drawn to lose and held at the last of it: worn down, not left standing there (Sean: more action)
+    if (H.fl && !H.fl.watchHeld) { const fl = H.fl, bp = fl.breakPart.bind(fl); fl.watchHeld = true; fl.breakPart = (q, ...a) => { if (!this.W.win && this.W.lossAt === 'disaster' && q.stage === 2 && q.hits === q.need - 1 && fl.giants.filter((g) => g.alive && g.stage === 2 && g.hits < g.need).length <= 1) { if (q.state === 'kneel') q.t = Math.max(q.t, 3); H.say('IT SHRUGS IT OFF!', 1.2, '#ff9a3a'); return; } return bp(q, ...a); }; } // drawn to lose to the Faultline: the last one's head stays on (the new fight is quick to win; she falls first)
+    if (!this.keepUp() && H.active && H.h && !H.over && (R.boss ? R.boss.heroHp <= 20.5 : this.t > (H.fl ? 55 : 75)) && (this.wearT = (this.wearT || 0) + 1 / 60) > 6 && (this.wearN = (this.wearN || 0) - 1 / 60) <= 0) { this.wearN = 1.6; H.bite(7); } // drawn to lose and held at the last of it: worn down, not left standing there (Sean: more action)
     if (this.W.win && this.t > RUSH_T && H.active && !H.over) this.rush(1 / 60);
     if (this.air) { this.airFate(1 / 60); this.airBot(1 / 60); return; }
     // up in the air after a fight in it: back down into the street, or at the next general
@@ -105,17 +106,24 @@ export class WatchLevel extends HeroGame {
     if (h.state === 'clutch') { if (B.tap <= 0) { B.tap = 0.3; H.tap(); } return; } // seized one: thrown
     if (H.held) { if (B.held <= 0) { H.release(); B.held = 0.6; } H.stick = null; return; } // carrying: let it fly (a boulder homes in on the giant)
     // what is about to land on her: dash off it
+    if (fl && h.state !== 'clutch') {
+      for (const q of fl.giants) { if (!q.alive || q.state !== 'sweep' || q.hit || q.t < 0.55 || q.t > 0.88 || B.fanAt === q.mk) continue; const dx = h.x - q.x, dz = h.z - q.z, d = Math.hypot(dx, dz); let a = Math.atan2(dx, dz) - q.yaw; a = Math.atan2(Math.sin(a), Math.cos(a)); if (d < q.size * 0.8 + 1.5 && Math.abs(a) < 1.15) { B.fanAt = q.mk; const sg = a >= 0 ? 1 : -1, l = d || 1; dashWorld(H, dz / l * sg + dx / l * 0.5, -dx / l * sg + dz / l * 0.5); return; } } // the red fan of its sweep: out of it sideways (a dash also passes under it) // whatever she is doing (a glide, a punch)
+    }
     if (can || h.state === 'block') {
       const T = H.tell; if (T && T.t > 0.45 && d2(T.x, T.z) < (T.r || 4) + 1.2 && B.tellAt !== T) { B.tellAt = T; away(T.x, T.z); return; }
       if (fl) {
         for (const w of fl.waves) { const d = d2(w.x, w.z), gap = d - w.r; if (gap > 1.5 && gap < 6 && !w.hit) { dashWorld(H, w.x - h.x, w.z - h.z); return; } } // through the quake ring: a dash passes under it
-        for (const f of fl.flying) if (!f.air && f.T - f.t < 0.7 && d2(f.x, f.z) < f.r + 2.5) { away(f.x, f.z); return; }
+        for (const f of fl.flying) if (!f.air && !f.safe && f.T - f.t < 0.7 && d2(f.x, f.z) < f.r + 2.5) { away(f.x, f.z); return; } // a boulder or a lava rock (a rock shaken loose by a stomp lands harmless: one to throw)
+        for (const pc of fl.pieces || []) { const m = pc.m; if (pc.vy < 0 && m.position.y - (h.y || 0) < 30 && d2(m.position.x, m.position.z) < pc.r * 1.1 + 2.5) { away(m.position.x, m.position.z); return; } } // an arm or its head coming down on her
         for (const q of fl.giants) if (q.alive && q.mk && q.at && d2(q.at[0], q.at[1]) < 5) { away(q.at[0], q.at[1]); return; }
       }
     }
     if (!can) return;
     // the boulders back at the big giants
-    if (fl && fl.stones.length && fl.giants.some((q) => q.alive && q.stage < 3 && !['sink', 'crumble', 'fall'].includes(q.state))) {
+    // the Faultline (2026-11-15): each big one broken a piece at a time, two ways, and she takes both: a boulder thrown back at the ringed piece, or in under it to batter its feet until it kneels, then the piece knocked off by hand (it looks good on TV: her running in under it)
+    const big = fl ? fl.giants.filter((q) => q.alive && q.stage < 3 && !['rise', 'crumble', 'fall'].includes(q.state)).sort((a, b) => d2(a.x, a.z) - d2(b.x, b.z)) : [], kneel = big.find((q) => q.state === 'kneel' && q.t < 3);
+    if (big.length && (B.planT = (B.planT || 0) - dt) <= 0) { B.planT = 7 + Math.random() * 4; B.plan = !fl.stones.length || Math.random() < 0.5 ? 'feet' : 'rock'; }
+    if (fl && fl.stones.length && big.length && !kneel && (B.plan !== 'feet' || d2(big[0].x, big[0].z) > big[0].size * 0.9)) {
       let s = null, bd = 1e9; for (const q of fl.stones) { const d = d2(q.x, q.z) - q.r; if (d < bd) { bd = d; s = q; } }
       if (s && bd < 40) { if (bd < 2) { H.stick = null; if (H.grabOn()) { B.held = 0.5; return; } } else { stickTo(H, s.x - h.x, s.z - h.z); this.stuckStep(dt); return; } }
     }
@@ -123,12 +131,13 @@ export class WatchLevel extends HeroGame {
     if (B.cd <= 0) { B.cd = fl ? 1 + Math.random() * 1.2 : 0.5 + Math.random() * 0.6; const K = H.kit, near = H.nearest(6); if (H.team >= 100 && !H.mateR && H.mates.length && (near || H.o.boss || fl)) { H.teamGo(Math.floor(Math.random() * H.mates.length)); return; } const boss = !fl && H.o.boss && H.o.boss.alive && H.bossNear && H.bossNear(12);
       if (boss && this.t - (B.smAt || 0) > 7 && Math.random() < 0.4) { B.smAt = this.t; H.takeOff(); return; } // a giant: up, and the SMASH LANDING on it (update brings her down)
       if ((near || boss) && Math.random() < (fl ? 0.3 : 0.55) && H.energy >= (H.COST[K.knock] || 99) + 12) { if (boss && !near && H.bossYaw) h.yaw = H.bossYaw(); H.cast(K.knock); setTimeout(() => H.castUp(K.knock), 300 + Math.random() * 500); return; } }
+    if (kneel) { const R = kneel.size * 0.2 + 0.8; if (d2(kneel.x, kneel.z) > R) { stickTo(H, kneel.x - h.x, kneel.z - h.z); this.stuckStep(dt); return; } H.stick = null; h.yaw = Math.atan2(kneel.x - h.x, kneel.z - h.z); if (B.tap <= 0) { B.tap = 0.2 + Math.random() * 0.1; H.tap(); } return; } // it has buckled: in and hit it
     // someone to hit
     const n = H.nearest(11);
     if (n) { H.stick = null; if (B.tap <= 0) { B.tap = fl ? 0.24 + Math.random() * 0.14 : 0.17 + Math.random() * 0.1; H.tap(); } return; }
     // the giant, the boss, a tripod's foot: go in and hit
     let tx = null, tz = null, R = 2.6;
-    if (fl) { const q = fl.giants.filter((q) => q.alive && q.stage === 3 && !['rise', 'sink', 'crumble'].includes(q.state)).sort((a, b) => d2(a.x, a.z) - d2(b.x, b.z))[0]; if (q) { tx = q.x; tz = q.z; R = q.size * 0.2 + 1.6; } }
+    if (fl) { const q = fl.giants.filter((q) => q.alive && q.stage === 3 && !['rise', 'crumble'].includes(q.state)).sort((a, b) => d2(a.x, a.z) - d2(b.x, b.z))[0]; if (q) { tx = q.x; tz = q.z; R = q.size * 0.2 + 1.6; } else if (big.length && (B.plan === 'feet' || !fl.stones.length)) { const g0 = big[0]; tx = g0.x; tz = g0.z; R = g0.size * 0.2 + 0.8; } } // a small one by hand; a big one: its feet
     if (tx == null && H.o.boss && H.o.boss.alive) { const q = H.bossPt(); if (q) { tx = q[0]; tz = q[1]; R = (q[2] || 2) + 1.5; } }
     if (tx == null && H.o.fleet) { const f = H.footNear(80); if (f) { tx = f[0]; tz = f[1]; R = 2.5; } }
     if (tx == null) { const far = H.nearest(160); if (far) { tx = far[0]; tz = far[1]; R = 9; } }
