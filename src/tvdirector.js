@@ -16,7 +16,7 @@ function subjects0(tv) {
   const g = tv.g, H = g.horde, F = g.flight, T = g.fightTest, lv = tv.lv; if (!lv) return null;
   if (T.active && T.h && T.v) return { a: { x: T.h.x, y: T.h.y, z: T.h.z, h: 1.9 }, b: { x: T.v.x, y: T.v.y, z: T.v.z, h: 2 }, fight: true };
   if (H.active && H.h) {
-    const a = { x: H.h.x, y: H.h.y || 0, z: H.h.z, h: 1.9 }; let b = null;
+    const a = { x: H.h.x, y: H.h.y || 0, z: H.h.z, h: 1.9 * ((H.h.r && H.h.r.root && H.h.r.root.scale.y) || 1) }; let b = null; // drawn bigger from far off (horde.js bigK): the tag over her real head
     const f = H.fl && H.fl.focus ? H.fl.focus() : null, e = H.o.boss && H.o.boss.alive ? H.o.boss : null;
     if (f && Number.isFinite(f.x)) { const s = f.size || f.up || 20; b = { x: f.x, y: 0, z: f.z, h: Math.max(8, s), big: true }; }
     else if (e) { if (e.type === 'worm') { const q = H.bossPt ? H.bossPt() : null; b = q ? { x: q[0], y: 0, z: q[1], h: 14, big: true } : { x: e.x, y: 0, z: e.z, h: 10, big: true }; } else b = { x: e.x, y: 0, z: e.z, h: e.type === 'kaiju' ? 40 : 16, big: true }; }
@@ -24,7 +24,7 @@ function subjects0(tv) {
     return { a, b };
   }
   if (F.active && F.pos) {
-    const a = { x: F.pos.x, y: F.pos.y - 1, z: F.pos.z, h: 1.9 }, L = F.live; let b = null;
+    const k = (F.obj && F.obj.scale && F.obj.scale.y) || 1, a = { x: F.pos.x, y: F.pos.y - k, z: F.pos.z, h: 1.9 * k }, L = F.live; let b = null; // flight.js bigK the same
     if (L && L.drain && Number.isFinite(L.px)) b = { x: L.px, y: L.py - 1, z: L.pz, h: 2.2 }; // the man with the hose
     else if (L && L.at && Number.isFinite(L.at.x) && (L.at.x || L.at.z)) b = { x: L.at.x, y: L.at.y - 9, z: L.at.z, h: 18, big: true }; // the storm's face
     else if (lv.ev0 && lv.ev0.tw) b = { x: lv.ev0.tw.x, y: 0, z: lv.ev0.tw.z, h: 60, big: true };
