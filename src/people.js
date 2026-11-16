@@ -705,7 +705,7 @@ export class People {
       const Z = ZTYPES[this.zt[i]];
       if (Z.rad && this.zrad[i] === 2) { // only the nuclear kind gives off enough to infect without a bite
         this.around(this.x[i], this.z[i], 6.5, (j) => { if (this.isPrey(j) && this.kind[j] === KIND.CIVILIAN && this.r() < 0.02) { this.inf[j] = 1; this.zrad[j] = 2; this.inc[j] = this.inc0[j] = 5 + this.r() * 8; this.dirty[j] = 1; } });
-      } else if (Z.spit && (this.spitT[i] -= 0.5) <= 0) {
+      } else if (Z.spit && !Z.army && (this.spitT[i] -= 0.5) <= 0) { // not an army's archers (figures.js): their shots are at the hero (horde.js spitStep), and nobody they hit turns
         let tg = -1, bd = 1e9;
         this.around(this.x[i], this.z[i], 9, (j, d2) => { if (d2 > 4 && d2 < bd && this.isPrey(j) && this.kind[j] === KIND.CIVILIAN) { bd = d2; tg = j; } });
         if (tg >= 0) {
