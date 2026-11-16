@@ -18,6 +18,7 @@ import { SEE } from './see.js';
 import { heroRig } from './heroes.js';
 import { relax, detail, villainRig , S, handAt } from './villains.js';
 import { hdLook } from './hdbody.js';
+import { Beacon } from './beacon.js';
 import { Interior } from './interior.js';
 import { LAB } from './lab.js';
 import { playClip } from './clips.js';
@@ -351,7 +352,7 @@ export class Flight {
     if (hr) { hr.cape.g.dispose(); if (hr.smooth && hr.smooth.mesh) { hr.smooth.mesh.geometry.dispose(); const m = hr.smooth.mesh.material; (Array.isArray(m) ? m : [m]).forEach(x => x && x.dispose()); } } else this.obj.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); // its own shapes and paint (a hero's are shared with the rest: only the cape is its own)
     for (const b of this.bombs) g.disasters.ctx.scene.remove(b.m); this.bombs = [];
     g.disasters.ctx.scene.remove(this.tracer); this.tracer.geometry.dispose(); this.tracer.material.dispose();
-    if (this.web) { g.disasters.ctx.scene.remove(this.web); this.web.geometry.dispose(); this.web.material.dispose(); this.web = null; } this.ft = null; this.ftOn = false;
+    if (this.web) { g.disasters.ctx.scene.remove(this.web); this.web.geometry.dispose(); this.web.material.dispose(); this.web = null; } this.ft = null; this.ftOn = false; if (this.beacon) { this.beacon.dispose(); this.beacon = null; }
     this.ov.remove(); this.bar.remove(); removeEventListener('keydown', this.onKey); removeEventListener('keyup', this.onKey); clearTimeout(this.tipT); this.tipEl = null;
     if (g.audio) g.audio.engine(null);
     camera.fov = this.saved.fov; camera.far = this.saved.far; camera.up.set(0, 1, 0); camera.updateProjectionMatrix(); post.opts.dof = this.saved.dof; SEE.on = this.saved.see;
@@ -363,7 +364,7 @@ export class Flight {
 
   // a frame (real time, held while paused): fly, hit, place the camera; the view's centre (tg) under the plane
   frame(dt, tg) {
-    const g = this.g, P = this.P, cam = this.ctx.camera;
+    const g = this.g, P = this.P, cam = this.ctx.camera; this.beaconStep(dt);
     const run = !g.paused && dt > 0;
     if (run) {
       this.coolT = Math.max(0, this.coolT - dt); if (this.bombs.length) this.bombStep(dt);
@@ -818,6 +819,8 @@ export class Flight {
   }
   // ---------- on foot (Sean, 2026-11-06: a flyer, a fast runner, a rope swinger, a super jumper; the wardrobe's Moves). Only travelling: a lock on, a giant
   // up close, something held, a ring fight are as flying is (the arcade's own). The floor is the street or a roof; a runner meets a wall and runs up it
+  // the arrow over a flying hero when the camera is far off (beacon.js): in a level, not in the cockpit
+  beaconStep(dt) { const on = !!(this.P && this.P.hero) && this.active && (this.inLevel || !!this.fromHorde) && this.obj.visible && this.view !== 'cockpit' && ['fly', 'tossed'].includes(this.state); if (!on && !this.beacon) return; if (!this.beacon) this.beacon = new Beacon(this.g.disasters.ctx.scene); this.beacon.step(dt, this.ctx.camera, this.pos.x, this.pos.y + 1.1, this.pos.z, on); }
   footOk() { const W = this.g.watchLevel; return !!this.fromHorde && !this.live && !(W && W.round && !W.round.ended); } // the street levels only: a storm's own game is in the air, and Watch flies them
   floorAt(x, z) { let f = this.g.people.groundY(x, z); this.g.city.buildingsNear(x, z, 0.3, (k, d, b) => { if (b.roofY > f) f = b.roofY; }); return f; }
   camYOf(dt) { if (!this.ftOn || this.camY == null) return (this.camY = this.pos.y); this.camY += (this.pos.y - this.camY) * (1 - Math.exp(-dt * 4)); this.camY = Math.max(this.pos.y - 3.5, Math.min(this.pos.y + 3.5, this.camY)); return this.camY; } // eased, but never more than a few metres off: she stays in the middle of the screen

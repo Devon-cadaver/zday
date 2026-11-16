@@ -6,6 +6,7 @@
 // ctrlMake, as the worm's and the kaiju's drivers). Down, the town is saved.
 import * as THREE from 'three';
 import { sfx } from './audio.js';
+import { GhostFace } from './livestorm.js';
 
 const AIRY = ['dodge', 'glide', 'jugUp', 'jugWait', 'jugFall', 'sig', 'liftoff'];
 const CARS = ['#c8352c', '#2a58c8', '#e8c33a', '#f4f1ea', '#20242e', '#3c7a4a'];
@@ -26,7 +27,7 @@ export class TwisterFoot {
   get funnel() { return this.tw && this.tw.phase !== 'rope' && this.tw.phase !== 'gone' && !this.down; }
   // ---------- each frame
   step(dt) {
-    if (this.H.over || !(dt > 0) || this.done) return; if (!this.started) { if (this.H.active) this.start(); else return; } this.t += dt; const h = this.H.h, tw = this.tw;
+    if (this.H.over || !(dt > 0) || this.done) return; if (!this.started) { if (this.H.active) this.start(); else return; } this.t += dt; const h = this.H.h, tw = this.tw; this.faceStep(dt);
     if (this.funnel) {
       // it circles her about 24 m off, closing in and backing off
       this.ang += dt * 0.22; const r = 24 + Math.sin(this.t * 0.35) * 8; tw.steerT = [h.x + Math.cos(this.ang) * r, h.z + Math.sin(this.ang) * r];
@@ -43,8 +44,10 @@ export class TwisterFoot {
     if (this.down && !this.ctrl && (this.downT += dt) > 2.5) { this.ctrl = this.H.ctrlMake({ type: 'tornado' }); this.H.countT = 0; }
   }
   // ---------- a car flung at where she is going
+  // its face (livestorm.js GhostFace, Sean 2026-11-15: in the round): 15 m up the funnel on her side of it, turned to her; the mouth open as a car leaves it, a flinch as one goes in
+  faceStep(dt) { const on = !!this.funnel && this.tw.descend > 0.5 && this.tw.fade > 0.5; if (!on) { if (this.ghost) this.ghost.show(false); return; } if (!this.ghost) this.ghost = new GhostFace(this.S, 'wind'); const h = this.H.h, tw = this.tw, Y = 15, k = Math.pow(Math.min(1, Y / tw.H), 1.5), ax = tw.x + (tw.vort.lx || 0) * k, az = tw.z + (tw.vort.lz || 0) * k, dx = h.x - ax, dz = h.z - az, d = Math.hypot(dx, dz) || 1, r = tw.radiusAt(Y) * 1.05, gy = this.P.groundY(ax, az); this.openT = Math.max(0, (this.openT || 0) - dt); this.hurtT = Math.max(0, (this.hurtT || 0) - dt); this.ghost.show(true); this.ghost.place(ax + dx / d * r, gy + Y, az + dz / d * r, Math.max(13, tw.radiusAt(Y) * 3), h.x, h.y + 1.5, h.z, this.openT > 0 ? 1 : 0, this.hurtT > 0, dt, this.g.disasters.lightK); }
   toss() {
-    const h = this.H.h, tw = this.tw, tx = h.x + h.vx * 0.7, tz = h.z + h.vz * 0.7, m = carMesh(CARS[Math.floor(Math.random() * CARS.length)]), a = new THREE.Vector3(tw.x, this.P.groundY(tw.x, tw.z) + 18, tw.z);
+    this.openT = 0.9; const h = this.H.h, tw = this.tw, tx = h.x + h.vx * 0.7, tz = h.z + h.vz * 0.7, m = carMesh(CARS[Math.floor(Math.random() * CARS.length)]), a = new THREE.Vector3(tw.x, this.P.groundY(tw.x, tw.z) + 18, tw.z);
     m.position.copy(a); this.S.add(m); this.flying.push({ m, mk: this.mark(tx, tz, 3.2), a, x: tx, y: this.P.groundY(tx, tz) + 0.6, z: tz, t: 0, T: 1.4, arc: 10, w: (Math.random() - 0.5) * 8 });
     sfx('whoosh', a.x, a.y, a.z, { gain: 1, rate: 0.7 }); this.say('throw', 'CARS! GRAB ONE THAT LANDS AND THROW IT INTO THE FUNNEL', 2.2);
   }
@@ -62,7 +65,7 @@ export class TwisterFoot {
   // thrown back (horde thrownStep): it flies into the funnel; true when it has hit
   homing(f, dt) { if (!this.funnel) return false; const tw = this.tw, cy = this.P.groundY(tw.x, tw.z) + 10, tx = tw.x - f.x, ty = cy - f.y, tz = tw.z - f.z, dd = Math.hypot(tx, ty, tz) || 1, sp = 46, k = Math.min(1, dt * 6); f.vx += (tx / dd * sp - f.vx) * k; f.vy += (ty / dd * sp - f.vy) * k; f.vz += (tz / dd * sp - f.vz) * k; if (dd > 6) return false; this.hit(f.x, f.y, f.z); return true; }
   hit(x, y, z) {
-    const D = this.g.disasters, tw = this.tw; this.hits++; D.ctx.fire.burst(x, y, z, 12, 2); D.flash && D.flash(0.12); this.g.shake = Math.max(this.g.shake || 0, 0.9); this.g.hitStop = Math.max(this.g.hitStop || 0, 0.1); sfx('crash', x, y, z, { gain: 1.2, rate: 0.7 }); this.H.hits++; this.H.hitsT = 1.5;
+    const D = this.g.disasters, tw = this.tw; this.hits++; this.hurtT = 0.9; D.ctx.fire.burst(x, y, z, 12, 2); D.flash && D.flash(0.12); this.g.shake = Math.max(this.g.shake || 0, 0.9); this.g.hitStop = Math.max(this.g.hitStop || 0, 0.1); sfx('crash', x, y, z, { gain: 1.2, rate: 0.7 }); this.H.hits++; this.H.hitsT = 1.5;
     tw.size = this.size0 * (1 - 0.45 * this.hits / this.need); if (tw.applySize) tw.applySize(); // smaller each time, the funnel made again to the size
     if (this.hits >= this.need) { this.down = true; this.downT = 0; tw.player = false; tw.phase = 'rope'; tw.ropeT = 0; this.giants[0].alive = false; this.H.say('IT\'S BREAKING UP!', 1.8, '#ffd27a'); for (const b of this.flying) { this.unmark(b.mk); this.S.remove(b.m); } this.flying = []; }
     else this.H.say('INTO THE FUNNEL! ' + this.hits + '/' + this.need, 1.2, '#ffd27a');
@@ -70,8 +73,8 @@ export class TwisterFoot {
   // her blows on the funnel do nothing but say so
   sweepHit(x, z, R, dmg, how) { if (this.busy || !this.funnel || (how !== 'blow' && how !== 'kick')) return; if (Math.hypot(this.tw.x - x, this.tw.z - z) > R + 6) return; if (performance.now() > (this.punchSaid || 0)) { this.punchSaid = performance.now() + 6000; this.H.say('YOU CANNOT PUNCH WIND: THROW CARS INTO IT', 1.6, '#9fd8ff'); } }
   // the camera: the funnel and her together, from lower and further, a wider lens
-  focus() { if (!this.funnel) return null; return { x: this.tw.x, z: this.tw.z, type: 'giant', want: 70, up: 14, el: 0.26, fov: innerWidth < innerHeight ? 40 : 28 }; }
+  focus() { if (!this.funnel) return null; return { x: this.tw.x, z: this.tw.z, type: 'giant', want: 78, up: 14, el: 0.26, fov: innerWidth < innerHeight ? 40 : 28 }; }
   // what is left: the funnel till it is down, then Twister till he is beaten
   giantsLeft() { if (this.done) return 0; if (!this.started || !this.down) return 1; return this.ctrl && this.ctrl.gone ? 0 : 1; }
-  dispose() { for (const s of this.stones) { this.unmark(s.glow); this.S.remove(s.m); } for (const b of this.flying) { this.unmark(b.mk); this.S.remove(b.m); } this.stones = []; this.flying = []; if (this.tw && this.tw.phase !== 'gone') { this.tw.player = false; this.tw.phase = 'rope'; this.tw.ropeT = 0; } this.done = true; }
+  dispose() { if (this.ghost) { this.ghost.dispose(); this.ghost = null; } for (const s of this.stones) { this.unmark(s.glow); this.S.remove(s.m); } for (const b of this.flying) { this.unmark(b.mk); this.S.remove(b.m); } this.stones = []; this.flying = []; if (this.tw && this.tw.phase !== 'gone') { this.tw.player = false; this.tw.phase = 'rope'; this.tw.ropeT = 0; } this.done = true; }
 }
