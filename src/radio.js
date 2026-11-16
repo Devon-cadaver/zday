@@ -94,6 +94,7 @@ export class Radio {
       .then(ab => new Promise((ok, no) => c.decodeAudioData(ab, ok, no))).then(b => { this.bufs[n] = b; }).catch(() => { this.bufs[n] = null; });
   }
   update(dt, g) {
+    { const f = document.getElementById('zd-fight'), fight = !!f && f.style.display !== 'none'; if (fight !== !!this.hid) { this.hid = fight; this.el.style.visibility = fight ? 'hidden' : ''; } } // a fight on the screen: the radio's line is not shown over it (it sat under the fight's own words)
     this.t += dt;
     const D = g.disasters, p = g.people;
     if (D) for (const e of D.list) {

@@ -253,7 +253,7 @@ export class HeroGame {
     const asia = !!(PLACES[key] && PLACES[key].style); this.round = { evs: [], need: 0, t: 0, downs: 0, hero: true, key, ended: false, zombie: true, n: 100, noun: ' left' };
     g.horde.start({ n: 100, pool, level: true, ground: true, label: 'FAULTLINE', verb: ' DOWN', hitK: 1 + 0.05 * this.ix, quake: { design: asia ? 'brute' : 'mountain', size: 50, tough: 1 + 0.1 * this.ix }, onEnd: (won, H) => { this.round.horde = H; this.finish(won, won ? null : 'The Faultline was too much'); } });
     this.rep = document.createElement('div'); this.rep.id = 'zd-rep'; document.body.appendChild(this.rep);
-    g.toast ? g.toast('Defend ' + PLACES[key].name + ': the Faultline rises. Dash through its quakes; GRAB its boulders and throw them back', 5000) : 0;
+    g.toast ? g.toast('Defend ' + PLACES[key].name + ': the Faultline rises. Break it apart: throw its boulders at the ring of light, or batter its feet until it buckles', 5000) : 0;
   }
   // the tornado fought on foot (Sean, 2026-11-06; twisterfoot.js): it circles her and flings cars, the cars thrown back into its funnel, then Twister in the street. In turn with the flying tornado level: the first on foot
   footTornado() { const s = this.s; s.twN = (s.twN || 0) + 1; HS.save(); return s.twN % 2 === 1; }

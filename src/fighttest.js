@@ -145,6 +145,8 @@ body.zd-flying #zd-bar,body.zd-flying #zd-dis,body.zd-flying #zd-followchip,body
 #zd-fight .hp{height:12px;margin-top:3px;border-radius:6px;background:rgba(0,0,0,.55);overflow:hidden;border:1px solid rgba(255,255,255,.35)}
 #zd-fight .hp i{display:block;height:100%;width:100%;transition:width .12s}
 #zd-fight .say{position:absolute;left:0;right:0;top:calc(62px + env(safe-area-inset-top));text-align:center;font:900 24px/1.1 system-ui,sans-serif;text-shadow:0 2px 8px #000;pointer-events:none;opacity:0;transition:opacity .15s}
+#zd-fight.crowd .say{left:88px;right:68px;top:calc(58px + env(safe-area-inset-top));font-size:18px;line-height:1.08} /* on foot in a level: between the compass and the team's circles, not across them */
+#zd-fight.sand .say{left:108px;right:10px;top:calc(118px + env(safe-area-inset-top));font-size:20px;line-height:1.08} /* on foot in the Sandbox: under Restart and Leave, beside the map */
 body.zd-flying #zd-side{top:calc(112px + env(safe-area-inset-top));transform:none}
 #zd-fight .acts button{min-height:44px}
 #zd-fight .hint{position:absolute;left:10px;right:10px;bottom:calc(212px + env(safe-area-inset-bottom));text-align:center;font:700 12px/1.45 system-ui,sans-serif;text-shadow:0 1px 3px #000;pointer-events:none;opacity:.9;transition:opacity .6s}
@@ -158,14 +160,14 @@ body.zd-flying #zd-side{top:calc(112px + env(safe-area-inset-top));transform:non
 #zd-fight .stk i{position:absolute;left:50%;top:50%;width:48px;height:48px;margin:-24px 0 0 -24px;border-radius:50%;background:linear-gradient(180deg,#ff5ad5,#b23cff);box-shadow:0 4px 12px rgba(0,0,0,.4)}
 #zd-fight .fly{background:linear-gradient(#5a4a8a,#2b2244)}
 #zd-fight .row4 [data-p]{font-size:25px;line-height:1;opacity:.42;filter:grayscale(.8)}
-#zd-fight .row4 [data-p] small{display:block;font:800 9px system-ui,sans-serif;margin-top:1px}
+#zd-fight .row4 [data-p] small{display:block;font:800 10px system-ui,sans-serif;margin-top:1px}
 #zd-fight .row4 [data-p].ok{opacity:1;filter:none;box-shadow:0 0 14px 3px rgba(255,226,122,.75);border-color:#ffe27a}
 #zd-fight .cmb{position:absolute;right:14px;top:calc(96px + env(safe-area-inset-top));display:none;text-align:right;pointer-events:none;transform-origin:100% 50%;text-shadow:0 2px 4px #000,0 0 2px #000;color:#fff}
 #zd-fight .cmb b{display:block;font:900 44px/0.95 Impact,'Arial Black',system-ui,sans-serif}
 #zd-fight .cmb small{display:block;font:900 11px system-ui,sans-serif;letter-spacing:.06em}
 #zd-fight .blk{background:linear-gradient(#5f6f8c,#2c3650)}
 #zd-fight .row4 .hrl{font-size:24px;line-height:1;background:radial-gradient(circle,#ffb46a,#8a3a10);opacity:.42;filter:grayscale(.8)}
-#zd-fight .row4 .hrl small{display:block;font:800 9px system-ui,sans-serif;margin-top:2px}
+#zd-fight .row4 .hrl small{display:block;font:800 10px system-ui,sans-serif;margin-top:2px}
 #zd-fight .row4 .hrl.ok{opacity:1;filter:none;box-shadow:0 0 14px 3px rgba(255,180,106,.8);border-color:#ffd27a}
 #zd-fight .blk.on{background:linear-gradient(#9fd4ff,#3f7ec4);box-shadow:0 0 14px 3px rgba(150,210,255,.8)}
 #zd-fight .row4 .fr{background:radial-gradient(circle,#7fdcff,#1a5f9c)}
@@ -175,9 +177,9 @@ body.zd-flying #zd-side{top:calc(112px + env(safe-area-inset-top));transform:non
 #zd-fight .fin button{flex:1 1 0;max-width:200px;padding:13px 8px;border-radius:16px;font:900 15px system-ui,sans-serif;background:linear-gradient(#ffd27a,#b86a12);color:#2a1600;border-color:#fff2a8;box-shadow:0 0 18px 4px rgba(255,210,122,.8);animation:zdfin .8s ease-in-out infinite alternate;touch-action:none}
 #zd-fight .fin button small{display:block;font:700 10px system-ui,sans-serif;margin-top:3px;color:#4a2a00}
 @keyframes zdfin{from{transform:scale(1)}to{transform:scale(1.06)}}
-#zd-fight .row4 .hrl~.team{font-size:9px}
+#zd-fight .row4 .hrl~.team{font-size:10px}
 #zd-fight .row4 .team{font:900 22px/1.05 system-ui,sans-serif}
-#zd-fight .row4 .team small{display:block;font:800 9px system-ui,sans-serif;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px}
+#zd-fight .row4 .team small{display:block;font:800 10px system-ui,sans-serif;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px}
 #zd-fight .team{font:900 12px system-ui,sans-serif;letter-spacing:.04em;background:linear-gradient(#3a5a3a,#1f2f22);opacity:.6;overflow:hidden;touch-action:none}
 #zd-fight .team.teambar{position:absolute;left:12px;right:12px;bottom:calc(84px + env(safe-area-inset-bottom));padding:8px 0;border-radius:12px;overflow:hidden}
 #zd-fight .team i{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(138,255,176,.28);transition:width .2s}
@@ -387,7 +389,7 @@ export class FightTest {
   // a blow taken on the block: a fifth of it; just as it was raised, none, and they stagger. Grabs go straight through a block
   blocked(n, kb) { const h = this.h, v = this.v, d = this.dist() || 1, parry = h.t < 0.22; h.hp -= parry ? 0 : n * 0.2; h.vx = (h.x - v.x) / d * kb; h.vz = (h.z - v.z) / d * kb; this.gain(parry ? 18 : 5); this.spark(h.x, h.y + 1.25, h.z, parry ? 3 : 2, [1, 1.7, 2.6]); sfx('clang', h.x, h.y + 1.25, h.z, { gain: parry ? 1 : 0.8, rate: parry ? 1.15 : 1 }); this.g.hitStop = Math.max(this.g.hitStop || 0, parry ? 0.1 : 0.05); this.say(parry ? 'PARRY!' : 'BLOCKED', 0.6, '#9fd4ff'); if (parry) { v.vx = -h.vx * 0.7; v.vz = -h.vz * 0.7; v.go('stun', CLIPS.hitBody); v.t = -0.35; } }
   tap() {
-    if (this.over || this.hDazed) return; const h = this.h, v = this.v; if (h.state === 'spin') { this.spinP = Math.min(24, (this.spinP || 0) + 4.5); return; } /* each tap winds it up */ if (h.state === 'clutch') return; if (h.state === 'drag') { this.dragPunch(); return; } if (this.finKind) { this.finTap(); return; } if (v.state === 'dazed') { if (v.t > 0.45 && (this.dzTap = (this.dzTap || 0) + 1) >= 2) { this.dzTap = 0; this.finPick(this.kit.fin1); } else this.say('DRAW A FINISHER, OR TAP AGAIN', 0.9, '#ffd27a'); return; } /* a second tap is the first finisher: nobody is left standing over a beaten foe not knowing what to do */
+    if (this.over || this.hDazed) return; const h = this.h, v = this.v; if (h.state === 'spin') { this.spinP = Math.min(24, (this.spinP || 0) + 4.5); return; } /* each tap winds it up */ if (h.state === 'clutch') return; if (h.state === 'drag') { this.dragPunch(); return; } if (this.finKind) { this.finTap(); return; } if (v.state === 'dazed') { if (performance.now() - (this.dazeAt || 0) > 450 && (this.dzTap = (this.dzTap || 0) + 1) >= 2) { this.dzTap = 0; this.finPick(this.kit.fin1); } else this.say('DRAW A FINISHER, OR TAP AGAIN', 0.9, '#ffd27a'); return; } /* a second tap is the first finisher: nobody is left standing over a beaten foe not knowing what to do. Taps in the first half second (the last of the mashing) do not count; by the clock, as the knockout runs in slow motion */
     if (h.state === 'ankles') { this.smash(); return; } if (h.state === 'smash') { this.buffer = true; return; }
     if (h.state === 'juggle' || h.state === 'sig') return;
     if (h.state === 'jugWait') { if (['air', 'flung'].includes(v.state) && v.hp > 0) h.go('juggle'); return; }
@@ -559,7 +561,7 @@ export class FightTest {
     D.flash(0.25 + 0.6 * k3); this.g.shake = Math.max(this.g.shake || 0, 1 + 2.5 * k3); this.g.hitStop = Math.max(this.g.hitStop || 0, 0.18 + 0.1 * k3); sfx('collapse', x, this.top, z, { gain: 1 + k3, rate: 0.5 }); sfx('crash', x, this.top, z, { gain: 1, rate: 0.6 }); this.say(k3 > 0.85 ? 'MINI NUKE!' : k3 > 0.4 ? 'SHOCKWAVE!' : 'SLAMMED!', 1.6, '#ffd27a');
   }
   // zero health: dazed and wobbly, waiting for the choice
-  daze() { const v = this.v, h = this.h; if (v.state === 'hold') { h.y = this.top; h.go('hurt', CLIPS.hitBody); } if (h.state === 'charge') { this.charging = false; h.go('idle', C.guard); } v.go('dazed', C.dazed); v.vx = 0; v.vz = 0; v.vy = 0; v.y = this.top; v.armor = false; v.bodyX = null; this.tellOff(); this.combo = 0; this.comboT = 0; this.buffer = false; this.launched = false; this.vh.style.background = 'linear-gradient(90deg,#ffd27a,#fff2a8)'; this.say('FINISH THEM!', 1.6, '#ffd27a'); this.finEl.classList.add('show'); this.el.querySelector('.hint').style.opacity = '0'; sfx('thud', v.x, v.y + 0.84, v.z, { gain: 0.7, rate: 0.5 }); }
+  daze() { const v = this.v, h = this.h; this.dazeAt = performance.now(); if (v.state === 'hold') { h.y = this.top; h.go('hurt', CLIPS.hitBody); } if (h.state === 'charge') { this.charging = false; h.go('idle', C.guard); } v.go('dazed', C.dazed); v.vx = 0; v.vz = 0; v.vy = 0; v.y = this.top; v.armor = false; v.bodyX = null; this.tellOff(); this.combo = 0; this.comboT = 0; this.buffer = false; this.launched = false; this.vh.style.background = 'linear-gradient(90deg,#ffd27a,#fff2a8)'; this.say('FINISH THEM!', 1.6, '#ffd27a'); this.finEl.classList.add('show'); this.el.querySelector('.hint').style.opacity = '0'; sfx('thud', v.x, v.y + 0.84, v.z, { gain: 0.7, rate: 0.5 }); }
   wobble(v) { const r = v.r, t = v.t; r.torso.rotation.z += Math.sin(t * 3.1) * 0.22; r.torso.rotation.x += 0.12 + Math.sin(t * 2.2) * 0.12; r.head.rotation.z += Math.sin(t * 4.3) * 0.25; r.head.rotation.y += Math.sin(t * 1.7) * 0.4; r.root.position.x += Math.sin(t * 1.9) * 0.3; r.root.position.z += Math.cos(t * 1.4) * 0.3; }
   // a trench behind them, in the cement
   scar(x, z, yaw) { if (this.lastScar && Math.hypot(x - this.lastScar[0], z - this.lastScar[1]) < 1.3) return; this.lastScar = [x, z]; const S = this.g.disasters.ctx.scene, m = new THREE.Mesh(this.scarGeo, this.scarMat); m.position.set(x, this.top + 0.05, z); m.rotation.y = yaw + (Math.random() - 0.5) * 0.3; m.scale.set(1.6 + Math.random() * 1, 1, 1.9); S.add(m); this.scars.push(m); if (this.scars.length > 70) S.remove(this.scars.shift()); }
