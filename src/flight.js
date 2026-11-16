@@ -30,6 +30,7 @@ import { HS } from './herogame.js';
 import { WindGame } from './windgame.js';
 import { LiveTornado } from './livestorm.js';
 import { StormGame, StormWar, stormKinds } from './stormgame.js';
+import { note } from './motion.js';
 
 // speeds in metres a second; turn: how hard it turns at full bank; chase: the camera's distance behind and height above;
 // seat: the cockpit's place (forward, up) in the model
@@ -127,6 +128,8 @@ body.zd-flying #zd-bar,body.zd-flying #zd-dis,body.zd-flying #zd-followchip,body
 `;
 
 export class Flight {
+  // the flyer's three states (fly, tossed, down) are in the one table of states too (motion.js): every change is counted there
+  setState(s) { note(this.state, s); this.state = s; }
   constructor(game, ctx) { // ctx: { camera, controls, post, renderer }
     this.g = game; this.ctx = ctx; this.active = false; this.view = 'chase'; this.pos = new THREE.Vector3(); this.q = new THREE.Quaternion();
     this.near = 1; this.focus = 30; this.at = new THREE.Vector3(); this.lod = 3; // main.js: flying, the whole town in view, everything in fewer pieces
@@ -161,7 +164,7 @@ export class Flight {
     const B = this.g.city.bounds, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2, a = Math.random() * Math.PI * 2, R = Math.max(B.x1 - B.x0, B.z1 - B.z0) * 0.5 + 60;
     this.pos.set(cx + Math.cos(a) * R, 95, cz + Math.sin(a) * R);
     this.yaw = Math.atan2(-(cz - this.pos.z), cx - this.pos.x); this.pitch = 0; this.roll = 0;
-    if (this.heroGame && this.inLevel) document.body.classList.add('zd-flying'); this.speed = this.thr = this.P.start; this.ix = this.iy = 0; this.state = 'fly'; this.t = 0; this.obj.visible = this.view !== 'cockpit'; this.snap = true;
+    if (this.heroGame && this.inLevel) document.body.classList.add('zd-flying'); this.speed = this.thr = this.P.start; this.ix = this.iy = 0; this.setState('fly'); this.t = 0; this.obj.visible = this.view !== 'cockpit'; this.snap = true;
     this.hullMax = this.P.hero ? LAB.heroHealth() : 100; this.hull = this.hullMax; this.caught = null; this.thrown = []; this.seedTw = null; this.lock = null; this.punch = 0; this.act = null; this.inB = -1; this.downAt = false; this.clearShots(); // a hero's health by the lab's level
     if (this.P.hero) this.pos.y = 60;
   }
@@ -499,7 +502,7 @@ export class Flight {
     if (this.state !== 'fly') return;
     this.goBase = null;
     const g = this.g, f = g.fire, x = this.pos.x, y = Math.max(1, this.pos.y), z = this.pos.z;
-    this.state = 'down'; this.t = 0; this.obj.visible = false; this.at.set(x, y, z); this.caught = null; this.hull = 0; this.lock = null; this.inB = -1; this.dropInside(); this.downAt = false; this.clearShots();
+    this.setState('down'); this.t = 0; this.obj.visible = false; this.at.set(x, y, z); this.caught = null; this.hull = 0; this.lock = null; this.inB = -1; this.dropInside(); this.downAt = false; this.clearShots();
     if (this.g.audio) this.g.audio.engine(null);
     if (this.P.hero) { f.dustCloud(x, z, 6, Math.min(20, y + 4)); sfx('thud', x, y, z, { gain: 1 }); this.tip((why || 'You were knocked out of the sky!') + ' Back up in a moment'); return; } // knocked down, no fireball
     f.burst(x, y, z, 16, 2.4); f.burst(x, y + 2, z, 10, 1.6);
@@ -517,7 +520,7 @@ export class Flight {
   // then up again where they fell
   hurl(vx, vy, vz, why) {
     if (this.state !== 'fly') return;
-    this.state = 'tossed'; this.vel = new THREE.Vector3(vx, vy, vz); this.lock = null; this.speed = Math.hypot(vx, vz); this.act = { kind: 'dive', t: 0, T: 1e9 }; this.obj.visible = this.view !== 'cockpit'; this.t = 0;
+    this.setState('tossed'); this.vel = new THREE.Vector3(vx, vy, vz); this.lock = null; this.speed = Math.hypot(vx, vz); this.act = { kind: 'dive', t: 0, T: 1e9 }; this.obj.visible = this.view !== 'cockpit'; this.t = 0;
     if (why) this.tip(why);
   }
   tossStep(dt) {
@@ -530,11 +533,11 @@ export class Flight {
       this.pos.y = gy; const x = this.pos.x, z = this.pos.z;
       g.disasters.decals.add('crack', x, z, 8, 8); g.fire.dustCloud(x, z, 5, 5); g.fire.burst(x, 0.5, z, 10, 1.6); sfx('thud', x, gy, z, { gain: 1.2, rate: 0.7 }); g.shake = Math.max(g.shake || 0, 0.5);
       LAB.stats.scared += g.people.scare(x, z, 14, 0.9); this.dropInside(); this.inB = -1;
-      this.state = 'down'; this.t = 0; this.at.set(x, gy, z); this.downAt = true; this.roll = 0; this.act = null;
+      this.setState('down'); this.t = 0; this.at.set(x, gy, z); this.downAt = true; this.roll = 0; this.act = null;
     }
   }
   getUp() { // back on their feet, flying low, slow, nose up
-    this.state = 'fly'; this.downAt = false; this.pos.copy(this.at); this.pos.y = Math.max(this.pos.y, 2.4) + 0.5; this.speed = this.thr = Math.max(this.P.min, this.P.start * 0.5); this.pitch = 0.4; this.roll = 0; this.yaw += Math.PI; this.obj.visible = this.view !== 'cockpit'; this.caught = null;
+    this.setState('fly'); this.downAt = false; this.pos.copy(this.at); this.pos.y = Math.max(this.pos.y, 2.4) + 0.5; this.speed = this.thr = Math.max(this.P.min, this.P.start * 0.5); this.pitch = 0.4; this.roll = 0; this.yaw += Math.PI; this.obj.visible = this.view !== 'cockpit'; this.caught = null;
     this.tip('Back up! Press Lock on to go after them'); if (this.g.audio) this.g.audio.engine(this.P.sound, 0.3);
   }
   // shots at a hero flying in: a villain locked on from 30 to 220 m away throws something every couple of seconds, aimed
