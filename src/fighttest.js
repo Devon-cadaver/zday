@@ -291,7 +291,7 @@ export class Body {
   // each end. All in the rig's own units (a leg is 0.9 long), blended over the stance the clip has by w. Returns the stride as an angle for the arms and shoulders
   gait(r, w, v, run) {
     const L0 = r.legs[0], sc = L0.hip.getWorldScale(_a).y || RIG_S, vr = v / sc, /* the rig's units to metres, as this figure is really drawn (a hero's own build, a giant fight's far-off size) */ l1 = L0.knee.position.length(), l2 = L0.ank ? L0.ank.position.length() : l1, LL = l1 + l2, cl = (n) => Math.max(-1, Math.min(1, n));
-    const Hh = LL * (0.965 - 0.09 * run), e = 0.075 + 0.1 * run, a = Math.min(0.2 + 0.12 * vr, 0.98 * Math.sqrt(Math.max(0.01, LL * LL - (Hh - e) * (Hh - e)))), beta = 0.62 - 0.1 * Math.min(1, vr / 3) - 0.24 * run;
+    const Hh = LL * (0.965 - 0.09 * run), e = 0.075 + 0.1 * run, a = Math.min(0.26 + 0.14 * vr, 0.98 * Math.sqrt(Math.max(0.01, LL * LL - (Hh - e) * (Hh - e)))), beta = 0.62 - 0.16 * Math.min(1, vr / 2.2) - 0.18 * Math.sqrt(run); // longer, slower steps than the first go (the gait sheet: a stroll was 2.1 steps a second, a jog 4.5): now about 1.5 at a stroll, 2.4 at a brisk 2 m/s (a little air under her already), 3.4 at a jog, 4.1 flat out
     const ph0 = this.gph = (((this.gph || 0) + (this.gd || 0) / sc * beta / (2 * a)) % 1 + 1) % 1; let air = true, cmin = 9;
     for (let i = 0; i < 2; i++) { const q = r.legs[i], ph = (ph0 + i * 0.5) % 1; let x, y, pitch;
       if (ph < beta) { const t = 2 * ph / beta - 1; x = -a * t; y = -Hh + e * Math.abs(t * t * t); pitch = t < 0 ? -0.3 * t * t : 0.55 * t * t; air = false; } // down: from a in front (t -1) to a behind (t 1)
