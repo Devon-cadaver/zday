@@ -10,6 +10,7 @@
 // picture tumbles, breaks up into static (SIGNAL LOST), and cuts to another one.
 import * as THREE from 'three';
 import { sfx } from './audio.js';
+import { Director } from './tvdirector.js';
 
 const ease = (u) => 1 - (1 - u) * (1 - u), smooth = (u) => u * u * (3 - 2 * u);
 
@@ -48,6 +49,7 @@ export class TvCam {
     const o = this.g.post.opts; this.dof0 = { bandK: o.bandK, rangeK: o.rangeK, blurFrac: o.blurFrac }; // the tilt-shift look, put back after
     this.L = new THREE.Vector3(); this.LV = new THREE.Vector3(); this.P = new THREE.Vector3(); this.F = new THREE.Vector3(); this.fx = []; this.t = 0; // LV: how fast the look is panning
     this.fov0 = this.g.camera.fov; // the zooms go from it and back
+    this.dir = new Director(this); // in a level: the shots that keep both fighters in view (tvdirector.js)
   }
   dispose() {
     Object.assign(this.g.post.opts, this.dof0);
@@ -105,6 +107,7 @@ export class TvCam {
   }
   // the viewer's Change camera: on to the next live camera in turn (a bad angle, or one that is slow to draw); the director holds off a while
   change() {
+    if (this.tv.lv && this.dir.S) { this.dir.cut(this.dir.S, 'time'); return; } // a level: the director's next angle that sees them both
     if (this.lost > 0 || (this.attack && this.attack.hit)) return;
     if (this.attack) { this.release(this.attack); this.attack = null; this.clearFx(); }
     const live = this.cams.filter(c => c.alive && (c.kind === 'heli' || !this.g.city.dead[c.k])); if (live.length < 2) { this.pick(true); return; }
@@ -117,6 +120,7 @@ export class TvCam {
   update(dt, sdt) {
     const g = this.g, cam = g.camera, tg = g.controls.target;
     this.t += dt;
+    if (this.tv.lv && !this.attack && !(this.lost > 0) && this.dir.step(dt)) { this.levelFrame(dt); return; } // a level: the director's shots
     const A0 = this.attack, look = this.lookAt(A0);
     const p = look || (A0 && A0.style === 'grab') ? null : this.want(); // coming for us: the orbit holds still
     // where to look: a flyer right on it (seen from above, the town behind); on the ground a little below the middle of it
@@ -172,6 +176,21 @@ export class TvCam {
     g.focusAt = this.F; // the depth of field on the action
     if (A0 && A0.style === 'grab' && A0.hit && !A0.who.kaiju) { const v = A0.who.obj; g.focusAt = this._fv || (this._fv = new THREE.Vector3()); g.focusAt.set(v.x, (v.y || 0) + 3.5, v.z); } // sharp on the one holding the camera (and the near plane close enough to draw it)
     if (c.kind === 'heli' && (this.labT = (this.labT || 0) - dt) <= 0) { this.labT = 0.5; this.show(); }
+  }
+
+  // a level's frame: where the director put the lens, the depth of field across both fighters (sharp from one to the other), the label
+  levelFrame(dt) {
+    const g = this.g, cam = g.camera, D = this.dir, o = g.post.opts, f = D.focus, k = 1 - Math.exp(-dt * 5);
+    this.P.copy(D.P); this.F.copy(D.F); this.L.copy(D.F); cam.position.copy(this.P); g.controls.target.copy(this.F); cam.lookAt(this.F); g.zoomTo = 0;
+    if (Math.abs(cam.fov - D.fov) > 0.01) { cam.fov = D.fov; cam.updateProjectionMatrix(); }
+    if (f) { o.bandK += (f.bandK - o.bandK) * k; o.rangeK += (f.rangeK - o.rangeK) * k; o.blurFrac += (this.dof0.blurFrac * 0.55 - o.blurFrac) * k; this.focusD = f.d; this.focusPt = (this.focusPt || new THREE.Vector3()).copy(this.F).sub(this.P).normalize().multiplyScalar(f.d).add(this.P); g.focusAt = this.focusPt; }
+    if (this.cur && this.cur.kind === 'heli' && (this.labT = (this.labT || 0) - dt) <= 0) { this.labT = 0.5; this.show(); }
+  }
+  // the director cut to a new shot: a helicopter (SKY 7 wide and from the side, SKY 4 over a shoulder) or a viewer's rooftop video
+  onShot(s) {
+    if (s.k === 'roof') this.cur = s.cam;
+    else { const H = this.cams.filter((c) => c.kind === 'heli' && c.alive); if (!H.length) { const h = { kind: 'heli', name: 'SKY ' + (5 + this.cams.length), alive: true }; this.cams.push(h); H.push(h); } this.cur = H[['side', 'high', 'top'].includes(s.k) ? 0 : Math.min(1, H.length - 1)]; }
+    this.onAirT = 0; this.zoom = null; this.focusPt = null; this.show();
   }
 
   // now and then a slow zoom in on the action, a hold, and back out (a viewer's phone more often, and closer); out again

@@ -15,7 +15,7 @@ import { stickTo, dashWorld } from './fightbot.js';
 export const FOOT = ['aliens', 'zombies', 'worm', 'kaiju', 'riot', 'quake']; // fought on foot (horde.js)
 export const AIR = ['tornado', 'flood', 'tsunami', 'haboob', 'coldwave']; // fought in the air (livestorm.js): the storm, then the villain in it
 export const AFTER = { worm: 'THE BURROWER', kaiju: 'THE BEAST KEEPER', zombies: 'the zombie general', aliens: 'the alien general', riot: 'the instigators', tornado: 'TWISTER', flood: 'CAPTAIN DELUGE', tsunami: 'RIPTIDE', haboob: 'THE DUST DEVIL', coldwave: 'JACK FROST' }; // the villain after the disaster
-const RUSH_T = 150; // s: a level drawn to be won and still going: the team sweeps in
+const RUSH_T = 115; // s: a level drawn to be won and still going: the team sweeps in (Sean, 2026-11-15: more action, less waiting)
 
 export class WatchLevel extends HeroGame {
   constructor(g, tv) { g.heroGo = false; super(g, 'hero'); this.tv = tv; } // HeroGame's own start waits for g.mode to be it, which it never is
@@ -58,6 +58,7 @@ export class WatchLevel extends HeroGame {
     // the hero's health and the disaster's, held to the draw
     if (this.keepUp()) { if (H.active && H.h && H.h.hp < 15) H.h.hp = 15; if (F.active && F.fromHorde && F.hull < (F.hullMax || 100) * 0.15) F.hull = (F.hullMax || 100) * 0.15; }
     if (!this.W.win && this.W.lossAt === 'disaster' && R.boss && R.boss.heroHp < 20) R.boss.heroHp = 20; // she falls before it does
+    if (!this.keepUp() && H.active && H.h && !H.over && !H.fl && (R.boss ? R.boss.heroHp <= 20.5 : this.t > 75) && (this.wearT = (this.wearT || 0) + 1 / 60) > 6 && (this.wearN = (this.wearN || 0) - 1 / 60) <= 0) { this.wearN = 1.6; H.bite(7); } // drawn to lose and held at the last of it: worn down, not left standing there (Sean: more action)
     if (this.W.win && this.t > RUSH_T && H.active && !H.over) this.rush(1 / 60);
     if (this.air) { this.airFate(1 / 60); this.airBot(1 / 60); return; }
     // up in the air after a fight in it: back down into the street, or at the next general
@@ -71,20 +72,21 @@ export class WatchLevel extends HeroGame {
   airFate(dt) {
     const F = this.g.flight, L = F.live, up = this.keepUp(), sh = this.stormHp();
     if (sh != null) { if (this.lastSh != null && sh < this.lastSh && up && sh > 0) this.stormSet(Math.max(1, sh - (this.lastSh - sh) * Math.max(0, this.t - 50) / 40)); if (!up && this.W.lossAt === 'disaster' && sh < 35) this.stormSet(35); /* a blow can take 30: it must not reach 0 */ if (up && this.W.win && this.t > RUSH_T && (this.rushT = (this.rushT || 0) - dt) <= 0) { this.rushT = 1; if (this.stormHp() > 1) this.stormSet(Math.max(1, this.stormHp() - 4)); if (L && L.laser && !L.drain) { L.pow = 100; L.armed = true; } if (!this.rushSaid) { this.rushSaid = true; F.bigText('THE TEAM SWEEPS IN!', '#8affb0', 1.6); } } this.lastSh = this.stormHp(); } else this.lastSh = null;
-    if (F.active && F.state === 'fly') { const mx = F.hullMax || 100; if (up) { if (F.hull < mx * 0.15) F.hull = mx * 0.15; } else if (this.t < 55) { if (F.hull < mx * 0.25) F.hull = mx * 0.25; } else if (this.lastHull != null && F.hull < this.lastHull) { const extra = (this.lastHull - F.hull) * (this.t - 55) / 25; this.lastHull = null; F.damage(extra, 'Too much!'); } /* drawn to lose: a fight first, then worn down */ this.lastHull = F.state === 'fly' ? F.hull : null; if (!up && this.t > 210) F.damage(mx * 2, 'It was too much!'); } else this.lastHull = null;
+    if (F.active && F.state === 'fly') { const mx = F.hullMax || 100; if (up) { if (F.hull < mx * 0.15) F.hull = mx * 0.15; } else if (this.t < 55) { if (F.hull < mx * 0.25) F.hull = mx * 0.25; } else if (this.lastHull != null && F.hull < this.lastHull) { const extra = (this.lastHull - F.hull) * (this.t - 55) / 25; this.lastHull = null; F.damage(extra, 'Too much!'); } /* drawn to lose: a fight first, then worn down */ this.lastHull = F.state === 'fly' ? F.hull : null; if (!up && this.t > 170) F.damage(mx * 2, 'It was too much!'); } else this.lastHull = null;
   }
   // in the air: PUNCH what is thrown at her as it comes in (or GRAB it), the laser when it is full, TAP TAP TAP when it asks, DRAIN when the water is high; nothing coming, LOCK ON (at the face, at the man with the hose, at the villain)
   airBot(dt) {
     const g = this.g, F = g.flight, L = F.live, B = this.B, up = this.keepUp(); if (!F.active || F.state !== 'fly' || g.fightTest.active || !B) return; B.tap -= dt; B.cd -= dt;
+    if (L && !L.drain && L.throwT > 1.7) L.throwT = 1.7; // (Sean, 2026-11-15: more action) the storm throws at her more often: more to punch back
     if (L && L.mash) { if (B.tap <= 0) { B.tap = up ? 0.1 + Math.random() * 0.05 : 0.24 + Math.random() * 0.1; L.mash.tap(); } return; }
     if (F.ring) return;
     if (L && L.laser && !L.drain) { if (L.armed && !L.lasing) L.laser(true); else if (L.lasing && !L.armed) L.laser(false); }
-    if (L && L.nearest && L.parry && !L.drain) { const q = L.nearest(22); if (q && !q.tried) { q.tried = true; if (Math.random() < (up ? (this.t < 45 ? 0.5 : 0.72) : this.t < 55 ? 0.6 : 0.3)) { const d = q.m.position.distanceTo(F.pos); if (d < 15 && L.grab && Math.random() < 0.35) L.grab(); else L.parry(); } return; } }
+    if (L && L.nearest && L.parry && !L.drain) { const q = L.nearest(22); if (q && !q.tried) { q.tried = true; if (Math.random() < (up ? (this.t < 35 ? 0.62 : 0.8) : this.t < 55 ? 0.62 : 0.32)) { const d = q.m.position.distanceTo(F.pos); if (d < 15 && L.grab && Math.random() < 0.35) L.grab(); else L.parry(); } return; } }
     if (L && L.drain && L.water > 0.55 && !(L.diveCd > 0)) { L.drain(); return; }
-    if (B.cd <= 0) { B.cd = L && L.drain ? 4 + Math.random() * 2 : 3.5 + Math.random() * 2; if (L && L.wall) { F.lockOn(); return; } }
+    if (B.cd <= 0) { B.cd = L && L.drain ? 3 + Math.random() * 1.5 : 1.8 + Math.random() * 1.4; if (L && L.wall) { F.lockOn(); return; } }
     // between moves she circles it, closing in and pulling back (Sean: the hero just hovered there)
     const c = L && L.drain ? { x: L.px, y: L.py, z: L.pz } : L && L.at && L.at.x != null ? L.at : null;
-    if (c && Number.isFinite(c.x)) { B.orb = (B.orb == null ? Math.random() * 6.28 : B.orb) + dt * 0.3; const R0 = 45 + 15 * Math.sin(B.orb * 1.7), tx = c.x + Math.cos(B.orb) * R0, tz = c.z + Math.sin(B.orb) * R0, ty = Math.max(28, (c.y || 30) - 4), dx = tx - F.pos.x, dy = ty - F.pos.y, dz = tz - F.pos.z, d = Math.hypot(dx, dy, dz); if (d > 1.5) { const st = Math.min(d, 16 * dt); F.pos.x += dx / d * st; F.pos.y += dy / d * st; F.pos.z += dz / d * st; if (F.holdY != null) F.holdY = F.pos.y; } F.yaw = Math.atan2(-(c.z - F.pos.z), c.x - F.pos.x); }
+    if (c && Number.isFinite(c.x)) { B.orb = (B.orb == null ? Math.random() * 6.28 : B.orb) + dt * 0.3; const R0 = 32 + 10 * Math.sin(B.orb * 1.7), tx = c.x + Math.cos(B.orb) * R0, tz = c.z + Math.sin(B.orb) * R0, ty = Math.max(28, (c.y || 30) - 4), dx = tx - F.pos.x, dy = ty - F.pos.y, dz = tz - F.pos.z, d = Math.hypot(dx, dy, dz); if (d > 1.5) { const st = Math.min(d, 21 * dt); F.pos.x += dx / d * st; F.pos.y += dy / d * st; F.pos.z += dz / d * st; if (F.holdY != null) F.holdY = F.pos.y; } F.yaw = Math.atan2(-(c.z - F.pos.z), c.x - F.pos.x); }
   }
   // a level drawn to be won, still going: the rest of the team sweeps in
   rush(dt) {
@@ -118,10 +120,12 @@ export class WatchLevel extends HeroGame {
       if (s && bd < 40) { if (bd < 2) { H.stick = null; if (H.grabOn()) { B.held = 0.5; return; } } else { stickTo(H, s.x - h.x, s.z - h.z); this.stuckStep(dt); return; } }
     }
     // the team, a power, now and then
-    if (B.cd <= 0) { B.cd = 1 + Math.random() * 1.2; const K = H.kit, near = H.nearest(6); if (H.team >= 100 && !H.mateR && H.mates.length && (near || H.o.boss || fl)) { H.teamGo(Math.floor(Math.random() * H.mates.length)); return; } if (near && Math.random() < 0.3 && H.energy >= (H.COST[K.knock] || 99) + 12) { H.cast(K.knock); setTimeout(() => H.castUp(K.knock), 300 + Math.random() * 500); return; } }
+    if (B.cd <= 0) { B.cd = fl ? 1 + Math.random() * 1.2 : 0.5 + Math.random() * 0.6; const K = H.kit, near = H.nearest(6); if (H.team >= 100 && !H.mateR && H.mates.length && (near || H.o.boss || fl)) { H.teamGo(Math.floor(Math.random() * H.mates.length)); return; } const boss = !fl && H.o.boss && H.o.boss.alive && H.bossNear && H.bossNear(12);
+      if (boss && this.t - (B.smAt || 0) > 7 && Math.random() < 0.4) { B.smAt = this.t; H.takeOff(); return; } // a giant: up, and the SMASH LANDING on it (update brings her down)
+      if ((near || boss) && Math.random() < (fl ? 0.3 : 0.55) && H.energy >= (H.COST[K.knock] || 99) + 12) { if (boss && !near && H.bossYaw) h.yaw = H.bossYaw(); H.cast(K.knock); setTimeout(() => H.castUp(K.knock), 300 + Math.random() * 500); return; } }
     // someone to hit
     const n = H.nearest(11);
-    if (n) { H.stick = null; if (B.tap <= 0) { B.tap = 0.24 + Math.random() * 0.14; H.tap(); } return; }
+    if (n) { H.stick = null; if (B.tap <= 0) { B.tap = fl ? 0.24 + Math.random() * 0.14 : 0.17 + Math.random() * 0.1; H.tap(); } return; }
     // the giant, the boss, a tripod's foot: go in and hit
     let tx = null, tz = null, R = 2.6;
     if (fl) { const q = fl.giants.filter((q) => q.alive && q.stage === 3 && !['rise', 'sink', 'crumble'].includes(q.state)).sort((a, b) => d2(a.x, a.z) - d2(b.x, b.z))[0]; if (q) { tx = q.x; tz = q.z; R = q.size * 0.2 + 1.6; } }
@@ -131,7 +135,7 @@ export class WatchLevel extends HeroGame {
     if (tx == null) { const q = (H.gens || []).find((q) => !q.gone && q.ground); if (q) { tx = q.x; tz = q.z; R = 2; } }
     if (tx == null) { H.stick = null; return; }
     if (d2(tx, tz) > R) { const d = d2(tx, tz); if (B.goD == null || d < B.goD - 3) { B.goD = d; B.goT = 0; } else if ((B.goT += dt) > 5 && R >= 9) { B.goT = 0; B.goD = null; H.stick = null; H.takeOff(); return; } /* walled off from them: up, and down by the nearest (update) */ stickTo(H, tx - h.x, tz - h.z); this.stuckStep(dt); return; }
-    H.stick = null; B.goD = null; h.yaw = Math.atan2(tx - h.x, tz - h.z); if (B.tap <= 0) { B.tap = 0.28 + Math.random() * 0.14; H.tap(); }
+    H.stick = null; B.goD = null; h.yaw = Math.atan2(tx - h.x, tz - h.z); if (B.tap <= 0) { B.tap = fl ? 0.28 + Math.random() * 0.14 : 0.2 + Math.random() * 0.1; H.tap(); }
   }
   // walking and getting nowhere (a wall, a car): a dash to one side
   stuckStep(dt) { const B = this.B, h = this.g.horde.h; if ((B.stuck += dt) < 1.4) return; const moved = Math.hypot(h.x - B.sx, h.z - B.sz); B.stuck = 0; B.sx = h.x; B.sz = h.z; if (moved < 1) { const a = Math.random() * 6.28; dashWorld(this.g.horde, Math.cos(a), Math.sin(a)); } }

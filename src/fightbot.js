@@ -28,7 +28,7 @@ export function botStep(T, dt) {
   // the foe at zero: a finisher from her two, a scripted one by choice (they run themselves; taps add to the last blow)
   if (v.state === 'dazed' && !T.finKind) { T.stick = null; if ((B.fin += dt) > 0.5) { B.fin = 0; const k = T.kit, opts = [k.fin1, k.fin2].filter(Boolean), s = opts.filter((f) => FIN_SCRIPTS[f]); T.finPick(pick(s.length && Math.random() < 0.8 ? s : opts)); } return; }
   if (T.finKind) { T.stick = null; if (T.finRun && B.tap <= 0) { B.tap = 0.16 + Math.random() * 0.1; T.tap(); } if (h.state === 'drag') { if ((B.drag += dt) > 1.4 + Math.random() * 0.6) { B.drag = 0; T.release(); } } else B.drag = 0; return; }
-  if (h.state === 'clutch') { if ((B.clutch += dt) > 0.3) { B.clutch = 0; T.grabPick(pick(['suplex', 'slam', 'throw', 'throw', 'drag'])); } return; }
+  if (h.state === 'clutch') { if ((B.clutch += dt) > 0.25) { B.clutch = 0; T.grabPick(pick(['suplex', 'slam', 'throw', 'throw', 'drag', 'drag', 'spin'])); } return; } // the throws and the neck drag go through buildings (Sean: more of the town wrecked)
   if (h.state === 'spin') { if (h.t > 1.2) T.toss(); else if (B.tap <= 0) { B.tap = 0.12; T.tap(); } return; }
   if (h.state === 'ankles') { if (B.tap <= 0) { B.tap = 0.3; T.tap(); } return; }
   if (h.state === 'charge') { if ((B.chg += dt) > 0.5) { B.chg = 0; T.release(); } return; } // a heavy wound up (GRAB out of reach): let it go
@@ -45,18 +45,20 @@ export function botStep(T, dt) {
   if (h.state === 'block' && !WINDS.includes(v.state)) T.release();
   if (T.counterT > 0 && B.tap <= 0) { B.tap = 0.1; T.tap(); return; } // dashed in time: the counter
   // now and then: the team, a power, a grab
-  if (B.cd <= 0 && ['idle', 'attack', 'land'].includes(h.state) && !slack) {
-    B.cd = 0.7 + Math.random() * 1.1; const q = Math.random(), K = T.kit;
-    if (T.team >= 100 && !T.mateR && T.mates.length && q < 0.6) { T.teamGo(Math.floor(Math.random() * T.mates.length)); return; }
-    if (q < 0.22 && T.energy >= T.COST[K.stun] + 10 && T.canTarget(K.stun)) { T.cast(K.stun); B.up = { id: K.stun, t: 0.15 }; return; }
-    if (q < 0.4 && T.energy >= T.COST[K.knock] + 10 && T.canTarget(K.knock)) { T.cast(K.knock); B.up = { id: K.knock, t: 0.3 + Math.random() * 0.8 }; return; }
-    if (q < 0.55 && d < 3 && !['down', 'air', 'flung', 'getup'].includes(v.state)) { if (T.grabOn()) return; }
-    if (q < 0.65 && v.state === 'down' && v.hp > 0) { if (T.grabOn()) return; } // by the feet
+  // (Sean, 2026-11-15: more action) a move every half second or so; a building torn up and HURLED now and then; drawn to lose, she still tries things
+  if (B.cd <= 0 && ['idle', 'attack', 'land'].includes(h.state) && (!slack || Math.random() < 0.35)) {
+    B.cd = 0.35 + Math.random() * 0.55; const q = Math.random(), K = T.kit;
+    if (T.team >= 100 && !T.mateR && T.mates.length && q < 0.75) { T.teamGo(Math.floor(Math.random() * T.mates.length)); return; }
+    if (q < 0.2 && T.energy >= T.COST[K.stun] + 10 && T.canTarget(K.stun)) { T.cast(K.stun); B.up = { id: K.stun, t: 0.15 }; return; }
+    if (q < 0.38 && T.energy >= T.COST[K.knock] + 10 && T.canTarget(K.knock)) { T.cast(K.knock); B.up = { id: K.knock, t: 0.3 + Math.random() * 0.6 }; return; }
+    if (q < 0.5 && T.hurl && T.energy >= 44 && d > 3.5 && (B.hurlT = (B.hurlT || 0) - 1) < 0) { B.hurlT = 3; T.hurl(); return; } // a building at them
+    if (q < 0.68 && d < 3 && !['down', 'air', 'flung', 'getup'].includes(v.state)) { if (T.grabOn()) return; }
+    if (q < 0.78 && v.state === 'down' && v.hp > 0) { if (T.grabOn()) return; } // by the feet
   }
   // in to hit: walk in from far, then the combo (a tap from a little way off lunges the rest)
   if (d > 7 && ['idle'].includes(h.state)) { stickTo(T, v.x - h.x, v.z - h.z); return; }
   T.stick = null;
-  if (B.tap <= 0 && ['idle', 'attack', 'lunge', 'land', 'dodge', 'jugWait'].includes(h.state) && !['down', 'getup'].includes(v.state)) { B.tap = (0.24 + (1 - sk) * 0.18 + Math.random() * 0.12) * (coast ? 1.5 : 1); T.tap(); }
+  if (B.tap <= 0 && ['idle', 'attack', 'lunge', 'land', 'dodge', 'jugWait'].includes(h.state) && !['down', 'getup'].includes(v.state)) { B.tap = (0.17 + (1 - sk) * 0.12 + Math.random() * 0.08) * (coast ? 1.2 : 1); T.tap(); }
 }
 // a swipe that sends her (wx, wz) in the world: the inverse of swipe()'s screen to world
 export function dashWorld(T, wx, wz) {
