@@ -2026,7 +2026,8 @@ export class People {
       else { const air = s === S.JUMP || s === S.EXT || s === S.AIR; let g = 0, k = 0; // the stride. In the air (thrown, falling) the legs go by the clock, as they did
         if (!air) { if (dts > 0) { const v = this.gv[i] + ((gJump ? 0 : gd / dts) - this.gv[i]) * kV; this.gv[i] = v < 0.02 && gd === 0 ? 0 : v; } if (GAIT[an]) { this.gl[i] = g = an; k = this.gv[i] > 0.12 ? strideK(an, this.gv[i]) : 0; } else if (an === 0 && this.ga[i] > 0.05 && this.gl[i]) g = this.gl[i]; /* stopped: the last of the stride dies away */ } else this.gv[i] = 0;
         if (dts > 0) { const a = this.ga[i] + (k - this.ga[i]) * kA; this.ga[i] = k === 0 && a < 0.05 ? 0 : a; }
-        if (g) { if (!gJump && gd > 0) this.gp[i] = (this.gp[i] + gd / strideLen(g, Math.max(0.55, k || this.ga[i]), kit[i * 4 + 3])) % 1; anim[i] = gaitCode(g, this.gp[i], this.ga[i]); } else { anim[i] = an; if (air || an !== 0) this.ga[i] = 0; } }
+        /* the stride moves on by the size it is drawn at (not the size it is growing to), so the foot keeps its spot while they speed up too */
+        if (g) { if (!gJump && gd > 0) this.gp[i] = (this.gp[i] + gd / strideLen(g, Math.max(0.55, this.ga[i]), kit[i * 4 + 3])) % 1; anim[i] = gaitCode(g, this.gp[i], this.ga[i]); } else { anim[i] = an; if (air || an !== 0) this.ga[i] = 0; } }
       if (this.crLayer && this.crLayer.put(i, this.zt[i], arr, o, t)) arr.fill(0, o, o + 16); // drawn by the creature layer instead
       if (s === S.DEAD) { dead++; continue; }
       if (s === S.ALIEN) continue;
