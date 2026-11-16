@@ -31,6 +31,7 @@ const pileH = (n) => 1.7 * Math.sqrt(n) + 0.5;
 const pileR = (n) => pileH(n) * 0.65 + 1.0;
 
 const S = ST;
+const BODY_T = 3.6; // s: how long a body is drawn (people.vanish with body)
 const CIV = new Uint8Array(32); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.ROOF, S.COP, S.FIREMAN, S.BOARD, S.RIOT, S.FILM, S.PRAY, S.FIGHT, S.STEAL].forEach(s => { CIV[s] = 1; });
 const INHASH = new Uint8Array(32); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.ROOF, S.COP, S.FIREMAN, S.BOARD, S.RIOT, S.GRABBED, S.TURNING, S.ZOMBIE, S.ALIEN, S.FROZEN, S.FILM, S.HELD, S.PRAY, S.FIGHT, S.STEAL].forEach(s => { INHASH[s] = 1; });
 const HITTABLE = new Uint8Array(32); [S.WALK, S.IDLE, S.FLEE, S.RETURN, S.SEEK, S.COP, S.FIREMAN, S.BOARD, S.RIOT, S.GRABBED, S.TURNING, S.ZOMBIE, S.ALIEN, S.FROZEN, S.FILM, S.HELD, S.PRAY, S.FIGHT, S.STEAL].forEach(s => { HITTABLE[s] = 1; });
@@ -115,7 +116,7 @@ export class People {
     this.x = F(); this.z = F(); this.y = F(); this.t1 = F(); this.inc = F(); this.inc0 = F(); this.spd = F(); this.s = F(); this.lat = F();
     this.hx = F(); this.hz = F(); this.tx = F(); this.tz = F(); this.think = F(); this.wt = F(); this.hp = F();
     this.braceT = new Float32Array(N); // curled up in a ball for this long, a storm wall about to hit (brace.js)
-    this.wz = new Uint8Array(N); this.wet = new Float32Array(N); this.cuff = new Float32Array(N); // seconds spent handcuffing a rioter
+    this.wz = new Uint8Array(N); this.body = new Float32Array(N); /* a body left by vanish(j, true): seconds it has lain (0: none) */ this.wet = new Float32Array(N); this.cuff = new Float32Array(N); // seconds spent handcuffing a rioter
     this.px = new Float32Array(N); this.pz = new Float32Array(N); this.watch = new Uint8Array(N); // what someone is watching (a disaster nearby)
     this.st = new Uint8Array(N); this.inf = new Uint8Array(N); this.dirty = new Uint8Array(N); this.fx = new Uint8Array(N); this.kind = new Uint8Array(N); this.zt = new Uint8Array(N);
     this.zrad = new Uint8Array(N); this.spitT = new Float32Array(N); this.specT = 0; // irradiated (turns radioactive); a spitter's cooldown
@@ -355,7 +356,7 @@ export class People {
     this.time = 0; this.bldT = 0; this.firstRoof = false;
     this.stats = { humans: this.nHuman, infected: 0, zombies: 0, dead: 0, roof: 0, bites: 0, runover: 0, shot: 0, officers: 0, rescued: 0, bombed: 0, bombedCiv: 0, bused: 0, nukedCiv: 0, nukedZ: 0,
       disasterCiv: 0, disasterZ: 0, drowned: 0, abducted: 0, aliens: 0, aliensKilled: 0, rioters: 0, arrests: 0, jailed: 0, treated: 0, prayed: 0, fought: 0, stole: 0 };
-    this.wz.fill(0); this.wet.fill(0); this.cuff.fill(0); this.watch.fill(0); this.waterAt = null; this.afloat = false; this.alarmT = 0; this.speedK = 1; this.mobs = [];
+    this.wz.fill(0); this.wet.fill(0); this.cuff.fill(0); this.watch.fill(0); this.waterAt = null; this.afloat = false; this.body.fill(0); this.alarmT = 0; this.speedK = 1; this.mobs = [];
     this.hord.fill(-1); this.hordes.clear(); this.hordeT = 0;
     this.events = [];
     this.flashList.length = 0; this.grenades.length = 0; this.grenadeCd = 0;
@@ -682,7 +683,7 @@ export class People {
   drop(x, z, type = 0, slot = -1) { // slot: an old one of the horde's (horde.js) dropped again
     const p = this.snapWalkable(x, z);
     if (!p || (slot < 0 && this.active >= this.N)) return -1;
-    const i = slot >= 0 ? slot : this.active++;
+    const i = slot >= 0 ? slot : this.active++; this.body[i] = 0;
     this.drops++;
     this.target[i] = -1; this.think[i] = 0; this.wt[i] = 0; this.bt[i] = -1; this.kind[i] = 0;
     this.startFall(i, p[0], p[1], this.groundY(p[0], p[1]) + 30, false);
@@ -1932,7 +1933,8 @@ export class People {
   hide(j) { const s = this.st[j]; if (s === S.DEAD || s === S.EVAC) return false; if (s === S.PILE || s === S.CLIMB) { const k = this.bt[j]; if (k >= 0) this.bPile[k] = Math.max(0, this.bPile[k] - 1); } if (s === S.INSIDE) { const k = this.bt[j]; if (k >= 0) this.bIn[k] = Math.max(0, this.bIn[k] - 1); } this.st[j] = S.EVAC; this.lvl[j] = -1; this.inf[j] = 0; this.target[j] = -1; this.bt[j] = -1; this.dirty[j] = 1; return true; }
   // a rioter knocked flat and calmed: they come to, and go home (never hurt)
   calm(j) { if (this.st[j] !== S.RIOT && this.st[j] !== S.EXT) return false; const m = this.mobs[this.bt[j]]; this.st[j] = S.FLEE; this.bt[j] = -1; this.target[j] = -1; this.inf[j] = 0; this.lvl[j] = -1; this.fx[j] = 0; this.t1[j] = 0; this.y[j] = this.groundY(this.x[j], this.z[j]); this.dirty[j] = 1; if (m) m.calmed = (m.calmed || 0) + 1; return true; }
-  vanish(j) { const s = this.st[j]; if (s !== S.ZOMBIE && s !== S.FALLING && s !== S.TURNING) return false; this.st[j] = S.EVAC; this.lvl[j] = -1; this.inf[j] = 0; this.target[j] = -1; this.bt[j] = -1; this.dirty[j] = 1; return true; }
+  // body: it is out of the game at once, but is drawn falling over, lying, then sinking into the ground (sync), not gone on the spot (Sean, 2026-11-16: "it feels weird when they just disappear")
+  vanish(j, body) { const s = this.st[j]; if (s !== S.ZOMBIE && s !== S.FALLING && s !== S.TURNING) return false; this.body[j] = body ? 0.001 : 0; this.y[j] = this.groundY(this.x[j], this.z[j]); this.st[j] = S.EVAC; this.lvl[j] = -1; this.inf[j] = 0; this.target[j] = -1; this.bt[j] = -1; this.dirty[j] = 1; return true; }
   bite(i, j, Z) {
     if (Z.alien || Z.robot || Z.army) { this.t1[i] = Z.biteT + Z.recover; this.target[i] = -1; this.panic(j, this.x[i], this.z[i], i); return; } // the invasion's soldiers and the robots scatter people; only a zombie's bite makes a zombie (Sean: level 1 just aliens)
     this.st[j] = S.GRABBED; this.t1[j] = Z.biteT; this.target[j] = i;
@@ -1988,7 +1990,7 @@ export class People {
       const o = i * 16;
       let an = ANIM[s];
       if (s === S.GO && (this.fx[i] === 8 || this.fx[i] === 7)) an = 0; // standing about at a park or a square, waiting at the kerb
-      if (s === S.INSIDE || s === S.EVAC) { arr.fill(0, o, o + 16); if (s === S.INSIDE) { if (this.inf[i]) infected++; else if (this.kind[i] === KIND.CIVILIAN) humans++; } continue; } // sheltering indoors still counts as alive
+      if (s === S.EVAC && this.body[i] > 0 && (this.body[i] += dts) > BODY_T) this.body[i] = 0; if (s === S.INSIDE || (s === S.EVAC && !(this.body[i] > 0))) { arr.fill(0, o, o + 16); if (s === S.INSIDE) { if (this.inf[i]) infected++; else if (this.kind[i] === KIND.CIVILIAN) humans++; } continue; } // sheltering indoors still counts as alive
       if (s === S.ALIEN) aliens++;
       let tilt = 0, y = this.y[i];
       if (s === S.ZOMBIE) {
@@ -2004,6 +2006,7 @@ export class People {
       else if (s === S.EXT && this.fx[i] === 3) an = 12; // on a rescue rope, holding on with both hands
       else if (s === S.EXT || s === S.AIR) tilt = t * (5 + (i % 5)) + i;
       else if (s === S.DEAD) { tilt = Math.PI / 2; y += 0.17; }
+      else if (s === S.EVAC) { const T = this.body[i], f = Math.min(1, T / 0.35), sink = Math.max(0, (T - (BODY_T - 1.4)) / 1.4); tilt = (i % 2 ? 1 : -1) * Math.PI / 2 * (1 - (1 - f) * (1 - f)); y += 0.17 * f - sink * sink * 1.6 * (ZTYPES[this.zt[i]].creature ? 1.5 : 1); an = 0; } // a body: over in a third of a second, lying, then down into the street
       else if (s === S.ROOF) an = this.t1[i] > 0 || this.fx[i] === 2 ? 2 : this.fx[i] === 1 ? 1 : this.fx[i] === 3 ? 6 : 0;
       else if (s === S.FILM) { an = this.films(i) ? 6 : 0; film++; }
       else if (s === S.HELD) an = this.t1[i] > 0 ? (this.t1[i] > 5 ? 2 : 1) : 0;
@@ -2029,6 +2032,7 @@ export class People {
         /* the stride moves on by the size it is drawn at (not the size it is growing to), so the foot keeps its spot while they speed up too */
         if (g) { if (!gJump && gd > 0) this.gp[i] = (this.gp[i] + gd / strideLen(g, Math.max(0.55, this.ga[i]), kit[i * 4 + 3])) % 1; anim[i] = gaitCode(g, this.gp[i], this.ga[i]); } else { anim[i] = an; if (air || an !== 0) this.ga[i] = 0; } }
       if (this.crLayer && this.crLayer.put(i, this.zt[i], arr, o, t)) arr.fill(0, o, o + 16); // drawn by the creature layer instead
+      if (s === S.EVAC) continue;
       if (s === S.DEAD) { dead++; continue; }
       if (s === S.ALIEN) continue;
       if ((s === S.EXT || s === S.AIR) && this.wz[i]) { zombies++; continue; }
