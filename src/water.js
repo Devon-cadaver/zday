@@ -201,7 +201,7 @@ export class WaterSurface {
   get active() { return this.level > -0.3; }
   update(h) {
     const { people, traffic } = this.D.ctx, on = this.active;
-    people.waterAt = on ? this.levelAt : null; traffic.waterAt = on ? this.levelAt : null; this.D.debris.waterY = on ? this.levelAt : null;
+    if (on) { people.waterAt = traffic.waterAt = this.D.debris.waterY = this.levelAt; } else { if (people.waterAt === this.levelAt) people.waterAt = null; if (traffic.waterAt === this.levelAt) traffic.waterAt = null; if (this.D.debris.waterY === this.levelAt) this.D.debris.waterY = null; } // off, it takes back only its own level: a villain's flood (livestorm.js LiveFlood) gives the town its level too
     if (on && (this.parkT = (this.parkT || 0) - h) <= 0) { // parked cars in deep water float off their spaces, a few at a time
       this.parkT = 0.5; const D = this.D; let n = 0;
       for (const pc of traffic.parkedList) {

@@ -355,7 +355,7 @@ export class People {
     this.time = 0; this.bldT = 0; this.firstRoof = false;
     this.stats = { humans: this.nHuman, infected: 0, zombies: 0, dead: 0, roof: 0, bites: 0, runover: 0, shot: 0, officers: 0, rescued: 0, bombed: 0, bombedCiv: 0, bused: 0, nukedCiv: 0, nukedZ: 0,
       disasterCiv: 0, disasterZ: 0, drowned: 0, abducted: 0, aliens: 0, aliensKilled: 0, rioters: 0, arrests: 0, jailed: 0, treated: 0, prayed: 0, fought: 0, stole: 0 };
-    this.wz.fill(0); this.wet.fill(0); this.cuff.fill(0); this.watch.fill(0); this.waterAt = null; this.alarmT = 0; this.speedK = 1; this.mobs = [];
+    this.wz.fill(0); this.wet.fill(0); this.cuff.fill(0); this.watch.fill(0); this.waterAt = null; this.afloat = false; this.alarmT = 0; this.speedK = 1; this.mobs = [];
     this.hord.fill(-1); this.hordes.clear(); this.hordeT = 0;
     this.events = [];
     this.flashList.length = 0; this.grenades.length = 0; this.grenadeCd = 0;
@@ -1028,7 +1028,7 @@ export class People {
       // deep water: a few seconds wading in it and the living are swept off their feet (zombies just keep walking)
       if (this.waterAt && CIV[this.st[i]] && this.lvl[i] === -1) {
         const d = this.waterAt(this.x[i], this.z[i]) - this.groundY(this.x[i], this.z[i]);
-        if (d > 1.3) { this.wet[i] += h; if (this.wet[i] > 5) this.swim(i, 60 + this.r() * 60); }
+        if (d > 1.3) { this.wet[i] += h * (d > 1.75 ? 8 : 1); /* over their heads: off their feet in half a second, not five of walking about under it (Sean, 2026-11-16) */ if (this.wet[i] > 5) this.swim(i, 60 + this.r() * 60); }
         else if (this.wet[i] > 0) this.wet[i] = Math.max(0, this.wet[i] - h);
       }
     }
@@ -1388,7 +1388,7 @@ export class People {
   swimStep(i, h) {
     const w = this.waterAt ? this.waterAt(this.x[i], this.z[i]) : -99, g = this.groundY(this.x[i], this.z[i]);
     if (w - g < 0.9) { this.st[i] = S.IDLE; this.y[i] = g; this.fx[i] = 0; return; } // back on their feet
-    if (this.fx[i] !== 1 && (this.t1[i] -= h) <= 0) { this.kill(i, 0, 0, 'drown'); this.stats.drowned++; return; }
+    if (this.fx[i] !== 1 && !this.afloat && (this.t1[i] -= h) <= 0) { this.kill(i, 0, 0, 'drown'); this.stats.drowned++; return; } // afloat: a villain's flood (no boats come in a hero's level): they keep afloat until the water goes down
     if (this.fx[i] === 1) { if ((this.t1[i] -= h) <= 0) { this.fx[i] = 0; this.t1[i] = 20; } } // the raft has drifted off or gone down
     else if (this.fx[i] === 4) { // swimming over to a life raft
       const dx = this.px[i] - this.x[i], dz = this.pz[i] - this.z[i], d = Math.hypot(dx, dz);
