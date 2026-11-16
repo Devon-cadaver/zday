@@ -67,7 +67,53 @@ export function plated() { const M = mat('#8d97a3', { metalness: 0.7, roughness:
   head: (n) => { const h = at(sph(0.2, 1.3, 0.72, 0.9, M), 0.16, 0.06, 0); n.add(h); h.add(at(cone(0.09, 0.36, M, 5), 0.24, 0.1, 0, 0, 0, -0.9)); for (const s of [-1, 1]) { h.add(at(sph(0.04, 1.4, 0.7, 0.7, G), 0.08, 0.05, s * 0.16)); h.add(at(cone(0.05, 0.28, M, 5), -0.12, 0.12, s * 0.12, s * 0.5, 0, 0.9)); } },
   extra: (g) => { for (let i = 0; i < 6; i++) { const x = 0.52 - i * 0.21, r = 0.3 + Math.sin(i / 5 * Math.PI) * 0.08, p = sph(r, 0.5, 0.82, 1.02, M); p.position.set(x, 0.74 + (1 - i / 5) * 0.06, 0); p.rotation.z = -0.25; g.add(p); const s = sph(r * 1.02, 0.09, 0.8, 1.04, G); s.position.set(x - r * 0.46, 0.74 + (1 - i / 5) * 0.06, 0); s.rotation.z = -0.25; g.add(s); } } }); }
 
-export const BUILD = { grey, mantis, squid, hound, maw, stalker, plated };
+// ---------- the orc army (Sean's reference sheets, 2026-11-16): chunky and green, in hide and iron with red pads on their shoulders: grunts with axes, archers, brutes with spiked clubs, wolf riders, shamans
+const OC = { skin: '#6f9a3c', hide: '#6a5038', iron: '#8a9098', red: '#a8301f', bone: '#e6dcc0', wood: '#5a4028', fur: '#5d5850', robe: '#3d2f4a' };
+// the build they share, k its size: a stocky trunk, a heavy jaw with tusks, red eyes, pointed ears, pads on the shoulders; its parts come back to be posed and armed
+function orc(k = 1, o = {}) {
+  const g = new THREE.Group(), skin = mat(OC.skin, { metalness: 0.05, roughness: 0.8 }), hide = mat(o.robe || OC.hide, { metalness: 0.05, roughness: 0.9 }), iron = mat(OC.iron, { metalness: 0.6, roughness: 0.4 }), red = mat(OC.red, { metalness: 0.1 }), bone = mat(OC.bone, { metalness: 0, roughness: 0.7 }), wood = mat(OC.wood, { metalness: 0, roughness: 0.9 }), body = new THREE.Group();
+  body.position.y = 0.8 * k; g.add(body); body.add(at(sph(0.25 * k, 1.2, 1.15, 0.85, hide), 0, 0.3 * k, 0)); body.add(at(sph(0.21 * k, 1.2, 0.5, 0.9, iron), 0, 0.04 * k, 0));
+  const head = at(sph(0.17 * k, 1.05, 1, 1, skin), 0, 0.7 * k, 0.03 * k); body.add(head); head.add(at(sph(0.12 * k, 1.2, 0.7, 0.95, skin), 0, -0.09 * k, 0.07 * k));
+  for (const s of [-1, 1]) { head.add(at(cone(0.024 * k, 0.1 * k, bone, 5), s * 0.075 * k, -0.05 * k, 0.16 * k, -0.25, 0, 0)); head.add(at(sph(0.024 * k, 1.2, 0.7, 0.6, glow('#ff4a22')), s * 0.065 * k, 0.045 * k, 0.15 * k)); head.add(at(cone(0.04 * k, 0.13 * k, skin, 4), s * 0.18 * k, 0.04 * k, -0.01 * k, 0, 0, s * -1.25)); }
+  if (o.helm) head.add(at(sph(0.178 * k, 1.08, 0.72, 1.06, iron), 0, 0.075 * k, -0.01 * k));
+  if (!o.bare) for (const s of [-1, 1]) body.add(at(sph(0.13 * k, 1.15, 0.7, 1.05, o.pads === 'iron' ? iron : red), s * 0.31 * k, 0.52 * k, 0));
+  const A = [-1, 1].map((s) => { const L = limb(0.3 * k, 0.3 * k, 0.075 * k, skin); at(L.hip, s * 0.34 * k, 0.47 * k, 0, 0, 0, s * 0.16); body.add(L.hip); return L; });
+  const F = o.legs === false ? [] : [-1, 1].map((s) => { const L = limb(0.37 * k, 0.37 * k, 0.09 * k, hide, mat('#33271c')); at(L.hip, s * 0.13 * k, 0.8 * k, 0); g.add(L.hip); return L; });
+  return { g, body, head, A, F, skin, hide, iron, red, bone, wood, k };
+}
+// their walk: a heavy stride, the trunk rolling over it
+const tramp = (P, p, sw = 0.6) => { P.F.forEach((L, i) => { const q = p + i * Math.PI; L.hip.rotation.x = Math.sin(q) * sw; L.knee.rotation.x = Math.max(0, Math.cos(q)) * 0.9; }); P.g.position.y = Math.abs(Math.sin(p)) * 0.04 * P.k; P.body.rotation.z = Math.sin(p) * 0.06; };
+export function orcGrunt() { // an axe held up in one hand
+  const P = orc(1), g = P.g, haft = at(new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.75, 5), P.wood), 0, -0.3, 0.14, 1.25, 0, 0); P.A[1].knee.add(haft); haft.add(at(new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.2, 0.26), P.iron), 0, 0.3, 0.1));
+  g.step = (t) => { const p = t * 6; tramp(P, p); P.A[0].hip.rotation.x = Math.sin(p) * 0.5; P.A[1].hip.rotation.x = -1.0 + Math.sin(p * 2) * 0.12; P.A[1].knee.rotation.x = -0.5; P.head.rotation.y = Math.sin(p) * 0.15; };
+  g.speed = 2.6; g.rate = 6; g.forwardZ = true; return g;
+}
+export function orcArcher() { // leaner, hooded, the bow held out and the string drawn; a quiver on the back
+  const P = orc(0.92, { bare: true }), g = P.g; P.head.add(at(cone(0.2, 0.3, P.red, 6), 0, 0.12, -0.03));
+  P.A[0].knee.add(at(new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.014, 4, 10, Math.PI), P.wood), 0, -0.3, 0.05, 0, Math.PI / 2, Math.PI / 2)); P.body.add(at(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.04, 0.4, 6), P.hide), 0.1, 0.4, -0.2, 0.3, 0, -0.3));
+  g.step = (t) => { const p = t * 6; tramp(P, p, 0.5); P.A[0].hip.rotation.x = -1.35; P.A[0].knee.rotation.x = -0.1; P.A[1].hip.rotation.x = -1.1 + Math.sin(p) * 0.1; P.A[1].knee.rotation.x = -1.5; P.head.rotation.y = Math.sin(p) * 0.1; };
+  g.speed = 2; g.rate = 6; g.forwardZ = true; return g;
+}
+export function orcBrute() { // half as big again, helmed, iron on its shoulders, a spiked club
+  const P = orc(1.5, { pads: 'iron', helm: true }), g = P.g, club = at(new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.05, 1.0, 7), P.wood), 0, -0.42, 0.2, 1.3, 0, 0); P.A[1].knee.add(club);
+  for (let i = 0; i < 5; i++) { const a = i * 1.26; club.add(at(cone(0.035, 0.12, P.iron, 4), Math.cos(a) * 0.11, 0.3 + (i % 2) * 0.12, Math.sin(a) * 0.11, Math.sin(a) * 1.57, 0, -Math.cos(a) * 1.57)); }
+  g.step = (t) => { const p = t * 4.5; tramp(P, p, 0.5); P.A[0].hip.rotation.x = Math.sin(p) * 0.4; P.A[0].hip.rotation.z = -0.35; P.A[1].hip.rotation.x = -0.7 + Math.sin(p) * 0.15; P.A[1].knee.rotation.x = -0.4; P.body.rotation.x = 0.12; };
+  g.speed = 1.9; g.rate = 4.5; g.forwardZ = true; return g;
+}
+export function wolfRider() { // a grey wolf at a gallop, a small orc with a spear on its back
+  const fur = mat(OC.fur, { metalness: 0.05, roughness: 0.9 }), dark = mat('#3a3632', { metalness: 0.05, roughness: 0.9 });
+  return dog({ m: fur, lm: dark, h: 0.72, len: 1.0, rise: 0.06, hip: 0.2, chest: 0.27, w: 0.13, th: 0.38, sh: 0.4, r: 0.05, rate: 10, amp: 0.9, hop: 0.18, run: 8, tn: 5, tl: 0.14, tr: 0.06,
+    head: (n) => { n.add(at(cap(0.09, 0.2, fur), 0, 0, 0, 0, 0, Math.PI / 2 + 0.7)); const h = at(sph(0.14, 1.2, 0.9, 0.9, fur), 0.22, 0.16, 0); n.add(h); h.add(at(cone(0.08, 0.26, dark), 0.2, -0.03, 0, 0, 0, -Math.PI / 2)); for (const s of [-1, 1]) { h.add(at(sph(0.03, 1.4, 0.7, 0.6, glow('#ffb02a')), 0.09, 0.05, s * 0.09)); h.add(at(cone(0.045, 0.16, fur, 4), -0.06, 0.15, s * 0.08, 0, 0, 0.3)); } },
+    extra: (g) => { const P = orc(0.78, { legs: false }); P.g.rotation.y = Math.PI / 2; P.g.position.set(-0.05, 0.38, 0); g.add(P.g); P.A[1].hip.rotation.x = -1.3; P.A[0].hip.rotation.x = -0.8; const spear = at(new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 1.3, 5), P.wood), 0, -0.24, 0.1, 1.45, 0, 0); P.A[1].knee.add(spear); spear.add(at(cone(0.04, 0.16, P.iron, 4), 0, 0.72, 0)); for (const s of [-1, 1]) { const L = limb(0.26, 0.24, 0.07, P.hide); at(L.hip, s * 0.2, 0.62, 0, -1.2, 0, s * 0.5); L.knee.rotation.x = 1.3; P.g.add(L.hip); } } });
+}
+export function orcShaman() { // robed, a crest of feathers and bone, a skull on a staff with green fire over it and in the other hand
+  const P = orc(0.96, { robe: OC.robe, bare: true }), g = P.g, G = glow('#7dff4a'); P.body.add(at(cone(0.34, 0.75, P.hide, 8), 0, -0.3, 0));
+  for (let i = -2; i <= 2; i++) P.head.add(at(cone(0.03, 0.24, i % 2 ? P.red : P.bone, 4), i * 0.06, 0.2 - Math.abs(i) * 0.02, -0.04, -0.3, 0, -i * 0.25));
+  const staff = at(new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.025, 1.6, 5), P.wood), 0, -0.28, 0.1, 1.5, 0, 0); P.A[1].knee.add(staff); staff.add(at(sph(0.08, 1, 1.1, 1, P.bone), 0, 0.84, 0)); staff.add(at(sph(0.06, 1, 1, 1, G), 0, 1.0, 0)); P.A[0].knee.add(at(sph(0.07, 1, 1, 1, G), 0, -0.34, 0));
+  g.step = (t) => { const p = t * 5; tramp(P, p, 0.35); P.A[1].hip.rotation.x = -1.2; P.A[1].knee.rotation.x = -0.3; P.A[0].hip.rotation.x = -0.9 + Math.sin(p) * 0.3; P.A[0].hip.rotation.z = -0.5; P.head.rotation.x = Math.sin(p * 2) * 0.06; };
+  g.speed = 1.8; g.rate = 5; g.forwardZ = true; return g;
+}
+export const BUILD = { grey, mantis, squid, hound, maw, stalker, plated, orcGrunt, orcArcher, orcBrute, wolfRider, orcShaman };
 const FRAMES = 10, CAP = 160, SIZE = 1.0;
 function record(build) {
   const o = build(), w = new THREE.Group(); if (o.forwardZ) o.rotation.y = Math.PI / 2; w.scale.setScalar(SIZE); w.add(o); const frames = [], c = new THREE.Color(); let glass = null;
@@ -75,12 +121,13 @@ function record(build) {
   return { frames, glass, rate: o.rate };
 }
 export class CreatureLayer {
-  constructor(scene, max) {
+  // army: only that army's creatures are recorded (figures.js: a unit's army); none: the invasion's, as before
+  constructor(scene, max, army) {
     this.scene = scene; this.kinds = []; this.byZt = new Map(); this.helmetT = ZTYPES.findIndex(z => z.id === 'soldier'); this.helm = new Uint8Array(max); this.flying = []; this.last = 0; // helm: 1 on, 2 knocked off
     this.mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0.15, flatShading: true });
     const glass = new THREE.MeshStandardMaterial({ color: '#d6f0ff', transparent: true, opacity: 0.5, roughness: 0.04, metalness: 0.35, depthWrite: false });
     this.ball = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 14, 10), glass, 80); this.ball.frustumCulled = false; this.ball.renderOrder = 2; scene.add(this.ball);
-    ZTYPES.forEach((z, t) => { if (!z.creature) return; const rec = record(BUILD[z.creature]), meshes = rec.frames.map((g) => { const m = new THREE.InstancedMesh(g, this.mat, CAP); m.frustumCulled = false; m.castShadow = true; m.count = 0; scene.add(m); return m; }); const kind = { rec, meshes, n: new Int32Array(FRAMES) }; this.kinds.push(kind); this.byZt.set(t, kind); });
+    ZTYPES.forEach((z, t) => { if (!z.creature || (z.army || null) !== (army || null)) return; const rec = record(BUILD[z.creature]), meshes = rec.frames.map((g) => { const m = new THREE.InstancedMesh(g, this.mat, CAP); m.frustumCulled = false; m.castShadow = true; m.count = 0; scene.add(m); return m; }); const kind = { rec, meshes, n: new Int32Array(FRAMES) }; this.kinds.push(kind); this.byZt.set(t, kind); });
   }
   begin() { for (const k of this.kinds) k.n.fill(0); this.balls = 0; }
   isKind(zt) { return this.byZt.has(zt); }

@@ -355,11 +355,23 @@ ZTYPES.push(
 for (const [creature, name, chase, lunge] of [['grey', 'Grey', 2.4, 3.6], ['mantis', 'Mantis drone', 3.0, 5.0], ['squid', 'Dome walker', 1.9, 3.2], ['hound', 'Silver hound', 5.0, 7.5], ['maw', 'Maw', 3.6, 6.0], ['stalker', 'Stalker', 4.2, 6.5], ['plated', 'Plated runner', 4.4, 6.0]]) ZTYPES.push({ ...ZTYPES[1], id: creature, name, creature, alien: true, w: 0, hp: 1, anim: 7, tilt: 0, scale: 1, torso: 1, chase, lunge, look: (L) => ALIEN(L) });
 // the Faultline's stone men (faultline.js): grey stone, no glow, one hit; w 0, so no town's zombies roll them
 ZTYPES.push({ ...ZTYPES[0], id: 'stoneman', name: 'Stone man', w: 0, hp: 1, chase: 2.3, lunge: 3.4, tilt: -0.1, scale: 0.95, torso: 1.2, look: (L) => ({ ...L, shirt: C('#5a524c'), pants: C('#463f39'), skin: C('#6e665e'), hat: 0, flags: FLAG.BALD, accent: C('#3a3430'), accent2: C('#3a3430'), blood: 0, bones: 0 }) });
+// The armies (Sean, 2026-11-16: more to fight than zombies, aliens and rioters; the orcs first; armies.js has each army's names and numbers). A unit is a creature of its own (creaturekit.js draws it;
+// the figure stays as the people system's handle); w 0, so no town's zombies roll them. army: whose it is. spit: it shoots from a way off (the spitter's rule: an arrow, a bolt of green fire).
+// hp and armored: how many blows it stands (a brute is knocked back a step by each)
+const UNIT = (o) => ({ ...ZTYPES[1], w: 0, hp: 1, anim: 7, tilt: 0, scale: 1, torso: 1, ...o });
+ZTYPES.push(
+  UNIT({ id: 'orcGrunt', name: 'Orc grunt', creature: 'orcGrunt', army: 'orcs', chase: 2.6, lunge: 4.0 }),
+  UNIT({ id: 'orcArcher', name: 'Orc archer', creature: 'orcArcher', army: 'orcs', chase: 2.0, lunge: 3.0, spit: true }),
+  UNIT({ id: 'orcBrute', name: 'Orc brute', creature: 'orcBrute', army: 'orcs', chase: 1.9, lunge: 3.2, hp: 4, armored: true }),
+  UNIT({ id: 'wolfRider', name: 'Wolf rider', creature: 'wolfRider', army: 'orcs', chase: 5.0, lunge: 7.5, hp: 2 }),
+  UNIT({ id: 'orcShaman', name: 'Orc shaman', creature: 'orcShaman', army: 'orcs', chase: 1.8, lunge: 2.8, hp: 2, spit: true }));
+// an army's crowd: each of its units as many times as its weight (1 if not given)
+export const armyMix = (army, weights = {}) => ZTYPES.flatMap((z, i) => (z.army === army ? Array(weights[z.id] || 1).fill(i) : []));
 export const ALIEN_TYPES = ZTYPES.map((z, i) => (z.alien ? i : -1)).filter((i) => i >= 0);
 export const ROBOT_TYPES = ZTYPES.map((z, i) => (z.robot ? i : -1)).filter((i) => i >= 0);
 export const RADIOACTIVE = ZTYPES.findIndex(z => z.rad);
 // level 1's crowd (Sean): some of everything, only a few of the silver commanders
-export const ALIEN_MIX = ZTYPES.flatMap((z, i) => (z.creature ? (z.creature === 'grey' || z.creature === 'mantis' || z.creature === 'squid' ? [i, i, i] : [i, i]) : z.id === 'soldier' ? [i] : []));
+export const ALIEN_MIX = ZTYPES.flatMap((z, i) => (z.creature && !z.army ? (z.creature === 'grey' || z.creature === 'mantis' || z.creature === 'squid' ? [i, i, i] : [i, i]) : z.id === 'soldier' ? [i] : []));
 export function rollZombieType(r) {
   let t = r(); for (let k = 0; k < ZTYPES.length; k++) { if ((t -= ZTYPES[k].w) <= 0) return k; }
   return 0;

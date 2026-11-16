@@ -16,6 +16,7 @@ import { Site } from './rebuild.js';
 import { damageOf, rememberDamage } from './world.js';
 import { HS, levelOf } from './herogame.js';
 import { WatchLevel, AFTER, FOOT, AIR } from './watchlevel.js';
+import { ARMIES, ARMY_KINDS } from './armies.js';
 import { LiveCalls, calls, odds } from './tvcalls.js';
 import { Wreck } from './tvwreck.js';
 
@@ -57,11 +58,11 @@ html body.zd-tv.zd-flying #zd-bar{display:flex!important} /* and the TV's own bu
 
 const POOL = FOOT.concat(AIR); // what hits next: the disasters as they are in Defend (watchlevel.js), on foot and in the air
 const TOWN_T = 170, TICK_SPEED = 60, WHAT_T = 8, WHO_T = 9; // s in a town at most; ticker px a second; s to call what hits, and who wins
-const KIND = { aliens: 'Aliens', zombies: 'Zombies', worm: 'Giant worm', kaiju: 'Kaiju', riot: 'Riot', quake: 'Earthquake', tornado: 'Tornado', flood: 'Flood', tsunami: 'Tsunami', haboob: 'Dust storm', coldwave: 'Cold wave' };
-const THE = { aliens: 'The invasion', zombies: 'The horde', worm: 'The worm', kaiju: 'The kaiju', riot: 'The mob', quake: 'The Faultline', tornado: 'The tornado', flood: 'The flood', tsunami: 'The wave', haboob: 'The dust storm', coldwave: 'The cold front' };
-const NEWS = { aliens: 'An alien invasion lands in', zombies: 'A zombie outbreak tears through', worm: 'A giant worm surfaces in', kaiju: 'A kaiju stomps into', riot: 'A riot breaks out in', quake: 'The Faultline rises in', tornado: 'A tornado touches down in', flood: 'Floods hit', tsunami: 'A tsunami heads for', haboob: 'A dust storm rolls into', coldwave: 'A cold front freezes' };
-const WIN_P = { aliens: 0.62, zombies: 0.66, worm: 0.56, kaiju: 0.5, riot: 0.7, quake: 0.52, tornado: 0.56, flood: 0.62, tsunami: 0.5, haboob: 0.56, coldwave: 0.56 }; // how often the heroes win each, before the night's form
-const CROWD = new Set(['zombies', 'aliens', 'riot']); // a crowd, not one foe: no "next big hit", how many she clears instead
+const KIND = { aliens: 'Aliens', zombies: 'Zombies', worm: 'Giant worm', kaiju: 'Kaiju', riot: 'Riot', quake: 'Earthquake', tornado: 'Tornado', flood: 'Flood', tsunami: 'Tsunami', haboob: 'Dust storm', coldwave: 'Cold wave', ...Object.fromEntries(ARMY_KINDS.map((k) => [k, ARMIES[k].name])) };
+const THE = { aliens: 'The invasion', zombies: 'The horde', worm: 'The worm', kaiju: 'The kaiju', riot: 'The mob', quake: 'The Faultline', tornado: 'The tornado', flood: 'The flood', tsunami: 'The wave', haboob: 'The dust storm', coldwave: 'The cold front', ...Object.fromEntries(ARMY_KINDS.map((k) => [k, ARMIES[k].the])) };
+const NEWS = { aliens: 'An alien invasion lands in', zombies: 'A zombie outbreak tears through', worm: 'A giant worm surfaces in', kaiju: 'A kaiju stomps into', riot: 'A riot breaks out in', quake: 'The Faultline rises in', tornado: 'A tornado touches down in', flood: 'Floods hit', tsunami: 'A tsunami heads for', haboob: 'A dust storm rolls into', coldwave: 'A cold front freezes', ...Object.fromEntries(ARMY_KINDS.map((k) => [k, ARMIES[k].news])) };
+const WIN_P = { aliens: 0.62, zombies: 0.66, worm: 0.56, kaiju: 0.5, riot: 0.7, quake: 0.52, tornado: 0.56, flood: 0.62, tsunami: 0.5, haboob: 0.56, coldwave: 0.56, ...Object.fromEntries(ARMY_KINDS.map((k) => [k, ARMIES[k].winP])) }; // how often the heroes win each, before the night's form
+const CROWD = new Set(['zombies', 'aliens', 'riot', ...ARMY_KINDS]); // a crowd, not one foe: no "next big hit", how many she clears instead
 const FORM = ['is in form tonight', 'trained all week', 'is coming off a win', 'looks rested']; // said of the one the odds favour
 const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const pick = (a) => a[Math.floor(Math.random() * a.length)];

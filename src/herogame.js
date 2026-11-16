@@ -14,6 +14,7 @@ import { POWER, finish as endDisaster } from './heropower.js';
 import { openLevels, restoreTests, levelInfo } from './levelmenu.js';
 import { Squad } from './squad.js';
 import { ALIEN_MIX } from './figures.js';
+import { ARMIES } from './armies.js';
 import { CreatureLayer } from './creaturekit.js';
 import { current, danger, resolve, waveOf, threatName, freshOnes } from './threats.js';
 import { LiveFront, LiveFlood } from './livestorm.js';
@@ -73,7 +74,7 @@ export const TREE = {
 const START_MOVES = ['spin', 'kick', 'laser', 'drag', 'wind', 'fire']; // and two powers to start with
 // a town's trouble, along the road: disasters by type, villains by name
 export const WAVES = [['aliens'], ['zombies'], ['worm'], ['kaiju'], ['tornado'], ['riot'], ['flood', 'blur'], ['quake', 'tyrant'], ['aliens'], ['haboob', 'weaver'], ['kaiju'], ['worm', 'blur'], ['plant', 'tyrant'], ['volcano', 'weaver'], ['tsunami', 'blur'], ['rift', 'tyrant'], ['sinkhole', 'weaver', 'blur'], ['blackhole', 'tyrant'], ['spill', 'blur', 'weaver'], ['coldwave', 'tyrant', 'weaver'], ['kaiju', 'blur', 'tyrant', 'weaver']];
-const LEVEL = { aliens: 'The alien invasion', zombies: 'The zombie outbreak', worm: 'The giant worm', kaiju: 'The kaiju', tornado: 'The tornado', riot: 'The riot' }, VILLAINS = ['blur', 'tyrant', 'weaver'];
+const LEVEL = { aliens: 'The alien invasion', zombies: 'The zombie outbreak', worm: 'The giant worm', kaiju: 'The kaiju', tornado: 'The tornado', riot: 'The riot', ...Object.fromEntries(Object.entries(ARMIES).map(([k, a]) => [k, a.level])) }, VILLAINS = ['blur', 'tyrant', 'weaver'];
 export { VILLAINS }; // the names of the first levels (Sean: the main action fights; the weather levels come after)
 const REP = (r) => (r >= 60 ? 'Hero' : r >= 35 ? 'Vigilante' : r >= 15 ? 'Menace' : 'Villain');
 const SW = ['#ff3fcf', '#3dff5c', '#29e3ff', '#ffd23d', '#ff5a2a', '#8f5bff', '#f4f1ea', '#20242e'];
@@ -183,6 +184,7 @@ export class HeroGame {
     if (hero && wave[0] === 'aliens' && g.horde) { this.alienLevel(key); return; }
     if (hero && (wave[0] === 'worm' || wave[0] === 'kaiju') && wave.length === 1 && g.horde) { this.bossLevel(key, wave[0]); return; }
     if (hero && wave[0] === 'zombies' && g.horde) { this.zombieLevel(key); return; }
+    if (hero && ARMIES[wave[0]] && g.horde) { this.armyLevel(key, wave[0]); return; }
     if (hero && wave[0] === 'riot' && wave.length === 1 && g.horde) { this.riotLevel(key); return; }
     if (hero && wave[0] === 'quake' && g.horde) { this.quakeLevel(key); return; }
     if (hero && wave[0] === 'tornado' && g.horde && this.footTornado()) { this.twisterLevel(key); return; } // every other tornado on foot, the others in the air
@@ -236,6 +238,18 @@ export class HeroGame {
     g.horde.start({ n, pool, level: true, hitK: 1 + 0.05 * this.ix, generals: 'zombie', onEnd: (won, H) => { this.round.horde = H; this.finish(won, won ? null : 'Overrun by the horde'); } });
     this.rep = document.createElement('div'); this.rep.id = 'zd-rep'; document.body.appendChild(this.rep);
     g.toast ? g.toast('Defend ' + PLACES[key].name + ': ' + n + ' zombies in the streets. Tap to punch, swipe to dash, hold to slam') : 0;
+  }
+  // an army in the streets (Sean, 2026-11-16; armies.js): as the zombie level, the town down to about 20 people, the rest of its people's slots dropped again as the army's units, each drawn as its own
+  // creature (creaturekit.js); she is on foot with the whole kit (horde.js), and its generals come for her. Cleared: the town is saved
+  armyLevel(key, kind) {
+    const g = this.g, P = g.people, B = g.city.bounds, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2, A = ARMIES[kind], ix = this.ix || 0, pool = []; let kept = 0; LAB.reset();
+    for (let j = 0; j < P.active; j++) { if (P.kind[j] !== 0) continue; if (kept < 20 && P.isCivilian(j) && P.lvl[j] === -1 && Math.hypot(P.x[j] - cx, P.z[j] - cz) < 60) { kept++; continue; } if (P.hide(j)) pool.push(j); }
+    for (let i = pool.length - 1; i > 0; i--) { const k = Math.floor(Math.random() * (i + 1)); const t = pool[i]; pool[i] = pool[k]; pool[k] = t; }
+    const n = Math.min(A.max, A.n + A.more * ix, pool.length); this.round = { evs: [], need: 0, t: 0, downs: 0, hero: true, key, ended: false, zombie: true, n, noun: A.noun };
+    P.crLayer = new CreatureLayer(g.disasters.ctx.scene, P.active + 64, kind);
+    g.horde.start({ n, pool, level: true, hitK: 1 + 0.05 * ix, generals: kind, army: kind, types: A.mix, label: A.label, verb: ' DOWN', onEnd: (won, H) => { this.round.horde = H; this.finish(won, won ? null : A.lost); } });
+    this.rep = document.createElement('div'); this.rep.id = 'zd-rep'; document.body.appendChild(this.rep);
+    g.toast ? g.toast(A.toast(n, PLACES[key].name)) : 0;
   }
   // the riot fought on foot (10d): the mob goes for her and shoves; she knocks them flat and calms them, never dusts them
   riotLevel(key) {

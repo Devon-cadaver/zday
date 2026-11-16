@@ -4,16 +4,17 @@
 // somewhere else; a loss leaves it there to retry. After every level one rotating disaster moves on too, so there is always something new on the map.
 // Danger goes with your level, a little more in the bigger towns. The Sandbox's numbered test levels do not use any of this.
 import { PATH, PLACES } from './places.js';
+import { ARMIES, ARMY_KINDS } from './armies.js';
 
 const KEY = 'zday_threats';
 // The mix tuned (Sean, 2026-11-06): the two giant cities one worm and one kaiju (they were two worms, the kaiju only now and then); the rotating one a level of
 // its own (zombies, the riot, the earthquake) three times in four, else one of the older disasters with a villain
-export const SLOTS = { villains: 1, aliens: 1, giant: 2, weather: 2 };
+export const SLOTS = { villains: 1, aliens: 1, giant: 2, weather: 2, army: 1 }; // army (Sean, 2026-11-16): one city with an army in its streets (armies.js: the orcs first), Defend only
 const GIANTS = ['worm', 'kaiju'], WEATHER = ['tornado', 'flood', 'haboob', 'tsunami', 'coldwave'], MAIN = ['zombies', 'riot', 'quake'], OLDER = ['plant', 'volcano', 'rift', 'sinkhole', 'blackhole', 'spill'];
 const COAST = ['harbor', 'bayview', 'umihama', 'minato', 'metro', 'lakeside']; // where the sea can come in
 const NEEDS = { tsunami: COAST };
 export const VILLAIN_IDS = ['blur', 'tyrant', 'weaver'];
-export const KIND_NAME = { villains: 'Villains', aliens: 'Alien invasion', worm: 'Giant worm', tornado: 'Tornado', flood: 'Flood', haboob: 'Dust storm', tsunami: 'Tsunami', coldwave: 'Cold wave', zombies: 'Zombies', kaiju: 'Kaiju', riot: 'Riot', quake: 'Earthquake', plant: 'Killer plant', volcano: 'Volcano', rift: 'Rift', sinkhole: 'Sinkhole', blackhole: 'Black hole', spill: 'Toxic spill' };
+export const KIND_NAME = { villains: 'Villains', aliens: 'Alien invasion', worm: 'Giant worm', tornado: 'Tornado', flood: 'Flood', haboob: 'Dust storm', tsunami: 'Tsunami', coldwave: 'Cold wave', zombies: 'Zombies', kaiju: 'Kaiju', riot: 'Riot', quake: 'Earthquake', plant: 'Killer plant', volcano: 'Volcano', rift: 'Rift', sinkhole: 'Sinkhole', blackhole: 'Black hole', spill: 'Toxic spill', ...Object.fromEntries(ARMY_KINDS.map((k) => [k, ARMIES[k].threat])) };
 const rnd = (a) => a[Math.floor(Math.random() * a.length)];
 let boards = null;
 const load = () => { if (boards) return boards; try { boards = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { boards = null; } return (boards = boards && typeof boards === 'object' ? boards : {}); };
@@ -29,6 +30,7 @@ function fill(B, side, villainsLeft) {
   while (count('aliens') < SLOTS.aliens) if (!add(B, 'aliens', 'aliens')) break;
   while (count('giant') < SLOTS.giant) if (!add(B, 'giant', pick(B, GIANTS))) break;
   while (count('weather') < SLOTS.weather) if (!add(B, 'weather', pick(B, WEATHER))) break;
+  if (side === 'hero') while (count('army') < SLOTS.army) if (!add(B, 'army', pick(B, ARMY_KINDS))) break;
   while (count('random') < B.randomN) if (!add(B, 'random', pick(B, Math.random() < 0.75 ? MAIN : OLDER))) break;
 }
 export function board(side, villainsLeft = []) {
@@ -58,7 +60,7 @@ export const waveOf = (t, left = []) => (t.kind === 'villains' ? (t.v ? [t.v] : 
 export const threatName = (t, side, shown) => (t.kind === 'villains' ? (side === 'hero' ? (t.v ? shown(t.v) : 'Villains') : 'The heroes on guard') : KIND_NAME[t.kind] || t.kind);
 
 // the icons on the globe, drawn here so no phone is missing an emoji. The little animation is in storymap.js
-const C = { villains: '#b04dff', aliens: '#27d86a', worm: '#d98a3a', tornado: '#8fa3b8', flood: '#2f8fe6', haboob: '#c99a55', tsunami: '#1f6fd6', coldwave: '#7fd8ff', zombies: '#6e9c3a', kaiju: '#d6452f', riot: '#ff7a2a', quake: '#a5764a', plant: '#35a84a', volcano: '#ff4a1f', rift: '#8a3cff', sinkhole: '#6a5a4a', blackhole: '#30205a', spill: '#b8d820' };
+const C = { villains: '#b04dff', aliens: '#27d86a', worm: '#d98a3a', tornado: '#8fa3b8', flood: '#2f8fe6', haboob: '#c99a55', tsunami: '#1f6fd6', coldwave: '#7fd8ff', zombies: '#6e9c3a', kaiju: '#d6452f', riot: '#ff7a2a', quake: '#a5764a', plant: '#35a84a', volcano: '#ff4a1f', rift: '#8a3cff', sinkhole: '#6a5a4a', blackhole: '#30205a', spill: '#b8d820', ...Object.fromEntries(ARMY_KINDS.map((k) => [k, ARMIES[k].color])) };
 const W = 'fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"', F = 'fill="#fff"';
 const ART = {
   villains: `<path ${F} d="M6 15c5-3 9-4 14-1 5-3 9-2 14 1 0 9-5 14-9 14-3 0-3-3-5-3s-2 3-5 3c-4 0-9-5-9-14z"/><path fill="#b04dff" d="M11 18l6 2-1 3-5-2zM29 18l-6 2 1 3 5-2z"/>`,
@@ -69,6 +71,7 @@ const ART = {
   haboob: `<g class="a-sway"><circle ${F} cx="13" cy="20" r="8"/><circle ${F} cx="25" cy="16" r="9"/><circle ${F} cx="29" cy="25" r="6"/><circle ${F} cx="17" cy="27" r="6"/></g>`,
   tsunami: `<g class="a-bob"><path ${F} d="M3 33c2-14 11-25 23-25 6 0 10 3 11 8-3-3-8-3-10 1-2 5 2 11 9 16z"/></g>`,
   coldwave: `<g class="a-spin"><path ${W} d="M20 5v30M7 12l26 16M33 12L7 28M20 11l-4-3M20 11l4-3M20 29l-4 3M20 29l4 3"/></g>`,
+  orcs: `<g class="a-bob"><path ${F} d="M8 15c0-6 5-10 12-10s12 4 12 10v7c0 6-5 11-12 11S8 28 8 22z"/><path fill="#5f8f2f" d="M12 17l6 2-1 3-5-2zM28 17l-6 2 1 3 5-2z"/><path ${F} d="M12 27l1 10 4-7zM28 27l-1 10-4-7z"/></g>`,
   zombies: `<g class="a-bob"><path ${F} d="M12 36V19l-3-7 3-1 3 6 1-11h3l1 10 2-11h3l-1 12 4-8 3 1-5 13v13z"/></g>`,
   kaiju: `<g class="a-bob"><path ${F} d="M6 36l3-13c0-9 5-15 13-15 4 0 7 1 10 4l-3 3 4 2-5 2 1 5-5-2-1 14h-5l-1-9-4 1-2 8z"/></g>`,
   riot: `<g class="a-bob"><path ${F} d="M12 36v-8l-3-4v-9c0-3 4-3 4 0v-3c0-3 4-3 4 0v-1c0-3 4-3 4 0v1c0-3 4-3 4 0v3c0-3 4-3 4 0v8l-3 5v8z"/></g>`,

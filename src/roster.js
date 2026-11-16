@@ -92,7 +92,7 @@ export function startRoster({ canvas, list, root }) {
   // ---------- the disasters themselves
   for (const [name, obj, fit] of disasterExamples()) add('Disasters', name, obj, fit);
   for (const [k, Z] of ZTYPES.entries()) {
-    if (Z.creature) { const o = BUILD[Z.creature](); o.step(0.4); add('Aliens', Z.name, o, 2.4); continue; }
+    if (Z.creature) { const o = BUILD[Z.creature](); o.step(0.4); add(Z.army ? Z.army[0].toUpperCase() + Z.army.slice(1) : 'Aliens', Z.name, o, 2.4); continue; }
     const base = ARCHETYPES[k % 3 === 0 ? 0 : k % 3 === 1 ? 4 : 2].roll(r);
     const L = Z.look(base); L.scale = Z.scale || 1; L.torso = Z.torso || 1;
     add(Z.robot ? 'Robots' : Z.alien ? 'Aliens' : 'Zombies', Z.name, figure(L, Z.anim), 2.3 * (Z.scale || 1));

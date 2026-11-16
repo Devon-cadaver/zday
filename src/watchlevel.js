@@ -8,13 +8,14 @@ import { LAB } from './lab.js';
 import { placeKey } from './places.js';
 import { Squad } from './squad.js';
 import { ALIEN_MIX } from './figures.js';
+import { ARMIES, ARMY_KINDS } from './armies.js';
 import { CreatureLayer } from './creaturekit.js';
 import { finish as endDisaster } from './heropower.js';
 import { stickTo, dashWorld } from './fightbot.js';
 
-export const FOOT = ['aliens', 'zombies', 'worm', 'kaiju', 'riot', 'quake']; // fought on foot (horde.js)
+export const FOOT = ['aliens', 'zombies', 'worm', 'kaiju', 'riot', 'quake', ...ARMY_KINDS]; // fought on foot (horde.js)
 export const AIR = ['tornado', 'flood', 'tsunami', 'haboob', 'coldwave']; // fought in the air (livestorm.js): the storm, then the villain in it
-export const AFTER = { worm: 'THE BURROWER', kaiju: 'THE BEAST KEEPER', zombies: 'the zombie general', aliens: 'the alien general', riot: 'the instigators', tornado: 'TWISTER', flood: 'CAPTAIN DELUGE', tsunami: 'RIPTIDE', haboob: 'THE DUST DEVIL', coldwave: 'JACK FROST' }; // the villain after the disaster
+export const AFTER = { worm: 'THE BURROWER', kaiju: 'THE BEAST KEEPER', zombies: 'the zombie general', aliens: 'the alien general', riot: 'the instigators', tornado: 'TWISTER', flood: 'CAPTAIN DELUGE', tsunami: 'RIPTIDE', haboob: 'THE DUST DEVIL', coldwave: 'JACK FROST', ...Object.fromEntries(ARMY_KINDS.map((k) => [k, ARMIES[k].after])) }; // the villain after the disaster
 const RUSH_T = 115; // s: a level drawn to be won and still going: the team sweeps in (Sean, 2026-11-15: more action, less waiting)
 
 export class WatchLevel extends HeroGame {
@@ -28,7 +29,8 @@ export class WatchLevel extends HeroGame {
     const end = (won, H, why) => { if (this.round) this.round.horde = H; this.finish(won, why); }, hitK = 1 + 0.05 * this.ix, bot = (dt) => this.bot(dt), watchK = () => this.biteK(), bossK = () => this.bossK();
     const R = this.round = { evs: [], need: 0, t: 0, downs: 0, hero: true, key, ended: false, zombie: true, n: 100, noun: '' };
     this.squad = new Squad(this); this.squad.ids = [this.squad.cur]; this.squad.draw(); // one life on television
-    if (kind === 'zombies') { const q = pool(140, 60); R.n = q.length; g.horde.start({ n: q.length, pool: q, level: true, hitK, generals: 'zombie', bot, watchK, bossK, onEnd: (w, H) => end(w, H, 'Overrun by the horde') }); g.horde.genQ = []; this.genLater = 'zombie'; }
+    if (ARMIES[kind]) { const A = ARMIES[kind], q = pool(140, 60); R.n = q.length; P.crLayer = new CreatureLayer(g.disasters.ctx.scene, P.active + 64, kind); g.horde.start({ n: q.length, pool: q, level: true, hitK, generals: kind, army: kind, types: A.mix, label: A.label, verb: ' DOWN', bot, watchK, bossK, onEnd: (w, H) => end(w, H, A.lostTV) }); g.horde.genQ = []; this.genLater = kind; } // an army (armies.js): its units in the streets, its general once they are thinned
+    else if (kind === 'zombies') { const q = pool(140, 60); R.n = q.length; g.horde.start({ n: q.length, pool: q, level: true, hitK, generals: 'zombie', bot, watchK, bossK, onEnd: (w, H) => end(w, H, 'Overrun by the horde') }); g.horde.genQ = []; this.genLater = 'zombie'; }
     else if (kind === 'aliens') { const q = pool(100, 60), e = g.disasters.start('aliens', cx, cz, { life: 99999, noSquads: true, tripods: 2, n: 3 }); if (e) { e.launchT = 0.5; e.dropT = 8; R.evs.push(e); } R.n = q.length; P.crLayer = new CreatureLayer(g.disasters.ctx.scene, P.active + 64); g.horde.start({ n: q.length, pool: q, level: true, generals: 'alien', hitK, fleet: e, types: ALIEN_MIX, label: 'ALIENS', verb: ' DOWN', bot, watchK, bossK, onEnd: (w, H) => end(w, H, 'The invasion won') }); g.horde.genQ = []; this.genLater = 'alien'; }
     else if (kind === 'worm' || kind === 'kaiju') { const e = g.disasters.start(kind, cx, cz, { life: 99999, quiet: true }); if (!e) return false; if (kind === 'kaiju') { e.x = cx + 80; e.z = cz; e.yaw = Math.PI; } e.heroHp = 100; e.heroTough = 1 + 0.08 * this.ix; R.evs.push(e); R.boss = e; g.horde.start({ boss: e, n: 100, level: true, hitK, label: kind.toUpperCase(), bot, watchK, bossK, onEnd: (w, H) => end(w, H, 'The ' + kind + ' was too much') }); }
     else if (kind === 'riot') { const e = g.disasters.start('riot', cx + (Math.random() - 0.5) * 80, cz + (Math.random() - 0.5) * 80); if (!e) return false; R.evs.push(e); R.riot = true; R.n = e.members.length; g.horde.start({ mode: 'riot', riot: e, level: true, hitK, bot, watchK, bossK, onEnd: (w, H) => { if (w) e.end(true); end(w, H, 'The mob won'); } }); }
