@@ -365,6 +365,12 @@ ZTYPES.push(
   UNIT({ id: 'orcBrute', name: 'Orc brute', creature: 'orcBrute', army: 'orcs', chase: 1.9, lunge: 3.2, hp: 4, armored: true }),
   UNIT({ id: 'wolfRider', name: 'Wolf rider', creature: 'wolfRider', army: 'orcs', chase: 5.0, lunge: 7.5, hp: 2 }),
   UNIT({ id: 'orcShaman', name: 'Orc shaman', creature: 'orcShaman', army: 'orcs', chase: 1.8, lunge: 2.8, hp: 2, spit: true }));
+// the robots (the base's own drone, trooper and brute above are older, figures in steel: base.js still drops those)
+ZTYPES.push(
+  UNIT({ id: 'combatBot', name: 'Combat bot', creature: 'combatBot', army: 'robots', chase: 2.6, lunge: 4.0 }),
+  UNIT({ id: 'assaultBot', name: 'Assault bot', creature: 'assaultBot', army: 'robots', chase: 1.9, lunge: 3.0, hp: 4, armored: true, spit: true }),
+  UNIT({ id: 'spiderBot', name: 'Spider bot', creature: 'spiderBot', army: 'robots', chase: 4.6, lunge: 7.0, hp: 2 }),
+  UNIT({ id: 'sentryDrone', name: 'Sentry drone', creature: 'sentryDrone', army: 'robots', chase: 3.2, lunge: 4.5, spit: true }));
 // an army's crowd: each of its units as many times as its weight (1 if not given)
 export const armyMix = (army, weights = {}) => ZTYPES.flatMap((z, i) => (z.army === army ? Array(weights[z.id] || 1).fill(i) : []));
 export const ALIEN_TYPES = ZTYPES.map((z, i) => (z.alien ? i : -1)).filter((i) => i >= 0);

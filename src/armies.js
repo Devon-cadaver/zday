@@ -12,5 +12,12 @@ export const ARMIES = {
     mix: armyMix('orcs', { orcGrunt: 6, orcArcher: 2, orcBrute: 1, wolfRider: 2, orcShaman: 1 }),
     general: { name: 'Orc warlord', an: 'An', hp: 440, dmgK: 0.9, look: { suit: '#5a4630', cape: '#7a1c16', dark: '#2a2018', belt: '#8a9098', skin: '#6f9a3c', eyec: '#ff4a22', beard: 'none', hair: 'bald', hg: 'spiked', back: 'none', chest: 'harness', sh: 'spike', arm: 'spike' } },
   },
+  robots: {
+    name: 'Robots', label: 'ROBOTS', noun: ' robots', threat: 'Robot army', level: 'The robot army', the: 'The machines', news: 'A robot army marches on', lost: 'The machines overran you', lostTV: 'The machines won', after: 'the Enforcers',
+    toast: (n, town) => 'Defend ' + town + ': ' + n + ' robots in the streets. Dash off the red bolts, the assault bots take four blows, the Enforcers come for you',
+    shot: 'SHOT!', shotCol: [1.7, 0.25, 0.15], n: 140, more: 15, max: 210, winP: 0.58, color: '#7c8794',
+    mix: armyMix('robots', { combatBot: 6, assaultBot: 1, spiderBot: 2, sentryDrone: 2 }),
+    general: { name: 'Enforcer', an: 'An', hp: 460, dmgK: 0.95, look: { suit: '#3a4048', cape: '#20242a', dark: '#15181c', belt: '#ff3020', skin: '#aeb8c2', hairc: '#aeb8c2', eyec: '#ff2a1a', hair: 'bald', beard: 'none', hg: 'skull', back: 'none', chest: 'plate', sh: 'plate' } },
+  },
 };
 export const ARMY_KINDS = Object.keys(ARMIES);

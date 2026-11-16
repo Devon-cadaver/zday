@@ -9,7 +9,7 @@ import { ARMIES, ARMY_KINDS } from './armies.js';
 const KEY = 'zday_threats';
 // The mix tuned (Sean, 2026-11-06): the two giant cities one worm and one kaiju (they were two worms, the kaiju only now and then); the rotating one a level of
 // its own (zombies, the riot, the earthquake) three times in four, else one of the older disasters with a villain
-export const SLOTS = { villains: 1, aliens: 1, giant: 2, weather: 2, army: 1 }; // army (Sean, 2026-11-16): one city with an army in its streets (armies.js: the orcs first), Defend only
+export const SLOTS = { villains: 1, aliens: 1, giant: 2, weather: 2, army: 2 }; // army (Sean, 2026-11-16): two cities with an army in their streets (armies.js: the orcs, the robots), Defend only
 const GIANTS = ['worm', 'kaiju'], WEATHER = ['tornado', 'flood', 'haboob', 'tsunami', 'coldwave'], MAIN = ['zombies', 'riot', 'quake'], OLDER = ['plant', 'volcano', 'rift', 'sinkhole', 'blackhole', 'spill'];
 const COAST = ['harbor', 'bayview', 'umihama', 'minato', 'metro', 'lakeside']; // where the sea can come in
 const NEEDS = { tsunami: COAST };
@@ -71,6 +71,7 @@ const ART = {
   haboob: `<g class="a-sway"><circle ${F} cx="13" cy="20" r="8"/><circle ${F} cx="25" cy="16" r="9"/><circle ${F} cx="29" cy="25" r="6"/><circle ${F} cx="17" cy="27" r="6"/></g>`,
   tsunami: `<g class="a-bob"><path ${F} d="M3 33c2-14 11-25 23-25 6 0 10 3 11 8-3-3-8-3-10 1-2 5 2 11 9 16z"/></g>`,
   coldwave: `<g class="a-spin"><path ${W} d="M20 5v30M7 12l26 16M33 12L7 28M20 11l-4-3M20 11l4-3M20 29l-4 3M20 29l4 3"/></g>`,
+  robots: `<g class="a-bob"><path ${F} d="M19 3h2v6h-2zM9 9h22v19H9zM13 29h14v7H13z"/><path fill="#ff3020" d="M12 15h16v5H12z"/><path fill="#7c8794" d="M15 31h10v2H15z"/></g>`,
   orcs: `<g class="a-bob"><path ${F} d="M8 15c0-6 5-10 12-10s12 4 12 10v7c0 6-5 11-12 11S8 28 8 22z"/><path fill="#5f8f2f" d="M12 17l6 2-1 3-5-2zM28 17l-6 2 1 3 5-2z"/><path ${F} d="M12 27l1 10 4-7zM28 27l-1 10-4-7z"/></g>`,
   zombies: `<g class="a-bob"><path ${F} d="M12 36V19l-3-7 3-1 3 6 1-11h3l1 10 2-11h3l-1 12 4-8 3 1-5 13v13z"/></g>`,
   kaiju: `<g class="a-bob"><path ${F} d="M6 36l3-13c0-9 5-15 13-15 4 0 7 1 10 4l-3 3 4 2-5 2 1 5-5-2-1 14h-5l-1-9-4 1-2 8z"/></g>`,

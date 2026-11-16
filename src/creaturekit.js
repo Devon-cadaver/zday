@@ -113,7 +113,49 @@ export function orcShaman() { // robed, a crest of feathers and bone, a skull on
   g.step = (t) => { const p = t * 5; tramp(P, p, 0.35); P.A[1].hip.rotation.x = -1.2; P.A[1].knee.rotation.x = -0.3; P.A[0].hip.rotation.x = -0.9 + Math.sin(p) * 0.3; P.A[0].hip.rotation.z = -0.5; P.head.rotation.x = Math.sin(p * 2) * 0.06; };
   g.speed = 1.8; g.rate = 5; g.forwardZ = true; return g;
 }
-export const BUILD = { grey, mantis, squid, hound, maw, stalker, plated, orcGrunt, orcArcher, orcBrute, wolfRider, orcShaman };
+// ---------- the robot army (Sean's sheets, 2026-11-16: "like terminators from the future"): gunmetal and steel, a red visor or one red eye: combat bots with a rifle for a forearm, assault bots half as big
+// again with a cannon on each shoulder, spider bots on four jointed legs, sentry drones hovering on four rotors
+const RB = { steel: '#8f99a5', gun: '#4d5560', dark: '#262a30', red: '#ff3020' };
+const box = (w, h, d, m) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
+// the walking kind's build, k its size: a boxed trunk and hips, a square head with a red visor and an aerial, ball joints at the shoulders, plated limbs; its parts come back to be posed and armed
+function bot(k = 1, o = {}) {
+  const g = new THREE.Group(), steel = mat(RB.steel, { metalness: 0.7, roughness: 0.35 }), gun = mat(o.body || RB.gun, { metalness: 0.6, roughness: 0.45 }), dark = mat(RB.dark, { metalness: 0.5, roughness: 0.5 }), R = glow(RB.red), body = new THREE.Group();
+  body.position.y = 0.84 * k; g.add(body); body.add(at(box(0.44 * k, 0.46 * k, 0.26 * k, gun), 0, 0.36 * k, 0)); body.add(at(box(0.3 * k, 0.16 * k, 0.2 * k, dark), 0, 0.05 * k, 0)); body.add(at(box(0.2 * k, 0.12 * k, 0.03 * k, steel), 0, 0.42 * k, 0.135 * k));
+  const head = at(box(0.2 * k, 0.2 * k, 0.2 * k, steel), 0, 0.74 * k, 0.01 * k); body.add(head); head.add(at(box(0.16 * k, 0.045 * k, 0.03 * k, R), 0, 0.02 * k, 0.1 * k)); head.add(at(box(0.012 * k, 0.12 * k, 0.012 * k, dark), 0.07 * k, 0.16 * k, -0.05 * k));
+  for (const s of [-1, 1]) body.add(at(sph(0.085 * k, 1, 1, 1, dark), s * 0.27 * k, 0.52 * k, 0));
+  const A = [-1, 1].map((s) => { const L = limb(0.3 * k, 0.3 * k, 0.055 * k, steel, dark); at(L.hip, s * 0.3 * k, 0.52 * k, 0, 0, 0, s * 0.1); body.add(L.hip); return L; });
+  const F = [-1, 1].map((s) => { const L = limb(0.4 * k, 0.4 * k, 0.07 * k, gun, dark); at(L.hip, s * 0.12 * k, 0.84 * k, 0); g.add(L.hip); return L; });
+  return { g, body, head, A, F, steel, gun, dark, R, k };
+}
+// their march: stiff and in step, the trunk level
+const march = (P, p, sw = 0.5) => { P.F.forEach((L, i) => { const q = p + i * Math.PI; L.hip.rotation.x = Math.sin(q) * sw; L.knee.rotation.x = Math.max(0, Math.cos(q)) * 0.8; }); P.g.position.y = Math.abs(Math.sin(p)) * 0.025 * P.k; };
+export function combatBot() { // a rifle for a right forearm, held level, its head turning from side to side
+  const P = bot(1), g = P.g; P.A[1].knee.add(at(box(0.07, 0.5, 0.07, P.dark), 0, -0.42, 0.03)); P.A[1].knee.add(at(sph(0.03, 1, 1, 1, P.R), 0, -0.68, 0.03));
+  g.step = (t) => { const p = t * 6; march(P, p); P.A[0].hip.rotation.x = Math.sin(p + Math.PI) * 0.4; P.A[1].hip.rotation.x = -0.75; P.A[1].knee.rotation.x = -0.8; P.head.rotation.y = Math.sin(p * 0.5) * 0.3; };
+  g.speed = 2.6; g.rate = 6; g.forwardZ = true; return g;
+}
+export function assaultBot() { // half as big again, plated, a cannon on each shoulder, a red core in its chest
+  const P = bot(1.45, { body: '#3f464f' }), g = P.g, k = P.k;
+  for (const s of [-1, 1]) { P.body.add(at(new THREE.Mesh(new THREE.CylinderGeometry(0.07 * k, 0.07 * k, 0.5 * k, 8), P.dark), s * 0.3 * k, 0.68 * k, 0.08 * k, Math.PI / 2, 0, 0)); P.body.add(at(sph(0.035 * k, 1, 1, 1, P.R), s * 0.3 * k, 0.68 * k, 0.34 * k)); P.body.add(at(box(0.2 * k, 0.1 * k, 0.3 * k, P.steel), s * 0.3 * k, 0.6 * k, 0)); }
+  P.body.add(at(sph(0.07 * k, 1, 1, 0.5, P.R), 0, 0.38 * k, 0.135 * k));
+  g.step = (t) => { const p = t * 4.5; march(P, p, 0.4); P.A.forEach((L, i) => { L.hip.rotation.x = Math.sin(p + i * Math.PI) * 0.3; L.knee.rotation.x = -0.4; }); P.body.rotation.y = Math.sin(p) * 0.08; };
+  g.speed = 1.9; g.rate = 4.5; g.forwardZ = true; return g;
+}
+export function spiderBot() { // a low steel body on four jointed legs, a dome with one red eye, a gun under its chin
+  const g = new THREE.Group(), steel = mat(RB.steel, { metalness: 0.7, roughness: 0.35 }), gun = mat(RB.gun, { metalness: 0.6, roughness: 0.45 }), dark = mat(RB.dark, { metalness: 0.5 }), R = glow(RB.red), body = new THREE.Group(); body.position.y = 0.55; g.add(body);
+  body.add(sph(0.3, 1.2, 0.5, 1.4, gun)); body.add(at(sph(0.18, 1, 0.8, 1, steel), 0, 0.14, 0.1)); body.add(at(sph(0.06, 1, 1, 0.6, R), 0, 0.16, 0.27)); body.add(at(box(0.05, 0.05, 0.3, dark), 0, -0.02, 0.45));
+  const L = [[1, 1], [-1, 1], [1, -1], [-1, -1]].map(([sx, sz]) => { const q = limb(0.42, 0.62, 0.04, steel, dark), piv = new THREE.Group(); piv.position.set(sx * 0.26, 0.02, sz * 0.3); piv.rotation.y = Math.atan2(sx, sz * 0.8); body.add(piv); piv.add(q.hip); return q; });
+  g.step = (t) => { const p = t * 9; L.forEach((q, i) => { const ph = p + (i === 0 || i === 3 ? 0 : Math.PI), lift = Math.max(0, Math.sin(ph)); q.hip.rotation.x = -1.9 + lift * 0.35 + Math.cos(ph) * 0.12; q.knee.rotation.x = 1.75 - lift * 0.3; }); body.position.y = 0.55 + Math.sin(p * 2) * 0.015; body.rotation.z = Math.sin(p) * 0.03; };
+  g.speed = 4.6; g.rate = 9; g.forwardZ = true; return g;
+}
+export function sentryDrone() { // it hovers at chest height on four rotors, a gun slung under its one red eye
+  const g = new THREE.Group(), steel = mat(RB.steel, { metalness: 0.7, roughness: 0.35 }), gun = mat(RB.gun, { metalness: 0.6, roughness: 0.45 }), dark = mat(RB.dark, { metalness: 0.5 }), R = glow(RB.red), body = new THREE.Group(); body.position.y = 1.35; g.add(body);
+  body.add(sph(0.2, 1.1, 0.75, 1.3, gun)); body.add(at(sph(0.07, 1, 1, 0.6, R), 0, 0, 0.24)); body.add(at(box(0.06, 0.06, 0.34, dark), 0, -0.14, 0.12)); body.add(at(sph(0.025, 1, 1, 1, R), 0, -0.14, 0.3));
+  const rot = [[1, 1], [-1, 1], [1, -1], [-1, -1]].map(([sx, sz]) => { body.add(at(box(0.04, 0.03, 0.34, steel), sx * 0.2, 0.04, sz * 0.2, 0, Math.atan2(sx, sz), 0)); const d = at(new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.015, 10), dark), sx * 0.32, 0.09, sz * 0.32); body.add(d); return d; });
+  g.step = (t) => { const p = t * 7; body.position.y = 1.35 + Math.sin(p) * 0.06; body.rotation.x = 0.12 + Math.sin(p) * 0.04; body.rotation.z = Math.sin(p * 0.5 + 1) * 0.06; rot.forEach((d, i) => { d.rotation.y = p * 3 + i; }); };
+  g.speed = 3.2; g.rate = 7; g.forwardZ = true; return g;
+}
+export const BUILD = { grey, mantis, squid, hound, maw, stalker, plated, orcGrunt, orcArcher, orcBrute, wolfRider, orcShaman, combatBot, assaultBot, spiderBot, sentryDrone };
 const FRAMES = 10, CAP = 160, SIZE = 1.0;
 function record(build) {
   const o = build(), w = new THREE.Group(); if (o.forwardZ) o.rotation.y = Math.PI / 2; w.scale.setScalar(SIZE); w.add(o); const frames = [], c = new THREE.Color(); let glass = null;
