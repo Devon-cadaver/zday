@@ -13,20 +13,26 @@ let mine = false; // off for good, its button gone (Sean); the user flag is kept
 export const SEE = { on: true, far: 430, user: mine, fights: true }; // on, and from how far out (modes set it; window.__z.see for comparisons); user: the player's own switch (the eye button)
 const U = { uSeeA: { value: new THREE.Vector3() }, uSeeB: { value: new THREE.Vector3() }, uSee: { value: new THREE.Vector3(0, 0, 0.86) } }; // uSee: the tube's radius, how much it is on, how much of the wall goes (0.86: a stipple is left; 1: all of it, in her fights on foot)
 
+// the buildings lowered out of the way of a fight on foot (seeBoxes): up to NB of them, each its footprint and the height above which it is not drawn
+const NB = 6, UB = { uSeeBox: { value: Array.from({ length: NB }, () => new THREE.Vector4(0, 0, 0, 0)) }, uSeeBoxH: { value: new Array(NB).fill(1e6) } };
+// the railway overhead has the tube of its own (a deck over her has no wall to lower): UR.uSeeR as U.uSee
+const UR = { uSeeR: { value: new THREE.Vector3(0, 0, 1) } };
+
 export function seeThrough(mat) {
   const prev = mat.onBeforeCompile;
   mat.onBeforeCompile = (sh, r) => {
     if (prev) prev(sh, r);
     if (sh.fragmentShader.includes('uSeeA')) return; // patched already (a material whose patches are run again)
-    Object.assign(sh.uniforms, U);
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform vec3 uSeeA; uniform vec3 uSeeB; uniform vec3 uSee;')
+    Object.assign(sh.uniforms, U, UB);
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform vec3 uSeeA; uniform vec3 uSeeB; uniform vec3 uSee; uniform vec4 uSeeBox[' + NB + ']; uniform float uSeeBoxH[' + NB + '];')
       .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
   if (uSee.y > 0.0) {
     vec3 ab = uSeeB - uSeeA; float t = clamp(dot(vHoleW - uSeeA, ab) / dot(ab, ab), 0.0, 1.0);
     float r = uSee.x * (0.6 + 0.4 * smoothstep(0.5, 0.95, t)); // a little wider down at the action
     float k = (1.0 - smoothstep(r * 0.5, r, distance(vHoleW, uSeeA + ab * t))) * step(t, 0.985) * uSee.y; // between the camera and the action only
     if (k * uSee.z > fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))))) discard; // a stipple: a ghost of the wall is left
-  }`);
+  }
+  for (int i = 0; i < ` + NB + `; i++) { vec4 b = uSeeBox[i]; if (vHoleW.y > uSeeBoxH[i] && vHoleW.x > b.x && vHoleW.x < b.z && vHoleW.z > b.y && vHoleW.z < b.w) discard; } // a whole building lowered to a low wall`);
   };
   return mat;
 }
@@ -37,20 +43,20 @@ export function seeAny(mat) {
   mat.onBeforeCompile = (sh, r) => {
     if (prev) prev(sh, r);
     if (sh.fragmentShader.includes('uSeeA')) return; // patched already (a material whose patches are run again)
-    Object.assign(sh.uniforms, U);
+    Object.assign(sh.uniforms, U, UR);
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vSeeW;').replace('#include <project_vertex>', `#include <project_vertex>
   { vec4 seeP = vec4(transformed, 1.0);
   #ifdef USE_INSTANCING
     seeP = instanceMatrix * seeP;
   #endif
     vSeeW = (modelMatrix * seeP).xyz; }`);
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vSeeW; uniform vec3 uSeeA; uniform vec3 uSeeB; uniform vec3 uSee;')
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vSeeW; uniform vec3 uSeeA; uniform vec3 uSeeB; uniform vec3 uSeeR;')
       .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
-  if (uSee.y > 0.0) {
+  if (uSeeR.y > 0.0) {
     vec3 ab = uSeeB - uSeeA; float t = clamp(dot(vSeeW - uSeeA, ab) / dot(ab, ab), 0.0, 1.0);
-    float r = uSee.x * (0.6 + 0.4 * smoothstep(0.5, 0.95, t));
-    float k = (1.0 - smoothstep(r * 0.5, r, distance(vSeeW, uSeeA + ab * t))) * step(t, 0.985) * uSee.y;
-    if (k * uSee.z > fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))))) discard;
+    float r = uSeeR.x * (0.6 + 0.4 * smoothstep(0.5, 0.95, t));
+    float k = (1.0 - smoothstep(r * 0.5, r, distance(vSeeW, uSeeA + ab * t))) * step(t, 0.985) * uSeeR.y;
+    if (k * uSeeR.z > fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))))) discard;
   }`);
   };
   return mat;
@@ -61,7 +67,29 @@ export function seeAny(mat) {
 export function seeFrame(camera, focus, dist, fight) {
   fight = fight && SEE.fights; const on = fight ? 1 : SEE.on && SEE.user ? Math.min(1, Math.max(0, (SEE.far - dist) / 100)) : 0;
   U.uSeeA.value.copy(camera.position); U.uSeeB.value.set(focus.x, (focus.y || 0) + 1.5, focus.z);
-  U.uSee.value.set(fight ? Math.min(30, Math.max(16, dist * 0.4)) : Math.min(24, Math.max(9, dist * 0.07)), on, fight ? 1 : 0.86);
+  U.uSee.value.set(Math.min(24, Math.max(9, dist * 0.07)), fight ? 0 : on, 0.86); // in a fight no tube through the walls (Sean: bits of buildings going, and ones beside her): seeBoxes lowers whole buildings instead
+  UR.uSeeR.value.set(fight ? 11 : U.uSee.value.x, on, fight ? 1 : 0.86);
+}
+
+// A fight on foot (Sean, 2026-11-16: making the buildings invisible "looks bad. Especially when they disappear when the building is on the other side of the player ... Even worse when it's just sections"):
+// a building is lowered only if the line from the camera to her really goes through it, or the line to the open ground 5 m to either side of her (so what comes at her is seen); never one behind her or
+// one she only stands beside. It goes down whole, to a low wall that still shows where it stands, in a quarter of a second, and comes back up the same way. pts: [x, y, z] each, the first is her.
+const LOW = 1.3, KEEP = new Map(); // building index -> how far down it is (0 to 1)
+SEE.low = KEEP; // for tests: which are down now
+function through(c, p, b, side) {
+  const m = 0.4, x0 = b.x0 - m, x1 = b.x1 + m, z0 = b.z0 - m, z1 = b.z1 + m; if (side && p[0] > x0 && p[0] < x1 && p[2] > z0 && p[2] < z1) return false; // that point is in it: she only stands beside it
+  const dx = p[0] - c.x, dz = p[2] - c.z; let t0 = 0, t1 = 1;
+  if (Math.abs(dx) < 1e-6) { if (c.x < x0 || c.x > x1) return false; } else { const a = (x0 - c.x) / dx, e = (x1 - c.x) / dx; t0 = Math.max(t0, Math.min(a, e)); t1 = Math.min(t1, Math.max(a, e)); }
+  if (Math.abs(dz) < 1e-6) { if (c.z < z0 || c.z > z1) return false; } else { const a = (z0 - c.z) / dz, e = (z1 - c.z) / dz; t0 = Math.max(t0, Math.min(a, e)); t1 = Math.min(t1, Math.max(a, e)); }
+  if (t0 >= t1) return false; const dy = p[1] - c.y; return Math.min(c.y + dy * t0, c.y + dy * t1) < b.roofY; // under its roof somewhere on the way through
+}
+export function seeBoxes(cam, pts, city, dt) {
+  const B = city.buildings, want = new Set();
+  if (pts && SEE.fights) for (let k = 0; k < B.length && want.size < NB; k++) { const b = B[k]; if (city.dead && city.dead[k]) continue; for (let i = 0; i < pts.length; i++) if (through(cam, pts[i], b, i > 0)) { want.add(k); break; } }
+  for (const k of want) if (!KEEP.has(k)) KEEP.set(k, 0);
+  let n = 0; for (const [k, v] of KEEP) { const to = want.has(k) ? 1 : 0, nv = v + Math.sign(to - v) * Math.min(Math.abs(to - v), dt * 4); if (nv <= 0 && !to) { KEEP.delete(k); continue; } KEEP.set(k, nv); if (n >= NB) continue;
+    const b = B[k], e = nv * nv * (3 - 2 * nv), top = Math.max(b.roofY, b.top || 0) + 6, base = b.baseY || 0; UB.uSeeBox.value[n].set(b.x0 - 0.4, b.z0 - 0.4, b.x1 + 0.4, b.z1 + 0.4); UB.uSeeBoxH.value[n] = base + LOW + (1 - e) * (top - base - LOW); n++; }
+  for (; n < NB; n++) { UB.uSeeBox.value[n].set(0, 0, 0, 0); UB.uSeeBoxH.value[n] = 1e6; }
 }
 
 // the eye in the column of round buttons: see-through on or off, remembered on this device

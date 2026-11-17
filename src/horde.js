@@ -25,6 +25,7 @@ import { ShotList, runShot, addProp, meleeFx } from './powerfx.js';
 import { STROKES } from './strokes.js';
 import { MELEE_ATK, BLOW } from './fightclips.js';
 import { ARMIES } from './armies.js';
+import { SEE } from './see.js';
 import { HS, rigFor, matesOf, mateDown, mateRig } from './herogame.js';
 import { hdLook } from './hdbody.js';
 const TAKEOFF = { fly: '\u2708 TAKE OFF', run: '\uD83D\uDCA8 SPRINT', swing: '\uD83D\uDD78 SWING', jump: '\u2934 LEAP' }; // the button off the street into the town, by how they get round it (the wardrobe's Moves)
@@ -539,7 +540,7 @@ export class Horde {
     if ((this.nearT = (this.nearT || 0) - dt) <= 0) { this.nearT = 0.5; const c = this.g.city, L = this.nearB = []; c.buildings.forEach((b, k) => { if (!c.dead[k] && Math.abs((b.x0 + b.x1) / 2 - h.x) < 70 && Math.abs((b.z0 + b.z1) / 2 - h.z) < 70) L.push(b); }); }
     if (this.hidden(at(this.azTo))) { let best = null; for (let k = 1; k <= 8 && best == null; k++) for (const sg of [1, -1]) { const a = this.azTo + sg * k * 0.3; if (!this.hidden(at(a))) { best = a; break; } } if (best != null) this.azTo = best; } else if (Math.abs(this.azTo - AZ0) > 0.01 && !this.hidden(at(AZ0))) this.azTo = AZ0;
     if (B0 && Math.hypot(B0.x - h.x, B0.z - h.z) < 120) { const a = Math.atan2(h.x - B0.x, h.z - B0.z); this.azTo = this.az + Math.atan2(Math.sin(a - this.az), Math.cos(a - this.az)); } // a giant: seen past her, it is never between the camera and her
-    this.az += (this.azTo - this.az) * Math.min(1, dt * 2.2); this.camTo = this.camTo || new THREE.Vector3(); this.camTo.copy(at(this.az)); const pullTo = this.hitT(this.camTo); this.pull = this.pull == null ? pullTo : this.pull + (pullTo - this.pull) * Math.min(1, dt * (pullTo < this.pull ? 8 : 1.5)); cam.position.lerpVectors(this.look, this.camTo, this.pull); this.aimLow(dt); this.cine(dt); this.trees(dt);
+    this.az += (this.azTo - this.az) * Math.min(1, dt * 2.2); this.camTo = this.camTo || new THREE.Vector3(); this.camTo.copy(at(this.az)); const pullTo = SEE.fights && !this.o.bot ? 1 : this.hitT(this.camTo); /* her own fights: the building in the way is lowered (see.js seeBoxes), the camera stays where it is; on television it still comes in before the wall */ this.pull = this.pull == null ? pullTo : this.pull + (pullTo - this.pull) * Math.min(1, dt * (pullTo < this.pull ? 8 : 1.5)); cam.position.lerpVectors(this.look, this.camTo, this.pull); this.aimLow(dt); this.cine(dt); this.trees(dt);
   }
   // where the camera points: at its pivot (this.look); but with a giant the pivot is high on it, and she stood under the buttons at the foot of the screen (measured 2026-11-15: y 620 of 636
   // for the golem, 500 to 520 for the tornado and the kaiju). So it tips down, never up, until she is no lower than 0.4 of the half screen below the middle; eased, so it does not jump

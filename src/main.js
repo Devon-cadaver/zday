@@ -16,7 +16,7 @@ import { Sirens } from './sirens.js';
 import { Searchlights } from './searchlights.js';
 import { Audio } from './audio.js';
 import { CURVE, curveFrame } from './curve.js';
-import { seeFrame, SEE } from './see.js';
+import { seeFrame, seeBoxes, SEE } from './see.js';
 const _seeAt = new THREE.Vector3();
 import { Band } from './band.js';
 import { BandGame } from './rhythm.js';
@@ -215,6 +215,7 @@ function frameBody() {
   curveFrame(scene, camera, tg); // the world curves away as you zoom out
   { const H = game.horde, FT = game.fightTest, at = FT && FT.active && FT.o.street && !FT.o.watch ? FT.h : H && H.active && !H.o.bot ? H.h : null; // her fights in the streets (not the ones on television): the buildings in the way are not drawn
     seeFrame(camera, at ? _seeAt.set(at.x, at.y, at.z) : game.focusAt || tg, focus, !!at);
+    { let pts = null; if (at) { pts = [[at.x, at.y + 1, at.z]]; if (at === FT.h && FT.v) pts.push([FT.v.x, FT.v.y + 1, FT.v.z]); else { const dx = at.x - camera.position.x, dz = at.z - camera.position.z, l = Math.hypot(dx, dz) || 1; for (const s of [-1, 1]) pts.push([at.x - dz / l * 5 * s, at.y + 1, at.z + dx / l * 5 * s]); } } seeBoxes(camera.position, pts, city, dt); } // the buildings really in the way go down to a low wall, whole (see.js)
     for (const e of disasters.list) if (e.type === 'rift' && e.g) e.g.visible = !(at && e.blocks(camera.position, at));
     { const F = game.flight, c = at || (F && F.active && F.pos ? F.pos : null); W.fire.uniforms.uClear.value.set(c ? c.x : 0, c ? c.y + 1 : 0, c ? c.z : 0, c ? 8 : 0); } } // and dust and smoke thin out on the way to the hero the player flies or fights with (fire.js) // nor is a rift's ring, while it stands between the camera and her // walls between the camera and the action go see-through, close in
   post.render(scene, camera, focus, time);
