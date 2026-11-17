@@ -385,6 +385,13 @@ ZTYPES.push(
   UNIT({ id: 'rootWalker', name: 'Root walker', creature: 'rootWalker', army: 'trees', chase: 4.4, lunge: 6.5 }),
   UNIT({ id: 'spiritTree', name: 'Spirit tree', creature: 'spiritTree', army: 'trees', chase: 1.8, lunge: 2.8, hp: 2, spit: true }),
   UNIT({ id: 'forestGolem', name: 'Forest golem', creature: 'forestGolem', army: 'trees', chase: 1.7, lunge: 3.0, hp: 4, armored: true }));
+// the Giants (Sean's sheet: ogre, stone, frost, fire and mountain giant): few and huge, each stands many blows
+ZTYPES.push(
+  UNIT({ id: 'ogre', name: 'Ogre', creature: 'ogre', army: 'giants', chase: 2.8, lunge: 4.5, hp: 6, pop: false }),
+  UNIT({ id: 'stoneGiant', name: 'Stone giant', creature: 'stoneGiant', army: 'giants', chase: 2.2, lunge: 3.6, hp: 10, armored: true, pop: false }),
+  UNIT({ id: 'frostGiant', name: 'Frost giant', creature: 'frostGiant', army: 'giants', chase: 3.0, lunge: 5.0, hp: 8, pop: false }),
+  UNIT({ id: 'fireGiant', name: 'Fire giant', creature: 'fireGiant', army: 'giants', chase: 2.2, lunge: 3.4, hp: 8, spit: true, pop: false }),
+  UNIT({ id: 'mountainGiant', name: 'Mountain giant', creature: 'mountainGiant', army: 'giants', chase: 1.8, lunge: 3.0, hp: 14, armored: true, pop: false }));
 export const armyMix = (army, weights = {}) => ZTYPES.flatMap((z, i) => (z.army === army ? Array(weights[z.id] || 1).fill(i) : []));
 export const ALIEN_TYPES = ZTYPES.map((z, i) => (z.alien ? i : -1)).filter((i) => i >= 0);
 export const ROBOT_TYPES = ZTYPES.map((z, i) => (z.robot ? i : -1)).filter((i) => i >= 0);

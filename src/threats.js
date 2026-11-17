@@ -9,7 +9,7 @@ import { ARMIES, ARMY_KINDS } from './armies.js';
 const KEY = 'zday_threats';
 // The mix tuned (Sean, 2026-11-06): the two giant cities one worm and one kaiju (they were two worms, the kaiju only now and then); the rotating one a level of
 // its own (zombies, the riot, the earthquake) three times in four, else one of the older disasters with a villain
-export const SLOTS = { villains: 1, aliens: 1, giant: 2, weather: 2, army: 2 }; // army (Sean, 2026-11-16): two cities with an army in their streets (armies.js: the orcs, the robots, the invaders, the walking trees), Defend only
+export const SLOTS = { villains: 1, aliens: 1, giant: 2, weather: 2, army: 2 }; // army (Sean, 2026-11-16): two cities with an army in their streets (armies.js: the orcs, the robots, the invaders, the walking trees, the giants), Defend only
 const GIANTS = ['worm', 'kaiju'], WEATHER = ['tornado', 'flood', 'haboob', 'tsunami', 'coldwave'], MAIN = ['zombies', 'riot', 'quake'], OLDER = ['plant', 'volcano', 'rift', 'sinkhole', 'blackhole', 'spill'];
 const COAST = ['harbor', 'bayview', 'umihama', 'minato', 'metro', 'lakeside']; // where the sea can come in
 const NEEDS = { tsunami: COAST };
@@ -74,6 +74,7 @@ const ART = {
   robots: `<g class="a-bob"><path ${F} d="M19 3h2v6h-2zM9 9h22v19H9zM13 29h14v7H13z"/><path fill="#ff3020" d="M12 15h16v5H12z"/><path fill="#7c8794" d="M15 31h10v2H15z"/></g>`,
   invaders: `<g class="a-bob"><path ${F} d="M7 20c0-9 6-14 13-14s13 5 13 14v3H7z"/><path fill="#3f6fb8" d="M11 17h18v4H11z"/><path ${F} d="M11 25h18v5c0 4-4 7-9 7s-9-3-9-7z" opacity=".8"/></g>`,
   trees: `<g class="a-sway"><path ${F} d="M20 3c7 0 12 5 12 11 0 5-4 9-9 10v6l5 6h-5l-3-3-3 3h-5l5-6v-6c-5-1-9-5-9-10C8 8 13 3 20 3z"/><path fill="#2f8a3a" d="M14 12l4 1.5-1 2.5-3.5-1.5zM26 12l-4 1.5 1 2.5 3.5-1.5z"/></g>`,
+  giants: `<g class="a-bob"><path ${F} d="M15 4h10v8H15zM6 13h28v9h-5v6h-4v9h-4v-9h-2v9h-4v-9h-4v-6H6z"/><path fill="#b06a3a" d="M17 7h2v2h-2zM21 7h2v2h-2z"/></g>`,
   orcs: `<g class="a-bob"><path ${F} d="M8 15c0-6 5-10 12-10s12 4 12 10v7c0 6-5 11-12 11S8 28 8 22z"/><path fill="#5f8f2f" d="M12 17l6 2-1 3-5-2zM28 17l-6 2 1 3 5-2z"/><path ${F} d="M12 27l1 10 4-7zM28 27l-1 10-4-7z"/></g>`,
   zombies: `<g class="a-bob"><path ${F} d="M12 36V19l-3-7 3-1 3 6 1-11h3l1 10 2-11h3l-1 12 4-8 3 1-5 13v13z"/></g>`,
   kaiju: `<g class="a-bob"><path ${F} d="M6 36l3-13c0-9 5-15 13-15 4 0 7 1 10 4l-3 3 4 2-5 2 1 5-5-2-1 14h-5l-1-9-4 1-2 8z"/></g>`,

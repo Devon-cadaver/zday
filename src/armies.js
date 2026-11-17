@@ -33,5 +33,12 @@ export const ARMIES = {
     mix: armyMix('trees', { sapling: 5, treant: 3, rootWalker: 2, spiritTree: 2, forestGolem: 1 }),
     general: { name: 'Ancient tree', an: 'An', hp: 470, dmgK: 0.95, look: { suit: '#5a4028', cape: '#3f7a2e', dark: '#2e2014', belt: '#5c7a2e', skin: '#7a5a36', eyec: '#ffb02a', hair: 'bald', beard: 'none', hg: 'spiked', back: 'none', chest: 'harness', sh: 'spike', arm: 'spike' } },
   },
+  giants: {
+    name: 'Giants', label: 'GIANTS', noun: ' giants', threat: 'Giants', level: 'The giants', the: 'The giants', news: 'Giants stride into', lost: 'The giants flattened you', lostTV: 'The giants won', after: 'the Giant kings',
+    toast: (n, town) => 'Defend ' + town + ': ' + n + ' giants in the streets. Each one takes many blows, dash off the fire giants\' fireballs, the Giant kings come for you',
+    shot: 'FIREBALL!', shotCol: [2.0, 0.7, 0.15], n: 30, more: 3, max: 48, tv: 34, winP: 0.55, color: '#b06a3a', // few and huge: tv is how many a show on television has (the other armies: 140)
+    mix: armyMix('giants', { ogre: 4, stoneGiant: 2, frostGiant: 2, fireGiant: 2, mountainGiant: 1 }),
+    general: { name: 'Giant king', an: 'A', hp: 520, dmgK: 1.05, look: { suit: '#6b4a2c', cape: '#8a2a1a', dark: '#3a2c22', belt: '#c9a53a', skin: '#c98f6a', eyec: '#ffd24a', hair: 'bald', beard: 'none', hg: 'spiked', back: 'none', chest: 'harness', sh: 'spike', arm: 'spike' } },
+  },
 };
 export const ARMY_KINDS = Object.keys(ARMIES);

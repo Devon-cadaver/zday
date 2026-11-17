@@ -250,7 +250,54 @@ export function forestGolem() { // a broad body of wood under leaves, its head s
   g.step = (t) => { const p = t * 4; F.forEach((q, i) => { const a = p + i * Math.PI; q.hip.rotation.x = Math.sin(a) * 0.4; q.knee.rotation.x = Math.max(0, Math.cos(a)) * 0.7; }); g.position.y = Math.abs(Math.sin(p)) * 0.05; body.rotation.z = Math.sin(p) * 0.08; body.rotation.x = 0.12; A.forEach((q, i) => { q.hip.rotation.x = -0.3 + Math.sin(p + (i ? 0 : Math.PI)) * 0.45; q.knee.rotation.x = -0.5; }); };
   g.speed = 1.7; g.rate = 4; g.forwardZ = true; return g;
 }
-export const BUILD = { sapling, treant, rootWalker, spiritTree, forestGolem, grey, mantis, squid, hound, maw, stalker, plated, orcGrunt, orcArcher, orcBrute, wolfRider, orcShaman, combatBot, assaultBot, spiderBot, sentryDrone, invInfantry, invShield, invEnergy, invScout };
+// ---------- the Giants (Sean's sheet, 2026-11-16): two and three storeys tall, broad, heavy fists: the ogre in a loincloth with a club, the stone giant in blue-grey slabs, the frost giant grown
+// over with ice, the fire giant black rock split by glowing cracks with flames for hair, the mountain giant with boulders on its shoulders
+const rock = (r, m) => new THREE.Mesh(new THREE.DodecahedronGeometry(r, 0), m);
+function giant(k, o = {}) {
+  const g = new THREE.Group(), skin = mat(o.skin, { metalness: o.metal || 0.03, roughness: o.rough || 0.85 }), dark = mat(o.dark || '#3a2c22', { metalness: 0.03, roughness: 0.9 }), E = glow(o.eye || '#ffd24a'), body = new THREE.Group(); body.position.y = 0.9 * k; g.add(body);
+  body.add(at(sph(0.36 * k, 1.25, 1.05, 0.85, skin), 0, 0.5 * k, 0)); body.add(at(sph(0.3 * k, 1.15, 0.9, 0.95, skin), 0, 0.16 * k, 0.04 * k)); body.add(at(box(0.52 * k, 0.22 * k, 0.36 * k, dark), 0, -0.02 * k, 0));
+  const head = at(sph(0.16 * k, 1, 1, 1, skin), 0, 0.98 * k, 0.06 * k); body.add(head); head.add(at(sph(0.125 * k, 1.2, 0.7, 1, skin), 0, -0.085 * k, 0.05 * k)); for (const s of [-1, 1]) { head.add(at(sph(0.028 * k, 1.3, 0.7, 0.6, E), s * 0.065 * k, 0.02 * k, 0.14 * k)); head.add(at(box(0.09 * k, 0.03 * k, 0.05 * k, dark), s * 0.065 * k, 0.06 * k, 0.135 * k, 0, 0, s * -0.4)); body.add(at(sph(0.18 * k, 1, 0.9, 1, skin), s * 0.47 * k, 0.72 * k, 0)); }
+  const A = [-1, 1].map((s) => { const L = limb(0.42 * k, 0.42 * k, 0.115 * k, skin, skin); at(L.hip, s * 0.52 * k, 0.7 * k, 0, 0, 0, s * 0.22); body.add(L.hip); L.knee.add(at(sph(0.155 * k, 1, 1, 1, skin), 0, -0.45 * k, 0)); return L; });
+  const F = [-1, 1].map((s) => { const L = limb(0.45 * k, 0.45 * k, 0.145 * k, skin, dark); at(L.hip, s * 0.21 * k, 0.9 * k, 0, 0, 0, s * 0.06); g.add(L.hip); return L; });
+  return { g, body, head, A, F, skin, dark, E, k };
+}
+// their walk: each step a stomp, the trunk rolling, the arms hanging and swinging
+const stomp = (P, p, sw = 0.45) => { P.F.forEach((L, i) => { const q = p + i * Math.PI; L.hip.rotation.x = Math.sin(q) * sw; L.knee.rotation.x = Math.max(0, Math.cos(q)) * 0.7; }); P.g.position.y = Math.abs(Math.sin(p)) * 0.05 * P.k; P.body.rotation.z = Math.sin(p) * 0.07; P.body.rotation.x = 0.1; P.A.forEach((L, i) => { L.hip.rotation.x = Math.sin(p + (i ? 0 : Math.PI)) * 0.4; L.knee.rotation.x = -0.35; }); };
+export function ogre() { // bare and pot-bellied, a loincloth, a tree trunk for a club
+  const P = giant(2.3, { skin: '#c98f6a', dark: '#5a3f28' }), g = P.g, k = P.k, wood = mat('#6b4a2c', { roughness: 0.95, metalness: 0.02 }); P.body.add(at(sph(0.33 * k, 1.1, 0.9, 1.05, P.skin), 0, 0.12 * k, 0.12 * k)); P.body.add(at(box(0.3 * k, 0.4 * k, 0.04 * k, P.dark), 0, -0.25 * k, 0.19 * k));
+  const club = at(twig(0.06 * k, 0.15 * k, 1.0 * k, wood, 7), 0, -0.45 * k, 0.05 * k, 1.3, 0, 0); P.A[1].knee.add(club); for (let i = 0; i < 4; i++) club.add(at(cone(0.04 * k, 0.14 * k, P.dark, 4), Math.cos(i * 1.57) * 0.14 * k, 0.8 * k, Math.sin(i * 1.57) * 0.14 * k, Math.sin(i * 1.57) * 1.57, 0, -Math.cos(i * 1.57) * 1.57));
+  g.step = (t) => { const p = t * 4.5; stomp(P, p, 0.5); P.A[1].hip.rotation.x = -0.9 + Math.sin(p) * 0.2; P.A[1].knee.rotation.x = -0.6; };
+  g.speed = 2.8; g.rate = 4.5; g.forwardZ = true; return g;
+}
+export function stoneGiant() { // blue-grey stone in slabs: plates on its chest, shoulders and forearms
+  const P = giant(2.7, { skin: '#6f7fa8', dark: '#3f4a6a', eye: '#bfe4ff', rough: 0.7 }), g = P.g, k = P.k, slab = mat('#8f9cc0', { roughness: 0.7, metalness: 0.05 });
+  for (const s of [-1, 1]) { P.body.add(at(rock(0.24 * k, slab), s * 0.48 * k, 0.8 * k, 0, 0.4, s, 0)); P.body.add(at(box(0.3 * k, 0.26 * k, 0.1 * k, slab), s * 0.17 * k, 0.58 * k, 0.28 * k, 0, 0, s * 0.1)); P.A[s < 0 ? 0 : 1].knee.add(at(rock(0.17 * k, slab), 0, -0.2 * k, 0)); P.F[s < 0 ? 0 : 1].knee.add(at(rock(0.19 * k, slab), 0, -0.12 * k, 0.03 * k)); } P.head.add(at(rock(0.15 * k, slab), 0, 0.08 * k, -0.03 * k)); P.body.add(at(rock(0.3 * k, slab), 0, 0.6 * k, -0.22 * k));
+  g.step = (t) => { stomp(P, t * 4, 0.42); };
+  g.speed = 2.2; g.rate = 4; g.forwardZ = true; return g;
+}
+export function frostGiant() { // pale blue ice, shards of it standing from its shoulders, back, head and forearms
+  const P = giant(2.5, { skin: '#6fc0f0', dark: '#2f6fa8', eye: '#ffffff', rough: 0.3, metal: 0.25 }), g = P.g, k = P.k, ice = glow('#9fe0ff'), ice2 = mat('#c8f0ff', { roughness: 0.2, metalness: 0.3 });
+  const S = [[0.45, 0.9, -0.05, 0.3, 0.5], [-0.45, 0.9, -0.05, 0.3, -0.5], [0.3, 0.95, -0.15, 0.36, 0.25], [-0.3, 0.95, -0.15, 0.36, -0.25], [0, 0.85, -0.3, 0.42, 0], [0.18, 0.6, -0.33, 0.3, 0.2], [-0.18, 0.6, -0.33, 0.3, -0.2], [0.58, 0.8, 0, 0.24, 0.9], [-0.58, 0.8, 0, 0.24, -0.9]];
+  S.forEach(([x, y, z, l, r], i) => P.body.add(at(cone(0.07 * k, l * k, i % 2 ? ice : ice2, 5), x * k, (y + l / 2) * k, z * k, z < -0.1 ? -0.5 : 0, 0, -r))); for (let i = -1; i <= 1; i++) P.head.add(at(cone(0.04 * k, 0.2 * k, i ? ice2 : ice, 5), i * 0.08 * k, 0.2 * k, -0.02 * k, 0, 0, -i * 0.35)); P.A.forEach((L) => L.knee.add(at(cone(0.06 * k, 0.26 * k, ice, 5), 0, -0.2 * k, -0.12 * k, -1.2, 0, 0)));
+  g.step = (t) => { const p = t * 5; stomp(P, p, 0.5); };
+  g.speed = 3.0; g.rate = 5; g.forwardZ = true; return g;
+}
+export function fireGiant() { // black rock split by glowing cracks, flames for hair, a ball of fire in one hand
+  const P = giant(2.5, { skin: '#3a2019', dark: '#1e1210', eye: '#ffd24a', rough: 0.9 }), g = P.g, k = P.k, L = glow('#ff6a14'), Y = glow('#ffc23a');
+  const C = [[0, 0.55, 0.3, 0.03, 0.5, 0.2], [0.14, 0.4, 0.3, 0.025, 0.3, -0.6], [-0.16, 0.62, 0.29, 0.025, 0.3, 0.7], [0.05, 0.18, 0.31, 0.025, 0.26, 0.9], [0.2, 0.7, 0.24, 0.02, 0.2, 1.2], [-0.1, 0.3, 0.31, 0.02, 0.22, -0.3]];
+  C.forEach(([x, y, z, w, h, r]) => P.body.add(at(box(w * k, h * k, 0.02 * k, L), x * k, y * k, z * k, 0, 0, r))); P.body.add(at(sph(0.08 * k, 1, 1, 0.4, Y), 0, 0.5 * k, 0.3 * k));
+  for (let i = 0; i < 5; i++) P.head.add(at(cone(0.05 * k, (0.2 + (i % 2) * 0.1) * k, i % 2 ? Y : L, 5), (i - 2) * 0.055 * k, 0.2 * k, -0.02 * k, -0.2, 0, -(i - 2) * 0.18)); P.A.forEach((q, i) => { q.hip.add(at(box(0.02 * k, 0.3 * k, 0.02 * k, L), 0, -0.2 * k, 0.11 * k, 0, 0, 0.3)); if (i) q.knee.add(at(sph(0.2 * k, 1, 1.1, 1, L), 0, -0.6 * k, 0)); }); P.F.forEach((q) => q.hip.add(at(box(0.02 * k, 0.3 * k, 0.02 * k, L), 0, -0.2 * k, 0.14 * k, 0, 0, -0.3)));
+  g.step = (t) => { const p = t * 4; stomp(P, p, 0.42); P.A[1].hip.rotation.x = -1.3 + Math.sin(p * 2) * 0.1; P.A[1].knee.rotation.x = -0.4; };
+  g.speed = 2.2; g.rate = 4; g.forwardZ = true; return g;
+}
+export function mountainGiant() { // the biggest: grey rock, boulders heaped on its shoulders and back, fists like boulders
+  const P = giant(3.2, { skin: '#8a8a84', dark: '#55554f', eye: '#ffb02a', rough: 0.95 }), g = P.g, k = P.k, st = mat('#a8a8a0', { roughness: 0.95, metalness: 0.02 }), st2 = mat('#6f6f69', { roughness: 0.95, metalness: 0.02 });
+  const R = [[0.5, 0.86, 0, 0.3], [-0.5, 0.86, 0, 0.3], [0.3, 1.0, -0.12, 0.22], [-0.28, 1.02, -0.12, 0.24], [0, 0.8, -0.3, 0.34], [0.26, 0.5, -0.3, 0.24], [-0.26, 0.48, -0.3, 0.24], [0.66, 0.7, 0.02, 0.18], [-0.66, 0.7, 0.02, 0.18]];
+  R.forEach(([x, y, z, r], i) => P.body.add(at(rock(r * k, i % 2 ? st : st2), x * k, y * k, z * k, i, i * 2, 0))); P.A.forEach((q) => q.knee.add(at(rock(0.24 * k, st), 0, -0.46 * k, 0, 0.5, 0.5, 0))); P.F.forEach((q) => q.knee.add(at(rock(0.2 * k, st2), 0, -0.4 * k, 0.04 * k)));
+  g.step = (t) => { stomp(P, t * 3.5, 0.38); };
+  g.speed = 1.8; g.rate = 3.5; g.forwardZ = true; return g;
+}
+export const BUILD = { ogre, stoneGiant, frostGiant, fireGiant, mountainGiant, sapling, treant, rootWalker, spiritTree, forestGolem, grey, mantis, squid, hound, maw, stalker, plated, orcGrunt, orcArcher, orcBrute, wolfRider, orcShaman, combatBot, assaultBot, spiderBot, sentryDrone, invInfantry, invShield, invEnergy, invScout };
 const FRAMES = 10, CAP = 160, SIZE = 1.0;
 function record(build) {
   const o = build(), w = new THREE.Group(); if (o.forwardZ) o.rotation.y = Math.PI / 2; w.scale.setScalar(SIZE); w.add(o); const frames = [], c = new THREE.Color(); let glass = null;
