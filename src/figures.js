@@ -372,6 +372,12 @@ ZTYPES.push(
   UNIT({ id: 'spiderBot', name: 'Spider bot', creature: 'spiderBot', army: 'robots', chase: 4.6, lunge: 7.0, hp: 2 }),
   UNIT({ id: 'sentryDrone', name: 'Sentry drone', creature: 'sentryDrone', army: 'robots', chase: 3.2, lunge: 4.5, spit: true }));
 // an army's crowd: each of its units as many times as its weight (1 if not given)
+// the Invading army (Sean's sheets: infantry, heavy troops with shields, energy troops; its tanks, artillery and dropships need vehicles that fight: later)
+ZTYPES.push(
+  UNIT({ id: 'invInfantry', name: 'Infantry', creature: 'invInfantry', army: 'invaders', chase: 2.7, lunge: 4.0 }),
+  UNIT({ id: 'invShield', name: 'Shield trooper', creature: 'invShield', army: 'invaders', chase: 1.9, lunge: 3.0, hp: 4, armored: true }),
+  UNIT({ id: 'invEnergy', name: 'Energy trooper', creature: 'invEnergy', army: 'invaders', chase: 2.1, lunge: 3.0, hp: 2, spit: true }),
+  UNIT({ id: 'invScout', name: 'Scout', creature: 'invScout', army: 'invaders', chase: 4.8, lunge: 7.0 }));
 export const armyMix = (army, weights = {}) => ZTYPES.flatMap((z, i) => (z.army === army ? Array(weights[z.id] || 1).fill(i) : []));
 export const ALIEN_TYPES = ZTYPES.map((z, i) => (z.alien ? i : -1)).filter((i) => i >= 0);
 export const ROBOT_TYPES = ZTYPES.map((z, i) => (z.robot ? i : -1)).filter((i) => i >= 0);

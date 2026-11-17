@@ -155,7 +155,41 @@ export function sentryDrone() { // it hovers at chest height on four rotors, a g
   g.step = (t) => { const p = t * 7; body.position.y = 1.35 + Math.sin(p) * 0.06; body.rotation.x = 0.12 + Math.sin(p) * 0.04; body.rotation.z = Math.sin(p * 0.5 + 1) * 0.06; rot.forEach((d, i) => { d.rotation.y = p * 3 + i; }); };
   g.speed = 3.2; g.rate = 7; g.forwardZ = true; return g;
 }
-export const BUILD = { grey, mantis, squid, hound, maw, stalker, plated, orcGrunt, orcArcher, orcBrute, wolfRider, orcShaman, combatBot, assaultBot, spiderBot, sentryDrone };
+// ---------- the Invading army (Sean's sheets, 2026-11-16): soldiers in dark blue armour with sand webbing, a round helmet and a blue visor: infantry with a rifle across the chest, shield troopers half
+// as big again behind a tall shield with a baton, energy troopers with a pack and a glowing lance, scouts light and running low with a blade
+const IV = { arm: '#4467a8', plate: '#8fa4c8', dark: '#1c222c', sand: '#b9a77a', blue: '#4ac8ff' };
+function soldier(k = 1, o = {}) {
+  const g = new THREE.Group(), arm = mat(o.body || IV.arm, { metalness: 0.3, roughness: 0.6 }), plate = mat(IV.plate, { metalness: 0.55, roughness: 0.4 }), dark = mat(IV.dark, { metalness: 0.3, roughness: 0.6 }), sand = mat(IV.sand, { metalness: 0.05, roughness: 0.9 }), B = glow(IV.blue), body = new THREE.Group();
+  body.position.y = 0.84 * k; g.add(body); body.add(at(sph(0.24 * k, 1, 1.1, 0.7, arm), 0, 0.34 * k, 0)); body.add(at(box(0.36 * k, 0.26 * k, 0.05 * k, plate), 0, 0.4 * k, 0.14 * k)); body.add(at(box(0.4 * k, 0.07 * k, 0.3 * k, sand), 0, 0.12 * k, 0)); body.add(at(box(0.3 * k, 0.14 * k, 0.2 * k, dark), 0, 0.02 * k, 0));
+  const head = at(sph(0.13 * k, 1, 1, 1, dark), 0, 0.72 * k, 0.01 * k); body.add(head); head.add(at(sph(0.155 * k, 1.05, 0.75, 1.1, plate), 0, 0.05 * k, -0.01 * k)); head.add(at(box(0.2 * k, 0.05 * k, 0.04 * k, B), 0, 0, 0.125 * k));
+  for (const s of [-1, 1]) body.add(at(sph(0.1 * k, 1.1, 0.7, 1, plate), s * 0.28 * k, 0.54 * k, 0));
+  const A = [-1, 1].map((s) => { const L = limb(0.3 * k, 0.3 * k, 0.06 * k, arm, dark); at(L.hip, s * 0.3 * k, 0.5 * k, 0, 0, 0, s * 0.1); body.add(L.hip); return L; });
+  const F = [-1, 1].map((s) => { const L = limb(0.4 * k, 0.4 * k, 0.075 * k, arm, dark); at(L.hip, s * 0.12 * k, 0.84 * k, 0); g.add(L.hip); return L; });
+  return { g, body, head, A, F, arm, plate, dark, sand, B, k };
+}
+export function invInfantry() { // a rifle held across the chest in both hands, a pack on the back
+  const P = soldier(1), g = P.g; P.body.add(at(box(0.26, 0.3, 0.12, P.sand), 0, 0.36, -0.2)); const rifle = at(box(0.05, 0.07, 0.7, P.dark), -0.16, -0.3, 0.1, 0.2, 0.5, 0); P.A[1].knee.add(rifle); rifle.add(at(sph(0.025, 1, 1, 1, P.B), 0, 0, 0.36));
+  g.step = (t) => { const p = t * 6; march(P, p, 0.55); P.A[1].hip.rotation.x = -0.6; P.A[1].knee.rotation.x = -1.2; P.A[1].hip.rotation.z = 0.25; P.A[0].hip.rotation.x = -0.9; P.A[0].knee.rotation.x = -0.9; P.A[0].hip.rotation.z = -0.45; P.body.rotation.y = Math.sin(p) * 0.08; };
+  g.speed = 2.7; g.rate = 6; g.forwardZ = true; return g;
+}
+export function invShield() { // half as big again, a tall shield with a blue slit held in front, a baton in the other hand
+  const P = soldier(1.4, { body: '#35528c' }), g = P.g, k = P.k, sh = at(box(0.62 * k, 1.05 * k, 0.05 * k, P.plate), 0.2 * k, -0.2 * k, 0.2 * k, 1.35, 0, 0); P.A[0].knee.add(sh); sh.add(at(box(0.36 * k, 0.05 * k, 0.02 * k, P.B), 0, 0.3 * k, 0.03 * k)); sh.add(at(box(0.5 * k, 0.07 * k, 0.02 * k, P.sand), 0, -0.2 * k, 0.03 * k));
+  const bat = at(new THREE.Mesh(new THREE.CylinderGeometry(0.03 * k, 0.03 * k, 0.6 * k, 6), P.dark), 0, -0.36 * k, 0.16 * k, 1.2, 0, 0); P.A[1].knee.add(bat); bat.add(at(sph(0.045 * k, 1, 1.6, 1, P.B), 0, 0.3 * k, 0));
+  g.step = (t) => { const p = t * 4.5; march(P, p, 0.4); P.A[0].hip.rotation.x = -1.25; P.A[0].knee.rotation.x = -0.15; P.A[1].hip.rotation.x = -0.6 + Math.sin(p) * 0.2; P.A[1].knee.rotation.x = -0.6; P.body.rotation.x = 0.1; };
+  g.speed = 1.9; g.rate = 4.5; g.forwardZ = true; return g;
+}
+export function invEnergy() { // a power pack with two glowing cells on the back, a long lance held level, its tip alight
+  const P = soldier(1.04), g = P.g; P.body.add(at(box(0.34, 0.4, 0.16, P.dark), 0, 0.38, -0.22)); for (const s of [-1, 1]) P.body.add(at(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.34, 8), P.B), s * 0.09, 0.4, -0.31));
+  const lance = at(new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 1.0, 7), P.plate), 0, -0.3, 0.3, 1.5, 0, 0); P.A[1].knee.add(lance); lance.add(at(sph(0.075, 1, 1.5, 1, P.B), 0, 0.55, 0)); lance.add(at(new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.015, 4, 10), P.B), 0, 0.3, 0, Math.PI / 2, 0, 0));
+  g.step = (t) => { const p = t * 5.5; march(P, p, 0.45); P.A[1].hip.rotation.x = -0.9; P.A[1].knee.rotation.x = -0.5; P.A[0].hip.rotation.x = -1.0; P.A[0].knee.rotation.x = -0.7; P.A[0].hip.rotation.z = -0.5; P.head.rotation.y = Math.sin(p * 0.5) * 0.2; };
+  g.speed = 2.1; g.rate = 5.5; g.forwardZ = true; return g;
+}
+export function invScout() { // smaller and light, bent low at a run, a blade held back in one hand
+  const P = soldier(0.9, { body: '#5578b4' }), g = P.g; const bl = at(box(0.03, 0.5, 0.07, P.plate), 0, -0.5, 0.02); P.A[1].knee.add(bl); bl.add(at(box(0.035, 0.44, 0.02, P.B), 0, 0, 0.04));
+  g.step = (t) => { const p = t * 10; march(P, p, 0.95); P.body.rotation.x = 0.42; P.A[0].hip.rotation.x = Math.sin(p + Math.PI) * 0.9; P.A[0].knee.rotation.x = -1.0; P.A[1].hip.rotation.x = 0.7 + Math.sin(p) * 0.25; P.A[1].knee.rotation.x = -0.3; P.g.position.y = Math.abs(Math.sin(p)) * 0.07; };
+  g.speed = 4.8; g.rate = 10; g.forwardZ = true; return g;
+}
+export const BUILD = { grey, mantis, squid, hound, maw, stalker, plated, orcGrunt, orcArcher, orcBrute, wolfRider, orcShaman, combatBot, assaultBot, spiderBot, sentryDrone, invInfantry, invShield, invEnergy, invScout };
 const FRAMES = 10, CAP = 160, SIZE = 1.0;
 function record(build) {
   const o = build(), w = new THREE.Group(); if (o.forwardZ) o.rotation.y = Math.PI / 2; w.scale.setScalar(SIZE); w.add(o); const frames = [], c = new THREE.Color(); let glass = null;

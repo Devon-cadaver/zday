@@ -19,5 +19,12 @@ export const ARMIES = {
     mix: armyMix('robots', { combatBot: 6, assaultBot: 1, spiderBot: 2, sentryDrone: 2 }),
     general: { name: 'Enforcer', an: 'An', hp: 460, dmgK: 0.95, look: { suit: '#3a4048', cape: '#20242a', dark: '#15181c', belt: '#ff3020', skin: '#aeb8c2', hairc: '#aeb8c2', eyec: '#ff2a1a', hair: 'bald', beard: 'none', hg: 'skull', back: 'none', chest: 'plate', sh: 'plate' } },
   },
+  invaders: {
+    name: 'Invading army', label: 'INVADERS', noun: ' soldiers', threat: 'Invading army', level: 'The invading army', the: 'The invaders', news: 'An invading army marches into', lost: 'The invaders overran you', lostTV: 'The invaders won', after: 'the Generals',
+    toast: (n, town) => 'Defend ' + town + ': ' + n + ' soldiers in the streets. Dash off the energy bolts, the shield troopers take four blows, their Generals come for you',
+    shot: 'ZAPPED!', shotCol: [0.3, 0.9, 2.0], n: 150, more: 15, max: 220, winP: 0.6, color: '#3f6fb8',
+    mix: armyMix('invaders', { invInfantry: 6, invShield: 1, invEnergy: 2, invScout: 2 }),
+    general: { name: 'General', an: 'A', hp: 450, dmgK: 0.92, look: { suit: '#2f3d55', cape: '#b9a77a', dark: '#1c222c', belt: '#b9a77a', skin: '#c9a184', eyec: '#4ac8ff', hair: 'bald', beard: 'none', hg: 'skull', back: 'none', chest: 'plate', sh: 'plate' } },
+  },
 };
 export const ARMY_KINDS = Object.keys(ARMIES);
