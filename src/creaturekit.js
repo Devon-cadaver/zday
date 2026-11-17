@@ -189,51 +189,68 @@ export function invScout() { // smaller and light, bent low at a run, a blade he
   g.step = (t) => { const p = t * 10; march(P, p, 0.95); P.body.rotation.x = 0.42; P.A[0].hip.rotation.x = Math.sin(p + Math.PI) * 0.9; P.A[0].knee.rotation.x = -1.0; P.A[1].hip.rotation.x = 0.7 + Math.sin(p) * 0.25; P.A[1].knee.rotation.x = -0.3; P.g.position.y = Math.abs(Math.sin(p)) * 0.07; };
   g.speed = 4.8; g.rate = 10; g.forwardZ = true; return g;
 }
-// ---------- the Walking trees (Sean's sheets, 2026-11-16): bark and leaves, amber eyes in a face in the trunk, branches for arms, roots for legs: saplings small and quick, treants a tree's height
-// with a crown of leaves, root walkers a stump scuttling on four roots, sporers under a mushroom cap with glowing pods, forest guardians half as big again, mossed, with a stone fist
-const TR = { bark: '#6b4a2c', dark: '#3d2a18', leaf: '#4f9a35', leaf2: '#7fbf3f', moss: '#5c7a2e', amber: '#ffb02a', spore: '#c8ff5a', stone: '#8a8f8a' };
-function tree(k = 1, o = {}) {
-  const g = new THREE.Group(), bark = mat(o.bark || TR.bark, { metalness: 0.02, roughness: 0.95 }), dark = mat(TR.dark, { metalness: 0.02, roughness: 0.95 }), leaf = mat(o.leaf || TR.leaf, { metalness: 0.02, roughness: 0.85 }), leaf2 = mat(TR.leaf2, { metalness: 0.02, roughness: 0.85 }), E = glow(TR.amber), body = new THREE.Group();
-  body.position.y = 0.8 * k; g.add(body); const trunk = at(new THREE.Mesh(new THREE.CylinderGeometry(0.17 * k, 0.26 * k, 1.0 * k, 7), bark), 0, 0.42 * k, 0); body.add(trunk);
-  for (const s of [-1, 1]) body.add(at(sph(0.035 * k, 1.3, 0.7, 0.6, E), s * 0.075 * k, 0.62 * k, 0.185 * k, 0, 0, s * -0.35)); body.add(at(box(0.14 * k, 0.035 * k, 0.03 * k, dark), 0, 0.46 * k, 0.21 * k)); body.add(at(cone(0.04 * k, 0.16 * k, bark, 5), 0, 0.55 * k, 0.24 * k, 1.4, 0, 0));
-  const crown = new THREE.Group(); crown.position.y = 0.95 * k; body.add(crown);
-  if (o.crown !== false) { crown.add(at(sph(0.36 * k, 1.1, 0.8, 1.1, leaf), 0, 0.14 * k, 0)); crown.add(at(sph(0.24 * k, 1, 0.85, 1, leaf2), 0.2 * k, 0.3 * k, 0.05 * k)); crown.add(at(sph(0.22 * k, 1, 0.85, 1, leaf), -0.22 * k, 0.26 * k, -0.08 * k)); crown.add(at(sph(0.2 * k, 1, 0.8, 1, leaf2), 0, 0.42 * k, -0.02 * k)); }
-  const A = [-1, 1].map((s) => { const L = limb(0.36 * k, 0.36 * k, 0.05 * k, bark, dark); at(L.hip, s * 0.22 * k, 0.72 * k, 0, 0, 0, s * 0.35); body.add(L.hip); for (let i = 0; i < 3; i++) L.knee.add(at(cone(0.018 * k, 0.16 * k, dark, 4), (i - 1) * 0.04 * k, -0.42 * k, 0, Math.PI, 0, (i - 1) * 0.4)); return L; });
-  const F = [-1, 1].map((s) => { const L = limb(0.38 * k, 0.38 * k, 0.085 * k, bark, dark); at(L.hip, s * 0.13 * k, 0.8 * k, 0, 0, 0, s * 0.08); g.add(L.hip); return L; });
-  return { g, body, crown, A, F, bark, dark, leaf, leaf2, E, k };
+// ---------- the Walking trees (Sean's sheet, 2026-11-16; rebuilt the same day: "Can the trees look more tree like? Like the examples I provided?"): a gnarled trunk that splits into spreading
+// branches with clumps of leaves at their tips, a face in the bark, long arms ending in twig claws, short legs on splayed roots: tree ents; walking pines (the living forest); the root walker, dead wood
+// with bare antlers on a tangle of roots, fire in its mouth; the spirit tree, alight with green; the forest golem, a broad body of wood under leaves
+const TR = { bark: '#6b4a2c', dark: '#3d2a18', leaf: '#4f9a35', leaf2: '#7fbf3f', pine: '#2f6a34', pine2: '#3f8a3c', moss: '#5c7a2e', amber: '#ffb02a', fire: '#ff7a1a', spirit: '#8dff3a', dead: '#5c4a38' };
+const TM = (c) => mat(c, { metalness: 0.02, roughness: 0.92 });
+const twig = (r0, r1, l, m, n = 6) => { const q = new THREE.CylinderGeometry(r1, r0, l, n); q.translate(0, l / 2, 0); return new THREE.Mesh(q, m); }; // grows up from its joint
+// roots spread from a foot: three toes lying on the ground
+const toes = (L, b, k, m) => { for (let i = -1; i <= 1; i++) L.knee.add(at(cone(0.045 * k, 0.3 * k, m, 5), i * 0.07 * k, -b + 0.02 * k, 0.1 * k, Math.PI / 2, 0, -i * 0.5)); };
+// a face in the bark: slanted amber eyes under a brow, a jagged mouth
+function face(p, k, y, z, E, dark, mouth) { for (const s of [-1, 1]) { p.add(at(sph(0.04 * k, 1.4, 0.65, 0.6, E), s * 0.085 * k, y, z, 0, 0, s * -0.45)); p.add(at(box(0.13 * k, 0.035 * k, 0.05 * k, dark), s * 0.09 * k, y + 0.06 * k, z + 0.005 * k, 0, 0, s * -0.5)); } p.add(at(box(0.2 * k, 0.06 * k, 0.04 * k, mouth || dark), 0, y - 0.17 * k, z + 0.01 * k)); for (let i = -1; i <= 1; i++) p.add(at(cone(0.022 * k, 0.07 * k, dark, 4), i * 0.06 * k, y - 0.15 * k, z + 0.03 * k, Math.PI, 0, 0)); p.add(at(cone(0.04 * k, 0.16 * k, dark, 5), 0, y - 0.05 * k, z + 0.05 * k, 1.3, 0, 0)); }
+// the spreading top: n branches out and up from the crown's root, each forked, leaves at the tips (bare: none, more forks)
+function boughs(crown, k, n, P, o = {}) { for (let i = 0; i < n; i++) { const a = i * Math.PI * 2 / n + 0.5, t = 0.55 + (i % 3) * 0.2, len = (0.55 + (i % 2) * 0.2) * k, b = at(twig(0.075 * k, 0.03 * k, len, P.bark), 0, 0, 0, Math.cos(a) * t, 0, -Math.sin(a) * t); crown.add(b);
+    const f1 = at(twig(0.035 * k, 0.012 * k, len * 0.6, P.bark, 5), 0, len * 0.55, 0, 0.7, a, 0.5), f2 = at(twig(0.03 * k, 0.01 * k, len * 0.5, P.bark, 5), 0, len * 0.95, 0, -0.5, a, -0.6); b.add(f1); b.add(f2);
+    if (o.bare) { b.add(at(twig(0.025 * k, 0.008 * k, len * 0.45, P.bark, 4), 0, len * 0.3, 0, -0.8, a + 1, 0.4)); f1.add(at(twig(0.016 * k, 0.006 * k, len * 0.3, P.bark, 4), 0, len * 0.4, 0, 0.6, 0, -0.7)); continue; }
+    b.add(at(sph(0.19 * k, 1.25, 0.6, 1.25, i % 2 ? P.leaf : P.leaf2), 0, len * 1.02, 0)); f1.add(at(sph(0.14 * k, 1.2, 0.6, 1.2, i % 2 ? P.leaf2 : P.leaf), 0, len * 0.6, 0)); f2.add(at(sph(0.12 * k, 1.2, 0.6, 1.2, o.tip || P.leaf), 0, len * 0.5, 0)); } }
+function ent(k = 1, o = {}) {
+  const g = new THREE.Group(), P = { g, k, bark: TM(o.bark || TR.bark), dark: TM(TR.dark), leaf: TM(o.leaf || TR.leaf), leaf2: TM(o.leaf2 || TR.leaf2), moss: TM(TR.moss), E: glow(o.eye || TR.amber) }, body = P.body = new THREE.Group(); body.position.y = 0.55 * k; g.add(body);
+  body.add(twig(0.33 * k, 0.21 * k, 0.75 * k, P.bark, 7)); const up = at(twig(0.22 * k, 0.15 * k, 0.5 * k, P.bark, 7), 0.02 * k, 0.7 * k, 0, 0, 0, 0.13); body.add(up); body.add(at(sph(0.16 * k, 1, 0.8, 0.8, P.bark), -0.16 * k, 0.55 * k, -0.08 * k)); body.add(at(sph(0.13 * k, 1.3, 0.5, 0.7, P.moss), 0.1 * k, 0.9 * k, 0.12 * k));
+  face(body, k, 0.52 * k, 0.24 * k, P.E, P.dark, o.mouth);
+  const crown = P.crown = new THREE.Group(); crown.position.set(-0.04 * k, 1.15 * k, 0); body.add(crown); boughs(crown, k, o.n || 5, P, o);
+  P.A = [-1, 1].map((s) => { const L = limb(0.44 * k, 0.46 * k, 0.07 * k, P.bark, P.dark); at(L.hip, s * 0.27 * k, 0.95 * k, 0, 0, 0, s * 0.45); body.add(L.hip); for (let i = -1; i <= 1; i++) L.knee.add(at(cone(0.022 * k, 0.24 * k, P.dark, 4), i * 0.05 * k, -0.55 * k, 0, Math.PI, 0, i * 0.45)); if (!o.bare) body.add(at(sph(0.12 * k, 1.2, 0.6, 1.2, P.leaf), s * 0.3 * k, 1.02 * k, -0.02 * k)); return L; });
+  P.F = [-1, 1].map((s) => { const L = limb(0.3 * k, 0.3 * k, 0.11 * k, P.bark, P.dark); at(L.hip, s * 0.17 * k, 0.6 * k, 0, 0, 0, s * 0.12); g.add(L.hip); toes(L, 0.3 * k, k, P.bark); return L; });
+  return P;
 }
-// their walk: slow and swaying, the crown rolling after the trunk
-const sway = (P, p, sw = 0.5) => { P.F.forEach((L, i) => { const q = p + i * Math.PI; L.hip.rotation.x = Math.sin(q) * sw; L.knee.rotation.x = Math.max(0, Math.cos(q)) * 0.8; }); P.g.position.y = Math.abs(Math.sin(p)) * 0.035 * P.k; P.body.rotation.z = Math.sin(p) * 0.07; P.crown.rotation.z = Math.sin(p - 0.8) * 0.1; };
-export function sapling() { // small and quick, a tuft of leaves, its twig arms reaching
-  const P = tree(0.62, { leaf: TR.leaf2 }), g = P.g;
-  g.step = (t) => { const p = t * 9; sway(P, p, 0.8); P.A.forEach((L, i) => { L.hip.rotation.x = -1.2 + Math.sin(p + i * Math.PI) * 0.4; L.knee.rotation.x = -0.4; }); };
+// their walk: slow and swaying, the boughs rolling after the trunk
+const sway = (P, p, sw = 0.5) => { P.F.forEach((L, i) => { const q = p + i * Math.PI; L.hip.rotation.x = Math.sin(q) * sw; L.knee.rotation.x = Math.max(0, Math.cos(q)) * 0.8; }); P.g.position.y = Math.abs(Math.sin(p)) * 0.035 * P.k; P.body.rotation.z = Math.sin(p) * 0.07; P.crown.rotation.z = Math.sin(p - 0.8) * 0.09; P.crown.rotation.x = Math.sin(p * 2) * 0.04; };
+export function sapling() { // the living forest: a pine on the move, three tiers of needles over a short trunk, twig arms, small roots
+  const k = 0.82, g = new THREE.Group(), bark = TM(TR.bark), dark = TM(TR.dark), n1 = TM(TR.pine), n2 = TM(TR.pine2), E = glow(TR.amber), body = new THREE.Group(); body.position.y = 0.36 * k; g.add(body);
+  body.add(twig(0.1 * k, 0.07 * k, 0.6 * k, bark)); const top = new THREE.Group(); body.add(top); top.add(at(cone(0.46 * k, 0.65 * k, n1, 8), 0, 0.72 * k, 0)); top.add(at(cone(0.36 * k, 0.6 * k, n2, 8), 0, 1.1 * k, 0)); top.add(at(cone(0.25 * k, 0.55 * k, n1, 8), 0, 1.47 * k, 0)); top.add(at(cone(0.13 * k, 0.4 * k, n2, 7), 0, 1.8 * k, 0));
+  for (const s of [-1, 1]) body.add(at(sph(0.04 * k, 1.3, 0.7, 0.6, E), s * 0.07 * k, 0.33 * k, 0.085 * k, 0, 0, s * -0.4)); body.add(at(box(0.1 * k, 0.03 * k, 0.03 * k, dark), 0, 0.2 * k, 0.1 * k));
+  const A = [-1, 1].map((s) => { const L = limb(0.26 * k, 0.26 * k, 0.03 * k, bark, dark); at(L.hip, s * 0.1 * k, 0.42 * k, 0.02 * k, 0, 0, s * 0.7); body.add(L.hip); return L; }), F = [-1, 1].map((s) => { const L = limb(0.19 * k, 0.19 * k, 0.055 * k, bark, dark); at(L.hip, s * 0.09 * k, 0.4 * k, 0, 0, 0, s * 0.15); g.add(L.hip); toes(L, 0.19 * k, k * 0.6, bark); return L; });
+  g.step = (t) => { const p = t * 9; F.forEach((L, i) => { const q = p + i * Math.PI; L.hip.rotation.x = Math.sin(q) * 0.8; L.knee.rotation.x = Math.max(0, Math.cos(q)) * 0.8; }); g.position.y = Math.abs(Math.sin(p)) * 0.05; top.rotation.z = Math.sin(p) * 0.09; top.rotation.x = Math.sin(p * 2) * 0.05; A.forEach((L, i) => { L.hip.rotation.x = -1.1 + Math.sin(p + i * Math.PI) * 0.4; L.knee.rotation.x = -0.4; }); };
   g.speed = 3.0; g.rate = 9; g.forwardZ = true; return g;
 }
-export function treant() { // a tree's height, a full crown, one branch raised to strike
-  const P = tree(1.15), g = P.g;
-  g.step = (t) => { const p = t * 5; sway(P, p, 0.5); P.A[0].hip.rotation.x = Math.sin(p) * 0.5; P.A[0].knee.rotation.x = -0.4; P.A[1].hip.rotation.x = -2.2 + Math.sin(p * 2) * 0.15; P.A[1].knee.rotation.x = -0.5; };
+export function treant() { // the tree ent: full boughs, one long arm raised to strike
+  const P = ent(1.1), g = P.g;
+  g.step = (t) => { const p = t * 5; sway(P, p, 0.5); P.A[0].hip.rotation.x = Math.sin(p) * 0.45; P.A[0].knee.rotation.x = -0.4; P.A[1].hip.rotation.x = -1.9 + Math.sin(p * 2) * 0.15; P.A[1].knee.rotation.x = -0.6; };
   g.speed = 2.2; g.rate = 5; g.forwardZ = true; return g;
 }
-export function rootWalker() { // a stump with a face, a sprig on top, scuttling on four roots
-  const g = new THREE.Group(), bark = mat(TR.bark, { metalness: 0.02, roughness: 0.95 }), dark = mat(TR.dark, { metalness: 0.02, roughness: 0.95 }), leaf = mat(TR.leaf2, { roughness: 0.85, metalness: 0.02 }), E = glow(TR.amber), body = new THREE.Group(); body.position.y = 0.6; g.add(body);
-  body.add(new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.32, 0.5, 7), bark)); body.add(at(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, 0.04, 7), mat('#c9a56a', { roughness: 0.9 })), 0, 0.26, 0)); for (const s of [-1, 1]) body.add(at(sph(0.045, 1.3, 0.7, 0.6, E), s * 0.1, 0.06, 0.27, 0, 0, s * -0.35)); body.add(at(box(0.16, 0.04, 0.03, dark), 0, -0.1, 0.3)); body.add(at(cone(0.012, 0.3, dark, 4), 0.08, 0.42, -0.05)); body.add(at(sph(0.1, 1, 0.7, 1, leaf), 0.08, 0.58, -0.05));
-  const L = [[1, 1], [-1, 1], [1, -1], [-1, -1]].map(([sx, sz]) => { const q = limb(0.4, 0.55, 0.055, bark, dark), piv = new THREE.Group(); piv.position.set(sx * 0.22, -0.18, sz * 0.22); piv.rotation.y = Math.atan2(sx, sz * 0.8); body.add(piv); piv.add(q.hip); return q; });
-  g.step = (t) => { const p = t * 9; L.forEach((q, i) => { const ph = p + (i === 0 || i === 3 ? 0 : Math.PI), lift = Math.max(0, Math.sin(ph)); q.hip.rotation.x = -1.85 + lift * 0.4 + Math.cos(ph) * 0.14; q.knee.rotation.x = 1.7 - lift * 0.3; }); body.position.y = 0.6 + Math.sin(p * 2) * 0.02; body.rotation.z = Math.sin(p) * 0.05; };
+export function rootWalker() { // dead wood: a hollow trunk with fire in its mouth and bare antlers, scuttling on six roots
+  const g = new THREE.Group(), P = { bark: TM(TR.dead), dark: TM('#2e241a'), k: 1 }, E = glow(TR.fire), body = new THREE.Group(); body.position.y = 0.62; g.add(body);
+  body.add(at(twig(0.3, 0.19, 0.8, P.bark, 7), 0, -0.2, 0, 0.25, 0, 0)); body.add(at(sph(0.17, 1, 0.9, 0.9, P.bark), 0.14, 0.1, -0.08)); face(body, 1.25, 0.28, 0.27, E, P.dark, E);
+  const crown = at(new THREE.Group(), 0, 0.55, 0.14, 0.25, 0, 0); body.add(crown); boughs(crown, 0.85, 5, P, { bare: true });
+  const L = [0.5, 1.57, 2.64, -0.5, -1.57, -2.64].map((a) => { const q = limb(0.42, 0.58, 0.05, P.bark, P.dark), piv = new THREE.Group(); piv.position.set(Math.sin(a) * 0.22, -0.14, Math.cos(a) * 0.22); piv.rotation.y = a; body.add(piv); piv.add(q.hip); q.knee.add(at(cone(0.025, 0.25, P.dark, 4), 0, -0.6, 0.06, 2.2, 0, 0)); return q; });
+  g.step = (t) => { const p = t * 9; L.forEach((q, i) => { const ph = p + (i % 2 ? Math.PI : 0), lift = Math.max(0, Math.sin(ph)); q.hip.rotation.x = -1.85 + lift * 0.4 + Math.cos(ph) * 0.14; q.knee.rotation.x = 1.7 - lift * 0.3; }); body.position.y = 0.62 + Math.sin(p * 2) * 0.02; body.rotation.z = Math.sin(p) * 0.05; crown.rotation.z = Math.sin(p - 0.8) * 0.08; };
   g.speed = 4.4; g.rate = 9; g.forwardZ = true; return g;
 }
-export function sporer() { // no crown: a wide mushroom cap, glowing pods under it and in one hand
-  const P = tree(1.0, { crown: false, bark: '#7a6a4a' }), g = P.g, S = glow(TR.spore), capM = mat('#a8452e', { roughness: 0.8, metalness: 0.02 });
-  P.crown.add(at(sph(0.5, 1, 0.45, 1, capM), 0, 0.05, 0)); for (let i = 0; i < 6; i++) { const a = i * 1.047; P.crown.add(at(sph(0.06, 1, 1, 1, S), Math.cos(a) * 0.34, -0.06, Math.sin(a) * 0.34)); P.crown.add(at(sph(0.05, 1, 0.5, 1, mat('#f2ead2')), Math.cos(a + 0.5) * 0.28, 0.2, Math.sin(a + 0.5) * 0.28)); } P.A[1].knee.add(at(sph(0.09, 1, 1, 1, S), 0, -0.44, 0));
-  g.step = (t) => { const p = t * 5; sway(P, p, 0.4); P.A[1].hip.rotation.x = -1.3 + Math.sin(p * 2) * 0.1; P.A[1].knee.rotation.x = -0.3; P.A[0].hip.rotation.x = Math.sin(p) * 0.4; P.crown.scale.setScalar(1 + Math.sin(p * 2) * 0.04); };
+export function spiritTree() { // an ent alight with green: its eyes, its heart, the tips of its boughs, a ball of green fire in one hand
+  const G = glow(TR.spirit), P = ent(1.0, { eye: TR.spirit, mouth: G, tip: G, leaf: '#5fae3a', bark: '#5f4a30' }), g = P.g; P.body.add(at(sph(0.09, 1, 1.4, 0.5, G), 0, 0.2, 0.27)); for (const s of [-1, 1]) P.body.add(at(box(0.02, 0.3, 0.02, G), s * 0.12, 0.75, 0.17, 0, 0, s * 0.3)); P.A[1].knee.add(at(sph(0.11, 1, 1, 1, G), 0, -0.62, 0));
+  g.step = (t) => { const p = t * 5; sway(P, p, 0.4); P.A[1].hip.rotation.x = -1.4 + Math.sin(p * 2) * 0.1; P.A[1].knee.rotation.x = -0.3; P.A[0].hip.rotation.x = Math.sin(p) * 0.4; P.A[0].knee.rotation.x = -0.4; };
   g.speed = 1.8; g.rate = 5; g.forwardZ = true; return g;
 }
-export function forestGuardian() { // half as big again, moss on its shoulders, a dark crown, one fist of stone
-  const P = tree(1.6, { bark: '#5a4028', leaf: '#3f7a2e' }), g = P.g, k = P.k, moss = mat(TR.moss, { roughness: 0.95, metalness: 0.02 }), stone = mat(TR.stone, { roughness: 0.9, metalness: 0.05 });
-  for (const s of [-1, 1]) P.body.add(at(sph(0.17 * k, 1.2, 0.6, 1.1, moss), s * 0.24 * k, 0.8 * k, 0)); P.A[1].knee.add(at(sph(0.14 * k, 1, 1, 1, stone), 0, -0.42 * k, 0)); P.body.add(at(sph(0.2 * k, 1.3, 0.5, 0.6, moss), 0, 0.2 * k, 0.16 * k));
-  g.step = (t) => { const p = t * 4; sway(P, p, 0.4); P.A[0].hip.rotation.x = Math.sin(p) * 0.35; P.A[0].knee.rotation.x = -0.4; P.A[1].hip.rotation.x = -0.9 + Math.sin(p) * 0.2; P.A[1].knee.rotation.x = -0.7; P.body.rotation.x = 0.1; };
+export function forestGolem() { // a broad body of wood under leaves, its head sunk between its shoulders, fists like stumps
+  const k = 1.5, g = new THREE.Group(), bark = TM('#5a4028'), dark = TM(TR.dark), leaf = TM('#3f8a2e'), leaf2 = TM(TR.leaf), E = glow(TR.amber), body = new THREE.Group(); body.position.y = 0.72 * k; g.add(body);
+  body.add(at(sph(0.4 * k, 1.2, 1, 0.8, bark), 0, 0.42 * k, 0)); body.add(at(sph(0.3 * k, 1.1, 0.8, 0.85, bark), 0, 0.08 * k, 0)); const head = at(sph(0.17 * k, 1, 1, 1, bark), 0, 0.82 * k, 0.1 * k); body.add(head); face(head, k * 0.8, 0.03 * k, 0.15 * k, E, dark);
+  const L = [[0, 0.98, 0, 0.22], [0.36, 0.78, -0.02, 0.24], [-0.36, 0.78, -0.02, 0.24], [0.2, 0.62, 0.22, 0.2], [-0.22, 0.55, 0.22, 0.18], [0, 0.6, -0.3, 0.26], [0.26, 0.3, -0.22, 0.2], [-0.26, 0.3, -0.22, 0.2], [0.1, 0.25, 0.26, 0.16], [0.5, 0.62, 0.04, 0.16], [-0.5, 0.62, 0.04, 0.16], [-0.12, 0.9, -0.14, 0.18]];
+  L.forEach(([x, y, z, r], i) => body.add(at(sph(r * k, 1.2, 0.65, 1.2, i % 2 ? leaf : leaf2), x * k, y * k, z * k, 0, i, (i % 3 - 1) * 0.3)));
+  const A = [-1, 1].map((s) => { const q = limb(0.42 * k, 0.4 * k, 0.12 * k, bark, dark); at(q.hip, s * 0.5 * k, 0.66 * k, 0, 0, 0, s * 0.3); body.add(q.hip); q.knee.add(at(sph(0.17 * k, 1, 1, 1, bark), 0, -0.44 * k, 0)); q.hip.add(at(sph(0.13 * k, 1.2, 0.6, 1.2, leaf), 0, -0.2 * k, -0.06 * k)); return q; }), F = [-1, 1].map((s) => { const q = limb(0.32 * k, 0.32 * k, 0.14 * k, bark, dark); at(q.hip, s * 0.2 * k, 0.72 * k, 0, 0, 0, s * 0.1); g.add(q.hip); toes(q, 0.32 * k, k, bark); return q; });
+  g.step = (t) => { const p = t * 4; F.forEach((q, i) => { const a = p + i * Math.PI; q.hip.rotation.x = Math.sin(a) * 0.4; q.knee.rotation.x = Math.max(0, Math.cos(a)) * 0.7; }); g.position.y = Math.abs(Math.sin(p)) * 0.05; body.rotation.z = Math.sin(p) * 0.08; body.rotation.x = 0.12; A.forEach((q, i) => { q.hip.rotation.x = -0.3 + Math.sin(p + (i ? 0 : Math.PI)) * 0.45; q.knee.rotation.x = -0.5; }); };
   g.speed = 1.7; g.rate = 4; g.forwardZ = true; return g;
 }
-export const BUILD = { sapling, treant, rootWalker, sporer, forestGuardian, grey, mantis, squid, hound, maw, stalker, plated, orcGrunt, orcArcher, orcBrute, wolfRider, orcShaman, combatBot, assaultBot, spiderBot, sentryDrone, invInfantry, invShield, invEnergy, invScout };
+export const BUILD = { sapling, treant, rootWalker, spiritTree, forestGolem, grey, mantis, squid, hound, maw, stalker, plated, orcGrunt, orcArcher, orcBrute, wolfRider, orcShaman, combatBot, assaultBot, spiderBot, sentryDrone, invInfantry, invShield, invEnergy, invScout };
 const FRAMES = 10, CAP = 160, SIZE = 1.0;
 function record(build) {
   const o = build(), w = new THREE.Group(); if (o.forwardZ) o.rotation.y = Math.PI / 2; w.scale.setScalar(SIZE); w.add(o); const frames = [], c = new THREE.Color(); let glass = null;

@@ -28,9 +28,9 @@ export const ARMIES = {
   },
   trees: {
     name: 'Walking trees', label: 'TREES', noun: ' trees', threat: 'Walking forest', level: 'The walking forest', the: 'The forest', news: 'A walking forest marches on', lost: 'The forest overran you', lostTV: 'The forest won', after: 'the Ancient trees',
-    toast: (n, town) => 'Defend ' + town + ': ' + n + ' walking trees in the streets. Dash off the spores, the forest guardians take four blows, the Ancient trees come for you',
-    shot: 'SPORES!', shotCol: [1.2, 1.9, 0.4], n: 150, more: 15, max: 220, winP: 0.6, color: '#2f8a3a',
-    mix: armyMix('trees', { sapling: 5, treant: 3, rootWalker: 2, sporer: 2, forestGuardian: 1 }),
+    toast: (n, town) => 'Defend ' + town + ': ' + n + ' walking trees in the streets. Dash off the green fire of the spirit trees, the forest golems take four blows, the Ancient trees come for you',
+    shot: 'GREEN FIRE!', shotCol: [0.9, 2.0, 0.3], n: 150, more: 15, max: 220, winP: 0.6, color: '#2f8a3a',
+    mix: armyMix('trees', { sapling: 5, treant: 3, rootWalker: 2, spiritTree: 2, forestGolem: 1 }),
     general: { name: 'Ancient tree', an: 'An', hp: 470, dmgK: 0.95, look: { suit: '#5a4028', cape: '#3f7a2e', dark: '#2e2014', belt: '#5c7a2e', skin: '#7a5a36', eyec: '#ffb02a', hair: 'bald', beard: 'none', hg: 'spiked', back: 'none', chest: 'harness', sh: 'spike', arm: 'spike' } },
   },
 };

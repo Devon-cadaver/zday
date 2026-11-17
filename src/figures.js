@@ -380,11 +380,11 @@ ZTYPES.push(
   UNIT({ id: 'invScout', name: 'Scout', creature: 'invScout', army: 'invaders', chase: 4.8, lunge: 7.0 }));
 // the Walking trees (Sean's sheets: treants, a living forest of saplings, root walkers, sporers, forest guardians; the spirit tree and the vine colossus later)
 ZTYPES.push(
-  UNIT({ id: 'sapling', name: 'Sapling', creature: 'sapling', army: 'trees', chase: 3.0, lunge: 4.5 }),
-  UNIT({ id: 'treant', name: 'Treant', creature: 'treant', army: 'trees', chase: 2.2, lunge: 3.6, hp: 2 }),
+  UNIT({ id: 'sapling', name: 'Walking pine', creature: 'sapling', army: 'trees', chase: 3.0, lunge: 4.5 }),
+  UNIT({ id: 'treant', name: 'Tree ent', creature: 'treant', army: 'trees', chase: 2.2, lunge: 3.6, hp: 2 }),
   UNIT({ id: 'rootWalker', name: 'Root walker', creature: 'rootWalker', army: 'trees', chase: 4.4, lunge: 6.5 }),
-  UNIT({ id: 'sporer', name: 'Sporer', creature: 'sporer', army: 'trees', chase: 1.8, lunge: 2.8, hp: 2, spit: true }),
-  UNIT({ id: 'forestGuardian', name: 'Forest guardian', creature: 'forestGuardian', army: 'trees', chase: 1.7, lunge: 3.0, hp: 4, armored: true }));
+  UNIT({ id: 'spiritTree', name: 'Spirit tree', creature: 'spiritTree', army: 'trees', chase: 1.8, lunge: 2.8, hp: 2, spit: true }),
+  UNIT({ id: 'forestGolem', name: 'Forest golem', creature: 'forestGolem', army: 'trees', chase: 1.7, lunge: 3.0, hp: 4, armored: true }));
 export const armyMix = (army, weights = {}) => ZTYPES.flatMap((z, i) => (z.army === army ? Array(weights[z.id] || 1).fill(i) : []));
 export const ALIEN_TYPES = ZTYPES.map((z, i) => (z.alien ? i : -1)).filter((i) => i >= 0);
 export const ROBOT_TYPES = ZTYPES.map((z, i) => (z.robot ? i : -1)).filter((i) => i >= 0);
