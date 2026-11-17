@@ -40,7 +40,7 @@ void main() {
 }`;
 
 const SMOKE_VS = COMMON_VS + /* glsl */`
-uniform vec2 uWind;
+uniform vec2 uWind; uniform vec4 uClear; // uClear: the hero the player controls (xyz) and how wide a way is kept clear to her from the camera (w; 0: none)
 void main() {
   float seed = aSeed.x, size = aSeed.y;
   float rate = 0.07 + h1(seed * 3.1) * 0.05;
@@ -52,6 +52,7 @@ void main() {
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
   float fade = clamp((uTime - aSeed.z) / 3.0, 0.0, 1.0) * (1.0 - clamp((uTime - aSeed.w) / 6.0, 0.0, 1.0));
   vA = fade * smoothstep(0.0, 0.08, t) * (1.0 - t) * 0.78; vT = t;
+  if (uClear.w > 0.0) { vec3 ab = uClear.xyz - cameraPosition; float k = clamp(dot(p - cameraPosition, ab) / dot(ab, ab), 0.0, 1.0); vA *= 0.1 + 0.9 * smoothstep(uClear.w, uClear.w * 2.6, distance(p, cameraPosition + ab * k)); }
   gl_PointSize = min(420.0, size * (2.4 + t * 8.0) * uScale / -mv.z);
   gl_Position = projectionMatrix * mv;
 }`;
@@ -122,7 +123,7 @@ class Pool {
 export class Fire {
   constructor(parent, city, opts = {}) {
     this.city = city;
-    this.uniforms = { uTime: { value: 0 }, uScale: { value: 500 }, uWind: { value: new THREE.Vector2(0.35, -0.2) } };
+    this.uniforms = { uClear: { value: new THREE.Vector4(0, 0, 0, 0) }, uTime: { value: 0 }, uScale: { value: 500 }, uWind: { value: new THREE.Vector2(0.35, -0.2) } };
     const low = opts.low;
     this.flames = new Pool(low ? 4000 : 8000, FLAME_VS, FLAME_FS, THREE.AdditiveBlending, parent, this.uniforms);
     this.smoke = new Pool(low ? 1600 : 3200, SMOKE_VS, SMOKE_FS, THREE.NormalBlending, parent, { ...this.uniforms, uColA: { value: new THREE.Vector3(0.06, 0.05, 0.045) }, uColB: { value: new THREE.Vector3(0.34, 0.31, 0.28) } });
