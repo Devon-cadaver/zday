@@ -17,6 +17,7 @@ export function seeThrough(mat) {
   const prev = mat.onBeforeCompile;
   mat.onBeforeCompile = (sh, r) => {
     if (prev) prev(sh, r);
+    if (sh.fragmentShader.includes('uSeeA')) return; // patched already (a material whose patches are run again)
     Object.assign(sh.uniforms, U);
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform vec3 uSeeA; uniform vec3 uSeeB; uniform vec3 uSee;')
       .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
@@ -25,6 +26,31 @@ export function seeThrough(mat) {
     float r = uSee.x * (0.6 + 0.4 * smoothstep(0.5, 0.95, t)); // a little wider down at the action
     float k = (1.0 - smoothstep(r * 0.5, r, distance(vHoleW, uSeeA + ab * t))) * step(t, 0.985) * uSee.y; // between the camera and the action only
     if (k * uSee.z > fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))))) discard; // a stipple: a ghost of the wall is left
+  }`);
+  };
+  return mat;
+}
+
+// the same for a material that is not the city's own (the railway overhead, its trains): it has no world position yet, so it is given one (instanced or not)
+export function seeAny(mat) {
+  const prev = mat.onBeforeCompile;
+  mat.onBeforeCompile = (sh, r) => {
+    if (prev) prev(sh, r);
+    if (sh.fragmentShader.includes('uSeeA')) return; // patched already (a material whose patches are run again)
+    Object.assign(sh.uniforms, U);
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vSeeW;').replace('#include <project_vertex>', `#include <project_vertex>
+  { vec4 seeP = vec4(transformed, 1.0);
+  #ifdef USE_INSTANCING
+    seeP = instanceMatrix * seeP;
+  #endif
+    vSeeW = (modelMatrix * seeP).xyz; }`);
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vSeeW; uniform vec3 uSeeA; uniform vec3 uSeeB; uniform vec3 uSee;')
+      .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
+  if (uSee.y > 0.0) {
+    vec3 ab = uSeeB - uSeeA; float t = clamp(dot(vSeeW - uSeeA, ab) / dot(ab, ab), 0.0, 1.0);
+    float r = uSee.x * (0.6 + 0.4 * smoothstep(0.5, 0.95, t));
+    float k = (1.0 - smoothstep(r * 0.5, r, distance(vSeeW, uSeeA + ab * t))) * step(t, 0.985) * uSee.y;
+    if (k * uSee.z > fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))))) discard;
   }`);
   };
   return mat;

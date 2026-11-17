@@ -5,6 +5,7 @@
 // train that cannot stop short of a gap runs off the broken end, its cars dropping one after another into the street.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { seeAny } from './see.js';
 
 const CAR = 19, CARS = 5, LEN = CAR * CARS, VMAX = 15, ACC = 1.0, BRAKE = 1.4, SH = 23; // m, m/s, m/s2; SH: the station's half length
 const LIGHT = new Set(['heroes', 'haboob', 'coldwave', 'spill', 'solar', 'riot', 'zombies', 'flood']); // these do not bring the line down
@@ -18,7 +19,7 @@ export class Rail {
     const g = this.group = new THREE.Group(); scene.add(g);
     this.spans = []; for (let k = 0; k + 1 < L.pillars.length; k++) this.spans.push({ a: L.pillars[k], b: L.pillars[k + 1], down: false });
     this.posts = L.pillars.map(x => ({ x, down: false, tilt: [0, 0] }));
-    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 });
+    const mat = seeAny(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 })); // the viaduct, the station and the trains over a fight on foot are cut out of its way (see.js)
     // a span: one unit long (scaled to its length), the deck, its parapets, the ballast and rails of both tracks
     const deck = mergeGeometries([
       bx(0, 1, -1.2, 0, -3.6, 3.6, '#b9b4aa'), bx(0, 1, 0, 1.1, 3.3, 3.6, '#c9c4ba'), bx(0, 1, 0, 1.1, -3.6, -3.3, '#c9c4ba'),
@@ -35,7 +36,7 @@ export class Rail {
     // the trains: five cars each, silver with the line's stripe (green, orange); their windows a mesh of their own, lit at night
     const car = (stripe) => mergeGeometries([bx(-9.2, 9.2, 0.35, 3.75, -1.45, 1.45, '#dfe3e6'), bx(-9.25, 9.25, 1.05, 1.4, -1.47, 1.47, stripe), bx(-9.2, 9.2, 3.75, 3.95, -1.2, 1.2, '#b4b8bc'), bx(-9.25, 9.25, 0.35, 0.6, -1.47, 1.47, '#3a3e42')]);
     this.cars = [new THREE.InstancedMesh(car('#3fae49'), mat, CARS), new THREE.InstancedMesh(car('#f08a24'), mat, CARS)];
-    this.winMat = new THREE.MeshStandardMaterial({ color: '#26323c', emissive: '#ffe2a8', emissiveIntensity: 0, roughness: 0.3 });
+    this.winMat = seeAny(new THREE.MeshStandardMaterial({ color: '#26323c', emissive: '#ffe2a8', emissiveIntensity: 0, roughness: 0.3 }));
     this.wins = new THREE.InstancedMesh(new THREE.BoxGeometry(17.2, 1.15, 2.96).translate(0, 2.37, 0), this.winMat, CARS * 2);
     for (const m of [this.deck, this.pier, this.station, ...this.cars, this.wins]) { m.castShadow = true; m.receiveShadow = true; g.add(m); }
     for (const m of [this.deck, this.pier, ...this.cars, this.wins]) m.frustumCulled = false; // moved by hand

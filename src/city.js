@@ -1061,7 +1061,7 @@ export function buildCity(tex, opts = {}) {
     fac: tex.facades.map((m, k) => seeThrough(walls(std({ map: m, normalMap: tex.facadeRelief[k], normalScale: nrm(1.6), vertexColors: true, roughness: 0.85, emissiveMap: tex.facadesLit[k], emissive: '#ffffff', emissiveIntensity: 0 })))), // walls in the way of the action go see-through (see.js)
     shop: seeThrough(walls(std({ map: tex.shop, normalMap: tex.shopRelief, normalScale: nrm(1.6), vertexColors: true, emissiveMap: tex.shopLit, emissive: '#ffffff', emissiveIntensity: 0 }))),
     roof: seeThrough(std({ map: tex.roof, normalMap: tex.roofRelief, normalScale: nrm(1.5), vertexColors: true })),
-    neon: neonMat(),
+    neon: seeThrough(neonMat()), // a sign on a wall that is cut away goes with it
     tile: seeThrough(std({ map: tex.tile, normalMap: tex.tileRelief, normalScale: nrm(1.3), vertexColors: true, roughness: 0.62, side: THREE.DoubleSide })), // seen from under the eaves too
     walk: std({ map: tex.sidewalk, vertexColors: true }),
     grass: std({ map: tex.grass, vertexColors: true, roughness: 1 }),
