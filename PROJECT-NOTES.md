@@ -1473,3 +1473,7 @@ Sean: "I wonder if the fights with ground units and villains should be side shot
 - The bar names the army of the wave (the label is its own span, .zl; barName): INVADERS, ORCS, GIANTS, then RIFT.
 - Tested at 375x636 on a build of the working tree (rift-level.cjs, its tester now walks to the rift and taps under it): the three waves with their names on the bar, NOW THE RIFT at 60 s, twelve blows, the rift closing, TOWN SAVED; the fifteen regressions into a fresh folder as before, no flag in watch-smoke.
 - Not done: a show of the rift on television. The tester lands the twelve blows in under 5 s: for a real player to judge.
+
+## The skills panel moved sideways on the iPhone (Sean, 2026-11-16, two screenshots: the panel dragged to the right, a bar along its foot)
+- base.js: #zd-base .panel had overflow auto, so on iOS it could be dragged and bounced sideways. Now overflow-x hidden, overflow-y auto, overscroll-behavior contain, touch-action pan-y. kitmenu.js: the grid columns are minmax(0, 1fr) and a cell has min-width 0 (a long name cannot widen it), the wheels overflow-x hidden.
+- In the headless Chromium at 375 and 320 wide nothing was wider than the panel before or after (scratchpad menu-test.cjs: locked sideways, scrolls down), so the fault itself shows only on iOS: Sean to confirm on the phone. Rollback tag before-menufix.
