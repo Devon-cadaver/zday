@@ -396,7 +396,11 @@ ZTYPES.push(
 ZTYPES.push(
   UNIT({ id: 'titan', name: 'Titan', creature: 'titan', army: 'robots', chase: 1.7, lunge: 2.8, hp: 12, armored: true, spit: true, pop: false }),
   UNIT({ id: 'invWalker', name: 'Walker', creature: 'invWalker', army: 'invaders', chase: 2.2, lunge: 3.4, hp: 6, armored: true, spit: true, pop: false }),
-  UNIT({ id: 'invTank', name: 'Tank', creature: 'invTank', army: 'invaders', chase: 1.8, lunge: 2.6, hp: 10, armored: true, spit: true, pop: false }));
+  UNIT({ id: 'invTank', name: 'Tank', creature: 'invTank', army: 'invaders', chase: 1.8, lunge: 2.6, hp: 10, armored: true, spit: true, pop: false }),
+  UNIT({ id: 'invTransport', name: 'Transport', creature: 'invTransport', army: 'invaders', chase: 3.4, lunge: 5.0, hp: 8, armored: true, pop: false }),
+  UNIT({ id: 'invDropship', name: 'Dropship', creature: 'invDropship', army: 'invaders', chase: 3.0, lunge: 4.0, hp: 5, spit: true, pop: false }),
+  UNIT({ id: 'invArtillery', name: 'Artillery', creature: 'invArtillery', army: 'invaders', chase: 1.3, lunge: 1.8, hp: 5, armored: true, spit: true, pop: false }),
+  UNIT({ id: 'orcChariot', name: 'War chariot', creature: 'orcChariot', army: 'orcs', chase: 4.4, lunge: 6.5, hp: 5, pop: false }));
 export const armyMix = (army, weights = {}) => ZTYPES.flatMap((z, i) => (z.army === army ? Array(weights[z.id] || 1).fill(i) : []));
 export const ALIEN_TYPES = ZTYPES.map((z, i) => (z.alien ? i : -1)).filter((i) => i >= 0);
 export const ROBOT_TYPES = ZTYPES.map((z, i) => (z.robot ? i : -1)).filter((i) => i >= 0);

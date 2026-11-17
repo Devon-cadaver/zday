@@ -9,7 +9,7 @@ export const ARMIES = {
     name: 'Orcs', label: 'ORCS', noun: ' orcs', threat: 'Orc horde', level: 'The orc horde', the: 'The horde', news: 'An orc horde storms', lost: 'The orcs overran you', lostTV: 'The orcs won', after: 'the orc warlords',
     toast: (n, town) => 'Defend ' + town + ': ' + n + ' orcs in the streets. Dash off their arrows, the brutes take four blows, their warlords come for you',
     shot: 'ARROW!', n: 150, more: 15, max: 220, winP: 0.62, color: '#5f8f2f',
-    mix: armyMix('orcs', { orcGrunt: 6, orcArcher: 2, orcBrute: 1, wolfRider: 2, orcShaman: 1 }),
+    mix: armyMix('orcs', { orcGrunt: 18, orcArcher: 6, orcBrute: 3, wolfRider: 6, orcShaman: 3, orcChariot: 2 }), // two war chariots in 38
     general: { name: 'Orc warlord', an: 'An', hp: 440, dmgK: 0.9, look: { suit: '#5a4630', cape: '#7a1c16', dark: '#2a2018', belt: '#8a9098', skin: '#6f9a3c', eyec: '#ff4a22', beard: 'none', hair: 'bald', hg: 'spiked', back: 'none', chest: 'harness', sh: 'spike', arm: 'spike' } },
   },
   robots: {
@@ -23,7 +23,7 @@ export const ARMIES = {
     name: 'Invading army', label: 'INVADERS', noun: ' soldiers', threat: 'Invading army', level: 'The invading army', the: 'The invaders', news: 'An invading army marches into', lost: 'The invaders overran you', lostTV: 'The invaders won', after: 'the Generals',
     toast: (n, town) => 'Defend ' + town + ': ' + n + ' soldiers in the streets. Dash off the energy bolts, the shield troopers take four blows, their walkers and tanks many more, their Generals come for you',
     shot: 'ZAPPED!', shotCol: [0.3, 0.9, 2.0], n: 150, more: 15, max: 220, winP: 0.6, color: '#3f6fb8',
-    mix: armyMix('invaders', { invInfantry: 18, invShield: 3, invEnergy: 6, invScout: 6, invWalker: 2, invTank: 1 }), // walkers two in 36, a tank one
+    mix: armyMix('invaders', { invInfantry: 18, invShield: 3, invEnergy: 6, invScout: 6, invWalker: 2, invTank: 1, invTransport: 1, invDropship: 2, invArtillery: 1 }), // of 40: two walkers, a tank, a transport, two dropships, a gun
     general: { name: 'General', an: 'A', hp: 450, dmgK: 0.92, look: { suit: '#2f3d55', cape: '#b9a77a', dark: '#1c222c', belt: '#b9a77a', skin: '#c9a184', eyec: '#4ac8ff', hair: 'bald', beard: 'none', hg: 'skull', back: 'none', chest: 'plate', sh: 'plate' } },
   },
   trees: {

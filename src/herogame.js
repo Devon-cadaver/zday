@@ -143,7 +143,7 @@ export class HeroGame {
   count(stat) { let n = 0; for (const B of Object.values(TREE)) for (const q of B) if (q.stat === stat && this.s.skills[q.id]) n++; return n; }
   // ---------- home: the base (Sean: the tower's screen is gone; the skills are on its computer, the next city on its Map station)
   hub(msg, at) {
-    if (this.g.testRun) { const T = this.g.testRun; this.g.testRun = null; restoreTests(); openLevels(this.g, { side: T.side, last: T.i, code: levelInfo(T.side, T.i).code, msg: msg || '' }); return; }
+    if (this.g.testRun) { const T = this.g.testRun; this.g.testRun = null; restoreTests(); openLevels(this.g, { side: T.side, last: T.army ? -1 : T.i, army: T.army, code: T.army ? (T.army === 'rift' ? 'Rift' : ARMIES[T.army].name) : levelInfo(T.side, T.i).code, msg: msg || '' }); return; }
     this.s = HS.load()[this.side]; if (!HS.team(this.side).length) { pickScreen(this.side, () => this.hub(msg, at), () => { this.g.toMenu ? this.g.toMenu() : location.reload(); }); if (msg) this.card(msg, 'OK'); return; }
     const g = this.g; g.base.start({ hub: this, at: at || 'door' }); if (msg) this.card(msg, 'OK'); const N = freshOnes(this.side)[0]; if (N && g.toast) g.toast('The Map station is flashing: ' + threatName(N, this.side, (id) => HS.shown(id)) + ' in ' + PLACES[N.key].name, 3500);
   }
@@ -181,6 +181,7 @@ export class HeroGame {
     LAB.hero = this.level; LAB.villain = Math.max(1, ix + 1); LAB.moves = this.moves(); LAB.powerK = 1 + 0.06 * this.count('power'); LAB.energyK = 1 + 0.1 * this.count('energy'); LAB.teamK = 1 + 0.15 * this.count('team'); LAB.spotK = 1 + 0.15 * this.count('spot'); LAB.toughK = 1 + 0.2 * this.count('tough'); LAB.army = this.side === 'villain' ? ix >= 2 : ix >= 4 && ix % 3 === 1;
     const D = g.disasters, B = g.city.bounds, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2, F = g.flight, hero = this.side === 'hero', wave = T ? waveOf(T, this.side === 'hero' ? villainsLeft() : []) : WAVES[s.idx % WAVES.length], evs = [], vs = [];
     if (hero && wave[0] === 'tornado') LAB.army = false; // no helicopters shooting at her while she dodges what it throws
+    if (hero && g.testRun && g.testRun.army && g.horde) { const k = g.testRun.army; if (k === 'rift') this.riftLevel(key); else this.armyLevel(key, k); return; } // the Sandbox's test levels: an army picked there (levelmenu.js)
     if (hero && wave[0] === 'aliens' && g.horde) { this.alienLevel(key); return; }
     if (hero && (wave[0] === 'worm' || wave[0] === 'kaiju') && wave.length === 1 && g.horde) { this.bossLevel(key, wave[0]); return; }
     if (hero && wave[0] === 'zombies' && g.horde) { this.zombieLevel(key); return; }
