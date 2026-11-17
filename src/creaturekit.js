@@ -297,7 +297,31 @@ export function mountainGiant() { // the biggest: grey rock, boulders heaped on 
   g.step = (t) => { stomp(P, t * 3.5, 0.38); };
   g.speed = 1.8; g.rate = 3.5; g.forwardZ = true; return g;
 }
-export const BUILD = { ogre, stoneGiant, frostGiant, fireGiant, mountainGiant, sapling, treant, rootWalker, spiritTree, forestGolem, grey, mantis, squid, hound, maw, stalker, plated, orcGrunt, orcArcher, orcBrute, wolfRider, orcShaman, combatBot, assaultBot, spiderBot, sentryDrone, invInfantry, invShield, invEnergy, invScout };
+// ---------- the big machines (Sean's sheets; 2026-11-16): the robots' titan, the invading army's walker and tank. Few in a crowd, many blows each
+export function titan() { // a robot three storeys tall: the walking kind's build in dark plate, a cannon for each forearm, missile racks on its shoulders, a red core and a red visor
+  const P = bot(3.2, { body: '#30363e' }), g = P.g, k = P.k;
+  for (const s of [-1, 1]) { P.body.add(at(box(0.26 * k, 0.16 * k, 0.3 * k, P.steel), s * 0.32 * k, 0.66 * k, -0.02 * k)); for (const u of [-1, 1]) P.body.add(at(sph(0.03 * k, 1, 1, 1, P.R), s * (0.32 + u * 0.07) * k, 0.7 * k, 0.14 * k)); P.A[s < 0 ? 0 : 1].knee.add(at(new THREE.Mesh(new THREE.CylinderGeometry(0.075 * k, 0.09 * k, 0.4 * k, 8), P.dark), 0, -0.3 * k, 0)); P.A[s < 0 ? 0 : 1].knee.add(at(sph(0.05 * k, 1, 0.5, 1, P.R), 0, -0.51 * k, 0)); }
+  P.body.add(at(sph(0.09 * k, 1, 1, 0.5, P.R), 0, 0.38 * k, 0.135 * k)); P.body.add(at(box(0.5 * k, 0.1 * k, 0.3 * k, P.steel), 0, 0.17 * k, 0)); for (const s of [-1, 1]) P.F[s < 0 ? 0 : 1].knee.add(at(box(0.2 * k, 0.3 * k, 0.22 * k, P.steel), 0, -0.2 * k, 0.02 * k));
+  g.step = (t) => { const p = t * 3; march(P, p, 0.34); P.g.position.y = Math.abs(Math.sin(p)) * 0.05 * k; P.A.forEach((L, i) => { L.hip.rotation.x = -0.5 + Math.sin(p + i * Math.PI) * 0.12; L.knee.rotation.x = -0.7; }); P.body.rotation.y = Math.sin(p) * 0.1; P.head.rotation.y = Math.sin(p * 0.5) * 0.35; };
+  g.speed = 1.7; g.rate = 3; g.forwardZ = true; return g;
+}
+export function invWalker() { // a walker: an armoured pod on two long bird legs, a blue visor slit, a gun on each cheek
+  const g = new THREE.Group(), arm = mat(IV.arm, { metalness: 0.45 }), plate = mat(IV.plate, { metalness: 0.5 }), dark = mat(IV.dark, { metalness: 0.5 }), B = glow(IV.blue), body = new THREE.Group(), k = 2.3; body.position.y = 1.25 * k; g.add(body);
+  body.add(box(0.62 * k, 0.5 * k, 0.8 * k, arm)); body.add(at(box(0.5 * k, 0.16 * k, 0.5 * k, plate), 0, 0.3 * k, -0.08 * k)); body.add(at(box(0.44 * k, 0.07 * k, 0.03 * k, B), 0, 0.08 * k, 0.41 * k)); body.add(at(box(0.3 * k, 0.2 * k, 0.3 * k, dark), 0, -0.3 * k, 0));
+  for (const s of [-1, 1]) { body.add(at(box(0.12 * k, 0.14 * k, 0.5 * k, dark), s * 0.38 * k, -0.06 * k, 0.12 * k)); body.add(at(new THREE.Mesh(new THREE.CylinderGeometry(0.03 * k, 0.03 * k, 0.4 * k, 6), plate), s * 0.38 * k, -0.06 * k, 0.5 * k, Math.PI / 2, 0, 0)); body.add(at(sph(0.03 * k, 1, 1, 1, B), s * 0.38 * k, -0.06 * k, 0.71 * k)); }
+  const F = [-1, 1].map((s) => { const L = limb(0.62 * k, 0.66 * k, 0.07 * k, arm, dark), piv = new THREE.Group(); piv.position.set(s * 0.3 * k, -0.3 * k, 0); body.add(piv); piv.add(L.hip); L.hip.add(at(box(0.16 * k, 0.3 * k, 0.2 * k, plate), 0, -0.3 * k, 0)); return L; });
+  g.step = (t) => { const p = t * 4; F.forEach((L, i) => { const q = p + i * Math.PI, lift = Math.max(0, Math.cos(q)); L.hip.rotation.x = 0.75 + Math.sin(q) * 0.4; L.knee.rotation.x = -1.35 + lift * 0.5 - Math.sin(q) * 0.2; }); body.position.y = 1.25 * k - 0.38 * k + Math.abs(Math.sin(p)) * 0.07 * k; body.rotation.z = Math.sin(p) * 0.05; body.rotation.x = 0.06; };
+  g.speed = 2.2; g.rate = 4; g.forwardZ = true; return g;
+}
+export function invTank() { // a tank: a low hull on two tracks, a turret with a long gun that swings as it hunts, blue lamps
+  const g = new THREE.Group(), arm = mat(IV.arm, { metalness: 0.45 }), plate = mat(IV.plate, { metalness: 0.5 }), dark = mat(IV.dark, { metalness: 0.5 }), B = glow(IV.blue), hull = new THREE.Group(), tur = new THREE.Group(); g.add(hull);
+  hull.add(at(box(2.3, 0.7, 4.4, arm), 0, 0.95, 0)); hull.add(at(box(2.0, 0.3, 3.2, plate), 0, 1.42, -0.2)); hull.add(at(box(2.3, 0.4, 1.0, arm), 0, 0.85, 2.3, -0.5, 0, 0));
+  const wheels = []; for (const s of [-1, 1]) { hull.add(at(box(0.6, 0.85, 4.8, dark), s * 1.35, 0.5, 0)); hull.add(at(box(0.66, 0.16, 4.9, plate), s * 1.35, 1.0, 0)); for (let i = -2; i <= 2; i++) { const w = at(new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.64, 8), arm), s * 1.36, 0.42, i * 1.05, 0, 0, Math.PI / 2); hull.add(w); wheels.push(w); } hull.add(at(sph(0.09, 1, 1, 0.5, B), s * 0.8, 1.05, 2.72)); }
+  tur.position.set(0, 1.58, -0.3); hull.add(tur); tur.add(at(box(1.5, 0.6, 1.9, arm), 0, 0.3, 0)); tur.add(at(box(1.1, 0.2, 1.2, plate), 0, 0.68, -0.1)); tur.add(at(new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 2.8, 8), dark), 0, 0.32, 2.3, Math.PI / 2, 0, 0)); tur.add(at(new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.4, 8), plate), 0, 0.32, 3.6, Math.PI / 2, 0, 0)); tur.add(at(box(0.5, 0.08, 0.04, B), 0, 0.42, 0.97)); tur.add(at(box(0.03, 0.7, 0.03, dark), -0.55, 1.1, -0.7));
+  g.step = (t) => { const p = t * 5; hull.position.y = Math.sin(p * 2) * 0.03; hull.rotation.x = Math.sin(p) * 0.012; tur.rotation.y = Math.sin(p * 0.5) * 0.3; wheels.forEach((w) => { w.rotation.x = p * 1.5; }); };
+  g.speed = 1.8; g.rate = 5; g.forwardZ = true; return g;
+}
+export const BUILD = { titan, invWalker, invTank, ogre, stoneGiant, frostGiant, fireGiant, mountainGiant, sapling, treant, rootWalker, spiritTree, forestGolem, grey, mantis, squid, hound, maw, stalker, plated, orcGrunt, orcArcher, orcBrute, wolfRider, orcShaman, combatBot, assaultBot, spiderBot, sentryDrone, invInfantry, invShield, invEnergy, invScout };
 const FRAMES = 10, CAP = 160, SIZE = 1.0;
 function record(build) {
   const o = build(), w = new THREE.Group(); if (o.forwardZ) o.rotation.y = Math.PI / 2; w.scale.setScalar(SIZE); w.add(o); const frames = [], c = new THREE.Color(); let glass = null;

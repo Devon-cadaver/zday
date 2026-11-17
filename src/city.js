@@ -1136,21 +1136,22 @@ export function buildCity(tex, opts = {}) {
     }
     return { meshes, mats, at: (k) => [at[k][0].im, at[k][1]] };
   };
-  const crownT = instTiled(crownGeometry(), std({ vertexColors: true, roughness: 1 }), crowns, (c) => {
+  const crownT = instTiled(crownGeometry(), seeThrough(std({ vertexColors: true, roughness: 1 })), crowns, // trees, trunks, tanks and lamps in the way of a fight on foot are cut as the walls are (see.js)
+    (c) => {
     e.set(0, r() * Math.PI * 2, 0); q.setFromEuler(e);
     m4.compose(p.set(c.x, c.y, c.z), q, s.set(c.s, c.s * (0.8 + r() * 0.3), c.s));
   }, true, new THREE.IcosahedronGeometry(1.05, 0).translate(0.05, 0.25, 0)); // its shadow: one lumpy ball instead of six
   const crownNear = crownT.meshes.length ? crownT.meshes[0].geometry : null, crownFar = crownGeometry(0);
   const trunkG = new THREE.CylinderGeometry(0.12, 0.2, 1, 5); trunkG.translate(0, 0.5, 0);
-  const trunkT = instTiled(trunkG, std({ color: '#5a4430' }), trunks, (t) => { q.identity(); m4.compose(p.set(t.x, t.y, t.z), q, s.set(t.s, t.h + 0.6, t.s)); });
+  const trunkT = instTiled(trunkG, seeThrough(std({ color: '#5a4430' })), trunks, (t) => { q.identity(); m4.compose(p.set(t.x, t.y, t.z), q, s.set(t.s, t.h + 0.6, t.s)); });
   const tankG = new THREE.CylinderGeometry(1, 1, 1, 10); tankG.translate(0, 0.5, 0);
   tanks.forEach(t => { t.col = t.dark ? '#3a3632' : '#e9e4da'; });
-  const tankT = instTiled(tankG, std({ color: '#ffffff', roughness: 0.6 }), tanks, (t) => { q.identity(); m4.compose(p.set(t.x, t.y, t.z), q, s.set(t.r, t.h, t.r)); });
+  const tankT = instTiled(tankG, seeThrough(std({ color: '#ffffff', roughness: 0.6 })), tanks, (t) => { q.identity(); m4.compose(p.set(t.x, t.y, t.z), q, s.set(t.r, t.h, t.r)); });
   const lampG = mergeGeometries([
     new THREE.CylinderGeometry(0.07, 0.1, 6.5, 4).translate(0, 3.25, 0),
     new THREE.BoxGeometry(1.4, 0.12, 0.25).translate(0.65, 6.45, 0),
   ]);
-  const lampT = instTiled(lampG, std({ color: '#4a4540' }), lamps, (l) => {
+  const lampT = instTiled(lampG, seeThrough(std({ color: '#4a4540' })), lamps, (l) => {
     e.set(0, Math.atan2(-l.arm[1], l.arm[0]), 0); q.setFromEuler(e);
     m4.compose(p.set(l.x, CURB, l.z), q, s.set(1, 1, 1));
   });

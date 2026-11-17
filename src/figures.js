@@ -392,6 +392,11 @@ ZTYPES.push(
   UNIT({ id: 'frostGiant', name: 'Frost giant', creature: 'frostGiant', army: 'giants', chase: 3.0, lunge: 5.0, hp: 8, pop: false }),
   UNIT({ id: 'fireGiant', name: 'Fire giant', creature: 'fireGiant', army: 'giants', chase: 2.2, lunge: 3.4, hp: 8, spit: true, pop: false }),
   UNIT({ id: 'mountainGiant', name: 'Mountain giant', creature: 'mountainGiant', army: 'giants', chase: 1.8, lunge: 3.0, hp: 14, armored: true, pop: false }));
+// the big machines, added after the rest so the types before keep their numbers: the robots' titan, the invading army's walker and tank (few in a crowd: their weights are in armies.js)
+ZTYPES.push(
+  UNIT({ id: 'titan', name: 'Titan', creature: 'titan', army: 'robots', chase: 1.7, lunge: 2.8, hp: 12, armored: true, spit: true, pop: false }),
+  UNIT({ id: 'invWalker', name: 'Walker', creature: 'invWalker', army: 'invaders', chase: 2.2, lunge: 3.4, hp: 6, armored: true, spit: true, pop: false }),
+  UNIT({ id: 'invTank', name: 'Tank', creature: 'invTank', army: 'invaders', chase: 1.8, lunge: 2.6, hp: 10, armored: true, spit: true, pop: false }));
 export const armyMix = (army, weights = {}) => ZTYPES.flatMap((z, i) => (z.army === army ? Array(weights[z.id] || 1).fill(i) : []));
 export const ALIEN_TYPES = ZTYPES.map((z, i) => (z.alien ? i : -1)).filter((i) => i >= 0);
 export const ROBOT_TYPES = ZTYPES.map((z, i) => (z.robot ? i : -1)).filter((i) => i >= 0);
