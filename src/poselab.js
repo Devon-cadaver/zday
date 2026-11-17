@@ -5,6 +5,7 @@
 // Export gives the text that makes the changes permanent for everyone (posedata.js).
 import * as THREE from 'three';
 import { Body, MOVES, PINS, reachArm } from './fighttest.js';
+import { FINISHERS } from './kit.js';
 import { rigFor, HS } from './herogame.js';
 import { villainRig, relax } from './villains.js';
 import { playClip, val, J, NAMES } from './clips.js';
@@ -44,7 +45,7 @@ function blowAt() { const m = S.move, K = m.clip.keys, h = K.find((k) => k.hit);
 function open(m) {
   if (m.other) { S.who = 1; m = MOVE_BY[m.partner]; } else S.who = 0;
   S.move = m; S.partner = m.partner ? MOVE_BY[m.partner] : null; S.dist = m.dist ?? 1.6; S.up = m.up ?? 0; S.t = 0; S.playing = false; S.undo = [];
-  orbit.z = m.pair ? 0 : S.dist / 2; orbit.y = m.pair ? 1.25 : 1.05; orbit.dist = m.pair ? 4.6 : 6.2; if (m.pair) { orbit.yaw = 1.45; orbit.pitch = 0.08; } else { orbit.yaw = 0.95; orbit.pitch = 0.2; } $('mv').textContent = m.name + ' ▾'; say(m.code ? 'The game also moves these arms by code, so not all of this shows in a fight' : ''); draw();
+  orbit.z = m.pair ? 0 : S.dist / 2; orbit.y = m.pair ? 1.25 : 1.05; orbit.dist = m.pair ? 4.6 : 6.2; if (m.pair) { orbit.yaw = 1.45; orbit.pitch = 0.08; } else { orbit.yaw = 0.95; orbit.pitch = 0.2; } $('mv').textContent = m.name + ' ▾'; say(m.code ? 'The game also moves these arms by code, so not all of this shows in a fight' : new Set((m.clip.keys || []).map((k) => JSON.stringify(k.p || k))).size < 2 ? 'A held pose: it has one key, so Play shows no movement. Move its joints to change it' : ''); draw();
 }
 
 // ---------- a change: into a key at this moment, kept, undoable
@@ -112,10 +113,12 @@ function moveDrag(x, y) {
 }
 
 // ---------- the frame
+const _hipW = new THREE.Vector3();
 function poseFighters(dt) {
   const m = S.move, pair = m.pair && m.clip.pair; A.clip = m.clip; A.blend = 1; A.ct = S.t - dt; A.fl = pair ? 0.35 : 0; A.bodyX = null; A.x = 0; A.z = 0; A.yaw = 0;
   if (drag && S.who === 0 && drag.h.foot != null) { A.y = drag.rootY; } else if (pair) A.y = 0.35 + pair.up; else A.y = 0;
   const gA = !m.air && !(drag && S.who === 0 && drag.h.foot != null); A.vx = 0; A.vz = pair ? 24 : 0; A.pose(dt, 0, gA);
+  if (m.air && !pair && !(drag && S.who === 0 && drag.h.foot != null)) { A.r.root.updateMatrixWorld(true); const hy = A.r.hips.getWorldPosition(_hipW).y; if (hy < 1.2) { A.y += 1.2 - hy; A.pose(1e-5, 0, gA); } } // a move of the air that turns her over (the dive) put her head first under the floor, out of sight: she is held up so her hips stay over it
   if (!S.partner) { B.r.root.visible = false; return; } B.r.root.visible = true; B.clip = S.partner.clip; B.blend = 1; B.yaw = Math.PI; B.x = 0; B.vx = 0; B.vz = pair ? 24 : 0;
   B.ct = clipT(1) - dt;
   if (pair) { B.z = -pair.off; B.y = 0.35; B.bodyX = pair.lean; B.fl = 1; B.pose(dt, 0, false); } else { B.z = S.dist; B.fl = 0; B.bodyX = null; const dragged = drag && S.who === 1 && drag.h.foot != null; B.y = dragged ? drag.rootY : S.up; B.pose(dt, 0, !dragged && !S.up && !m.air); }
@@ -214,7 +217,31 @@ $('cape').onclick = () => { const on = !A.r.cape.mesh.visible; for (const f of F
 $('hide').onclick = () => { S.hide = !S.hide; $('hide').classList.toggle('on', S.hide); };
 
 // ---------- the list of moves
-function fillList() { const G = {}; for (const m of MOVES) (G[m.group] = G[m.group] || []).push(m); $('list').innerHTML = Object.keys(G).map((g) => '<h3>' + g + '</h3><div class="g">' + G[g].map((m) => '<button type="button" data-m="' + m.id + '">' + (m.changed ? '<i></i>' : '') + m.name + '</button>').join('') + '</div>').join(''); $('list').querySelectorAll('button').forEach((b) => { b.onclick = () => { $('sheet').classList.remove('show'); open(MOVE_BY[b.dataset.m]); }; }); }
+// A finisher is not one pose: it is carried out in steps, each a pose that is also in the list under its own name (To the sky: the uppercut, the dive, the hammer raised, the hammer blow, the landing; the foe launched,
+// crushed, down). So he could not find "To the sky". USED: each finisher (kit.js FINISHERS) and the poses it plays, with what each is in it (from fighttest.js for the sky and the neck drag, finishers.js FIN_SCRIPTS for
+// the rest: fdo is the one doing it, fget the one it is done to). A change to a pose shows in every finisher and move that uses it.
+const DO = 'doing it', GET = 'the foe';
+const USED = {
+  sky: { 'CLIPS.uppercut': 'the launch', 'CLIPS.dash': 'the rise past them', 'CLIPS.hammerUp': 'the grab at the top', 'CLIPS.hammerDown': 'the dive down', 'CLIPS.land': 'the landing', 'CLIPS.hitUp': 'the foe, hanging in the air', 'CLIPS.crushed': 'the foe, driven down', 'C.down': 'the foe, down' },
+  neck: { 'C.drag': DO, 'C.dragged': GET },
+  meteor: { 'C.hold': DO, 'CLIPS.hammerUp': DO, 'CLIPS.hammerDown': DO, 'C.held': GET, 'CLIPS.crushed': GET }, cyclone: { 'C.spinH': DO, 'C.swung': GET }, crater: { 'CLIPS.liftOverhead': DO, 'C.hold': DO, 'CLIPS.hammerDown': DO, 'C.held': GET, 'CLIPS.crushed': GET },
+  hundred: { 'CLIPS.jabL': DO, 'CLIPS.uppercut': DO, 'C.dazed': GET }, clap: { 'FP.clapW': DO, 'FP.clapS': DO, 'C.dazed': GET }, carpile: { 'FP.mind': DO, 'C.dazed': GET, 'CLIPS.crushed': GET, 'C.down': GET }, icetomb: { 'C.cast': DO, 'C.chargeWind': DO, 'CLIPS.cross': DO, 'C.dazed': GET },
+  lightning: { 'FP.mind': DO, 'CLIPS.hitUp': GET }, nova: { 'C.charge': DO, 'C.dazed': GET }, blackhole: { 'C.cast': DO, 'C.dazed': GET, 'C.dragged': GET }, swing: { 'C.spinH': DO, 'CLIPS.hammerDown': DO, 'C.swung': GET }, starkick: { 'C.chargeWind': DO, 'CLIPS.kick': DO, 'C.dazed': GET, 'CLIPS.hitUp': GET },
+  surf: { 'FP.surf': DO, 'CLIPS.kick': DO, 'C.down': GET }, lamphomer: { 'FP.batUp': DO, 'FP.batHit': DO, 'C.dazed': GET }, rocket: { 'CLIPS.dash': DO, 'CLIPS.hammerDown': DO, 'C.dragged': GET }, roadwave: { 'FP.stomp': DO, 'FP.stompDn': DO, 'C.stumble': GET, 'CLIPS.hitUp': GET },
+  mindlift: { 'FP.mind': DO, 'CLIPS.hammerDown': DO, 'FP.floppy': GET }, team: { 'CLIPS.uppercut': DO, 'CLIPS.cross': DO, 'CLIPS.hammerDown': DO, 'CLIPS.hitUp': GET, 'CLIPS.crushed': GET },
+};
+const FIN_NAME = (id) => (FINISHERS[id] && FINISHERS[id].name) || id, TAGS = {}; for (const [fid, L] of Object.entries(USED)) for (const id of Object.keys(L)) (TAGS[id] = TAGS[id] || []).push(FIN_NAME(fid)); // a pose's finishers: the filter finds it by their names too
+window.__plUsed = USED;
+// the list: a box to type in (a move's name, its group, a finisher's name), the finishers by name with their poses, then every pose by its group
+function fillList() {
+  const btn = (m, label, fin) => '<button type="button" data-m="' + m.id + '" data-q="' + (m.name + ' ' + (fin || m.group + ' ' + (TAGS[m.id] || []).join(' '))).toLowerCase().replace(/"/g, '') + '">' + (m.changed ? '<i></i>' : '') + (label || m.name) + '</button>';
+  const fins = Object.keys(USED).filter((k) => FINISHERS[k]).sort((a, b) => FIN_NAME(a).localeCompare(FIN_NAME(b))).map((k) => { const L = Object.entries(USED[k]).filter(([id]) => MOVE_BY[id]); return L.length ? '<div class="sec" data-fin="' + FIN_NAME(k).toLowerCase() + '"><h3>' + FIN_NAME(k) + ' <small style="opacity:.7;text-transform:none;letter-spacing:0">finisher: its poses</small></h3><div class="g">' + L.map(([id, role]) => btn(MOVE_BY[id], '<span style="display:block">' + MOVE_BY[id].name + '<small style="display:block;opacity:.7;font-weight:500">' + role + '</small></span>', FIN_NAME(k))).join('') + '</div></div>' : ''; }).join('');
+  const G = {}; for (const m of MOVES) (G[m.group] = G[m.group] || []).push(m);
+  $('list').innerHTML = '<input id="flt" type="search" placeholder="Find a move or a finisher (try: sky)" autocomplete="off" autocapitalize="off" spellcheck="false" style="position:sticky;top:0;z-index:2;display:block;width:100%;box-sizing:border-box;margin:0 0 4px;padding:11px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.3);background:#0e1222;color:#fff;font:600 15px system-ui,sans-serif"><div id="none" style="display:none;padding:14px 4px;opacity:.8">Nothing by that name.</div><h3 class="big" style="color:#ffd36b">The finishers, and the poses each is made of</h3>' + fins + '<h3 class="big" style="color:#ffd36b">Every pose, by kind</h3>' + Object.keys(G).map((g) => '<div class="sec"><h3>' + g + '</h3><div class="g">' + G[g].map((m) => btn(m)).join('') + '</div></div>').join('');
+  $('list').querySelectorAll('button').forEach((b) => { b.onclick = () => { $('sheet').classList.remove('show'); open(MOVE_BY[b.dataset.m]); }; });
+  const flt = $('flt'), apply = () => { const q = flt.value.trim().toLowerCase(); S.filter = flt.value; let any = false; $('list').querySelectorAll('.sec').forEach((sec) => { const whole = !!q && !!sec.dataset.fin && sec.dataset.fin.includes(q); let n = 0; sec.querySelectorAll('button').forEach((b) => { const on = !q || whole || b.dataset.q.includes(q); b.style.display = on ? '' : 'none'; if (on) n++; }); sec.style.display = n ? '' : 'none'; if (n) any = true; }); $('list').querySelectorAll('h3.big').forEach((h) => { h.style.display = q ? 'none' : ''; }); $('none').style.display = any ? 'none' : 'block'; };
+  flt.value = S.filter || ''; flt.oninput = apply; apply();
+}
 $('mv').onclick = () => { fillList(); $('sheet').classList.add('show'); }; $('closeS').onclick = () => $('sheet').classList.remove('show');
 window.addEventListener('error', (e) => { const l = $('load'); if (l) { l.textContent = 'Something went wrong: ' + e.message; l.style.display = 'block'; } });
 
