@@ -1438,3 +1438,7 @@ Sean: "I wonder if the fights with ground units and villains should be side shot
 - They stand over her and each other: she shows as the pale shape through them, as behind a building. A camera further out for this army is a thing to try.
 - Tested at 375x636 on a build of the working tree: the level (32 of all five kinds, FIREBALL! and ARMOURED! seen, the Giant king in at 10 s and a second at 35 s), the show on TV (38 down, the king beaten at about 100 s, no errors), the globe's board, the fifteen regressions as before.
 - Still to do: 6 the Rift fought on foot with an army pouring out. Later: a bigger general for the giants, the invaders' vehicles, the robots' titan, model files.
+
+## A tap on the joystick is a blow (Sean, 2026-11-16: "I can't tap to hit If near or over the joystick")
+- A touch within 85 px of the fixed stick was always the stick's, so a tap there did nothing. Now (horde.js and fighttest.js, the same three edits): the stick's finger wakes the stick only once it has moved 10 px or stayed 220 ms (stickOn); a finger that never woke it and lifts within 300 ms is tap(), as a tap anywhere else.
+- Tested with real touches at 375x636 in the orcs' level (scratchpad sticktap-test.cjs): taps on it, 64 px off, slipping 6 px: one blow each; a drag runs her with no blow; held 400 ms at the edge and nudged: full stick, no blow. The fifteen regressions as before.
