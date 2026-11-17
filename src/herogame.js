@@ -14,7 +14,7 @@ import { POWER, finish as endDisaster } from './heropower.js';
 import { openLevels, restoreTests, levelInfo } from './levelmenu.js';
 import { Squad } from './squad.js';
 import { ALIEN_MIX } from './figures.js';
-import { ARMIES } from './armies.js';
+import { ARMIES, ARMY_KINDS } from './armies.js';
 import { CreatureLayer } from './creaturekit.js';
 import { current, danger, resolve, waveOf, threatName, freshOnes } from './threats.js';
 import { LiveFront, LiveFlood } from './livestorm.js';
@@ -185,6 +185,7 @@ export class HeroGame {
     if (hero && (wave[0] === 'worm' || wave[0] === 'kaiju') && wave.length === 1 && g.horde) { this.bossLevel(key, wave[0]); return; }
     if (hero && wave[0] === 'zombies' && g.horde) { this.zombieLevel(key); return; }
     if (hero && ARMIES[wave[0]] && g.horde) { this.armyLevel(key, wave[0]); return; }
+    if (hero && wave[0] === 'rift' && g.horde) { this.riftLevel(key); return; } // the rift on foot: armies pour out of it
     if (hero && wave[0] === 'riot' && wave.length === 1 && g.horde) { this.riotLevel(key); return; }
     if (hero && wave[0] === 'quake' && g.horde) { this.quakeLevel(key); return; }
     if (hero && wave[0] === 'tornado' && g.horde && this.footTornado()) { this.twisterLevel(key); return; } // every other tornado on foot, the others in the air
@@ -250,6 +251,24 @@ export class HeroGame {
     g.horde.start({ n, pool, level: true, hitK: 1 + 0.05 * ix, generals: kind, army: kind, types: A.mix, label: A.label, verb: ' DOWN', onEnd: (won, H) => { this.round.horde = H; this.finish(won, won ? null : A.lost); } });
     this.rep = document.createElement('div'); this.rep.id = 'zd-rep'; document.body.appendChild(this.rep);
     g.toast ? g.toast(A.toast(n, PLACES[key].name)) : 0;
+  }
+  // the Dimensional Rift fought on foot (Sean, 2026-11-16: the armies "can spill out of the rift adding something to fight besides the tentacles"): the tear stands over a street by the middle of town,
+  // three of the armies pour out of its mouth one after the other (the giants last, if they are among them; horde.js waveGo), and it is forced shut when the last of them is down
+  riftLevel(key) {
+    const g = this.g, P = g.people, D = g.disasters, B = g.city.bounds, cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2, ix = this.ix || 0, pool = [], at = P.snapWalkable(cx, cz, 80) || [cx, cz], e = D.start('rift', at[0], at[1], { life: 99999 }); let kept = 0;
+    if (!e) { this.armyLevel(key, 'orcs'); return; } LAB.reset(); e.hp = 1e6; // nothing but her closes it
+    for (let j = 0; j < P.active; j++) { if (P.kind[j] !== 0) continue; if (kept < 20 && P.isCivilian(j) && P.lvl[j] === -1 && Math.hypot(P.x[j] - cx, P.z[j] - cz) < 60) { kept++; continue; } if (P.hide(j)) pool.push(j); }
+    for (let i = pool.length - 1; i > 0; i--) { const k = Math.floor(Math.random() * (i + 1)); const t = pool[i]; pool[i] = pool[k]; pool[k] = t; }
+    const kinds = ARMY_KINDS.slice().sort(() => Math.random() - 0.5).slice(0, 3).sort((a, b) => (a === 'giants') - (b === 'giants'));
+    const waves = kinds.map((k, i) => { const A = ARMIES[k]; return { army: k, types: A.mix, n: Math.max(6, Math.round(Math.min(A.max, A.n + A.more * ix) * 0.36)), say: 'WAVE ' + (i + 1) + ': ' + A.label + '!', toast: 'Out of the rift: ' + A.name.toLowerCase() }; });
+    let n = waves.reduce((s, w) => s + w.n, 0); if (n > pool.length) { const k = pool.length / n; n = 0; for (const w of waves) { w.n = Math.max(1, Math.floor(w.n * k)); n += w.n; } }
+    this.round = { evs: [e], need: 0, t: 0, downs: 0, hero: true, key, ended: false, zombie: true, n, noun: ' invaders' };
+    P.crLayer = new CreatureLayer(g.disasters.ctx.scene, P.active + 64, kinds);
+    g.horde.start({ n, pool, level: true, hitK: 1 + 0.05 * ix, generals: kinds[0], army: kinds[0], types: waves[0].types, label: 'RIFT', verb: ' DOWN', rift: e, waves, at: { x: e.x + e.n[0] * 40, z: e.z + e.n[1] * 40 }, onEnd: (won, H) => {
+      const R = this.round; if (!R) return; R.horde = H; if (!won || !e.alive) { this.finish(won, won ? null : 'The armies of the rift overran you'); return; }
+      e.close('sealed'); if (g.toast) g.toast('The last of them is down: the rift is forced shut!', 3000); setTimeout(() => { if (this.round === R && !R.ended) this.finish(true); }, 2900); } }); // its implosion seen before the card
+    this.rep = document.createElement('div'); this.rep.id = 'zd-rep'; document.body.appendChild(this.rep);
+    g.toast ? g.toast('Defend ' + PLACES[key].name + ': a rift has torn open. Three armies pour out of it, one after the other. Beat them all and it shuts') : 0;
   }
   // the riot fought on foot (10d): the mob goes for her and shoves; she knocks them flat and calms them, never dusts them
   riotLevel(key) {

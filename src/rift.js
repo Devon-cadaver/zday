@@ -110,6 +110,8 @@ export class Rift {
     // the army: soldiers in range shoot the orbs down and fire into the rift
     if ((this.armyT = (this.armyT || 0) - h) <= 0) { this.armyT = 0.4; this.army(); }
   }
+  // in the way of a fight on foot (main.js): the line from the camera to her goes through the ring or its glow, or the camera is right at it
+  blocks(c, at) { if (this.phase === 'closing') return false; const n = this.n, sc = (c.x - this.x) * n[0] + (c.z - this.z) * n[1], sh = (at.x - this.x) * n[0] + (at.z - this.z) * n[1]; if (sc * sh >= 0 && Math.abs(sc) > 6) return false; const t = sc * sh < 0 ? sc / (sc - sh) : 0, px = c.x + (at.x - c.x) * t, py = c.y + (at.y + 1 - c.y) * t, pz = c.z + (at.z - c.z) * t, u = Math.hypot(px - this.x, pz - this.z) / (RX * 1.4), v = (py - this.cy) / (RY * 1.4); return u * u + v * v < 1; }
   close(why) {
     if (this.phase === 'closing') return;
     this.phase = 'closing'; this.closeT = 0;

@@ -305,13 +305,13 @@ function record(build) {
   return { frames, glass, rate: o.rate };
 }
 export class CreatureLayer {
-  // army: only that army's creatures are recorded (figures.js: a unit's army); none: the invasion's, as before
+  // army: only that army's creatures are recorded (figures.js: a unit's army); a list: those armies' (the rift's waves); none: the invasion's, as before
   constructor(scene, max, army) {
     this.scene = scene; this.kinds = []; this.byZt = new Map(); this.helmetT = ZTYPES.findIndex(z => z.id === 'soldier'); this.helm = new Uint8Array(max); this.flying = []; this.last = 0; // helm: 1 on, 2 knocked off
     this.mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0.15, flatShading: true });
     const glass = new THREE.MeshStandardMaterial({ color: '#d6f0ff', transparent: true, opacity: 0.5, roughness: 0.04, metalness: 0.35, depthWrite: false });
     this.ball = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 14, 10), glass, 80); this.ball.frustumCulled = false; this.ball.renderOrder = 2; scene.add(this.ball);
-    ZTYPES.forEach((z, t) => { if (!z.creature || (z.army || null) !== (army || null)) return; const rec = record(BUILD[z.creature]), meshes = rec.frames.map((g) => { const m = new THREE.InstancedMesh(g, this.mat, CAP); m.frustumCulled = false; m.castShadow = true; m.count = 0; scene.add(m); return m; }); const kind = { rec, meshes, n: new Int32Array(FRAMES) }; this.kinds.push(kind); this.byZt.set(t, kind); });
+    ZTYPES.forEach((z, t) => { if (!z.creature || (Array.isArray(army) ? !army.includes(z.army) : (z.army || null) !== (army || null))) return; const rec = record(BUILD[z.creature]), meshes = rec.frames.map((g) => { const m = new THREE.InstancedMesh(g, this.mat, CAP); m.frustumCulled = false; m.castShadow = true; m.count = 0; scene.add(m); return m; }); const kind = { rec, meshes, n: new Int32Array(FRAMES) }; this.kinds.push(kind); this.byZt.set(t, kind); });
   }
   begin() { for (const k of this.kinds) k.n.fill(0); this.balls = 0; }
   isKind(zt) { return this.byZt.has(zt); }
