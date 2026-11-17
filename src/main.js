@@ -17,6 +17,7 @@ import { Searchlights } from './searchlights.js';
 import { Audio } from './audio.js';
 import { CURVE, curveFrame } from './curve.js';
 import { seeFrame, SEE } from './see.js';
+const _seeAt = new THREE.Vector3();
 import { Band } from './band.js';
 import { BandGame } from './rhythm.js';
 import { Rail } from './rail.js';
@@ -212,7 +213,8 @@ function frameBody() {
   }
   sirens.update(time); W.searchlights.update(dt); if (W.band) W.band.update(dt);
   curveFrame(scene, camera, tg); // the world curves away as you zoom out
-  seeFrame(camera, game.focusAt || tg, focus); // walls between the camera and the action go see-through, close in
+  { const H = game.horde, FT = game.fightTest, at = FT && FT.active && FT.o.street && !FT.o.watch ? FT.h : H && H.active && !H.o.bot ? H.h : null; // her fights in the streets (not the ones on television): the buildings in the way are not drawn
+    seeFrame(camera, at ? _seeAt.set(at.x, at.y, at.z) : game.focusAt || tg, focus, !!at); } // walls between the camera and the action go see-through, close in
   post.render(scene, camera, focus, time);
   camera.position.x -= jx; camera.position.y -= jy; camera.position.z -= jz;
 

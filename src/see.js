@@ -10,31 +10,32 @@ import * as THREE from 'three';
 import { sideButton } from './ui.js';
 
 let mine = false; // off for good, its button gone (Sean); the user flag is kept so nothing else changes
-export const SEE = { on: true, far: 430, user: mine }; // on, and from how far out (modes set it; window.__z.see for comparisons); user: the player's own switch (the eye button)
-const U = { uSeeA: { value: new THREE.Vector3() }, uSeeB: { value: new THREE.Vector3() }, uSee: { value: new THREE.Vector2(0, 0) } };
+export const SEE = { on: true, far: 430, user: mine, fights: true }; // on, and from how far out (modes set it; window.__z.see for comparisons); user: the player's own switch (the eye button)
+const U = { uSeeA: { value: new THREE.Vector3() }, uSeeB: { value: new THREE.Vector3() }, uSee: { value: new THREE.Vector3(0, 0, 0.86) } }; // uSee: the tube's radius, how much it is on, how much of the wall goes (0.86: a stipple is left; 1: all of it, in her fights on foot)
 
 export function seeThrough(mat) {
   const prev = mat.onBeforeCompile;
   mat.onBeforeCompile = (sh, r) => {
     if (prev) prev(sh, r);
     Object.assign(sh.uniforms, U);
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform vec3 uSeeA; uniform vec3 uSeeB; uniform vec2 uSee;')
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform vec3 uSeeA; uniform vec3 uSeeB; uniform vec3 uSee;')
       .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
   if (uSee.y > 0.0) {
     vec3 ab = uSeeB - uSeeA; float t = clamp(dot(vHoleW - uSeeA, ab) / dot(ab, ab), 0.0, 1.0);
     float r = uSee.x * (0.6 + 0.4 * smoothstep(0.5, 0.95, t)); // a little wider down at the action
     float k = (1.0 - smoothstep(r * 0.5, r, distance(vHoleW, uSeeA + ab * t))) * step(t, 0.985) * uSee.y; // between the camera and the action only
-    if (k * 0.86 > fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))))) discard; // a stipple: a ghost of the wall is left
+    if (k * uSee.z > fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))))) discard; // a stipple: a ghost of the wall is left
   }`);
   };
   return mat;
 }
 
 // each frame: the tube from the camera to what it looks at, how wide, how strong (fading in over the last 100 m inside SEE.far)
-export function seeFrame(camera, focus, dist) {
-  const on = SEE.on && SEE.user ? Math.min(1, Math.max(0, (SEE.far - dist) / 100)) : 0;
+// fight: she is fighting on foot there (main.js): the walls and roofs in the way are cut out whole, in a wider tube, whatever the player's switch says (Sean, 2026-11-16: "any building in the way should be invisible")
+export function seeFrame(camera, focus, dist, fight) {
+  fight = fight && SEE.fights; const on = fight ? 1 : SEE.on && SEE.user ? Math.min(1, Math.max(0, (SEE.far - dist) / 100)) : 0;
   U.uSeeA.value.copy(camera.position); U.uSeeB.value.set(focus.x, (focus.y || 0) + 1.5, focus.z);
-  U.uSee.value.set(Math.min(24, Math.max(9, dist * 0.07)), on);
+  U.uSee.value.set(fight ? Math.min(30, Math.max(16, dist * 0.4)) : Math.min(24, Math.max(9, dist * 0.07)), on, fight ? 1 : 0.86);
 }
 
 // the eye in the column of round buttons: see-through on or off, remembered on this device
